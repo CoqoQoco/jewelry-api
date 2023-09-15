@@ -1,0 +1,18 @@
+
+ ---- Restart postgreSQL ----
+net stop postgresql-x64-12
+net start postgresql-x64-12
+
+---- inspect Docker -----
+docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" Jewelry.Api
+
+
+ ---- docker compose -----
+docker-compose down 
+docker-compose build
+docker-compose up -d
+
+
+
+
+

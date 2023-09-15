@@ -1,0 +1,11 @@
+version: '3.4'
+
+services:
+  JEWELRY.APP.API:
+   container_name: jewelry
+   image: jewelryapp
+   build:
+    context: ./
+    dockerfile: Jewelry.Api/Dockerfile
+   ports:
+    - 2001:80
