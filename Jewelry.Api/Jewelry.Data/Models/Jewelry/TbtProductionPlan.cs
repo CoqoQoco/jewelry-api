@@ -70,6 +70,8 @@ public partial class TbtProductionPlan
 
     public int Status { get; set; }
 
+    public string ProductDetail { get; set; } = null!;
+
     public virtual ICollection<TbtProductionPlanImage> TbtProductionPlanImage { get; set; } = new List<TbtProductionPlanImage>();
 
     public virtual ICollection<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; } = new List<TbtProductionPlanMaterial>();

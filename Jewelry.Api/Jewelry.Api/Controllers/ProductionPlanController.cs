@@ -35,7 +35,7 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(ProductionPlanCreateResponse))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public async Task<IActionResult> ProductionPlanCreate([FromBody] ProductionPlanCreateRequest request)
+        public async Task<IActionResult> ProductionPlanCreate([FromForm] ProductionPlanCreateRequest request)
         {
             try
             {

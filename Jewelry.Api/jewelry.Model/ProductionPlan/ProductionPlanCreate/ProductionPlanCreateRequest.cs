@@ -16,6 +16,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
 
         public string Mold { get; set; }
         public string ProductNumber { get; set; }
+        public string ProductDetail { get; set; }
         public string CustomerNumber { get; set; }
 
         public int Qty { get; set; }
@@ -26,12 +27,14 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
 
         public string? Remark { get; set; }
 
-        public List<ProductionPlanMaterialCreateRequest> Material { get; set; }
-        //public List<IFormFile>? Images { get; set; }
+        public string Material { get; set; }
+
+        //public List<ProductionPlanMaterialCreateRequest> Material { get; set; }
+        public IFormFile Images { get; set; }
 
         public ProductionPlanCreateRequest()
         {
-            Material = new List<ProductionPlanMaterialCreateRequest> ();
+            //Material = new List<ProductionPlanMaterialCreateRequest> ();
             //Images = new List<IFormFile>();
         }
     }

@@ -7,6 +7,8 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
 using NPOI.HPSF;
 using System;
 using System.Collections.Generic;
@@ -29,19 +31,21 @@ namespace Jewelry.Service.ProductionPlan
     {
         private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
-        public ProductionPlanService(JewelryContext JewelryContext)
+        private IHostEnvironment _hostingEnvironment;
+        public ProductionPlanService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
         {
             _jewelryContext = JewelryContext;
+            _hostingEnvironment = HostingEnvironment;
         }
 
         #region ----- Production Plan -----
         public async Task<ProductionPlanCreateResponse> ProductionPlanCreate(ProductionPlanCreateRequest request)
         {
 
-            if (request.Material.Count <= 0)
-            {
-                throw new HandleException($"กรุณาระบุส่วนประกอบใบจ่าย-รับคืนงาน");
-            }
+            //if (request.Material.Count <= 0)
+            //{
+            //    throw new HandleException($"กรุณาระบุส่วนประกอบใบจ่าย-รับคืนงาน");
+            //}
 
             var checkDubPlan = (from item in _jewelryContext.TbtProductionPlan
                                 where item.Wo == request.Wo.ToUpper()
@@ -63,6 +67,7 @@ namespace Jewelry.Service.ProductionPlan
 
                     Mold = request.Mold.Trim(),
                     ProductNumber = request.ProductNumber.Trim(),
+                    ProductDetail = request.ProductDetail.Trim(),
                     CustomerNumber = request.CustomerNumber.Trim(),
                     Remark = !string.IsNullOrEmpty(request.Remark) ? request.Remark.Trim() : string.Empty,
 
@@ -86,8 +91,10 @@ namespace Jewelry.Service.ProductionPlan
                     throw new HandleException($"กรุณาระบุส่วนประกอบใบจ่าย-รับคืนงาน");
                 }
 
+                var materials = JsonConvert.DeserializeObject<List<ProductionPlanMaterialCreateRequest>>(request.Material);
+
                 var createMaterials = new List<TbtProductionPlanMaterial>();
-                foreach (var material in request.Material)
+                foreach (var material in materials)
                 {
                     var createMaterial = new TbtProductionPlanMaterial()
                     {
@@ -109,6 +116,56 @@ namespace Jewelry.Service.ProductionPlan
                 _jewelryContext.TbtProductionPlanMaterial.AddRange(createMaterials);
                 await _jewelryContext.SaveChangesAsync();
 
+                if (request.Images == null)
+                {
+                    throw new HandleException($"กรุณาระบุรูปภาพสินค้า");
+                }
+
+                string _imageName = $"{request.Wo.ToUpper().Trim()}-{request.WoNumber}-Product.png";
+                try
+                {
+
+                    // combind path
+                    string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
+
+                    //check CreateDirectory
+                    if (!Directory.Exists(imagePath))
+                    {
+                        Directory.CreateDirectory(imagePath);
+                    }
+
+                    //combine image name
+                    string imagePathWithFileName = Path.Combine(imagePath, _imageName);
+
+                    //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
+                    using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                    {
+                        request.Images.CopyTo(fileStream);
+                        fileStream.Close();
+                    }
+
+
+                }
+                catch (Exception ex)
+                {
+                    throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                }
+
+
+                var createImage = new TbtProductionPlanImage()
+                {
+                    ProductionPlanId = createPlan.Id,
+                    Number = 0,
+
+                    Path = _imageName,
+
+                    IsActive = true,
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = _admin,
+                };
+                _jewelryContext.TbtProductionPlanImage.Add(createImage);
+                await _jewelryContext.SaveChangesAsync();
+
                 scope.Complete();
             }
             return new ProductionPlanCreateResponse();
@@ -122,8 +179,8 @@ namespace Jewelry.Service.ProductionPlan
 
             if (plan == null)
             {
-                return new ProductionPlanCreateResponse() 
-                { 
+                return new ProductionPlanCreateResponse()
+                {
                     Code = 400,
                     Message = "บันทึกรุปไม่สำเร็จ กรุุณาทำรายการภายหลังอีกครั้ง"
                 };
@@ -207,10 +264,10 @@ namespace Jewelry.Service.ProductionPlan
                          select item);
             }
 
-            return query.OrderByDescending(x => x.RequestDate) ;
+            return query.OrderByDescending(x => x.RequestDate);
         }
 
-        
+
         #endregion
     }
 }
