@@ -43,6 +43,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
     {
         public string Material { get; set; }
         public string MaterialType { get; set; }
+        public string MaterialShape { get; set; }
         public string MaterialSize { get; set; }
         public string MaterialQty { get; set; }
         public string? MaterialRemark { get; set; }

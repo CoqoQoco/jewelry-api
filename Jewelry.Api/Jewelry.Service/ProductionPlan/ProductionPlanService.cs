@@ -101,6 +101,7 @@ namespace Jewelry.Service.ProductionPlan
                         Material = material.Material.ToUpper().Trim(),
                         MaterialSize = material.MaterialSize.Trim(),
                         MaterialType = material.MaterialType.Trim(),
+                        MaterialShape = material.MaterialShape.Trim(),
                         MaterialQty = material.MaterialQty.Trim(),
 
                         MaterialRemark = !string.IsNullOrEmpty(material.MaterialRemark) ? material.MaterialRemark.Trim() : string.Empty,
