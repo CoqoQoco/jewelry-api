@@ -18,16 +18,17 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
 
+    public virtual DbSet<TbmProductionPlanStatus> TbmProductionPlanStatus { get; set; }
+
     public virtual DbSet<TbtProductionPlan> TbtProductionPlan { get; set; }
 
     public virtual DbSet<TbtProductionPlanImage> TbtProductionPlanImage { get; set; }
 
     public virtual DbSet<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    { }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//    => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
+//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +48,26 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(10)
                 .HasColumnName("username");
+        });
+
+        modelBuilder.Entity<TbmProductionPlanStatus>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbm_production_plan_status_pk");
+
+            entity.ToTable("tbm_production_plan_status");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedNever()
+                .HasColumnName("id");
+            entity.Property(e => e.Description)
+                .HasColumnType("character varying")
+                .HasColumnName("description");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
         });
 
         modelBuilder.Entity<TbtProductionPlan>(entity =>
@@ -111,6 +132,11 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.WoNumber)
                 .HasComment("ลำดับใบจ่าย-รับงาน")
                 .HasColumnName("wo_number");
+
+            entity.HasOne(d => d.StatusNavigation).WithMany(p => p.TbtProductionPlan)
+                .HasForeignKey(d => d.Status)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_production_plan_fk");
         });
 
         modelBuilder.Entity<TbtProductionPlanImage>(entity =>

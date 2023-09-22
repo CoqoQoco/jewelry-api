@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
+using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
 using Jewelry.Api.Extension;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
@@ -80,6 +81,48 @@ namespace Jewelry.Api.Controllers
                 var result = report.ToDataSource(request);
 
                 return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("ProductionPlanUpdateStatus")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionPlanUpdateStatus([FromBody] ProductionPlanUpdateRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.ProductionPlanUpdateStatus(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
+
+        [Route("GetProductionPlanStatus")]
+        [HttpGet]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbmProductionPlanStatus>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult GetProductionPlanStatus()
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var response = _IProductionPlanService.GetProductionPlanStatus();
+                //var result = report.ToDataSource(request);
+
+                return Ok(response);
             }
             catch (HandleException ex)
             {

@@ -2,12 +2,14 @@
 using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
+using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using NetTopologySuite.Index.HPRtree;
 using Newtonsoft.Json;
 using NPOI.HPSF;
 using System;
@@ -26,6 +28,10 @@ namespace Jewelry.Service.ProductionPlan
         Task<ProductionPlanCreateResponse> ProductionPlanCreate(ProductionPlanCreateRequest request);
         Task<ProductionPlanCreateResponse> ProductionPlanCreateImage(List<IFormFile> images, string wo, int woNumber);
         IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request);
+        Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateRequest request);
+
+
+        IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus();
     }
     public class ProductionPlanService : IProductionPlanService
     {
@@ -39,6 +45,8 @@ namespace Jewelry.Service.ProductionPlan
         }
 
         #region ----- Production Plan -----
+
+        // ----- Create ----- //
         public async Task<ProductionPlanCreateResponse> ProductionPlanCreate(ProductionPlanCreateRequest request)
         {
 
@@ -78,7 +86,7 @@ namespace Jewelry.Service.ProductionPlan
                     QtyUnit = request.QtyUnit,
 
                     IsActive = true,
-                    Status = ProductionPlanStatus.Processing,
+                    Status = ProductionPlanStatus.Designed,
 
                     CreateDate = DateTime.UtcNow,
                     CreateBy = _admin,
@@ -241,7 +249,10 @@ namespace Jewelry.Service.ProductionPlan
         }
         public IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request)
         {
-            var query = (from item in _jewelryContext.TbtProductionPlan.Include(x => x.TbtProductionPlanImage).Include(x => x.TbtProductionPlanMaterial)
+            var query = (from item in _jewelryContext.TbtProductionPlan
+                         .Include(x => x.TbtProductionPlanImage)
+                         .Include(x => x.TbtProductionPlanMaterial)
+                         .Include(x => x.StatusNavigation)
                          where item.IsActive == true
                          select item);
 
@@ -269,6 +280,38 @@ namespace Jewelry.Service.ProductionPlan
             return query.OrderByDescending(x => x.RequestDate);
         }
 
+        // ----- Update ----- //
+        public async Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                        where item.Id == request.Id
+                        && item.Wo == request.Wo
+                        && item.WoNumber == request.WoNumber
+                        select item).SingleOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException($"ไม่พบใบจ่ายขรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+
+            plan.Status = request.Status;
+            plan.UpdateDate = DateTime.UtcNow;
+            plan.UpdateBy = _admin;
+
+            _jewelryContext.Update(plan);
+            await _jewelryContext.SaveChangesAsync();
+
+
+            return $"{plan.Wo}-{plan.WoNumber}";
+        }
+
+
+        // ----- Master ----- //
+        public IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus()
+        {
+            return (from item in _jewelryContext.TbmProductionPlanStatus
+                    select item);
+        }
 
         #endregion
     }

@@ -72,6 +72,8 @@ public partial class TbtProductionPlan
 
     public string ProductDetail { get; set; } = null!;
 
+    public virtual TbmProductionPlanStatus StatusNavigation { get; set; } = null!;
+
     public virtual ICollection<TbtProductionPlanImage> TbtProductionPlanImage { get; set; } = new List<TbtProductionPlanImage>();
 
     public virtual ICollection<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; } = new List<TbtProductionPlanMaterial>();
