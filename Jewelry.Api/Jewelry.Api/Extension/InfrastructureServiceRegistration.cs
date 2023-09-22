@@ -23,6 +23,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IReadExcelProduct, ReadExcelProduct>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IProductionPlanService, ProductionPlanService>();
+            services.AddScoped<IFileExtension, FileExtension>();
 
             return services;
         }

@@ -240,7 +240,8 @@ namespace Jewelry.Service.ProductionPlan
         }
         public IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request)
         {
-            var query = (from item in _jewelryContext.TbtProductionPlan.Include(x => x.TbtProductionPlanImage)
+            var query = (from item in _jewelryContext.TbtProductionPlan.Include(x => x.TbtProductionPlanImage).Include(x => x.TbtProductionPlanMaterial)
+                         where item.IsActive == true
                          select item);
 
             //query = query.Where(x => x.GIDate >= request.DateFrom.StartOfDayUtc() && x.GIDate <= request.DateTo.EndOfDayUtc());

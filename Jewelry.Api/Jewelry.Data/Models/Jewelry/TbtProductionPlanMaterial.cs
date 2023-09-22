@@ -29,5 +29,7 @@ public partial class TbtProductionPlanMaterial
 
     public int ProductionPlanId { get; set; }
 
+    public string MaterialShape { get; set; } = null!;
+
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 }

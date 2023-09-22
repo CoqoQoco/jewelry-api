@@ -75,7 +75,7 @@ namespace Jewelry.Api.Controllers
             {
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
-        } 
+        }
         #endregion
         #endregion
     }
