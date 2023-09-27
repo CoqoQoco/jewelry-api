@@ -53,6 +53,10 @@ public partial class TbtProductionPlan
 
     public string ProductType { get; set; } = null!;
 
+    public virtual TbmCustomerType CustomerTypeNavigation { get; set; } = null!;
+
+    public virtual TbmCustomerType ProductTypeNavigation { get; set; } = null!;
+
     public virtual TbmProductionPlanStatus StatusNavigation { get; set; } = null!;
 
     public virtual ICollection<TbtProductionPlanImage> TbtProductionPlanImage { get; set; } = new List<TbtProductionPlanImage>();

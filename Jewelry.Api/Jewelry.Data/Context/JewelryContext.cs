@@ -38,10 +38,9 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    { }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//    => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
+//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,13 +64,10 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbmCustomerType>(entity =>
         {
-            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_customer_type_pk");
+            entity.HasKey(e => e.Code).HasName("tbm_customer_type_pk");
 
             entity.ToTable("tbm_customer_type");
 
-            entity.Property(e => e.Id)
-                .ValueGeneratedOnAdd()
-                .HasColumnName("id");
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
@@ -79,6 +75,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")
@@ -90,13 +89,10 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbmGem>(entity =>
         {
-            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_gem_pk");
+            entity.HasKey(e => e.Code).HasName("tbm_gem_pk");
 
             entity.ToTable("tbm_gem");
 
-            entity.Property(e => e.Id)
-                .ValueGeneratedOnAdd()
-                .HasColumnName("id");
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
@@ -104,6 +100,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")
@@ -115,13 +114,10 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbmGemShape>(entity =>
         {
-            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_gem_shape_pk");
+            entity.HasKey(e => e.Code).HasName("tbm_gem_shape_pk");
 
             entity.ToTable("tbm_gem_shape");
 
-            entity.Property(e => e.Id)
-                .ValueGeneratedOnAdd()
-                .HasColumnName("id");
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
@@ -129,6 +125,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")
@@ -140,13 +139,10 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbmGold>(entity =>
         {
-            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_gold_pk");
+            entity.HasKey(e => e.Code).HasName("tbm_gold_pk");
 
             entity.ToTable("tbm_gold");
 
-            entity.Property(e => e.Id)
-                .ValueGeneratedOnAdd()
-                .HasColumnName("id");
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
@@ -154,6 +150,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")
@@ -165,13 +164,10 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbmGoldSize>(entity =>
         {
-            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_gold_size_pk");
+            entity.HasKey(e => e.Code).HasName("tbm_gold_size_pk");
 
             entity.ToTable("tbm_gold_size");
 
-            entity.Property(e => e.Id)
-                .ValueGeneratedOnAdd()
-                .HasColumnName("id");
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
@@ -179,6 +175,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")
@@ -190,13 +189,10 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbmProductType>(entity =>
         {
-            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_product_type_pk");
+            entity.HasKey(e => e.Code).HasName("tbm_product_type_pk");
 
             entity.ToTable("tbm_product_type");
 
-            entity.Property(e => e.Id)
-                .ValueGeneratedOnAdd()
-                .HasColumnName("id");
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
@@ -204,6 +200,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")
@@ -289,6 +288,16 @@ public partial class JewelryContext : DbContext
                 .HasComment("ลำดับใบจ่าย-รับงาน")
                 .HasColumnName("wo_number");
 
+            entity.HasOne(d => d.CustomerTypeNavigation).WithMany(p => p.TbtProductionPlanCustomerTypeNavigation)
+                .HasForeignKey(d => d.CustomerType)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_customer_type_fk");
+
+            entity.HasOne(d => d.ProductTypeNavigation).WithMany(p => p.TbtProductionPlanProductTypeNavigation)
+                .HasForeignKey(d => d.ProductType)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_type_fk");
+
             entity.HasOne(d => d.StatusNavigation).WithMany(p => p.TbtProductionPlan)
                 .HasForeignKey(d => d.Status)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -362,6 +371,26 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.GemNavigation).WithMany(p => p.TbtProductionPlanMaterial)
+                .HasForeignKey(d => d.Gem)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_gem_fk");
+
+            entity.HasOne(d => d.GemShapeNavigation).WithMany(p => p.TbtProductionPlanMaterial)
+                .HasForeignKey(d => d.GemShape)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_gem_shape_fk");
+
+            entity.HasOne(d => d.GoldNavigation).WithMany(p => p.TbtProductionPlanMaterial)
+                .HasForeignKey(d => d.Gold)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_gold_fk");
+
+            entity.HasOne(d => d.GoldSizeNavigation).WithMany(p => p.TbtProductionPlanMaterial)
+                .HasForeignKey(d => d.GoldSize)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_gold_size_fk");
 
             entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanMaterial)
                 .HasForeignKey(d => d.ProductionPlanId)

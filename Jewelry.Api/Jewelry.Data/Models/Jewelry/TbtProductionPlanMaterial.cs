@@ -33,5 +33,13 @@ public partial class TbtProductionPlanMaterial
 
     public string GemSize { get; set; } = null!;
 
+    public virtual TbmGem GemNavigation { get; set; } = null!;
+
+    public virtual TbmGemShape GemShapeNavigation { get; set; } = null!;
+
+    public virtual TbmGold GoldNavigation { get; set; } = null!;
+
+    public virtual TbmGoldSize GoldSizeNavigation { get; set; } = null!;
+
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 }

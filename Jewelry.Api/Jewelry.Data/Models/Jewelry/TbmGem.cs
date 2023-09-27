@@ -18,4 +18,6 @@ public partial class TbmGem
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;
+
+    public virtual ICollection<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; } = new List<TbtProductionPlanMaterial>();
 }
