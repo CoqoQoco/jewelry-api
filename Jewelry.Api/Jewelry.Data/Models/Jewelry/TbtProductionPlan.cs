@@ -39,31 +39,6 @@ public partial class TbtProductionPlan
 
     public string CustomerNumber { get; set; } = null!;
 
-    /// <summary>
-    /// ยอดสั่ง
-    /// </summary>
-    public int Qty { get; set; }
-
-    /// <summary>
-    /// ยอดสำเร็จรูป
-    /// </summary>
-    public int? QtyFinish { get; set; }
-
-    /// <summary>
-    /// ยอดกึ่งสำเร็จรูป
-    /// </summary>
-    public int? QtySemiFinish { get; set; }
-
-    /// <summary>
-    /// ยอดหล่อ
-    /// </summary>
-    public int? QtyCast { get; set; }
-
-    /// <summary>
-    /// หน่วย
-    /// </summary>
-    public string QtyUnit { get; set; } = null!;
-
     public string? Remark { get; set; }
 
     public bool? IsActive { get; set; }
@@ -71,6 +46,12 @@ public partial class TbtProductionPlan
     public int Status { get; set; }
 
     public string ProductDetail { get; set; } = null!;
+
+    public string CustomerType { get; set; } = null!;
+
+    public string ProductName { get; set; } = null!;
+
+    public string ProductType { get; set; } = null!;
 
     public virtual TbmProductionPlanStatus StatusNavigation { get; set; } = null!;
 

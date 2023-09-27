@@ -17,19 +17,21 @@ public partial class TbtProductionPlanMaterial
 
     public bool? IsActive { get; set; }
 
-    public string Material { get; set; } = null!;
-
-    public string MaterialType { get; set; } = null!;
-
-    public string MaterialSize { get; set; } = null!;
-
-    public string MaterialQty { get; set; } = null!;
-
-    public string? MaterialRemark { get; set; }
-
     public int ProductionPlanId { get; set; }
 
-    public string MaterialShape { get; set; } = null!;
+    public string Gold { get; set; } = null!;
+
+    public string GoldSize { get; set; } = null!;
+
+    public string Gem { get; set; } = null!;
+
+    public string GemShape { get; set; } = null!;
+
+    public int GemQty { get; set; }
+
+    public string GemUnit { get; set; } = null!;
+
+    public string GemSize { get; set; } = null!;
 
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 }

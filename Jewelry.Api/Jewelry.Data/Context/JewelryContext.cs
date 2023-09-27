@@ -38,9 +38,9 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
-//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -246,6 +246,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CustomerNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("customer_number");
+            entity.Property(e => e.CustomerType)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_type");
             entity.Property(e => e.IsActive)
                 .IsRequired()
                 .HasDefaultValueSql("true")
@@ -257,25 +260,15 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ProductDetail)
                 .HasColumnType("character varying")
                 .HasColumnName("product_detail");
+            entity.Property(e => e.ProductName)
+                .HasColumnType("character varying")
+                .HasColumnName("product_name");
             entity.Property(e => e.ProductNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("product_number");
-            entity.Property(e => e.Qty)
-                .HasComment("ยอดสั่ง")
-                .HasColumnName("qty");
-            entity.Property(e => e.QtyCast)
-                .HasComment("ยอดหล่อ")
-                .HasColumnName("qty_cast");
-            entity.Property(e => e.QtyFinish)
-                .HasComment("ยอดสำเร็จรูป")
-                .HasColumnName("qty_finish");
-            entity.Property(e => e.QtySemiFinish)
-                .HasComment("ยอดกึ่งสำเร็จรูป")
-                .HasColumnName("qty_semi_finish");
-            entity.Property(e => e.QtyUnit)
-                .HasComment("หน่วย")
+            entity.Property(e => e.ProductType)
                 .HasColumnType("character varying")
-                .HasColumnName("qty_unit");
+                .HasColumnName("product_type");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
@@ -340,28 +333,29 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Gem)
+                .HasColumnType("character varying")
+                .HasColumnName("gem");
+            entity.Property(e => e.GemQty).HasColumnName("gem_qty");
+            entity.Property(e => e.GemShape)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_shape");
+            entity.Property(e => e.GemSize)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_size");
+            entity.Property(e => e.GemUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_unit");
+            entity.Property(e => e.Gold)
+                .HasColumnType("character varying")
+                .HasColumnName("gold");
+            entity.Property(e => e.GoldSize)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_size");
             entity.Property(e => e.IsActive)
                 .IsRequired()
                 .HasDefaultValueSql("true")
                 .HasColumnName("is_active");
-            entity.Property(e => e.Material)
-                .HasColumnType("character varying")
-                .HasColumnName("material");
-            entity.Property(e => e.MaterialQty)
-                .HasColumnType("character varying")
-                .HasColumnName("material_qty");
-            entity.Property(e => e.MaterialRemark)
-                .HasColumnType("character varying")
-                .HasColumnName("material_remark");
-            entity.Property(e => e.MaterialShape)
-                .HasColumnType("character varying")
-                .HasColumnName("material_shape");
-            entity.Property(e => e.MaterialSize)
-                .HasColumnType("character varying")
-                .HasColumnName("material_size");
-            entity.Property(e => e.MaterialType)
-                .HasColumnType("character varying")
-                .HasColumnName("material_type");
             entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
