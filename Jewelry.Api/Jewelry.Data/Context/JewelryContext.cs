@@ -18,6 +18,18 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
 
+    public virtual DbSet<TbmCustomerType> TbmCustomerType { get; set; }
+
+    public virtual DbSet<TbmGem> TbmGem { get; set; }
+
+    public virtual DbSet<TbmGemShape> TbmGemShape { get; set; }
+
+    public virtual DbSet<TbmGold> TbmGold { get; set; }
+
+    public virtual DbSet<TbmGoldSize> TbmGoldSize { get; set; }
+
+    public virtual DbSet<TbmProductType> TbmProductType { get; set; }
+
     public virtual DbSet<TbmProductionPlanStatus> TbmProductionPlanStatus { get; set; }
 
     public virtual DbSet<TbtProductionPlan> TbtProductionPlan { get; set; }
@@ -48,6 +60,156 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(10)
                 .HasColumnName("username");
+        });
+
+        modelBuilder.Entity<TbmCustomerType>(entity =>
+        {
+            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_customer_type_pk");
+
+            entity.ToTable("tbm_customer_type");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmGem>(entity =>
+        {
+            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_gem_pk");
+
+            entity.ToTable("tbm_gem");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmGemShape>(entity =>
+        {
+            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_gem_shape_pk");
+
+            entity.ToTable("tbm_gem_shape");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmGold>(entity =>
+        {
+            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_gold_pk");
+
+            entity.ToTable("tbm_gold");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmGoldSize>(entity =>
+        {
+            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_gold_size_pk");
+
+            entity.ToTable("tbm_gold_size");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmProductType>(entity =>
+        {
+            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbm_product_type_pk");
+
+            entity.ToTable("tbm_product_type");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
         });
 
         modelBuilder.Entity<TbmProductionPlanStatus>(entity =>
