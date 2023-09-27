@@ -30,7 +30,6 @@ namespace Jewelry.Service.Master
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
         }
-
         public IQueryable<MasterModel> MasterGold()
         {
             var response = (from item in _jewelryContext.TbmGold

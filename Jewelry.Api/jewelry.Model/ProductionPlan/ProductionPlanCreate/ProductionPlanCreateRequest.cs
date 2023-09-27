@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using jewelry.Model.Master;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -12,25 +13,25 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
     {
         public string Wo { get; set; }
         public int WoNumber { get; set; }
+        public string Mold { get; set; }
+
+        public string CustomerNumber { get; set; }
+        public string CustomerType { get; set; }
         public DateTimeOffset RequestDate { get; set; }
 
-        public string Mold { get; set; }
         public string ProductNumber { get; set; }
+        public string ProductName { get; set; }
+        public string ProductType { get; set; }
+
         public string ProductDetail { get; set; }
-        public string CustomerNumber { get; set; }
-
-        public int Qty { get; set; }
-        public int? QtyFinish { get; set; }
-        public int? QtySemiFinish { get; set; }
-        public int? QtyCast { get; set; }
-        public string QtyUnit { get; set; }
-
         public string? Remark { get; set; }
+
+        public IFormFile Images { get; set; }
+
 
         public string Material { get; set; }
 
         //public List<ProductionPlanMaterialCreateRequest> Material { get; set; }
-        public IFormFile Images { get; set; }
 
         public ProductionPlanCreateRequest()
         {
@@ -41,11 +42,13 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
 
     public class ProductionPlanMaterialCreateRequest
     {
-        public string Material { get; set; }
-        public string MaterialType { get; set; }
-        public string MaterialShape { get; set; }
-        public string MaterialSize { get; set; }
-        public string MaterialQty { get; set; }
-        public string? MaterialRemark { get; set; }
+        public MasterModel Gold { get; set; }
+        public MasterModel GoldSize { get; set; }
+
+        public MasterModel Gem { get; set; }
+        public MasterModel GemShape { get; set; }
+        public int GemQty { get; set; }
+        public string GemUnit { get; set; }
+        public string GemSize { get; set; }
     }
 }

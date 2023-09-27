@@ -87,6 +87,26 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+        [Route("ProductionPlanMaterialSearch")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var report = _IProductionPlanService.ProductionPlanMaterialSearch(request);
+                return Ok(report);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
         [Route("ProductionPlanUpdateStatus")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]

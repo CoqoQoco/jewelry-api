@@ -28,6 +28,7 @@ namespace Jewelry.Service.ProductionPlan
         Task<ProductionPlanCreateResponse> ProductionPlanCreate(ProductionPlanCreateRequest request);
         Task<ProductionPlanCreateResponse> ProductionPlanCreateImage(List<IFormFile> images, string wo, int woNumber);
         IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request);
+        IQueryable<TbtProductionPlanMaterial> ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request);
         Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateRequest request);
 
 
@@ -71,19 +72,18 @@ namespace Jewelry.Service.ProductionPlan
                 {
                     Wo = request.Wo.ToUpper().Trim(),
                     WoNumber = request.WoNumber,
+                    Mold = request.Mold.Trim(),
+
+                    CustomerNumber = request.CustomerNumber.Trim(),
+                    CustomerType = request.CustomerType.Trim(),
                     RequestDate = request.RequestDate.UtcDateTime,
 
-                    Mold = request.Mold.Trim(),
                     ProductNumber = request.ProductNumber.Trim(),
-                    ProductDetail = request.ProductDetail.Trim(),
-                    CustomerNumber = request.CustomerNumber.Trim(),
-                    Remark = !string.IsNullOrEmpty(request.Remark) ? request.Remark.Trim() : string.Empty,
+                    ProductName = request.ProductName.Trim(),
+                    ProductType = request.ProductType.Trim(),
 
-                    Qty = request.Qty,
-                    QtyFinish = request.QtyFinish,
-                    QtySemiFinish = request.QtySemiFinish,
-                    QtyCast = request.QtyCast,
-                    QtyUnit = request.QtyUnit,
+                    ProductDetail = request.ProductDetail.Trim(),
+                    Remark = !string.IsNullOrEmpty(request.Remark) ? request.Remark.Trim() : string.Empty,
 
                     IsActive = true,
                     Status = ProductionPlanStatus.Designed,
@@ -106,13 +106,14 @@ namespace Jewelry.Service.ProductionPlan
                 {
                     var createMaterial = new TbtProductionPlanMaterial()
                     {
-                        Material = material.Material.ToUpper().Trim(),
-                        MaterialSize = material.MaterialSize.Trim(),
-                        MaterialType = material.MaterialType.Trim(),
-                        MaterialShape = material.MaterialShape.Trim(),
-                        MaterialQty = material.MaterialQty.Trim(),
+                        Gold = material.Gold.Code,
+                        GoldSize = material.GoldSize.Code,
 
-                        MaterialRemark = !string.IsNullOrEmpty(material.MaterialRemark) ? material.MaterialRemark.Trim() : string.Empty,
+                        Gem = material.Gem.Code,
+                        GemShape = material.GemShape.Code,
+                        GemQty = material.GemQty,
+                        GemUnit = material.GemUnit,
+                        GemSize = material.GemSize,
 
                         ProductionPlanId = createPlan.Id,
 
@@ -152,8 +153,6 @@ namespace Jewelry.Service.ProductionPlan
                         request.Images.CopyTo(fileStream);
                         fileStream.Close();
                     }
-
-
                 }
                 catch (Exception ex)
                 {
@@ -251,7 +250,7 @@ namespace Jewelry.Service.ProductionPlan
         {
             var query = (from item in _jewelryContext.TbtProductionPlan
                          .Include(x => x.TbtProductionPlanImage)
-                         .Include(x => x.TbtProductionPlanMaterial)
+                         //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
                          where item.IsActive == true
                          select item);
@@ -278,6 +277,18 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             return query.OrderByDescending(x => x.RequestDate);
+        }
+        public IQueryable<TbtProductionPlanMaterial> ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request)
+        {
+            var query = (from item in _jewelryContext.TbtProductionPlanMaterial
+                         .Include(x => x.GoldNavigation)
+                         .Include(x => x.GoldSizeNavigation)
+                         .Include(x => x.GemNavigation)
+                         .Include(x => x.GemShapeNavigation)
+                         where item.ProductionPlanId == request.Id
+                         select item);
+
+            return query;
         }
 
         // ----- Update ----- //
