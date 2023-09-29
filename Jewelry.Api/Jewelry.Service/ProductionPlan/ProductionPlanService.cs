@@ -28,6 +28,7 @@ namespace Jewelry.Service.ProductionPlan
         Task<ProductionPlanCreateResponse> ProductionPlanCreate(ProductionPlanCreateRequest request);
         Task<ProductionPlanCreateResponse> ProductionPlanCreateImage(List<IFormFile> images, string wo, int woNumber);
         IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request);
+        TbtProductionPlan ProductionPlanGet(int id);
         IQueryable<TbtProductionPlanMaterial> ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request);
         Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateRequest request);
 
@@ -101,6 +102,12 @@ namespace Jewelry.Service.ProductionPlan
 
                 var materials = JsonConvert.DeserializeObject<List<ProductionPlanMaterialCreateRequest>>(request.Material);
 
+
+                if (materials == null || !materials.Any())
+                {
+                    throw new HandleException($"กรุณาระบุส่วนประกอบใบจ่าย-รับคืนงาน");
+                }
+
                 var createMaterials = new List<TbtProductionPlanMaterial>();
                 foreach (var material in materials)
                 {
@@ -109,11 +116,19 @@ namespace Jewelry.Service.ProductionPlan
                         Gold = material.Gold.Code,
                         GoldSize = material.GoldSize.Code,
 
-                        Gem = material.Gem.Code,
-                        GemShape = material.GemShape.Code,
-                        GemQty = material.GemQty,
+                        Gem = material.Gem?.Code,
+                        GemShape = material.GemShape?.Code,
+                        GemQty = material.GemQty ?? default,
                         GemUnit = material.GemUnit,
                         GemSize = material.GemSize,
+                        GemWeight = material.GemWeight,
+                        GemWeightUnit = material.GemWeightUnit,
+
+                        DiamondQty = material.DiamondQty ?? default,
+                        DiamondUnit = material.DiamondUnit,
+                        DiamondQuality = material.DiamondQuality,
+                        DiamondWeight = material.DiamondWeight,
+                        DiamondWeightUnit = material.DiamondWeightUnit,
 
                         ProductionPlanId = createPlan.Id,
 
@@ -277,6 +292,25 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             return query.OrderByDescending(x => x.RequestDate);
+        }
+        public TbtProductionPlan ProductionPlanGet(int id)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                         .Include(x => x.ProductTypeNavigation)
+                         .Include(x => x.CustomerTypeNavigation)
+                         .Include(x => x.TbtProductionPlanImage)
+                         //.Include(x => x.TbtProductionPlanMaterial)
+                         .Include(x => x.StatusNavigation)
+                        where item.IsActive == true
+                        && item.Id == id
+                        select item).SingleOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException("ไม่พบข้อมูล กรุณาลองใหม่อีกครั้ง");
+            }
+
+            return plan;
         }
         public IQueryable<TbtProductionPlanMaterial> ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request)
         {

@@ -45,10 +45,18 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
         public MasterModel Gold { get; set; }
         public MasterModel GoldSize { get; set; }
 
-        public MasterModel Gem { get; set; }
-        public MasterModel GemShape { get; set; }
-        public int GemQty { get; set; }
-        public string GemUnit { get; set; }
-        public string GemSize { get; set; }
+        public MasterModel? Gem { get; set; }
+        public MasterModel? GemShape { get; set; }
+        public int? GemQty { get; set; }
+        public string? GemUnit { get; set; }
+        public string? GemSize { get; set; }
+        public string? GemWeight { get; set; }
+        public string? GemWeightUnit { get; set; }
+
+        public int? DiamondQty { get; set; }
+        public string? DiamondUnit { get; set; }
+        public string? DiamondQuality { get; set; }
+        public string? DiamondWeight { get; set; }
+        public string? DiamondWeightUnit { get; set; }
     }
 }

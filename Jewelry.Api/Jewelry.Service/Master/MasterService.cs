@@ -35,7 +35,7 @@ namespace Jewelry.Service.Master
             var response = (from item in _jewelryContext.TbmGold
                             where item.IsActive == true
                             select new MasterModel()
-                            { 
+                            {
                                 Id = item.Id,
                                 NameEn = item.NameEn,
                                 NameTh = item.NameTh,
@@ -73,7 +73,9 @@ namespace Jewelry.Service.Master
                                 Description = $"{item.Code}: {item.NameTh}"
                             });
 
-            return response.OrderBy(x => x.Code);
+            var FixCode = new string[] { "RU", "SA" };
+            return response.OrderByDescending(x => FixCode.Contains(x.Code)).ThenBy(x => x.Code);
+            //return response.OrderByDescending(x => x.Code == "RU").ThenByDescending(x => x.Code == "SA").ThenBy(x => x.Code);
         }
         public IQueryable<MasterModel> MasterGemShape()
         {

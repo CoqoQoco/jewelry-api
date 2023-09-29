@@ -19,7 +19,5 @@ public partial class TbmCustomerType
 
     public string CreateBy { get; set; } = null!;
 
-    public virtual ICollection<TbtProductionPlan> TbtProductionPlanCustomerTypeNavigation { get; set; } = new List<TbtProductionPlan>();
-
-    public virtual ICollection<TbtProductionPlan> TbtProductionPlanProductTypeNavigation { get; set; } = new List<TbtProductionPlan>();
+    public virtual ICollection<TbtProductionPlan> TbtProductionPlan { get; set; } = new List<TbtProductionPlan>();
 }

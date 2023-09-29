@@ -38,9 +38,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    { }
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
+//    => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -288,12 +289,12 @@ public partial class JewelryContext : DbContext
                 .HasComment("ลำดับใบจ่าย-รับงาน")
                 .HasColumnName("wo_number");
 
-            entity.HasOne(d => d.CustomerTypeNavigation).WithMany(p => p.TbtProductionPlanCustomerTypeNavigation)
+            entity.HasOne(d => d.CustomerTypeNavigation).WithMany(p => p.TbtProductionPlan)
                 .HasForeignKey(d => d.CustomerType)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_customer_type_fk");
 
-            entity.HasOne(d => d.ProductTypeNavigation).WithMany(p => p.TbtProductionPlanProductTypeNavigation)
+            entity.HasOne(d => d.ProductTypeNavigation).WithMany(p => p.TbtProductionPlan)
                 .HasForeignKey(d => d.ProductType)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_product_type_fk");
@@ -343,6 +344,19 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.DiamondQty).HasColumnName("diamond_qty");
+            entity.Property(e => e.DiamondQuality)
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_quality");
+            entity.Property(e => e.DiamondUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_unit");
+            entity.Property(e => e.DiamondWeight)
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_weight");
+            entity.Property(e => e.DiamondWeightUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_weight_unit");
             entity.Property(e => e.Gem)
                 .HasColumnType("character varying")
                 .HasColumnName("gem");
@@ -356,6 +370,12 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GemUnit)
                 .HasColumnType("character varying")
                 .HasColumnName("gem_unit");
+            entity.Property(e => e.GemWeight)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_weight");
+            entity.Property(e => e.GemWeightUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_weight_unit");
             entity.Property(e => e.Gold)
                 .HasColumnType("character varying")
                 .HasColumnName("gold");
@@ -374,12 +394,10 @@ public partial class JewelryContext : DbContext
 
             entity.HasOne(d => d.GemNavigation).WithMany(p => p.TbtProductionPlanMaterial)
                 .HasForeignKey(d => d.Gem)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_gem_fk");
 
             entity.HasOne(d => d.GemShapeNavigation).WithMany(p => p.TbtProductionPlanMaterial)
                 .HasForeignKey(d => d.GemShape)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_gem_shape_fk");
 
             entity.HasOne(d => d.GoldNavigation).WithMany(p => p.TbtProductionPlanMaterial)

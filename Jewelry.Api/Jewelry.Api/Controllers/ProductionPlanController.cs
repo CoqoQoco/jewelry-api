@@ -70,7 +70,7 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public IActionResult ProductionPlanSearch(ProductionPlanTrackingRequest request)
+        public IActionResult ProductionPlanSearch([FromBody] ProductionPlanTrackingRequest request)
         {
             try
             {
@@ -87,12 +87,32 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+        [Route("ProductionPlanGet")]
+        [HttpGet]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(TbtProductionPlan))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult ProductionPlanGet(int id)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var report = _IProductionPlanService.ProductionPlanGet(id);
+                return Ok(report);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
         [Route("ProductionPlanMaterialSearch")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public IActionResult ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request)
+        public IActionResult ProductionPlanMaterialSearch([FromBody] ProductionPlanTrackingMaterialRequest request)
         {
             try
             {
