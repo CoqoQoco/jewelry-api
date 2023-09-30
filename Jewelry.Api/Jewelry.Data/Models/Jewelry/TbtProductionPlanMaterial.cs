@@ -47,6 +47,8 @@ public partial class TbtProductionPlanMaterial
 
     public string? DiamondWeightUnit { get; set; }
 
+    public string? DiamondSize { get; set; }
+
     public virtual TbmGem? GemNavigation { get; set; }
 
     public virtual TbmGemShape? GemShapeNavigation { get; set; }

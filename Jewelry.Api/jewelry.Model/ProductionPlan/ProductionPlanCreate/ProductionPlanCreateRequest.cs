@@ -23,6 +23,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
         public string ProductName { get; set; }
         public string ProductType { get; set; }
 
+        public int ProductQty { get; set; }
+        public string ProductQtyUnit { get; set; }
+
         public string ProductDetail { get; set; }
         public string? Remark { get; set; }
 
@@ -58,5 +61,6 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
         public string? DiamondQuality { get; set; }
         public string? DiamondWeight { get; set; }
         public string? DiamondWeightUnit { get; set; }
+        public string? DiamondSize { get; set; }
     }
 }

@@ -267,6 +267,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ProductNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("product_number");
+            entity.Property(e => e.ProductQty).HasColumnName("product_qty");
+            entity.Property(e => e.ProductQtyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("product_qty_unit");
             entity.Property(e => e.ProductType)
                 .HasColumnType("character varying")
                 .HasColumnName("product_type");
@@ -288,11 +292,6 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.WoNumber)
                 .HasComment("ลำดับใบจ่าย-รับงาน")
                 .HasColumnName("wo_number");
-
-            entity.HasOne(d => d.CustomerTypeNavigation).WithMany(p => p.TbtProductionPlan)
-                .HasForeignKey(d => d.CustomerType)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("tbt_customer_type_fk");
 
             entity.HasOne(d => d.ProductTypeNavigation).WithMany(p => p.TbtProductionPlan)
                 .HasForeignKey(d => d.ProductType)
@@ -348,6 +347,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.DiamondQuality)
                 .HasColumnType("character varying")
                 .HasColumnName("diamond_quality");
+            entity.Property(e => e.DiamondSize)
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_size");
             entity.Property(e => e.DiamondUnit)
                 .HasColumnType("character varying")
                 .HasColumnName("diamond_unit");

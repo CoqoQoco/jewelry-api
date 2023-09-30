@@ -83,6 +83,9 @@ namespace Jewelry.Service.ProductionPlan
                     ProductName = request.ProductName.Trim(),
                     ProductType = request.ProductType.Trim(),
 
+                    ProductQty = request.ProductQty,
+                    ProductQtyUnit = request.ProductQtyUnit,
+
                     ProductDetail = request.ProductDetail.Trim(),
                     Remark = !string.IsNullOrEmpty(request.Remark) ? request.Remark.Trim() : string.Empty,
 
@@ -129,6 +132,7 @@ namespace Jewelry.Service.ProductionPlan
                         DiamondQuality = material.DiamondQuality,
                         DiamondWeight = material.DiamondWeight,
                         DiamondWeightUnit = material.DiamondWeightUnit,
+                        DiamondSize = material.DiamondSize,
 
                         ProductionPlanId = createPlan.Id,
 
@@ -297,7 +301,7 @@ namespace Jewelry.Service.ProductionPlan
         {
             var plan = (from item in _jewelryContext.TbtProductionPlan
                          .Include(x => x.ProductTypeNavigation)
-                         .Include(x => x.CustomerTypeNavigation)
+                         //.Include(x => x.CustomerTypeNavigation)
                          .Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
