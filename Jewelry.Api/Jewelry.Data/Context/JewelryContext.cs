@@ -381,6 +381,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Gold)
                 .HasColumnType("character varying")
                 .HasColumnName("gold");
+            entity.Property(e => e.GoldQty).HasColumnName("gold_qty");
             entity.Property(e => e.GoldSize)
                 .HasColumnType("character varying")
                 .HasColumnName("gold_size");

@@ -120,6 +120,7 @@ namespace Jewelry.Service.ProductionPlan
                         {
                             Gold = material.Gold.Code,
                             GoldSize = material.GoldSize.Code,
+                            GoldQty = material.GoldQty,
 
                             Gem = material.Gem?.Code,
                             GemShape = material.GemShape?.Code,

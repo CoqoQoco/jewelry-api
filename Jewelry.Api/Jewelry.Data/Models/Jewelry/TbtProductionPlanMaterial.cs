@@ -49,6 +49,8 @@ public partial class TbtProductionPlanMaterial
 
     public string? DiamondSize { get; set; }
 
+    public int? GoldQty { get; set; }
+
     public virtual TbmGem? GemNavigation { get; set; }
 
     public virtual TbmGemShape? GemShapeNavigation { get; set; }

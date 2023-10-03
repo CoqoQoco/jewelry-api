@@ -47,6 +47,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
     {
         public MasterModel Gold { get; set; }
         public MasterModel GoldSize { get; set; }
+        public int? GoldQty { get; set; }
 
         public MasterModel? Gem { get; set; }
         public MasterModel? GemShape { get; set; }
