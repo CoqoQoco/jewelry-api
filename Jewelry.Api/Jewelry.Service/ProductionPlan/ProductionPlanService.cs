@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
+using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
 using Jewelry.Data.Context;
@@ -29,9 +30,10 @@ namespace Jewelry.Service.ProductionPlan
         Task<ProductionPlanCreateResponse> ProductionPlanCreateImage(List<IFormFile> images, string wo, int woNumber);
         IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request);
         TbtProductionPlan ProductionPlanGet(int id);
-        IQueryable<TbtProductionPlanMaterial> ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request);
+        IQueryable<TbtProductionPlanMaterial> ProductionPlanMateriaGet(ProductionPlanTrackingMaterialRequest request);
         Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request);
         Task<string> ProductionPlanUpdateHeader(ProductionPlanUpdateHeaderRequest request);
+        Task<string> ProductionPlanDeleteMaterial(ProductionPlanMaterialDeleteRequest request);
 
 
         IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus();
@@ -326,7 +328,7 @@ namespace Jewelry.Service.ProductionPlan
 
             return plan;
         }
-        public IQueryable<TbtProductionPlanMaterial> ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request)
+        public IQueryable<TbtProductionPlanMaterial> ProductionPlanMateriaGet(ProductionPlanTrackingMaterialRequest request)
         {
             var query = (from item in _jewelryContext.TbtProductionPlanMaterial
                          .Include(x => x.GoldNavigation)
@@ -334,6 +336,7 @@ namespace Jewelry.Service.ProductionPlan
                          .Include(x => x.GemNavigation)
                          .Include(x => x.GemShapeNavigation)
                          where item.ProductionPlanId == request.Id
+                         && item.IsActive == true
                          select item);
 
             return query;
@@ -357,7 +360,7 @@ namespace Jewelry.Service.ProductionPlan
             plan.UpdateDate = DateTime.UtcNow;
             plan.UpdateBy = _admin;
 
-            _jewelryContext.Update(plan);
+            _jewelryContext.TbtProductionPlan.Update(plan);
             await _jewelryContext.SaveChangesAsync();
 
 
@@ -390,12 +393,48 @@ namespace Jewelry.Service.ProductionPlan
             plan.UpdateDate = DateTime.UtcNow;
             plan.UpdateBy = _admin;
 
-            _jewelryContext.Update(plan);
+            _jewelryContext.TbtProductionPlan.Update(plan);
             await _jewelryContext.SaveChangesAsync();
 
             return $"{plan.Wo}-{plan.WoNumber}";
         }
 
+
+        // ----- Delete ----- //
+        public async Task<string> ProductionPlanDeleteMaterial(ProductionPlanMaterialDeleteRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan.Include(x => x.TbtProductionPlanMaterial)
+                        where item.Id == request.PlanId
+                        && item.Wo == request.Wo
+                        && item.WoNumber == request.WoNumber
+                        select item).SingleOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+
+            if (plan.TbtProductionPlanMaterial.Any() == false)
+            {
+                throw new HandleException($"ไม่มีส่วนประกอบในใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+
+            var material = plan.TbtProductionPlanMaterial.Where(x => x.ProductionPlanId == request.PlanId && x.Id == request.MaterialId).SingleOrDefault();
+            if (material == null)
+            {
+                throw new HandleException($"ไม่พบส่วนประกอบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+
+            material.IsActive = false;
+
+            material.UpdateDate = DateTime.UtcNow;
+            material.UpdateBy = _admin;
+
+            _jewelryContext.TbtProductionPlanMaterial.Update(material);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"{plan.Wo}-{plan.WoNumber}";
+        }
 
         // ----- Master ----- //
         public IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus()

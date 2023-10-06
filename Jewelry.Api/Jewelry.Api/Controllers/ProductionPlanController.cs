@@ -1,5 +1,6 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
+using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
 using Jewelry.Api.Extension;
@@ -107,7 +108,7 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
-        [Route("ProductionPlanMaterialSearch")]
+        [Route("ProductionPlanMateriaGet")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
@@ -119,7 +120,7 @@ namespace Jewelry.Api.Controllers
                 if (!ModelState.IsValid)
                     return ModelStateBadRequest();
 
-                var report = _IProductionPlanService.ProductionPlanMaterialSearch(request);
+                var report = _IProductionPlanService.ProductionPlanMateriaGet(request);
                 return Ok(report);
             }
             catch (HandleException ex)
@@ -178,6 +179,24 @@ namespace Jewelry.Api.Controllers
             try
             {
                 var response = await _IProductionPlanService.ProductionPlanUpdateHeader(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ProductionPlanDeleteMaterial")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionPlanDeleteMaterial([FromBody] ProductionPlanMaterialDeleteRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.ProductionPlanDeleteMaterial(request);
                 return Ok(response);
             }
             catch (HandleException ex)
