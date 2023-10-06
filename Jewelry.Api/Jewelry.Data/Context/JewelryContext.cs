@@ -410,7 +410,6 @@ public partial class JewelryContext : DbContext
 
             entity.HasOne(d => d.GoldSizeNavigation).WithMany(p => p.TbtProductionPlanMaterial)
                 .HasForeignKey(d => d.GoldSize)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_gold_size_fk");
 
             entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanMaterial)
