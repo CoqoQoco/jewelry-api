@@ -69,6 +69,7 @@ namespace Jewelry.Service.ProductionPlan
                     throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} ทำซ้ำ กรุณาสร้างหมายเลขใหม่");
                 }
 
+
                 using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
                 {
                     var createPlan = new TbtProductionPlan()
@@ -303,7 +304,7 @@ namespace Jewelry.Service.ProductionPlan
                          select item);
             }
 
-            return query.OrderByDescending(x => x.RequestDate);
+            return query.OrderByDescending(x => x.CreateDate);
         }
         public TbtProductionPlan ProductionPlanGet(int id)
         {
