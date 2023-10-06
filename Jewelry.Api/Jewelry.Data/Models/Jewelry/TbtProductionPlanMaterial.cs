@@ -21,7 +21,7 @@ public partial class TbtProductionPlanMaterial
 
     public string Gold { get; set; } = null!;
 
-    public string GoldSize { get; set; } = null!;
+    public string? GoldSize { get; set; }
 
     public string? Gem { get; set; }
 
@@ -57,7 +57,7 @@ public partial class TbtProductionPlanMaterial
 
     public virtual TbmGold GoldNavigation { get; set; } = null!;
 
-    public virtual TbmGoldSize GoldSizeNavigation { get; set; } = null!;
+    public virtual TbmGoldSize? GoldSizeNavigation { get; set; }
 
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 }

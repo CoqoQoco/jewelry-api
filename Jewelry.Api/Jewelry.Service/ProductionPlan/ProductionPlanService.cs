@@ -119,7 +119,7 @@ namespace Jewelry.Service.ProductionPlan
                         var createMaterial = new TbtProductionPlanMaterial()
                         {
                             Gold = material.Gold.Code,
-                            GoldSize = material.GoldSize.Code,
+                            GoldSize = material.GoldSize?.Code,
                             GoldQty = material.GoldQty,
 
                             Gem = material.Gem?.Code,
