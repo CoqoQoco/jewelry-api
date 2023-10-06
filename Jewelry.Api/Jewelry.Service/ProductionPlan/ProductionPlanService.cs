@@ -30,7 +30,8 @@ namespace Jewelry.Service.ProductionPlan
         IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request);
         TbtProductionPlan ProductionPlanGet(int id);
         IQueryable<TbtProductionPlanMaterial> ProductionPlanMaterialSearch(ProductionPlanTrackingMaterialRequest request);
-        Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateRequest request);
+        Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request);
+        Task<string> ProductionPlanUpdateHeader(ProductionPlanUpdateHeaderRequest request);
 
 
         IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus();
@@ -339,7 +340,7 @@ namespace Jewelry.Service.ProductionPlan
         }
 
         // ----- Update ----- //
-        public async Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateRequest request)
+        public async Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request)
         {
             var plan = (from item in _jewelryContext.TbtProductionPlan
                         where item.Id == request.Id
@@ -359,6 +360,38 @@ namespace Jewelry.Service.ProductionPlan
             _jewelryContext.Update(plan);
             await _jewelryContext.SaveChangesAsync();
 
+
+            return $"{plan.Wo}-{plan.WoNumber}";
+        }
+        public async Task<string> ProductionPlanUpdateHeader(ProductionPlanUpdateHeaderRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                        where item.Id == request.Id
+                        && item.Wo == request.Wo
+                        && item.WoNumber == request.WoNumber
+                        select item).SingleOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException($"ไม่พบใบจ่ายขรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+
+            plan.RequestDate = request.RequestDate.UtcDateTime;
+
+            plan.ProductQty = request.ProductQty;
+            plan.ProductQtyUnit = request.ProductQtyUnit;
+
+            plan.ProductNumber = request.ProductNumber;
+            plan.ProductName = request.ProductName;
+            plan.ProductDetail = request.ProductDetail;
+
+            plan.Remark = request.Remark ?? plan.Remark;
+
+            plan.UpdateDate = DateTime.UtcNow;
+            plan.UpdateBy = _admin;
+
+            _jewelryContext.Update(plan);
+            await _jewelryContext.SaveChangesAsync();
 
             return $"{plan.Wo}-{plan.WoNumber}";
         }

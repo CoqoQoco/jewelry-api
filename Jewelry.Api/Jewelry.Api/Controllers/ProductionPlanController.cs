@@ -132,7 +132,7 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public async Task<IActionResult> ProductionPlanUpdateStatus([FromBody] ProductionPlanUpdateRequest request)
+        public async Task<IActionResult> ProductionPlanUpdateStatus([FromBody] ProductionPlanUpdateStatusRequest request)
         {
             try
             {
@@ -144,8 +144,6 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
-
-
 
         [Route("GetProductionPlanStatus")]
         [HttpGet]
@@ -162,6 +160,24 @@ namespace Jewelry.Api.Controllers
                 var response = _IProductionPlanService.GetProductionPlanStatus();
                 //var result = report.ToDataSource(request);
 
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ProductionPlanUpdateHeader")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionPlanUpdateHeader([FromBody] ProductionPlanUpdateHeaderRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.ProductionPlanUpdateHeader(request);
                 return Ok(response);
             }
             catch (HandleException ex)

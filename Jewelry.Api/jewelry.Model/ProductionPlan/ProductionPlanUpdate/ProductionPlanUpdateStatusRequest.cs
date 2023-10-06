@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace jewelry.Model.ProductionPlan.ProductionPlanUpdate
 {
-    public class ProductionPlanUpdateRequest
+    public class ProductionPlanUpdateStatusRequest
     {
         public int Id { get; set; }
         public string Wo { get; set; }
