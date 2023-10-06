@@ -34,6 +34,7 @@ namespace Jewelry.Service.ProductionPlan
         Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request);
         Task<string> ProductionPlanUpdateHeader(ProductionPlanUpdateHeaderRequest request);
         Task<string> ProductionPlanDeleteMaterial(ProductionPlanMaterialDeleteRequest request);
+        Task<string> ProductionPlanUpdateMaterial(ProductionPlanUpdateMaterialRequest request);
 
 
         IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus();
@@ -394,6 +395,51 @@ namespace Jewelry.Service.ProductionPlan
             plan.UpdateBy = _admin;
 
             _jewelryContext.TbtProductionPlan.Update(plan);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"{plan.Wo}-{plan.WoNumber}";
+        }
+        public async Task<string> ProductionPlanUpdateMaterial(ProductionPlanUpdateMaterialRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                        where item.Id == request.Id
+                        && item.Wo == request.Wo
+                        && item.WoNumber == request.WoNumber
+                        select item).SingleOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException($"ไม่พบใบจ่ายขรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+
+            var createMaterial = new TbtProductionPlanMaterial()
+            {
+                Gold = request.Material.Gold.Code,
+                GoldSize = request.Material.GoldSize?.Code,
+                GoldQty = request.Material.GoldQty,
+
+                Gem = request.Material.Gem?.Code,
+                GemShape = request.Material.GemShape?.Code,
+                GemQty = request.Material.GemQty ?? default,
+                GemUnit = request.Material.GemUnit,
+                GemSize = request.Material.GemSize,
+                GemWeight = request.Material.GemWeight,
+                GemWeightUnit = request.Material.GemWeightUnit,
+
+                DiamondQty = request.Material.DiamondQty ?? default,
+                DiamondUnit = request.Material.DiamondUnit,
+                DiamondQuality = request.Material.DiamondQuality,
+                DiamondWeight = request.Material.DiamondWeight,
+                DiamondWeightUnit = request.Material.DiamondWeightUnit,
+                DiamondSize = request.Material.DiamondSize,
+
+                ProductionPlanId = plan.Id,
+
+                IsActive = true,
+                CreateDate = DateTime.UtcNow,
+                CreateBy = _admin,
+            };
+            _jewelryContext.TbtProductionPlanMaterial.Add(createMaterial);
             await _jewelryContext.SaveChangesAsync();
 
             return $"{plan.Wo}-{plan.WoNumber}";

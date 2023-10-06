@@ -205,5 +205,23 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("ProductionPlanUpdateMaterial")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionPlanUpdateMaterial([FromBody] ProductionPlanUpdateMaterialRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.ProductionPlanUpdateMaterial(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
     }
 }
