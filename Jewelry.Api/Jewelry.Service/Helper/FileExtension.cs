@@ -48,8 +48,8 @@ namespace Jewelry.Service.Helper
         }
         public string GetPlanImageBase64String(string imageName)
         {
-            //string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
-            string folderPath = Path.Combine("Images", "/OrderPlan");
+            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
+            //string folderPath = Path.Combine("Images", "/OrderPlan");
             string imagePath = Path.Combine(folderPath, imageName);
 
             if (System.IO.File.Exists(imagePath))

@@ -163,8 +163,8 @@ namespace Jewelry.Service.ProductionPlan
                     {
 
                         // combind path
-                        //string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
-                        string imagePath = Path.Combine("Images", "/OrderPlan");
+                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
+                        //string imagePath = Path.Combine("Images", "/OrderPlan");
 
                         //check CreateDirectory
                         if (!Directory.Exists(imagePath))
