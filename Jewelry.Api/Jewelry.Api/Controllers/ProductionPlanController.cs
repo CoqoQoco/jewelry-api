@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
+using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
 using Jewelry.Api.Extension;
@@ -215,6 +216,58 @@ namespace Jewelry.Api.Controllers
             try
             {
                 var response = await _IProductionPlanService.ProductionPlanUpdateMaterial(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ProductionPlanAddStatusDetail")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionPlanAddStatusDetail([FromBody] ProductionPlanStatusAddRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.ProductionPlanAddStatusDetail(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("ProductionPlanUpdateStatusDetail")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionPlanUpdateStatusDetail([FromBody] ProductionPlanStatusUpdateRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.ProductionPlanUpdateStatusDetail(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("ProductionPlanDeleteStatusDetail")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionPlanDeleteStatusDetail([FromBody] ProductionPlanStatusDeleteRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.ProductionPlanDeleteStatusDetail(request);
                 return Ok(response);
             }
             catch (HandleException ex)

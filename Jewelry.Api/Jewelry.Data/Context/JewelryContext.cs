@@ -38,10 +38,11 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; }
 
+    public virtual DbSet<TbtProductionPlanStatusDetail> TbtProductionPlanStatusDetail { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    { }
-//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//    => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -416,6 +417,56 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.ProductionPlanId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_production_plan_material_fk");
+        });
+
+        modelBuilder.Entity<TbtProductionPlanStatusDetail>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_production_plan_status_detail_pk");
+
+            entity.ToTable("tbt_production_plan_status_detail");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AssignBy)
+                .HasColumnType("character varying")
+                .HasColumnName("assign_by");
+            entity.Property(e => e.AssignDate).HasColumnName("assign_date");
+            entity.Property(e => e.AssignDetail)
+                .HasColumnType("character varying")
+                .HasColumnName("assign_detail");
+            entity.Property(e => e.AssignTo)
+                .HasColumnType("character varying")
+                .HasColumnName("assign_to");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.ReceiveBy)
+                .HasColumnType("character varying")
+                .HasColumnName("receive_by");
+            entity.Property(e => e.ReceiveDate).HasColumnName("receive_date");
+            entity.Property(e => e.ReceiveDetail)
+                .HasColumnType("character varying")
+                .HasColumnName("receive_detail");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanStatusDetail)
+                .HasForeignKey(d => d.ProductionPlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_production_plan_fk");
+
+            entity.HasOne(d => d.StatusNavigation).WithMany(p => p.TbtProductionPlanStatusDetail)
+                .HasForeignKey(d => d.Status)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_production_plan_status_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);

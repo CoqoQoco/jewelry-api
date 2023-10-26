@@ -2,6 +2,7 @@
 using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
+using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
 using Jewelry.Data.Context;
@@ -16,6 +17,7 @@ using NPOI.HPSF;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -36,6 +38,9 @@ namespace Jewelry.Service.ProductionPlan
         Task<string> ProductionPlanDeleteMaterial(ProductionPlanMaterialDeleteRequest request);
         Task<string> ProductionPlanUpdateMaterial(ProductionPlanUpdateMaterialRequest request);
 
+        Task<string> ProductionPlanAddStatusDetail(ProductionPlanStatusAddRequest request);
+        Task<string> ProductionPlanUpdateStatusDetail(ProductionPlanStatusUpdateRequest request);
+        Task<string> ProductionPlanDeleteStatusDetail(ProductionPlanStatusDeleteRequest request);
 
         IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus();
     }
@@ -319,6 +324,7 @@ namespace Jewelry.Service.ProductionPlan
                          .Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
+                         .Include(x => x.TbtProductionPlanStatusDetail).ThenInclude(x => x.IsActive == true)
                         where item.IsActive == true
                         && item.Id == id
                         select item).SingleOrDefault();
@@ -378,10 +384,14 @@ namespace Jewelry.Service.ProductionPlan
 
             if (plan == null)
             {
-                throw new HandleException($"ไม่พบใบจ่ายขรับคืนงาน {request.Wo}-{request.WoNumber}");
+                throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
             }
 
-            plan.RequestDate = request.RequestDate.UtcDateTime;
+            if (DateTime.TryParseExact(request.RequestDate, "dd/MM/yyyy", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime result))
+            {
+                //var date = result.ToTimeZone();
+                plan.RequestDate = result.ToUniversalTime();
+            }
 
             plan.ProductQty = request.ProductQty;
             plan.ProductQtyUnit = request.ProductQtyUnit;
@@ -478,6 +488,134 @@ namespace Jewelry.Service.ProductionPlan
             material.UpdateBy = _admin;
 
             _jewelryContext.TbtProductionPlanMaterial.Update(material);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"{plan.Wo}-{plan.WoNumber}";
+        }
+
+        // ----- Add/Update Status Detail -----//
+        public async Task<string> ProductionPlanAddStatusDetail(ProductionPlanStatusAddRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                             where item.Id == request.ProductionPlanId
+                             && item.Wo == request.Wo.ToUpper()
+                             && item.WoNumber == request.WoNumber
+                             select item).SingleOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
+            }
+
+            var addStatusDetail = new TbtProductionPlanStatusDetail()
+            {
+                ProductionPlanId = plan.Id,
+
+                CreateDate = DateTime.UtcNow,
+                CreateBy = _admin,
+
+                AssignDate = request.AssignDate.UtcDateTime,
+                AssignBy = request.AssignBy,
+
+                AssignTo = request.AssignTo ?? string.Empty,
+                AssignDetail = request.AssignDetail ?? string.Empty,
+
+                ReceiveDate = request.ReceiveDate.HasValue ? request.ReceiveDate.Value.UtcDateTime : null,
+                ReceiveBy = request.ReceiveBy ?? string.Empty,
+                ReceiveDetail = request.ReceiveDetail ?? string.Empty,
+
+                Remark = request.Remark ?? string.Empty,
+                IsActive = true,
+            };
+
+            _jewelryContext.TbtProductionPlanStatusDetail.Add(addStatusDetail);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"{plan.Wo}-{plan.WoNumber}";
+        }
+        public async Task<string> ProductionPlanUpdateStatusDetail(ProductionPlanStatusUpdateRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                        where item.Id == request.ProductionPlanId
+                        && item.Wo == request.Wo.ToUpper()
+                        && item.WoNumber == request.WoNumber
+                        select item).SingleOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
+            }
+
+            var status = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                          where item.Id == request.Id
+                          && item.IsActive == true
+                          select item).SingleOrDefault();
+
+            if (status == null)
+            {
+                throw new HandleException($"ไม่พบสถานะใบงาน");
+            }
+
+            status.UpdateDate = DateTime.Now;
+            status.UpdateBy = _admin;
+
+            status.AssignDate = request.AssignDate.UtcDateTime;
+            status.AssignBy = request.AssignBy ?? status.AssignBy;
+
+            status.AssignTo = request.AssignTo ?? status.AssignTo;
+            status.AssignDetail = request.AssignDetail ?? status.AssignDetail;
+
+            status.ReceiveDate = request.ReceiveDate.HasValue ? request.ReceiveDate.Value.UtcDateTime : status.ReceiveDate;
+            status.ReceiveBy = request.ReceiveBy ?? status.ReceiveBy;
+            status.ReceiveDetail = request.AssignDetail ?? status.ReceiveDetail;
+
+            status.Remark = request.Remark ?? status.Remark;
+
+            _jewelryContext.TbtProductionPlanStatusDetail.Update(status);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"{plan.Wo}-{plan.WoNumber}";
+        }
+        public async Task<string> ProductionPlanDeleteStatusDetail(ProductionPlanStatusDeleteRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                        where item.Id == request.ProductionPlanId
+                        && item.Wo == request.Wo.ToUpper()
+                        && item.WoNumber == request.WoNumber
+                        select item).SingleOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
+            }
+
+            var status = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                          where item.Id == request.Id
+                          && item.IsActive == true
+                          select item).SingleOrDefault();
+
+            if (status == null)
+            {
+                throw new HandleException($"ไม่พบสถานะใบงาน");
+            }
+
+            status.UpdateDate = DateTime.Now;
+            status.UpdateBy = _admin;
+            status.IsActive = false;
+
+            _jewelryContext.TbtProductionPlanStatusDetail.Update(status);
             await _jewelryContext.SaveChangesAsync();
 
             return $"{plan.Wo}-{plan.WoNumber}";

@@ -12,7 +12,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanUpdate
         public string Wo { get; set; }
         public int WoNumber { get; set; }
 
-        public DateTimeOffset RequestDate { get; set; }
+        public string RequestDate { get; set; }
 
         public int ProductQty { get; set; }
         public string ProductQtyUnit { get; set; }

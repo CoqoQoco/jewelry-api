@@ -34,6 +34,13 @@ namespace Jewelry.Service.Helper
             return new DateTimeOffset(source.Date.AddHours(0).AddMinutes(0).AddSeconds(0), source.Offset);
         }
 
+        public static DateTime? StartOfDay(this DateTime? source)
+        {
+            if (!source.HasValue)
+                return null;
+
+            return source.Value.Date;
+        }
         public static DateTime? EndOfDay(this DateTime? source)
         {
             if (!source.HasValue)
