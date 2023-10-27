@@ -324,9 +324,10 @@ namespace Jewelry.Service.ProductionPlan
                          .Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
-                         .Include(x => x.TbtProductionPlanStatusDetail).ThenInclude(x => x.IsActive == true)
+                         .Include(x => x.TbtProductionPlanStatusDetail.Where(o => o.IsActive == true).OrderByDescending(x => x.AssignDate).ThenByDescending(x => x.CreateDate))
                         where item.IsActive == true
                         && item.Id == id
+                        //&& item.TbtProductionPlanStatusDetail.Any(x => x.IsActive == true)
                         select item).SingleOrDefault();
 
             if (plan == null)
@@ -497,10 +498,10 @@ namespace Jewelry.Service.ProductionPlan
         public async Task<string> ProductionPlanAddStatusDetail(ProductionPlanStatusAddRequest request)
         {
             var plan = (from item in _jewelryContext.TbtProductionPlan
-                             where item.Id == request.ProductionPlanId
-                             && item.Wo == request.Wo.ToUpper()
-                             && item.WoNumber == request.WoNumber
-                             select item).SingleOrDefault();
+                        where item.Id == request.ProductionPlanId
+                        && item.Wo == request.Wo.ToUpper()
+                        && item.WoNumber == request.WoNumber
+                        select item).SingleOrDefault();
 
             if (plan == null)
             {
@@ -514,6 +515,7 @@ namespace Jewelry.Service.ProductionPlan
             var addStatusDetail = new TbtProductionPlanStatusDetail()
             {
                 ProductionPlanId = plan.Id,
+                Status = request.Status,
 
                 CreateDate = DateTime.UtcNow,
                 CreateBy = _admin,
@@ -611,7 +613,7 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"ไม่พบสถานะใบงาน");
             }
 
-            status.UpdateDate = DateTime.Now;
+            status.UpdateDate = DateTime.UtcNow;
             status.UpdateBy = _admin;
             status.IsActive = false;
 
