@@ -1,11 +1,13 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.Master;
+using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using Jewelry.Api.Extension;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Master;
 using Jewelry.Service.ProductionPlan;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Net;
 
 namespace Jewelry.Api.Controllers
 {
@@ -150,6 +152,79 @@ namespace Jewelry.Api.Controllers
                 var response = _service.MasterCustomerType();
                 //var result = report.ToDataSource(request);
 
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
+        // ------ post to get master
+        [Route("SearchMasterGem")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<MasterModel>))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult SearchMasterGem([FromBody] SearchMasterModelRequest request)
+        {
+            try
+            {
+                var response = _service.SearchMasterGem(request.Search);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
+        [Route("UpdateMasterModel")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UpdateMasterModel([FromBody] UpdateEditMasterModelRequest request)
+        {
+            try
+            {
+                var response = await _service.UpdateMasterModel(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("DeleteMasterModel")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> DeleteMasterModel([FromBody] DeleteMasterModelRequest request)
+        {
+            try
+            {
+                var response = await _service.DeleteMasterModel(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("CreateMasterModel")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CreateMasterModel([FromBody] CreateMasterModelRequest request)
+        {
+            try
+            {
+                var response = await _service.CreateMasterModel(request);
                 return Ok(response);
             }
             catch (HandleException ex)

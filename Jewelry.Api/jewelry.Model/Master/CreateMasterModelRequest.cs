@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace jewelry.Model.Master
 {
-    public class MasterModel
+    public class CreateMasterModelRequest
     {
-        public int Id { get; set; }
+        public string Type { get; set; }
         public string NameEn { get; set; }
         public string NameTh { get; set; }
         public string Code { get; set; }

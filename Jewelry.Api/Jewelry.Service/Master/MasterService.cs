@@ -1,4 +1,5 @@
-﻿using jewelry.Model.Master;
+﻿using jewelry.Model.Exceptions;
+using jewelry.Model.Master;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Microsoft.Extensions.Hosting;
@@ -18,6 +19,13 @@ namespace Jewelry.Service.Master
         IQueryable<MasterModel> MasterGemShape();
         IQueryable<MasterModel> MasterProductType();
         IQueryable<MasterModel> MasterCustomerType();
+
+
+        IQueryable<MasterModel> SearchMasterGem(SearchMasterModel request);
+
+        Task<string> UpdateMasterModel(UpdateEditMasterModelRequest request);
+        Task<string> DeleteMasterModel(DeleteMasterModelRequest request);
+        Task<string> CreateMasterModel(CreateMasterModelRequest request);
     }
 
     public class MasterService : IMasterService
@@ -60,6 +68,7 @@ namespace Jewelry.Service.Master
 
             return response.OrderBy(x => x.NameEn);
         }
+
         public IQueryable<MasterModel> MasterGem()
         {
             var response = (from item in _jewelryContext.TbmGem
@@ -121,6 +130,114 @@ namespace Jewelry.Service.Master
                             });
 
             return response.OrderBy(x => x.Code);
+        }
+
+        // ------ search ------- //
+        public IQueryable<MasterModel> SearchMasterGem(SearchMasterModel request)
+        {
+            var response = (from item in _jewelryContext.TbmGem
+                            where item.IsActive == true
+                            select new MasterModel()
+                            {
+                                Id = item.Id,
+                                NameEn = item.NameEn,
+                                NameTh = item.NameTh,
+                                Code = item.Code,
+                                Description = $"{item.Code}: {item.NameTh}"
+                            });
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                response = (from item in response
+                            where item.Code.Contains(request.Text.ToUpper())
+                            || item.NameTh.Contains(request.Text.ToUpper())
+                            || item.NameEn.Contains(request.Text.ToUpper())
+                            select item);
+            }
+
+            //var FixCode = new string[] { "RU", "SA" };
+            //return response.OrderByDescending(x => FixCode.Contains(x.Code)).ThenBy(x => x.Code);
+            //return response.OrderByDescending(x => x.Code == "RU").ThenByDescending(x => x.Code == "SA").ThenBy(x => x.Code);
+            return response.OrderBy(x => x.Code);
+        }
+
+
+        // ------ Update/Edit ------ //
+        public async Task<string> UpdateMasterModel(UpdateEditMasterModelRequest request)
+        {
+            if (request.Type.ToUpper() == "GEM")
+            {
+                var gem = (from item in _jewelryContext.TbmGem
+                           where item.Id == request.Id
+                           && item.Code == request.Code.ToUpper()
+                           select item).SingleOrDefault();
+
+                if (gem == null)
+                {
+                    throw new HandleException($"ไม่พอข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                gem.NameEn = request.NameEn;
+                gem.NameTh = request.NameTh;
+
+                _jewelryContext.TbmGem.Update(gem);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            return "success";
+        }
+
+        // ------ Delete ------ //
+        public async Task<string> DeleteMasterModel(DeleteMasterModelRequest request)
+        {
+            if (request.Type.ToUpper() == "GEM")
+            {
+                var gem = (from item in _jewelryContext.TbmGem
+                           where item.Id == request.Id
+                           && item.Code == request.Code.ToUpper()
+                           select item).SingleOrDefault();
+
+                if (gem == null)
+                {
+                    throw new HandleException($"ไม่พอข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                _jewelryContext.TbmGem.Remove(gem);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            return "success";
+        }
+
+        // ------ Create ------ //
+        public async Task<string> CreateMasterModel(CreateMasterModelRequest request)
+        {
+            if (request.Type.ToUpper() == "GEM")
+            {
+                var gem = (from item in _jewelryContext.TbmGem
+                           where item.Code == request.Code.ToUpper()
+                           select item).SingleOrDefault();
+
+                if (gem != null)
+                {
+                    throw new HandleException($"มีข้อมูลรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+                }
+
+                var newGem = new TbmGem()
+                {
+                    Code = request.Code.ToUpper(),
+                    NameEn = request.NameEn,
+                    NameTh = request.NameTh,
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = _admin,
+                    IsActive = true,
+                };
+
+                _jewelryContext.TbmGem.Add(newGem);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            return "success";
         }
     }
 }
