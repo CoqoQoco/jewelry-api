@@ -179,6 +179,23 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+        [Route("SearchMasterGemShape")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<MasterModel>))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult SearchMasterGemShape([FromBody] SearchMasterModelRequest request)
+        {
+            try
+            {
+                var response = _service.SearchMasterGemShape(request.Search);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
 
 
         [Route("UpdateMasterModel")]

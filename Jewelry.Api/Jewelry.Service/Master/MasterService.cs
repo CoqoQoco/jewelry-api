@@ -22,6 +22,7 @@ namespace Jewelry.Service.Master
 
 
         IQueryable<MasterModel> SearchMasterGem(SearchMasterModel request);
+        IQueryable<MasterModel> SearchMasterGemShape(SearchMasterModel request);
 
         Task<string> UpdateMasterModel(UpdateEditMasterModelRequest request);
         Task<string> DeleteMasterModel(DeleteMasterModelRequest request);
@@ -160,6 +161,33 @@ namespace Jewelry.Service.Master
             //return response.OrderByDescending(x => x.Code == "RU").ThenByDescending(x => x.Code == "SA").ThenBy(x => x.Code);
             return response.OrderBy(x => x.Code);
         }
+        public IQueryable<MasterModel> SearchMasterGemShape(SearchMasterModel request)
+        {
+            var response = (from item in _jewelryContext.TbmGemShape
+                            where item.IsActive == true
+                            select new MasterModel()
+                            {
+                                Id = item.Id,
+                                NameEn = item.NameEn,
+                                NameTh = item.NameTh,
+                                Code = item.Code,
+                                Description = $"{item.Code}: {item.NameTh}"
+                            });
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                response = (from item in response
+                            where item.Code.Contains(request.Text.ToUpper())
+                            || item.NameTh.Contains(request.Text.ToUpper())
+                            || item.NameEn.Contains(request.Text.ToUpper())
+                            select item);
+            }
+
+            //var FixCode = new string[] { "RU", "SA" };
+            //return response.OrderByDescending(x => FixCode.Contains(x.Code)).ThenBy(x => x.Code);
+            //return response.OrderByDescending(x => x.Code == "RU").ThenByDescending(x => x.Code == "SA").ThenBy(x => x.Code);
+            return response.OrderBy(x => x.Code);
+        }
 
 
         // ------ Update/Edit ------ //
@@ -206,6 +234,22 @@ namespace Jewelry.Service.Master
                 await _jewelryContext.SaveChangesAsync();
             }
 
+            if (request.Type.ToUpper() == "GEM-SHAPE")
+            {
+                var gemShape = (from item in _jewelryContext.TbmGemShape
+                           where item.Id == request.Id
+                           && item.Code == request.Code.ToUpper()
+                           select item).SingleOrDefault();
+
+                if (gemShape == null)
+                {
+                    throw new HandleException($"ไม่พอข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                _jewelryContext.TbmGemShape.Remove(gemShape);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
             return "success";
         }
 
@@ -234,6 +278,31 @@ namespace Jewelry.Service.Master
                 };
 
                 _jewelryContext.TbmGem.Add(newGem);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            if (request.Type.ToUpper() == "GEM-SHAPE")
+            {
+                var gemShape = (from item in _jewelryContext.TbmGemShape
+                           where item.Code == request.Code.ToUpper()
+                           select item).SingleOrDefault();
+
+                if (gemShape != null)
+                {
+                    throw new HandleException($"มีข้อมูลรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+                }
+
+                var newGemShape = new TbmGemShape()
+                {
+                    Code = request.Code.ToUpper(),
+                    NameEn = request.NameEn,
+                    NameTh = request.NameTh,
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = _admin,
+                    IsActive = true,
+                };
+
+                _jewelryContext.TbmGemShape.Add(newGemShape);
                 await _jewelryContext.SaveChangesAsync();
             }
 
