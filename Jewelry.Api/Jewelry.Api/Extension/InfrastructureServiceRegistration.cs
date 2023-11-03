@@ -2,6 +2,7 @@
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
 using Jewelry.Service.ProductionPlan;
+using Jewelry.Service.Stock;
 using Jewelry.Service.User;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,6 +27,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionPlanService, ProductionPlanService>();
             services.AddScoped<IFileExtension, FileExtension>();
             services.AddScoped<IMasterService, MasterService>();
+            services.AddScoped<IMoldService, MoldService>();
 
             return services;
         }

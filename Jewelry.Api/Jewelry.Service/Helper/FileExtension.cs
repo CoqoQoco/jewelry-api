@@ -13,6 +13,7 @@ namespace Jewelry.Service.Helper
     {
         Stream? GetPlanImage(string imageName);
         string GetPlanImageBase64String(string imageName);
+        string GetMoldImageBase64String(string imageName);
     }
     public class FileExtension : IFileExtension
     {
@@ -49,6 +50,24 @@ namespace Jewelry.Service.Helper
         public string GetPlanImageBase64String(string imageName)
         {
             string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
+            //string folderPath = Path.Combine("Images", "/OrderPlan");
+            string imagePath = Path.Combine(folderPath, imageName);
+
+            if (System.IO.File.Exists(imagePath))
+            {
+                byte[] imageBytes = System.IO.File.ReadAllBytes(imagePath);
+
+                // แปลง byte array เป็น Base64 string
+                return Convert.ToBase64String(imageBytes);
+            }
+            else
+            {
+                return null;
+            }
+        }
+        public string GetMoldImageBase64String(string imageName)
+        {
+            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
             //string folderPath = Path.Combine("Images", "/OrderPlan");
             string imagePath = Path.Combine(folderPath, imageName);
 

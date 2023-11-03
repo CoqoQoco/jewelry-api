@@ -32,6 +32,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmProductionPlanStatus> TbmProductionPlanStatus { get; set; }
 
+    public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
+
     public virtual DbSet<TbtProductionPlan> TbtProductionPlan { get; set; }
 
     public virtual DbSet<TbtProductionPlanImage> TbtProductionPlanImage { get; set; }
@@ -40,10 +42,9 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanStatusDetail> TbtProductionPlanStatusDetail { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    { }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//    => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
+//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -233,6 +234,35 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.NameTh)
                 .HasColumnType("character varying")
                 .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbtProductMold>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbt_product_mold_pk");
+
+            entity.ToTable("tbt_product_mold");
+
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.Category)
+                .HasColumnType("character varying")
+                .HasColumnName("category");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Description)
+                .HasColumnType("character varying")
+                .HasColumnName("description");
+            entity.Property(e => e.Image)
+                .HasColumnType("character varying")
+                .HasColumnName("image");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         modelBuilder.Entity<TbtProductionPlan>(entity =>
