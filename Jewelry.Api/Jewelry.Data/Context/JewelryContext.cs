@@ -42,9 +42,12 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanStatusDetail> TbtProductionPlanStatusDetail { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
+    public virtual DbSet<TbtRunningNumber> TbtRunningNumber { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    { }
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
+//    => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -303,6 +306,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ProductQtyUnit)
                 .HasColumnType("character varying")
                 .HasColumnName("product_qty_unit");
+            entity.Property(e => e.ProductRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("product_running");
             entity.Property(e => e.ProductType)
                 .HasColumnType("character varying")
                 .HasColumnName("product_type");
@@ -502,6 +508,18 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.Status)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_production_plan_status_fk");
+        });
+
+        modelBuilder.Entity<TbtRunningNumber>(entity =>
+        {
+            entity.HasKey(e => e.Key).HasName("tbt_running_number_pk");
+
+            entity.ToTable("tbt_running_number");
+
+            entity.Property(e => e.Key)
+                .HasColumnType("character varying")
+                .HasColumnName("key");
+            entity.Property(e => e.Number).HasColumnName("number");
         });
 
         OnModelCreatingPartial(modelBuilder);

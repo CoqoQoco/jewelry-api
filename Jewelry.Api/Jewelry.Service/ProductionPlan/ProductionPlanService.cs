@@ -49,10 +49,12 @@ namespace Jewelry.Service.ProductionPlan
         private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
-        public ProductionPlanService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
+        private readonly IRunningNumber _runningNumberService;
+        public ProductionPlanService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
+            _runningNumberService = runningNumberService;
         }
 
         #region ----- Production Plan -----
@@ -78,6 +80,7 @@ namespace Jewelry.Service.ProductionPlan
                     throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} ทำซ้ำ กรุณาสร้างหมายเลขใหม่");
                 }
 
+                var running = await _runningNumberService.GenerateRunningNumber("PLAN");
 
                 using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
                 {
@@ -91,7 +94,9 @@ namespace Jewelry.Service.ProductionPlan
                         CustomerType = request.CustomerType.Trim(),
                         RequestDate = request.RequestDate.UtcDateTime,
 
-                        ProductNumber = request.ProductNumber.Trim(),
+                        ProductRunning = running,
+                        ProductNumber = request.ProductNumber,
+
                         ProductName = request.ProductName.Trim(),
                         ProductType = request.ProductType.Trim(),
 

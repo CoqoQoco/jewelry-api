@@ -28,6 +28,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IFileExtension, FileExtension>();
             services.AddScoped<IMasterService, MasterService>();
             services.AddScoped<IMoldService, MoldService>();
+            services.AddScoped<IRunningNumber, RunningNumber>();
 
             return services;
         }

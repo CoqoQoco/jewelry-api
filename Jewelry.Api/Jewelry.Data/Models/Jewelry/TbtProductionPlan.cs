@@ -57,6 +57,8 @@ public partial class TbtProductionPlan
 
     public string ProductQtyUnit { get; set; } = null!;
 
+    public string? ProductRunning { get; set; }
+
     public virtual TbmCustomerType? CustomerTypeNavigation { get; set; }
 
     public virtual TbmProductType ProductTypeNavigation { get; set; } = null!;
