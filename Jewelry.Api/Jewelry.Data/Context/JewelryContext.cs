@@ -325,6 +325,10 @@ public partial class JewelryContext : DbContext
                 .HasComment("ลำดับใบจ่าย-รับงาน")
                 .HasColumnName("wo_number");
 
+            entity.HasOne(d => d.CustomerTypeNavigation).WithMany(p => p.TbtProductionPlan)
+                .HasForeignKey(d => d.CustomerType)
+                .HasConstraintName("tbt_customer_type_fk");
+
             entity.HasOne(d => d.ProductTypeNavigation).WithMany(p => p.TbtProductionPlan)
                 .HasForeignKey(d => d.ProductType)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -333,7 +337,7 @@ public partial class JewelryContext : DbContext
             entity.HasOne(d => d.StatusNavigation).WithMany(p => p.TbtProductionPlan)
                 .HasForeignKey(d => d.Status)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("tbt_production_plan_fk");
+                .HasConstraintName("tbt_production_status_fk");
         });
 
         modelBuilder.Entity<TbtProductionPlanImage>(entity =>

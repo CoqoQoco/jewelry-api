@@ -18,4 +18,6 @@ public partial class TbmCustomerType
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;
+
+    public virtual ICollection<TbtProductionPlan> TbtProductionPlan { get; set; } = new List<TbtProductionPlan>();
 }

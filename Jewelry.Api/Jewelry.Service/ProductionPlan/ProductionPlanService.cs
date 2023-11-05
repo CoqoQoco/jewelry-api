@@ -320,7 +320,7 @@ namespace Jewelry.Service.ProductionPlan
         {
             var plan = (from item in _jewelryContext.TbtProductionPlan
                          .Include(x => x.ProductTypeNavigation)
-                         //.Include(x => x.CustomerTypeNavigation)
+                         .Include(x => x.CustomerTypeNavigation)
                          .Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
@@ -388,19 +388,28 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
             }
 
-            if (DateTime.TryParseExact(request.RequestDate, "dd/MM/yyyy", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime result))
+            plan.Mold = request.Mold.ToUpper();
+            if (request.RequestDate.HasValue)
             {
-                //var date = result.ToTimeZone();
-                plan.RequestDate = result.ToUniversalTime();
+                plan.RequestDate = request.RequestDate.Value.UtcDateTime;
+            }
+
+            plan.CustomerNumber = request.CustomerNumber.Trim();
+            if (!string.IsNullOrEmpty(request.CustomerType))
+            {
+                plan.CustomerType = request.CustomerType.Trim();
             }
 
             plan.ProductQty = request.ProductQty;
             plan.ProductQtyUnit = request.ProductQtyUnit;
 
-            plan.ProductNumber = request.ProductNumber;
             plan.ProductName = request.ProductName;
-            plan.ProductDetail = request.ProductDetail;
+            if (!string.IsNullOrEmpty(request.ProductType))
+            {
+                plan.ProductType = request.ProductType.Trim();
+            }
 
+            plan.ProductDetail = request.ProductDetail;
             plan.Remark = request.Remark ?? plan.Remark;
 
             plan.UpdateDate = DateTime.UtcNow;
