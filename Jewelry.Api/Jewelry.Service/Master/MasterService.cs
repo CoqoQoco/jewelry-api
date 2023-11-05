@@ -21,8 +21,7 @@ namespace Jewelry.Service.Master
         IQueryable<MasterModel> MasterCustomerType();
 
 
-        IQueryable<MasterModel> SearchMasterGem(SearchMasterModel request);
-        IQueryable<MasterModel> SearchMasterGemShape(SearchMasterModel request);
+        IQueryable<MasterModel> SearchMaster(SearchMasterModel request);
 
         Task<string> UpdateMasterModel(UpdateEditMasterModelRequest request);
         Task<string> DeleteMasterModel(DeleteMasterModelRequest request);
@@ -134,61 +133,120 @@ namespace Jewelry.Service.Master
         }
 
         // ------ search ------- //
-        public IQueryable<MasterModel> SearchMasterGem(SearchMasterModel request)
+        public IQueryable<MasterModel> SearchMaster(SearchMasterModel request)
         {
-            var response = (from item in _jewelryContext.TbmGem
-                            where item.IsActive == true
-                            select new MasterModel()
-                            {
-                                Id = item.Id,
-                                NameEn = item.NameEn,
-                                NameTh = item.NameTh,
-                                Code = item.Code,
-                                Description = $"{item.Code}: {item.NameTh}"
-                            });
 
-            if (!string.IsNullOrEmpty(request.Text))
+            if (request.Type == "GEM")
             {
-                response = (from item in response
-                            where item.Code.Contains(request.Text.ToUpper())
-                            || item.NameTh.Contains(request.Text.ToUpper())
-                            || item.NameEn.Contains(request.Text.ToUpper())
-                            select item);
+
+                var response = (from item in _jewelryContext.TbmGem
+                                where item.IsActive == true
+                                select new MasterModel()
+                                {
+                                    Id = item.Id,
+                                    NameEn = item.NameEn,
+                                    NameTh = item.NameTh,
+                                    Code = item.Code,
+                                    Description = $"{item.Code}: {item.NameTh}"
+                                });
+
+
+                if (!string.IsNullOrEmpty(request.Text))
+                {
+                    response = (from item in response
+                                where item.Code.Contains(request.Text.ToUpper())
+                                || item.NameTh.Contains(request.Text.ToUpper())
+                                || item.NameEn.Contains(request.Text.ToUpper())
+                                select item);
+                }
+
+                //var FixCode = new string[] { "RU", "SA" };
+                //return response.OrderByDescending(x => FixCode.Contains(x.Code)).ThenBy(x => x.Code);
+                //return response.OrderByDescending(x => x.Code == "RU").ThenByDescending(x => x.Code == "SA").ThenBy(x => x.Code);
+                return response.OrderBy(x => x.Code);
             }
 
-            //var FixCode = new string[] { "RU", "SA" };
-            //return response.OrderByDescending(x => FixCode.Contains(x.Code)).ThenBy(x => x.Code);
-            //return response.OrderByDescending(x => x.Code == "RU").ThenByDescending(x => x.Code == "SA").ThenBy(x => x.Code);
-            return response.OrderBy(x => x.Code);
-        }
-        public IQueryable<MasterModel> SearchMasterGemShape(SearchMasterModel request)
-        {
-            var response = (from item in _jewelryContext.TbmGemShape
-                            where item.IsActive == true
-                            select new MasterModel()
-                            {
-                                Id = item.Id,
-                                NameEn = item.NameEn,
-                                NameTh = item.NameTh,
-                                Code = item.Code,
-                                Description = $"{item.Code}: {item.NameTh}"
-                            });
-
-            if (!string.IsNullOrEmpty(request.Text))
+            else if (request.Type == "GEM-SHAPE")
             {
-                response = (from item in response
-                            where item.Code.Contains(request.Text.ToUpper())
-                            || item.NameTh.Contains(request.Text.ToUpper())
-                            || item.NameEn.Contains(request.Text.ToUpper())
-                            select item);
+                var response = (from item in _jewelryContext.TbmGemShape
+                                where item.IsActive == true
+                                select new MasterModel()
+                                {
+                                    Id = item.Id,
+                                    NameEn = item.NameEn,
+                                    NameTh = item.NameTh,
+                                    Code = item.Code,
+                                    Description = $"{item.Code}: {item.NameTh}"
+                                });
+
+                if (!string.IsNullOrEmpty(request.Text))
+                {
+                    response = (from item in response
+                                where item.Code.Contains(request.Text.ToUpper())
+                                || item.NameTh.Contains(request.Text.ToUpper())
+                                || item.NameEn.Contains(request.Text.ToUpper())
+                                select item);
+                }
+
+                return response.OrderBy(x => x.Code);
             }
 
-            //var FixCode = new string[] { "RU", "SA" };
-            //return response.OrderByDescending(x => FixCode.Contains(x.Code)).ThenBy(x => x.Code);
-            //return response.OrderByDescending(x => x.Code == "RU").ThenByDescending(x => x.Code == "SA").ThenBy(x => x.Code);
-            return response.OrderBy(x => x.Code);
-        }
+            else if (request.Type.ToUpper() == "GOLD-SIZE")
+            {
+                var response = (from item in _jewelryContext.TbmGoldSize
+                                where item.IsActive == true
+                                select new MasterModel()
+                                {
+                                    Id = item.Id,
+                                    NameEn = item.NameEn,
+                                    NameTh = item.NameTh,
+                                    Code = item.Code,
+                                    Description = $"{item.Code}: {item.NameTh}"
+                                });
 
+                if (!string.IsNullOrEmpty(request.Text))
+                {
+                    response = (from item in response
+                                where item.Code.Contains(request.Text.ToUpper())
+                                || item.NameTh.Contains(request.Text.ToUpper())
+                                || item.NameEn.Contains(request.Text.ToUpper())
+                                select item);
+                }
+
+                //var FixCode = new string[] { "RU", "SA" };
+                //return response.OrderByDescending(x => FixCode.Contains(x.Code)).ThenBy(x => x.Code);
+                //return response.OrderByDescending(x => x.Code == "RU").ThenByDescending(x => x.Code == "SA").ThenBy(x => x.Code);
+                return response.OrderBy(x => x.Code);
+            }
+
+            else if (request.Type.ToUpper() == "PRODUCT-TYPE")
+            {
+                var response = (from item in _jewelryContext.TbmProductType
+                                where item.IsActive == true
+                                select new MasterModel()
+                                {
+                                    Id = item.Id,
+                                    NameEn = item.NameEn,
+                                    NameTh = item.NameTh,
+                                    Code = item.Code,
+                                    Description = $"{item.Code}: {item.NameTh}"
+                                });
+
+                if (!string.IsNullOrEmpty(request.Text))
+                {
+                    response = (from item in response
+                                where item.Code.Contains(request.Text.ToUpper())
+                                || item.NameTh.Contains(request.Text.ToUpper())
+                                || item.NameEn.Contains(request.Text.ToUpper())
+                                select item);
+                }
+
+                return response.OrderBy(x => x.Code);
+            }
+
+            throw new HandleException("Type is required.");
+
+        }
 
         // ------ Update/Edit ------ //
         public async Task<string> UpdateMasterModel(UpdateEditMasterModelRequest request)
@@ -234,12 +292,12 @@ namespace Jewelry.Service.Master
                 await _jewelryContext.SaveChangesAsync();
             }
 
-            if (request.Type.ToUpper() == "GEM-SHAPE")
+            else if (request.Type.ToUpper() == "GEM-SHAPE")
             {
                 var gemShape = (from item in _jewelryContext.TbmGemShape
-                           where item.Id == request.Id
-                           && item.Code == request.Code.ToUpper()
-                           select item).SingleOrDefault();
+                                where item.Id == request.Id
+                                && item.Code == request.Code.ToUpper()
+                                select item).SingleOrDefault();
 
                 if (gemShape == null)
                 {
@@ -247,6 +305,38 @@ namespace Jewelry.Service.Master
                 }
 
                 _jewelryContext.TbmGemShape.Remove(gemShape);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            else if (request.Type.ToUpper() == "GOLD-SIZE")
+            {
+                var goldSize = (from item in _jewelryContext.TbmGoldSize
+                                where item.Id == request.Id
+                                && item.Code == request.Code.ToUpper()
+                                select item).SingleOrDefault();
+
+                if (goldSize == null)
+                {
+                    throw new HandleException($"ไม่พอข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                _jewelryContext.TbmGoldSize.Remove(goldSize);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            else if (request.Type.ToUpper() == "PRODUCT-TYPE")
+            {
+                var productType = (from item in _jewelryContext.TbmProductType
+                                   where item.Id == request.Id
+                                   && item.Code == request.Code.ToUpper()
+                                   select item).SingleOrDefault();
+
+                if (productType == null)
+                {
+                    throw new HandleException($"ไม่พอข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                _jewelryContext.TbmProductType.Remove(productType);
                 await _jewelryContext.SaveChangesAsync();
             }
 
@@ -281,11 +371,11 @@ namespace Jewelry.Service.Master
                 await _jewelryContext.SaveChangesAsync();
             }
 
-            if (request.Type.ToUpper() == "GEM-SHAPE")
+            else if (request.Type.ToUpper() == "GEM-SHAPE")
             {
                 var gemShape = (from item in _jewelryContext.TbmGemShape
-                           where item.Code == request.Code.ToUpper()
-                           select item).SingleOrDefault();
+                                where item.Code == request.Code.ToUpper()
+                                select item).SingleOrDefault();
 
                 if (gemShape != null)
                 {
@@ -303,6 +393,56 @@ namespace Jewelry.Service.Master
                 };
 
                 _jewelryContext.TbmGemShape.Add(newGemShape);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            else if (request.Type.ToUpper() == "GOLD-SIZE")
+            {
+                var goldSize = (from item in _jewelryContext.TbmGoldSize
+                                where item.Code == request.Code.ToUpper()
+                                select item).SingleOrDefault();
+
+                if (goldSize != null)
+                {
+                    throw new HandleException($"มีข้อมูลรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+                }
+
+                var newGoldSize = new TbmGoldSize()
+                {
+                    Code = request.Code.ToUpper(),
+                    NameEn = request.NameEn,
+                    NameTh = request.NameTh,
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = _admin,
+                    IsActive = true,
+                };
+
+                _jewelryContext.TbmGoldSize.Add(newGoldSize);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            else if (request.Type.ToUpper() == "PRODUCT-TYPE")
+            {
+                var productType = (from item in _jewelryContext.TbmProductType
+                                where item.Code == request.Code.ToUpper()
+                                select item).SingleOrDefault();
+
+                if (productType != null)
+                {
+                    throw new HandleException($"มีข้อมูลรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+                }
+
+                var newProductType = new TbmProductType()
+                {
+                    Code = request.Code.ToUpper(),
+                    NameEn = request.NameEn,
+                    NameTh = request.NameTh,
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = _admin,
+                    IsActive = true,
+                };
+
+                _jewelryContext.TbmProductType.Add(newProductType);
                 await _jewelryContext.SaveChangesAsync();
             }
 

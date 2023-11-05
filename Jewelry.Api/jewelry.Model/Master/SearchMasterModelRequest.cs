@@ -13,6 +13,7 @@ namespace jewelry.Model.Master
 
     public class SearchMasterModel
     {
+        public string Type { get; set; }
         public string? Text { get; set; }
     }
 }
