@@ -409,6 +409,8 @@ namespace Jewelry.Service.ProductionPlan
             plan.ProductQtyUnit = request.ProductQtyUnit;
 
             plan.ProductName = request.ProductName;
+            plan.ProductNumber = request.ProductNumber; 
+
             if (!string.IsNullOrEmpty(request.ProductType))
             {
                 plan.ProductType = request.ProductType.Trim();

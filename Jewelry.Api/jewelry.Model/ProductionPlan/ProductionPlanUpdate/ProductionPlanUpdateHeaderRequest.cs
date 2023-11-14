@@ -22,6 +22,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanUpdate
         public string ProductQtyUnit { get; set; }
 
         public string ProductName { get; set; }
+        public string ProductNumber { get; set; }
         public string? ProductType { get; set; }
         public string ProductDetail { get; set; }
         public string? Remark { get; set; }
