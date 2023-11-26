@@ -29,7 +29,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
         public string ProductDetail { get; set; }
         public string? Remark { get; set; }
 
-        public IFormFile Images { get; set; }
+        //public IFormFile Images { get; set; }
 
 
         public string Material { get; set; }

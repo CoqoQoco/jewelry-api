@@ -5,6 +5,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using Jewelry.Api.Extension;
 using Jewelry.Service.ProductionPlan;
 using Jewelry.Service.Stock;
+using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -49,18 +50,18 @@ namespace Jewelry.Api.Controllers
         [Route("SearchMold")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<MasterModel>))]
-        [ProducesResponseType((int)HttpStatusCode.OK)]
-        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult SearchMold([FromBody] SearchMoldRequest request)
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult SearchMold([FromBody] SearchMoldRequest request)
         {
             try
             {
                 var response = _service.SearchMold(request.Search);
-                return Ok(response);
+                return response.ToDataSource(request);
             }
             catch (HandleException ex)
             {
-                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
     }

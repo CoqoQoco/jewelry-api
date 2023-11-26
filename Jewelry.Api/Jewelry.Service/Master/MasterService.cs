@@ -260,7 +260,7 @@ namespace Jewelry.Service.Master
 
                 if (gem == null)
                 {
-                    throw new HandleException($"ไม่พอข้อมูลรหัส {request.Code.ToUpper()}");
+                    throw new HandleException($"ไม่พบข้อมูลรหัส {request.Code.ToUpper()}");
                 }
 
                 gem.NameEn = request.NameEn;

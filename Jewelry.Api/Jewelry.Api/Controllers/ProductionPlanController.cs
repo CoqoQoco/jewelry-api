@@ -72,21 +72,17 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public IActionResult ProductionPlanSearch([FromBody] ProductionPlanTrackingRequest request)
+        public DataSourceResult ProductionPlanSearch([FromBody] ProductionPlanTrackingRequest request)
         {
             try
             {
-                if (!ModelState.IsValid)
-                    return ModelStateBadRequest();
-
                 var report = _IProductionPlanService.ProductionPlanSearch(request.Search);
-                var result = report.ToDataSource(request);
+                return report.ToDataSource(request);
 
-                return Ok(result);
             }
             catch (HandleException ex)
             {
-                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
         [Route("ProductionPlanGet")]

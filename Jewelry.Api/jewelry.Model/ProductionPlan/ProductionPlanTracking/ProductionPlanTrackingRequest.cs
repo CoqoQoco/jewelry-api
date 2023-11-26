@@ -9,7 +9,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
 {
     public class ProductionPlanTrackingRequest : DataSourceRequest
     {
-        public ProductionPlanTracking? Search { get; set; }
+        public ProductionPlanTracking Search { get; set; }
     }
     public class ProductionPlanTracking
     {

@@ -163,54 +163,53 @@ namespace Jewelry.Service.ProductionPlan
                     _jewelryContext.TbtProductionPlanMaterial.AddRange(createMaterials);
                     await _jewelryContext.SaveChangesAsync();
 
-                    if (request.Images == null)
-                    {
-                        throw new HandleException($"กรุณาระบุรูปภาพสินค้า");
-                    }
+                    //if (request.Images == null)
+                    //{
+                    //    throw new HandleException($"กรุณาระบุรูปภาพสินค้า");
+                    //}
 
-                    string _imageName = $"{request.Wo.ToUpper().Trim()}-{request.WoNumber}-Product.png";
-                    try
-                    {
+                    //string _imageName = $"{request.Wo.ToUpper().Trim()}-{request.WoNumber}-Product.png";
+                    //try
+                    //{
 
-                        // combind path
-                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
-                        //string imagePath = Path.Combine("Images", "/OrderPlan");
+                    //    // combind path
+                    //    string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
 
-                        //check CreateDirectory
-                        if (!Directory.Exists(imagePath))
-                        {
-                            Directory.CreateDirectory(imagePath);
-                        }
+                    //    //check CreateDirectory
+                    //    if (!Directory.Exists(imagePath))
+                    //    {
+                    //        Directory.CreateDirectory(imagePath);
+                    //    }
 
-                        //combine image name
-                        string imagePathWithFileName = Path.Combine(imagePath, _imageName);
+                    //    //combine image name
+                    //    string imagePathWithFileName = Path.Combine(imagePath, _imageName);
 
-                        //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                        using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
-                        {
-                            request.Images.CopyTo(fileStream);
-                            fileStream.Close();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
-                    }
+                    //    //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
+                    //    using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                    //    {
+                    //        request.Images.CopyTo(fileStream);
+                    //        fileStream.Close();
+                    //    }
+                    //}
+                    //catch (Exception ex)
+                    //{
+                    //    throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                    //}
 
 
-                    var createImage = new TbtProductionPlanImage()
-                    {
-                        ProductionPlanId = createPlan.Id,
-                        Number = 0,
+                    //var createImage = new TbtProductionPlanImage()
+                    //{
+                    //    ProductionPlanId = createPlan.Id,
+                    //    Number = 0,
 
-                        Path = _imageName,
+                    //    Path = _imageName,
 
-                        IsActive = true,
-                        CreateDate = DateTime.UtcNow,
-                        CreateBy = _admin,
-                    };
-                    _jewelryContext.TbtProductionPlanImage.Add(createImage);
-                    await _jewelryContext.SaveChangesAsync();
+                    //    IsActive = true,
+                    //    CreateDate = DateTime.UtcNow,
+                    //    CreateBy = _admin,
+                    //};
+                    //_jewelryContext.TbtProductionPlanImage.Add(createImage);
+                    //await _jewelryContext.SaveChangesAsync();
 
                     scope.Complete();
                 }
@@ -292,7 +291,7 @@ namespace Jewelry.Service.ProductionPlan
         public IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request)
         {
             var query = (from item in _jewelryContext.TbtProductionPlan
-                         .Include(x => x.TbtProductionPlanImage)
+                         //.Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
                          where item.IsActive == true
