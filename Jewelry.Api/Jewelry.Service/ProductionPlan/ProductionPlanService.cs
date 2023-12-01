@@ -325,10 +325,12 @@ namespace Jewelry.Service.ProductionPlan
             var plan = (from item in _jewelryContext.TbtProductionPlan
                          .Include(x => x.ProductTypeNavigation)
                          .Include(x => x.CustomerTypeNavigation)
-                         .Include(x => x.TbtProductionPlanImage)
+                         //.Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
-                         .Include(x => x.TbtProductionPlanStatusDetail.Where(o => o.IsActive == true).OrderByDescending(x => x.AssignDate).ThenByDescending(x => x.CreateDate))
+                         .Include(x => x.TbtProductionPlanStatusHeader
+                            .Where(o => o.IsActive == true).OrderByDescending(x => x.CreateDate))
+                            .ThenInclude(x => x.TbtProductionPlanStatusDetail)
                         where item.IsActive == true
                         && item.Id == id
                         //&& item.TbtProductionPlanStatusDetail.Any(x => x.IsActive == true)
@@ -408,7 +410,7 @@ namespace Jewelry.Service.ProductionPlan
             plan.ProductQtyUnit = request.ProductQtyUnit;
 
             plan.ProductName = request.ProductName;
-            plan.ProductNumber = request.ProductNumber; 
+            plan.ProductNumber = request.ProductNumber;
 
             if (!string.IsNullOrEmpty(request.ProductType))
             {
@@ -527,30 +529,158 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
             }
 
-            var addStatusDetail = new TbtProductionPlanStatusDetail()
+            var checkDubStatus = (from item in _jewelryContext.TbtProductionPlanStatusHeader
+                                  where item.ProductionPlanId == request.ProductionPlanId && item.Status == request.Status && item.IsActive
+                                  select item);
+
+            if (checkDubStatus.Any())
             {
-                ProductionPlanId = plan.Id,
-                Status = request.Status,
+                throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber}  ถูกระบุสถานะดำเนินการเเล้ว กรุณาใช้การเเก้ไขข้อมูล");
+            }
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var addStatusItem = new List<TbtProductionPlanStatusDetail>();
 
-                CreateDate = DateTime.UtcNow,
-                CreateBy = _admin,
+                switch (request.Status)
+                {
+                    case 50: //จ่ายเเต่ง
+                    case 60: //จ่ายขัดดิบ
+                    case 80: //จ่ายฝัง
+                    case 90: //จ่ายขัดชุบ
+                        {
+                            if (request.Golds == null || request.Golds.Any() == false)
+                            {
+                                throw new HandleException($"โปรดระบุรายละเอียดของทอง");
+                            }
+                            var addStatus = new TbtProductionPlanStatusHeader
+                            {
+                                ProductionPlanId = request.ProductionPlanId,
+                                Status = request.Status,
+                                IsActive = true,
 
-                AssignDate = request.AssignDate.UtcDateTime,
-                AssignBy = request.AssignBy,
+                                CreateDate = DateTime.UtcNow,
+                                CreateBy = _admin,
+                                UpdateDate = DateTime.UtcNow,
+                                UpdateBy = _admin,
 
-                AssignTo = request.AssignTo ?? string.Empty,
-                AssignDetail = request.AssignDetail ?? string.Empty,
+                                SendName = request.SendName,
+                                SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null,
+                                CheckName = request.CheckName,
+                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
 
-                ReceiveDate = request.ReceiveDate.HasValue ? request.ReceiveDate.Value.UtcDateTime : null,
-                ReceiveBy = request.ReceiveBy ?? string.Empty,
-                ReceiveDetail = request.ReceiveDetail ?? string.Empty,
+                                Remark1 = request.Remark1,
+                                Remark2 = request.Remark2,
+                            };
+                            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
+                            await _jewelryContext.SaveChangesAsync();
 
-                Remark = request.Remark ?? string.Empty,
-                IsActive = true,
-            };
+                            foreach (var item in request.Golds)
+                            {
 
-            _jewelryContext.TbtProductionPlanStatusDetail.Add(addStatusDetail);
-            await _jewelryContext.SaveChangesAsync();
+                                var newStatusItem = new TbtProductionPlanStatusDetail()
+                                {
+                                    HeaderId = addStatus.Id,
+                                    ProductionPlanId = request.ProductionPlanId,
+                                    ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
+                                    IsActive = true,
+
+                                    Gold = item.Gold,
+                                    GoldQtySend = item.GoldQTYSend,
+                                    GoldWeightSend = item.GoldWeightSend,
+                                    GoldQtyCheck = item.GoldQTYCheck,
+                                    GoldWeightCheck = item.GoldWeightCheck,
+                                    ////GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck,
+                                    //GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend),
+                                    Worker = item.Worker,
+
+                                };
+
+                                if (item.GoldWeightSend.HasValue && item.GoldWeightCheck.HasValue)
+                                {
+                                    newStatusItem.GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck;
+                                    newStatusItem.GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend);
+                                }
+
+                                addStatusItem.Add(newStatusItem);
+                            }
+                        }
+                        break;
+                    case 70: //จ่ายขัดพลอย
+                        {
+                            if (request.Golds == null || request.Golds.Any() == false)
+                            {
+                                throw new HandleException($"โปรดระบุรายละเอียดของทอง");
+                            }
+
+                            var addStatus = new TbtProductionPlanStatusHeader
+                            {
+                                ProductionPlanId = request.ProductionPlanId,
+                                Status = request.Status,
+                                IsActive = true,
+
+                                CreateDate = DateTime.UtcNow,
+                                CreateBy = _admin,
+                                UpdateDate = DateTime.UtcNow,
+                                UpdateBy = _admin,
+
+                                CheckName = request.CheckName,
+                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+
+                                Remark1 = request.Remark1,
+                                Remark2 = request.Remark2,
+                            };
+                            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
+                            await _jewelryContext.SaveChangesAsync();
+
+                            foreach (var item in request.Golds)
+                            {
+                                //var itemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}");
+                                var newStatus = new TbtProductionPlanStatusDetail()
+                                {
+                                    HeaderId = addStatus.Id,
+                                    ProductionPlanId = request.ProductionPlanId,
+                                    ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
+                                    IsActive = true,
+
+                                    Gold = item.Gold,
+                                    GoldQtyCheck = item.GoldQTYCheck,
+                                    GoldWeightCheck = item.GoldWeightCheck,
+                                };
+                                addStatusItem.Add(newStatus);
+                            }
+                        }
+                        break;
+                    case 85: //CVD
+                        {
+
+                            var addStatus = new TbtProductionPlanStatusHeader
+                            {
+                                ProductionPlanId = request.ProductionPlanId,
+                                Status = request.Status,
+                                IsActive = true,
+
+                                CreateDate = DateTime.UtcNow,
+                                CreateBy = _admin,
+                                UpdateDate = DateTime.UtcNow,
+                                UpdateBy = _admin,
+
+                                CheckName = request.CheckName,
+                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+
+                                Remark1 = request.Remark1,
+                                Remark2 = request.Remark2,
+                            };
+                            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
+                            await _jewelryContext.SaveChangesAsync();
+                        }
+                        break;
+                }
+
+                _jewelryContext.TbtProductionPlanStatusDetail.AddRange(addStatusItem);
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
 
             return $"{plan.Wo}-{plan.WoNumber}";
         }
@@ -571,33 +701,6 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
             }
 
-            var status = (from item in _jewelryContext.TbtProductionPlanStatusDetail
-                          where item.Id == request.Id
-                          && item.IsActive == true
-                          select item).SingleOrDefault();
-
-            if (status == null)
-            {
-                throw new HandleException($"ไม่พบสถานะใบงาน");
-            }
-
-            status.UpdateDate = DateTime.Now;
-            status.UpdateBy = _admin;
-
-            status.AssignDate = request.AssignDate.UtcDateTime;
-            status.AssignBy = request.AssignBy ?? status.AssignBy;
-
-            status.AssignTo = request.AssignTo ?? status.AssignTo;
-            status.AssignDetail = request.AssignDetail ?? status.AssignDetail;
-
-            status.ReceiveDate = request.ReceiveDate.HasValue ? request.ReceiveDate.Value.UtcDateTime : status.ReceiveDate;
-            status.ReceiveBy = request.ReceiveBy ?? status.ReceiveBy;
-            status.ReceiveDetail = request.AssignDetail ?? status.ReceiveDetail;
-
-            status.Remark = request.Remark ?? status.Remark;
-
-            _jewelryContext.TbtProductionPlanStatusDetail.Update(status);
-            await _jewelryContext.SaveChangesAsync();
 
             return $"{plan.Wo}-{plan.WoNumber}";
         }
@@ -618,21 +721,29 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
             }
 
-            var status = (from item in _jewelryContext.TbtProductionPlanStatusDetail
-                          where item.Id == request.Id
-                          && item.IsActive == true
-                          select item).SingleOrDefault();
-
-            if (status == null)
+            var statusHeader = (from item in _jewelryContext.TbtProductionPlanStatusHeader.Include(x => x.TbtProductionPlanStatusDetail)
+                                where item.Id == request.Id
+                                select item).SingleOrDefault();
+            if (statusHeader == null)
             {
-                throw new HandleException($"ไม่พบสถานะใบงาน");
+                throw new HandleException($"ไม่พบสถานะงาน กรุณาตรวจสอบอีกครั้ง");
             }
 
-            status.UpdateDate = DateTime.UtcNow;
-            status.UpdateBy = _admin;
-            status.IsActive = false;
+            statusHeader.IsActive = false;
+            statusHeader.UpdateDate = DateTime.UtcNow;
+            statusHeader.UpdateBy = _admin;
 
-            _jewelryContext.TbtProductionPlanStatusDetail.Update(status);
+            _jewelryContext.TbtProductionPlanStatusHeader.Update(statusHeader);
+
+            if (statusHeader.TbtProductionPlanStatusDetail != null)
+            {
+                foreach (var item in statusHeader.TbtProductionPlanStatusDetail)
+                {
+                    item.IsActive = false;
+                }
+                _jewelryContext.TbtProductionPlanStatusDetail.UpdateRange(statusHeader.TbtProductionPlanStatusDetail);
+            }
+
             await _jewelryContext.SaveChangesAsync();
 
             return $"{plan.Wo}-{plan.WoNumber}";

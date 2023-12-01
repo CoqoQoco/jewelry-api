@@ -5,39 +5,29 @@ namespace Jewelry.Data.Models.Jewelry;
 
 public partial class TbtProductionPlanStatusDetail
 {
-    public int Id { get; set; }
-
-    public DateTime CreateDate { get; set; }
-
-    public string CreateBy { get; set; } = null!;
-
-    public DateTime? UpdateDate { get; set; }
-
-    public string? UpdateBy { get; set; }
-
     public int ProductionPlanId { get; set; }
 
-    public int Status { get; set; }
+    public string ItemNo { get; set; } = null!;
 
-    public DateTime AssignDate { get; set; }
+    public string? Gold { get; set; }
 
-    public string AssignBy { get; set; } = null!;
+    public decimal? GoldWeightSend { get; set; }
 
-    public DateTime? ReceiveDate { get; set; }
+    public string? Worker { get; set; }
 
-    public string? ReceiveBy { get; set; }
+    public decimal? GoldWeightCheck { get; set; }
 
-    public string? Remark { get; set; }
+    public decimal? GoldWeightDiff { get; set; }
 
-    public string? AssignTo { get; set; }
-
-    public string? AssignDetail { get; set; }
-
-    public string? ReceiveDetail { get; set; }
+    public decimal? GoldWeightDiffPercent { get; set; }
 
     public bool IsActive { get; set; }
 
-    public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
+    public decimal? GoldQtySend { get; set; }
 
-    public virtual TbmProductionPlanStatus StatusNavigation { get; set; } = null!;
+    public decimal? GoldQtyCheck { get; set; }
+
+    public int HeaderId { get; set; }
+
+    public virtual TbtProductionPlanStatusHeader Header { get; set; } = null!;
 }
