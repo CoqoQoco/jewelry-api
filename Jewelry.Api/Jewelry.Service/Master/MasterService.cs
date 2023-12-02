@@ -270,6 +270,63 @@ namespace Jewelry.Service.Master
                 await _jewelryContext.SaveChangesAsync();
             }
 
+            if (request.Type.ToUpper() == "GEM-SHAPE")
+            {
+                var gemShape = (from item in _jewelryContext.TbmGemShape
+                           where item.Id == request.Id
+                           && item.Code == request.Code.ToUpper()
+                           select item).SingleOrDefault();
+
+                if (gemShape == null)
+                {
+                    throw new HandleException($"ไม่พบข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                gemShape.NameEn = request.NameEn;
+                gemShape.NameTh = request.NameTh;
+
+                _jewelryContext.TbmGemShape.Update(gemShape);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            if (request.Type.ToUpper() == "GOLD-SIZE")
+            {
+                var goldSize = (from item in _jewelryContext.TbmGoldSize
+                                where item.Id == request.Id
+                                && item.Code == request.Code.ToUpper()
+                                select item).SingleOrDefault();
+
+                if (goldSize == null)
+                {
+                    throw new HandleException($"ไม่พบข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                goldSize.NameEn = request.NameEn;
+                goldSize.NameTh = request.NameTh;
+
+                _jewelryContext.TbmGoldSize.Update(goldSize);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            if (request.Type.ToUpper() == "PRODUCT-TYPE")
+            {
+                var productType = (from item in _jewelryContext.TbmProductType
+                                where item.Id == request.Id
+                                && item.Code == request.Code.ToUpper()
+                                select item).SingleOrDefault();
+
+                if (productType == null)
+                {
+                    throw new HandleException($"ไม่พบข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                productType.NameEn = request.NameEn;
+                productType.NameTh = request.NameTh;
+
+                _jewelryContext.TbmProductType.Update(productType);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
             return "success";
         }
 
