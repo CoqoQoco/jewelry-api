@@ -44,6 +44,7 @@ namespace Jewelry.Service.Stock
                 { 
                     Code = request.Code.Trim().ToUpper(),
                     Category = request.Category,
+                    CategoryCode = request.CategoryCode,
                     Description = request.Description,
 
                     CreateDate = DateTime.UtcNow,

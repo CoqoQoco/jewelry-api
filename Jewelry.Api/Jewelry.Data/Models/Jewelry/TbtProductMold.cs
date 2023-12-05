@@ -22,4 +22,6 @@ public partial class TbtProductMold
     public bool IsActive { get; set; }
 
     public string Category { get; set; } = null!;
+
+    public string? CategoryCode { get; set; }
 }

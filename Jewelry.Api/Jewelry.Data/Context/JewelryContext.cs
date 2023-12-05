@@ -252,6 +252,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Category)
                 .HasColumnType("character varying")
                 .HasColumnName("category");
+            entity.Property(e => e.CategoryCode)
+                .HasColumnType("character varying")
+                .HasColumnName("category_code");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
