@@ -3,6 +3,7 @@ using jewelry.Model.Mold;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Microsoft.Extensions.Hosting;
+using NPOI.SS.Formula.Functions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +16,7 @@ namespace Jewelry.Service.Stock
     public interface IMoldService
     {
         Task<string> CreateMold(CreateMoldRequest request);
+        Task<string> UpdateMold(UpdateMoldRequest request);
         IQueryable<TbtProductMold> SearchMold(SearchMold request);
     }
     public class MoldService : IMoldService
@@ -40,8 +42,8 @@ namespace Jewelry.Service.Stock
 
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                var addMold = new TbtProductMold() 
-                { 
+                var addMold = new TbtProductMold()
+                {
                     Code = request.Code.Trim().ToUpper(),
                     Category = request.Category,
                     CategoryCode = request.CategoryCode,
@@ -83,6 +85,29 @@ namespace Jewelry.Service.Stock
 
             return "success";
         }
+        public async Task<string> UpdateMold(UpdateMoldRequest request)
+        {
+            var mold = (from item in _jewelryContext.TbtProductMold
+                        where item.Code == request.Code.ToUpper()
+                        select item).SingleOrDefault();
+
+            if (mold == null)
+            {
+                throw new HandleException($"ไม่พบข้อมูลเเม่พิมพ์รหัส {request.Code.ToUpper()} กรุณาลองอีกครั้ง");
+            }
+
+            mold.Category = request.Category;
+            mold.CategoryCode = request.CategoryCode;
+            mold.Description = request.Description;
+
+            mold.UpdateDate = DateTime.UtcNow;
+            mold.UpdateBy = _admin;
+
+            _jewelryContext.TbtProductMold.Update(mold);
+            await _jewelryContext.SaveChangesAsync();
+
+            return "success";
+        }
         public IQueryable<TbtProductMold> SearchMold(SearchMold request)
         {
             var mold = (from item in _jewelryContext.TbtProductMold
@@ -97,7 +122,7 @@ namespace Jewelry.Service.Stock
                         select item);
             }
 
-            return mold;
+            return mold.OrderByDescending(x => x.CreateDate);
         }
     }
 
