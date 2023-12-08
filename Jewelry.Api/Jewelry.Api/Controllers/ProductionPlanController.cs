@@ -69,7 +69,7 @@ namespace Jewelry.Api.Controllers
         }
         [Route("ProductionPlanSearch")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanTrackingResponse>))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
         public DataSourceResult ProductionPlanSearch([FromBody] ProductionPlanTrackingRequest request)

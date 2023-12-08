@@ -30,7 +30,7 @@ namespace Jewelry.Service.ProductionPlan
     {
         Task<ProductionPlanCreateResponse> ProductionPlanCreate(ProductionPlanCreateRequest request);
         Task<ProductionPlanCreateResponse> ProductionPlanCreateImage(List<IFormFile> images, string wo, int woNumber);
-        IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request);
+        IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearch(ProductionPlanTracking request);
         TbtProductionPlan ProductionPlanGet(int id);
         IQueryable<TbtProductionPlanMaterial> ProductionPlanMateriaGet(ProductionPlanTrackingMaterialRequest request);
         Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request);
@@ -88,6 +88,7 @@ namespace Jewelry.Service.ProductionPlan
                     {
                         Wo = request.Wo.ToUpper().Trim(),
                         WoNumber = request.WoNumber,
+                        WoText = $"{ request.Wo.ToUpper().Trim()}{request.WoNumber.ToString()}",
                         Mold = request.Mold.Trim(),
 
                         CustomerNumber = request.CustomerNumber.Trim(),
@@ -288,14 +289,29 @@ namespace Jewelry.Service.ProductionPlan
                 };
             }
         }
-        public IQueryable<TbtProductionPlan> ProductionPlanSearch(ProductionPlanTracking request)
+        public IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearch(ProductionPlanTracking request)
         {
             var query = (from item in _jewelryContext.TbtProductionPlan
                          //.Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
                          where item.IsActive == true
-                         select item);
+                         select new ProductionPlanTrackingResponse() 
+                         { 
+                             Id = item.Id,
+                             Wo = item.Wo,
+                             WoNumber = item.WoNumber,
+                             WoText = item.WoText,
+
+                             Mold = item.Mold,
+                             Status = item.Status,
+                             StatusName = item.StatusNavigation.NameTh,
+
+                             ProductNumber = item.ProductNumber,
+                             CustomerNumber = item.CustomerNumber,
+                             CreateDate = item.CreateDate,
+                             RequestDate = item.RequestDate,
+                         });
 
             //query = query.Where(x => x.GIDate >= request.DateFrom.StartOfDayUtc() && x.GIDate <= request.DateTo.EndOfDayUtc());
 
@@ -311,10 +327,11 @@ namespace Jewelry.Service.ProductionPlan
             {
                 query = (from item in query
                          where item.Wo.Contains(request.Text.ToUpper())
+                          || item.WoText.Contains(request.Text)
                          || item.Mold.Contains(request.Text)
                          || item.ProductNumber.Contains(request.Text)
                          || item.CustomerNumber.Contains(request.Text)
-                         || item.CreateBy.Contains(request.Text)
+                         //|| item.CreateBy.Contains(request.Text)
                          select item);
             }
 

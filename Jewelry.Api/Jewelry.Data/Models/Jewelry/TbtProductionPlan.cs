@@ -59,6 +59,8 @@ public partial class TbtProductionPlan
 
     public string? ProductRunning { get; set; }
 
+    public string WoText { get; set; } = null!;
+
     public virtual TbmCustomerType? CustomerTypeNavigation { get; set; }
 
     public virtual TbmProductType ProductTypeNavigation { get; set; } = null!;

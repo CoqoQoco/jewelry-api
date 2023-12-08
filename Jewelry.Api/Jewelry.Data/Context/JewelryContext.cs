@@ -334,6 +334,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.WoNumber)
                 .HasComment("ลำดับใบจ่าย-รับงาน")
                 .HasColumnName("wo_number");
+            entity.Property(e => e.WoText)
+                .HasColumnType("character varying")
+                .HasColumnName("wo_text");
 
             entity.HasOne(d => d.CustomerTypeNavigation).WithMany(p => p.TbtProductionPlan)
                 .HasForeignKey(d => d.CustomerType)
