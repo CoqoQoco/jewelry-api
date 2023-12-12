@@ -24,6 +24,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
 
         public string? Remark1 { get; set; }
         public string? Remark2 { get; set; }
+        //public string? Description { get; set; }
         public decimal? TotalWages { get; set; }
     }
 }

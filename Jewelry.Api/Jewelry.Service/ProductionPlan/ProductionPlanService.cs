@@ -347,7 +347,7 @@ namespace Jewelry.Service.ProductionPlan
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
                          .Include(x => x.TbtProductionPlanStatusHeader
-                            .Where(o => o.IsActive == true).OrderByDescending(x => x.CreateDate))
+                            .Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
                             .ThenInclude(x => x.TbtProductionPlanStatusDetail)
                         where item.IsActive == true
                         && item.Id == id
@@ -611,6 +611,7 @@ namespace Jewelry.Service.ProductionPlan
                                     ////GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck,
                                     //GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend),
                                     Worker = item.Worker,
+                                    Description = item.Description,
                                     Wages = item.Wages ?? 0,
 
                                 };
@@ -648,7 +649,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
-                                WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.Wages) : 0,
+                                WagesTotal = request.TotalWages ?? 0,
                             };
                             _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
                             await _jewelryContext.SaveChangesAsync();
@@ -673,7 +674,6 @@ namespace Jewelry.Service.ProductionPlan
                         break;
                     case 85: //CVD
                         {
-
                             var addStatus = new TbtProductionPlanStatusHeader
                             {
                                 ProductionPlanId = request.ProductionPlanId,
@@ -701,15 +701,16 @@ namespace Jewelry.Service.ProductionPlan
                 _jewelryContext.TbtProductionPlanStatusDetail.AddRange(addStatusItem);
                 await _jewelryContext.SaveChangesAsync();
 
+                plan.Status = request.Status;
+                plan.UpdateDate = DateTime.UtcNow;
+                plan.UpdateBy = _admin;
+
+                _jewelryContext.TbtProductionPlan.Update(plan);
+                await _jewelryContext.SaveChangesAsync();
+
                 scope.Complete();
             }
 
-            plan.Status = request.Status;
-            plan.UpdateDate = DateTime.UtcNow;
-            plan.UpdateBy = _admin;
-
-            _jewelryContext.TbtProductionPlan.Update(plan);
-            await _jewelryContext.SaveChangesAsync();
 
             return $"{plan.Wo}-{plan.WoNumber}";
         }
@@ -795,6 +796,8 @@ namespace Jewelry.Service.ProductionPlan
                                     ////GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck,
                                     //GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend),
                                     Worker = item.Worker,
+
+                                    Description = item.Description,
                                     Wages = item.Wages ?? 0,
 
                                 };
@@ -816,25 +819,20 @@ namespace Jewelry.Service.ProductionPlan
                                 throw new HandleException($"โปรดระบุรายละเอียดของทอง");
                             }
 
-                            var addStatus = new TbtProductionPlanStatusHeader
-                            {
-                                ProductionPlanId = request.ProductionPlanId,
-                                Status = request.Status,
-                                IsActive = true,
+                            _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(checkStatus.TbtProductionPlanStatusDetail);
+                            await _jewelryContext.SaveChangesAsync();
 
-                                CreateDate = DateTime.UtcNow,
-                                CreateBy = _admin,
-                                UpdateDate = DateTime.UtcNow,
-                                UpdateBy = _admin,
+                            checkStatus.CheckName = request.CheckName;
+                            checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
 
-                                CheckName = request.CheckName,
-                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                            checkStatus.Remark1 = request.Remark1;
+                            checkStatus.Remark2 = request.Remark2;
+                            checkStatus.WagesTotal = request.TotalWages ?? 0;
 
-                                Remark1 = request.Remark1,
-                                Remark2 = request.Remark2,
-                                WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.Wages) : 0,
-                            };
-                            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
+                            checkStatus.UpdateDate = DateTime.UtcNow;
+                            checkStatus.UpdateBy = _admin;
+
+                            _jewelryContext.TbtProductionPlanStatusHeader.Update(checkStatus);
                             await _jewelryContext.SaveChangesAsync();
 
                             foreach (var item in request.Golds)
@@ -842,7 +840,7 @@ namespace Jewelry.Service.ProductionPlan
                                 //var itemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}");
                                 var newStatus = new TbtProductionPlanStatusDetail()
                                 {
-                                    HeaderId = addStatus.Id,
+                                    HeaderId = checkStatus.Id,
                                     ProductionPlanId = request.ProductionPlanId,
                                     ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
                                     IsActive = true,
@@ -858,31 +856,30 @@ namespace Jewelry.Service.ProductionPlan
                     case 85: //CVD
                         {
 
-                            var addStatus = new TbtProductionPlanStatusHeader
-                            {
-                                ProductionPlanId = request.ProductionPlanId,
-                                Status = request.Status,
-                                IsActive = true,
 
-                                CreateDate = DateTime.UtcNow,
-                                CreateBy = _admin,
-                                UpdateDate = DateTime.UtcNow,
-                                UpdateBy = _admin,
+                            checkStatus.CheckName = request.CheckName;
+                            checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
 
-                                CheckName = request.CheckName,
-                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                            checkStatus.Remark1 = request.Remark1;
+                            checkStatus.Remark2 = request.Remark2;
+                            //checkStatus.WagesTotal = request.TotalWages ?? 0;
 
-                                Remark1 = request.Remark1,
-                                Remark2 = request.Remark2,
-                                WagesTotal = request.TotalWages ?? 0,
-                            };
-                            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
+                            checkStatus.UpdateDate = DateTime.UtcNow;
+                            checkStatus.UpdateBy = _admin;
+                            _jewelryContext.TbtProductionPlanStatusHeader.Update(checkStatus);
                             await _jewelryContext.SaveChangesAsync();
                         }
                         break;
                 }
 
                 _jewelryContext.TbtProductionPlanStatusDetail.AddRange(addStatusItem);
+                await _jewelryContext.SaveChangesAsync();
+
+                plan.Status = request.Status;
+                plan.UpdateDate = DateTime.UtcNow;
+                plan.UpdateBy = _admin;
+
+                _jewelryContext.TbtProductionPlan.Update(plan);
                 await _jewelryContext.SaveChangesAsync();
 
                 scope.Complete();

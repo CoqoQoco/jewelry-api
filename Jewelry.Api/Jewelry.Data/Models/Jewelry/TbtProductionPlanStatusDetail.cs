@@ -31,5 +31,7 @@ public partial class TbtProductionPlanStatusDetail
 
     public decimal? Wages { get; set; }
 
+    public string? Description { get; set; }
+
     public virtual TbtProductionPlanStatusHeader Header { get; set; } = null!;
 }

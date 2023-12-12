@@ -23,6 +23,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
 
         public string? Remark1 { get; set; }
         public string? Remark2 { get; set; }
+        //public string? Description { get; set; }
         public decimal? TotalWages { get; set; }
     }
 
@@ -35,5 +36,6 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
         public decimal? GoldQTYCheck { get; set; }
         public string? Worker { get; set; }
         public decimal? Wages { get; set; }
+        public string? Description { get; set; }
     }
 }
