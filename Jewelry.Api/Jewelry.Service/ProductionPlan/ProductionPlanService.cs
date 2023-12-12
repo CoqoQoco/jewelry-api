@@ -82,13 +82,14 @@ namespace Jewelry.Service.ProductionPlan
 
                 var running = await _runningNumberService.GenerateRunningNumber("PLAN");
 
+
                 using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
                 {
                     var createPlan = new TbtProductionPlan()
                     {
                         Wo = request.Wo.ToUpper().Trim(),
                         WoNumber = request.WoNumber,
-                        WoText = $"{ request.Wo.ToUpper().Trim()}{request.WoNumber.ToString()}",
+                        WoText = $"{request.Wo.ToUpper().Trim()}{request.WoNumber.ToString()}",
                         Mold = request.Mold.Trim(),
 
                         CustomerNumber = request.CustomerNumber.Trim(),
@@ -296,8 +297,8 @@ namespace Jewelry.Service.ProductionPlan
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
                          where item.IsActive == true
-                         select new ProductionPlanTrackingResponse() 
-                         { 
+                         select new ProductionPlanTrackingResponse()
+                         {
                              Id = item.Id,
                              Wo = item.Wo,
                              WoNumber = item.WoNumber,
@@ -587,6 +588,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
+                                WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.Wages) : 0,
                             };
                             _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
                             await _jewelryContext.SaveChangesAsync();
@@ -609,6 +611,7 @@ namespace Jewelry.Service.ProductionPlan
                                     ////GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck,
                                     //GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend),
                                     Worker = item.Worker,
+                                    Wages = item.Wages ?? 0,
 
                                 };
 
@@ -645,6 +648,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
+                                WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.Wages) : 0,
                             };
                             _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
                             await _jewelryContext.SaveChangesAsync();
@@ -686,6 +690,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
+                                WagesTotal = request.TotalWages ?? 0,
                             };
                             _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
                             await _jewelryContext.SaveChangesAsync();
@@ -698,6 +703,13 @@ namespace Jewelry.Service.ProductionPlan
 
                 scope.Complete();
             }
+
+            plan.Status = request.Status;
+            plan.UpdateDate = DateTime.UtcNow;
+            plan.UpdateBy = _admin;
+
+            _jewelryContext.TbtProductionPlan.Update(plan);
+            await _jewelryContext.SaveChangesAsync();
 
             return $"{plan.Wo}-{plan.WoNumber}";
         }
@@ -718,6 +730,163 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
             }
 
+
+            var checkStatus = (from item in _jewelryContext.TbtProductionPlanStatusHeader.Include(x => x.TbtProductionPlanStatusDetail)
+                               where item.ProductionPlanId == request.ProductionPlanId
+                               && item.Status == request.Status
+                               && item.Id == request.HeaderId
+                               && item.IsActive
+                               select item).SingleOrDefault();
+
+            if (checkStatus == null)
+            {
+                throw new HandleException($"ไม่พบสถานะการผลิต");
+            }
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var addStatusItem = new List<TbtProductionPlanStatusDetail>();
+                switch (request.Status)
+                {
+                    case 50: //จ่ายเเต่ง
+                    case 60: //จ่ายขัดดิบ
+                    case 80: //จ่ายฝัง
+                    case 90: //จ่ายขัดชุบ
+                        {
+
+                            if (request.Golds == null || request.Golds.Any() == false)
+                            {
+                                throw new HandleException($"โปรดระบุรายละเอียดของทอง");
+                            }
+
+                            _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(checkStatus.TbtProductionPlanStatusDetail);
+                            await _jewelryContext.SaveChangesAsync();
+
+
+                            checkStatus.SendName = request.SendName;
+                            checkStatus.SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null;
+                            checkStatus.CheckName = request.CheckName;
+                            checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
+                            checkStatus.Remark1 = request.Remark1;
+                            checkStatus.Remark2 = request.Remark2;
+                            checkStatus.WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.Wages) : 0;
+                            checkStatus.UpdateDate = DateTime.UtcNow;
+                            checkStatus.UpdateBy = _admin;
+
+
+                            _jewelryContext.TbtProductionPlanStatusHeader.Update(checkStatus);
+                            await _jewelryContext.SaveChangesAsync();
+
+                            foreach (var item in request.Golds)
+                            {
+
+                                var newStatusItem = new TbtProductionPlanStatusDetail()
+                                {
+                                    HeaderId = checkStatus.Id,
+                                    ProductionPlanId = request.ProductionPlanId,
+                                    ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
+                                    IsActive = true,
+
+                                    Gold = item.Gold,
+                                    GoldQtySend = item.GoldQTYSend,
+                                    GoldWeightSend = item.GoldWeightSend,
+                                    GoldQtyCheck = item.GoldQTYCheck,
+                                    GoldWeightCheck = item.GoldWeightCheck,
+                                    ////GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck,
+                                    //GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend),
+                                    Worker = item.Worker,
+                                    Wages = item.Wages ?? 0,
+
+                                };
+
+                                if (item.GoldWeightSend.HasValue && item.GoldWeightCheck.HasValue)
+                                {
+                                    newStatusItem.GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck;
+                                    newStatusItem.GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend);
+                                }
+
+                                addStatusItem.Add(newStatusItem);
+                            }
+                        }
+                        break;
+                    case 70: //จ่ายขัดพลอย
+                        {
+                            if (request.Golds == null || request.Golds.Any() == false)
+                            {
+                                throw new HandleException($"โปรดระบุรายละเอียดของทอง");
+                            }
+
+                            var addStatus = new TbtProductionPlanStatusHeader
+                            {
+                                ProductionPlanId = request.ProductionPlanId,
+                                Status = request.Status,
+                                IsActive = true,
+
+                                CreateDate = DateTime.UtcNow,
+                                CreateBy = _admin,
+                                UpdateDate = DateTime.UtcNow,
+                                UpdateBy = _admin,
+
+                                CheckName = request.CheckName,
+                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+
+                                Remark1 = request.Remark1,
+                                Remark2 = request.Remark2,
+                                WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.Wages) : 0,
+                            };
+                            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
+                            await _jewelryContext.SaveChangesAsync();
+
+                            foreach (var item in request.Golds)
+                            {
+                                //var itemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}");
+                                var newStatus = new TbtProductionPlanStatusDetail()
+                                {
+                                    HeaderId = addStatus.Id,
+                                    ProductionPlanId = request.ProductionPlanId,
+                                    ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
+                                    IsActive = true,
+
+                                    Gold = item.Gold,
+                                    GoldQtyCheck = item.GoldQTYCheck,
+                                    GoldWeightCheck = item.GoldWeightCheck,
+                                };
+                                addStatusItem.Add(newStatus);
+                            }
+                        }
+                        break;
+                    case 85: //CVD
+                        {
+
+                            var addStatus = new TbtProductionPlanStatusHeader
+                            {
+                                ProductionPlanId = request.ProductionPlanId,
+                                Status = request.Status,
+                                IsActive = true,
+
+                                CreateDate = DateTime.UtcNow,
+                                CreateBy = _admin,
+                                UpdateDate = DateTime.UtcNow,
+                                UpdateBy = _admin,
+
+                                CheckName = request.CheckName,
+                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+
+                                Remark1 = request.Remark1,
+                                Remark2 = request.Remark2,
+                                WagesTotal = request.TotalWages ?? 0,
+                            };
+                            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
+                            await _jewelryContext.SaveChangesAsync();
+                        }
+                        break;
+                }
+
+                _jewelryContext.TbtProductionPlanStatusDetail.AddRange(addStatusItem);
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
 
             return $"{plan.Wo}-{plan.WoNumber}";
         }

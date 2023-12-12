@@ -33,6 +33,8 @@ public partial class TbtProductionPlanStatusHeader
 
     public bool IsActive { get; set; }
 
+    public decimal? WagesTotal { get; set; }
+
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 
     public virtual TbmProductionPlanStatus StatusNavigation { get; set; } = null!;

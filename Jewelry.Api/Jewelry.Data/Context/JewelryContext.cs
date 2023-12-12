@@ -488,6 +488,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GoldWeightSend).HasColumnName("gold_weight_send");
             entity.Property(e => e.HeaderId).HasColumnName("header_id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.Wages).HasColumnName("wages");
             entity.Property(e => e.Worker)
                 .HasColumnType("character varying")
                 .HasColumnName("worker");
@@ -530,6 +531,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.WagesTotal).HasColumnName("wages_total");
 
             entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanStatusHeader)
                 .HasForeignKey(d => d.ProductionPlanId)
