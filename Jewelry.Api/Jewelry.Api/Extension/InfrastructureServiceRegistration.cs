@@ -1,4 +1,5 @@
 ﻿using Jewelry.Data.Context;
+using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
 using Jewelry.Service.ProductionPlan;
@@ -29,6 +30,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IMasterService, MasterService>();
             services.AddScoped<IMoldService, MoldService>();
             services.AddScoped<IRunningNumber, RunningNumber>();
+            services.AddScoped<ICustomerService, CustomerService>();
 
             return services;
         }

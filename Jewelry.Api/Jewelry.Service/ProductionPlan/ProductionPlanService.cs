@@ -129,10 +129,16 @@ namespace Jewelry.Service.ProductionPlan
                     {
                         throw new HandleException($"กรุณาระบุส่วนประกอบใบจ่าย-รับคืนงาน");
                     }
+                    
 
                     var createMaterials = new List<TbtProductionPlanMaterial>();
                     foreach (var material in materials)
                     {
+                        if (material.Gold == null)
+                        {
+                            throw new HandleException($"กรุณาระบุส่วนประกอบใบจ่าย-รับคืนงาน");
+                        }
+
                         var createMaterial = new TbtProductionPlanMaterial()
                         {
                             Gold = material.Gold.Code,

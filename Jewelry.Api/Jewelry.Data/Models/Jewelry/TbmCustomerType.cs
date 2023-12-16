@@ -19,5 +19,7 @@ public partial class TbmCustomerType
 
     public string CreateBy { get; set; } = null!;
 
+    public virtual ICollection<TbmCustomer> TbmCustomer { get; set; } = new List<TbmCustomer>();
+
     public virtual ICollection<TbtProductionPlan> TbtProductionPlan { get; set; } = new List<TbtProductionPlan>();
 }

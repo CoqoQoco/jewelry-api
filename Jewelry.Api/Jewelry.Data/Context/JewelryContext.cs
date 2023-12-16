@@ -18,6 +18,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
 
+    public virtual DbSet<TbmCustomer> TbmCustomer { get; set; }
+
     public virtual DbSet<TbmCustomerType> TbmCustomerType { get; set; }
 
     public virtual DbSet<TbmGem> TbmGem { get; set; }
@@ -68,6 +70,57 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(10)
                 .HasColumnName("username");
+        });
+
+        modelBuilder.Entity<TbmCustomer>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbm_customer_pk");
+
+            entity.ToTable("tbm_customer");
+
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.Address)
+                .HasColumnType("character varying")
+                .HasColumnName("address");
+            entity.Property(e => e.ContactName)
+                .HasColumnType("character varying")
+                .HasColumnName("contact_name");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Email)
+                .HasColumnType("character varying")
+                .HasColumnName("email");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.Telephone1)
+                .HasColumnType("character varying")
+                .HasColumnName("telephone_1");
+            entity.Property(e => e.Telephone2)
+                .HasColumnType("character varying")
+                .HasColumnName("telephone_2");
+            entity.Property(e => e.TypeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("type_code");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.TypeCodeNavigation).WithMany(p => p.TbmCustomer)
+                .HasForeignKey(d => d.TypeCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbm_customer_fk");
         });
 
         modelBuilder.Entity<TbmCustomerType>(entity =>
@@ -340,6 +393,7 @@ public partial class JewelryContext : DbContext
 
             entity.HasOne(d => d.CustomerTypeNavigation).WithMany(p => p.TbtProductionPlan)
                 .HasForeignKey(d => d.CustomerType)
+                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_customer_type_fk");
 
             entity.HasOne(d => d.ProductTypeNavigation).WithMany(p => p.TbtProductionPlan)
