@@ -378,7 +378,8 @@ namespace Jewelry.Service.ProductionPlan
                          && item.IsActive == true
                          select item);
 
-            return query;
+            return query.OrderByDescending(x => x.Gold == "WG");
+            //return query.OrderBy(x => x.Gold);
         }
 
         // ----- Update ----- //
