@@ -595,7 +595,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
-                                WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.Wages) : 0,
+                                WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.TotalWages) : 0,
                             };
                             _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
                             await _jewelryContext.SaveChangesAsync();
@@ -619,7 +619,9 @@ namespace Jewelry.Service.ProductionPlan
                                     //GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend),
                                     Worker = item.Worker,
                                     Description = item.Description,
+
                                     Wages = item.Wages ?? 0,
+                                    TotalWages = item.TotalWages ?? 0,
 
                                 };
 
@@ -777,7 +779,7 @@ namespace Jewelry.Service.ProductionPlan
                             checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
                             checkStatus.Remark1 = request.Remark1;
                             checkStatus.Remark2 = request.Remark2;
-                            checkStatus.WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.Wages) : 0;
+                            checkStatus.WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.TotalWages) : 0;
                             checkStatus.UpdateDate = DateTime.UtcNow;
                             checkStatus.UpdateBy = _admin;
 
@@ -806,6 +808,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                     Description = item.Description,
                                     Wages = item.Wages ?? 0,
+                                    TotalWages = item.TotalWages ?? 0,
 
                                 };
 
@@ -834,7 +837,7 @@ namespace Jewelry.Service.ProductionPlan
 
                             checkStatus.Remark1 = request.Remark1;
                             checkStatus.Remark2 = request.Remark2;
-                            checkStatus.WagesTotal = request.TotalWages ?? 0;
+                            //checkStatus.WagesTotal = request.TotalWages ?? 0;
 
                             checkStatus.UpdateDate = DateTime.UtcNow;
                             checkStatus.UpdateBy = _admin;
