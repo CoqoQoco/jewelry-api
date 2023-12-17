@@ -95,16 +95,36 @@ namespace Jewelry.Service.Stock
             {
                 throw new HandleException($"ไม่พบข้อมูลเเม่พิมพ์รหัส {request.Code.ToUpper()} กรุณาลองอีกครั้ง");
             }
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                if (request.Images != null)
+                {
+                    //string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
+                    string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold", $"{request.Code.ToUpper().Trim()}-Mold.png");
+                    if (File.Exists(imagePath))
+                    {
+                        File.Delete(imagePath);
+                    }
 
-            mold.Category = request.Category;
-            mold.CategoryCode = request.CategoryCode;
-            mold.Description = request.Description;
+                    using (Stream fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write))
+                    {
+                        request.Images.CopyTo(fileStream);
+                        fileStream.Close();
+                    }
+                }
 
-            mold.UpdateDate = DateTime.UtcNow;
-            mold.UpdateBy = _admin;
+                mold.Category = request.Category;
+                mold.CategoryCode = request.CategoryCode;
+                mold.Description = request.Description;
 
-            _jewelryContext.TbtProductMold.Update(mold);
-            await _jewelryContext.SaveChangesAsync();
+                mold.UpdateDate = DateTime.UtcNow;
+                mold.UpdateBy = _admin;
+
+                _jewelryContext.TbtProductMold.Update(mold);
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
 
             return "success";
         }

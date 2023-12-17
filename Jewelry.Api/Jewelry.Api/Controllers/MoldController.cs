@@ -52,7 +52,7 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public async Task<IActionResult> CreateMold([FromBody] UpdateMoldRequest request)
+        public async Task<IActionResult> CreateMold([FromForm] UpdateMoldRequest request)
         {
             try
             {
