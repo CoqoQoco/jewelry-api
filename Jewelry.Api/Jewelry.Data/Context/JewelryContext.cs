@@ -34,6 +34,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmProductionPlanStatus> TbmProductionPlanStatus { get; set; }
 
+    public virtual DbSet<TbmWorker> TbmWorker { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
 
     public virtual DbSet<TbtProductionPlan> TbtProductionPlan { get; set; }
@@ -291,6 +293,33 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.NameTh)
                 .HasColumnType("character varying")
                 .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmWorker>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbm_worker_pk");
+
+            entity.ToTable("tbm_worker");
+
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.TypeId).HasColumnName("type_id");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         modelBuilder.Entity<TbtProductMold>(entity =>
