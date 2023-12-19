@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
+using jewelry.Model.ProductionPlan.ProductionPlanGet;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
@@ -87,7 +88,7 @@ namespace Jewelry.Api.Controllers
         }
         [Route("ProductionPlanGet")]
         [HttpGet]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(TbtProductionPlan))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(ProductionPlanGetResponse))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
         public IActionResult ProductionPlanGet(int id)
@@ -97,7 +98,7 @@ namespace Jewelry.Api.Controllers
                 if (!ModelState.IsValid)
                     return ModelStateBadRequest();
 
-                var report = _IProductionPlanService.ProductionPlanGet(id);
+                var report = _IProductionPlanService.NewProductionPlanGet(id);
                 return Ok(report);
             }
             catch (HandleException ex)

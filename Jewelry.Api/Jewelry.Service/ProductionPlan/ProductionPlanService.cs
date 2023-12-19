@@ -2,6 +2,7 @@
 using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
+using jewelry.Model.ProductionPlan.ProductionPlanGet;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
@@ -31,7 +32,10 @@ namespace Jewelry.Service.ProductionPlan
         Task<ProductionPlanCreateResponse> ProductionPlanCreate(ProductionPlanCreateRequest request);
         Task<ProductionPlanCreateResponse> ProductionPlanCreateImage(List<IFormFile> images, string wo, int woNumber);
         IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearch(ProductionPlanTracking request);
+
         TbtProductionPlan ProductionPlanGet(int id);
+        ProductionPlanGetResponse NewProductionPlanGet(int id);
+
         IQueryable<TbtProductionPlanMaterial> ProductionPlanMateriaGet(ProductionPlanTrackingMaterialRequest request);
         Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request);
         Task<string> ProductionPlanUpdateHeader(ProductionPlanUpdateHeaderRequest request);
@@ -129,7 +133,7 @@ namespace Jewelry.Service.ProductionPlan
                     {
                         throw new HandleException($"กรุณาระบุส่วนประกอบใบจ่าย-รับคืนงาน");
                     }
-                    
+
 
                     var createMaterials = new List<TbtProductionPlanMaterial>();
                     foreach (var material in materials)
@@ -367,6 +371,118 @@ namespace Jewelry.Service.ProductionPlan
 
             return plan;
         }
+        public ProductionPlanGetResponse NewProductionPlanGet(int id)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                         .Include(x => x.ProductTypeNavigation)
+                         .Include(x => x.CustomerTypeNavigation)
+                         //.Include(x => x.TbtProductionPlanImage)
+                         //.Include(x => x.TbtProductionPlanMaterial)
+                         .Include(x => x.StatusNavigation)
+                         .Include(x => x.TbtProductionPlanStatusHeader
+                            .Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
+                            .ThenInclude(x => x.TbtProductionPlanStatusDetail)
+
+                        join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
+                        from cj in customerJoin.DefaultIfEmpty()
+
+                        where item.IsActive == true
+                        && item.Id == id
+                        //&& item.TbtProductionPlanStatusDetail.Any(x => x.IsActive == true)
+                        select new { item, cj } ).SingleOrDefault();
+
+
+            if (plan == null)
+            {
+                throw new HandleException("ไม่พบข้อมูล กรุณาลองใหม่อีกครั้ง");
+            }
+
+            var response = new ProductionPlanGetResponse()
+            {
+                Id = plan.item.Id,
+                Wo = plan.item.Wo,
+                WoNumber = plan.item.WoNumber,
+
+                CreateDate = plan.item.CreateDate,
+                CreateBy = plan.item.CreateBy,
+                UpdateBy = plan.item.UpdateBy,
+                UpdateDate = plan.item.UpdateDate,
+
+                RequestDate = plan.item.RequestDate,
+                Mold = plan.item.Mold,
+
+                ProductRunning = plan.item.ProductRunning,
+                ProductName = plan.item.ProductName,
+                ProductNumber = plan.item.ProductNumber,
+                ProductDetail = plan.item.ProductDetail,
+
+                ProductType = plan.item.ProductType,
+                ProductTypeName = plan.item.ProductTypeNavigation != null ? plan.item.ProductTypeNavigation.NameTh : null,
+
+                ProductQty = plan.item.ProductQty,
+                ProductQtyUnit = plan.item.ProductQtyUnit,
+
+                CustomerNumber = plan.item.CustomerNumber,
+                CustomerName = plan.cj != null ? plan.cj.NameTh : null,
+                CustomerType  = plan.item.CustomerType,
+                CustomerTypeName = plan.item.CustomerTypeNavigation != null ? plan.item.CustomerTypeNavigation.NameTh : null,
+
+                IsActive = plan.item.IsActive,
+                Status = plan.item.Status,
+                StatusName = plan.item.StatusNavigation.NameTh,
+                Remark = plan.item.Remark,
+
+                TbtProductionPlanStatusHeader = (from item in plan.item.TbtProductionPlanStatusHeader
+                                                 select new StatusDetailHeader() 
+                                                 { 
+                                                     Id = item.Id,
+                                                     ProductionPlanId = item.Id,
+
+                                                     CreateDate = item.CreateDate,
+                                                     CreateBy = item.CreateBy,
+                                                     UpdateDate = item.UpdateDate,
+                                                     UpdateBy = item.UpdateBy,
+
+                                                     Status = item.Status,
+
+                                                     SendDate = item.SendDate,
+                                                     SendName = item.SendName,
+                                                     CheckDate = item.CheckDate,
+                                                     CheckName = item.CheckName,
+
+                                                     IsActive = item.IsActive,
+                                                     Remark1 = item.Remark1,
+                                                     Remark2 = item.Remark2,
+                                                     WagesTotal = item.WagesTotal,
+
+                                                     TbtProductionPlanStatusDetail = (from detail in item.TbtProductionPlanStatusDetail
+                                                                                      select new StatusDetailDetail() 
+                                                                                      { 
+                                                                                          ProductionPlanId = detail.ProductionPlanId,
+                                                                                          HeaderId = detail.HeaderId,
+                                                                                          ItemNo = detail.ItemNo,
+
+                                                                                          Gold = detail.Gold,
+                                                                                          GoldQtySend = detail.GoldQtySend,
+                                                                                          GoldWeightSend = detail.GoldWeightSend,
+                                                                                          GoldQtyCheck = detail.GoldQtyCheck,
+                                                                                          GoldWeightCheck = detail.GoldWeightCheck,
+                                                                                          GoldWeightDiff = detail.GoldWeightDiff,
+                                                                                          GoldWeightDiffPercent = detail.GoldWeightDiffPercent,
+
+                                                                                          IsActive = detail.IsActive,
+
+                                                                                          Description = detail.Description,
+                                                                                          Worker = detail.Worker,
+                                                                                          Wages = detail.Wages,
+                                                                                          TotalWages = detail.TotalWages,
+                                                                                      }).ToList(),
+                                                 }).ToList()
+            };
+
+            return response;
+        }
+
         public IQueryable<TbtProductionPlanMaterial> ProductionPlanMateriaGet(ProductionPlanTrackingMaterialRequest request)
         {
             var query = (from item in _jewelryContext.TbtProductionPlanMaterial
