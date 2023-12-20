@@ -88,6 +88,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
 
         public string? Description { get; set; }
         public string? Worker { get; set; }
+        public string? WorkerName { get; set; }
         public decimal? Wages { get; set; }
         public decimal? TotalWages { get; set; }
     }

@@ -97,6 +97,12 @@ namespace Jewelry.Service.Worker
                              UpdateBy = item.UpdateBy,
                          });
 
+            if (!string.IsNullOrEmpty(request.Code))
+            {
+                query = (from item in query
+                         where item.Code == request.Code.ToUpper()
+                         select item);
+            }
             if (!string.IsNullOrEmpty(request.Text))
             {
                 query = (from item in query

@@ -389,7 +389,10 @@ namespace Jewelry.Service.ProductionPlan
                         where item.IsActive == true
                         && item.Id == id
                         //&& item.TbtProductionPlanStatusDetail.Any(x => x.IsActive == true)
-                        select new { item, cj } ).SingleOrDefault();
+                        select new { item, cj }).SingleOrDefault();
+
+            var listWork = (from item in _jewelryContext.TbmWorker
+                            select item);
 
 
             if (plan == null)
@@ -424,7 +427,7 @@ namespace Jewelry.Service.ProductionPlan
 
                 CustomerNumber = plan.item.CustomerNumber,
                 CustomerName = plan.cj != null ? plan.cj.NameTh : null,
-                CustomerType  = plan.item.CustomerType,
+                CustomerType = plan.item.CustomerType,
                 CustomerTypeName = plan.item.CustomerTypeNavigation != null ? plan.item.CustomerTypeNavigation.NameTh : null,
 
                 IsActive = plan.item.IsActive,
@@ -433,8 +436,8 @@ namespace Jewelry.Service.ProductionPlan
                 Remark = plan.item.Remark,
 
                 TbtProductionPlanStatusHeader = (from item in plan.item.TbtProductionPlanStatusHeader
-                                                 select new StatusDetailHeader() 
-                                                 { 
+                                                 select new StatusDetailHeader()
+                                                 {
                                                      Id = item.Id,
                                                      ProductionPlanId = item.Id,
 
@@ -456,8 +459,8 @@ namespace Jewelry.Service.ProductionPlan
                                                      WagesTotal = item.WagesTotal,
 
                                                      TbtProductionPlanStatusDetail = (from detail in item.TbtProductionPlanStatusDetail
-                                                                                      select new StatusDetailDetail() 
-                                                                                      { 
+                                                                                      select new StatusDetailDetail()
+                                                                                      {
                                                                                           ProductionPlanId = detail.ProductionPlanId,
                                                                                           HeaderId = detail.HeaderId,
                                                                                           ItemNo = detail.ItemNo,
@@ -473,7 +476,13 @@ namespace Jewelry.Service.ProductionPlan
                                                                                           IsActive = detail.IsActive,
 
                                                                                           Description = detail.Description,
+
                                                                                           Worker = detail.Worker,
+                                                                                          WorkerName = !string.IsNullOrEmpty(detail.Worker) && listWork.Any() ? (from item in listWork
+                                                                                                                                                                 where item.Code == detail.Worker.ToUpper()
+                                                                                                                                                                 select item.NameTh).SingleOrDefault()
+                                                                                                                                                                 : null,
+
                                                                                           Wages = detail.Wages,
                                                                                           TotalWages = detail.TotalWages,
                                                                                       }).ToList(),

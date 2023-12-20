@@ -13,6 +13,7 @@ namespace jewelry.Model.Worker.List
     }
     public class ListWorkerProduction
     {
+        public string? Code { get; set; }
         public string? Text { get; set; }
         public int? Type { get; set; }
         public int? Active { get; set; }
