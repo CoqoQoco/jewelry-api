@@ -3,6 +3,7 @@ using jewelry.Model.Exceptions;
 using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
 using jewelry.Model.Worker.List;
+using jewelry.Model.Worker.WorkerWages;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Worker;
@@ -75,6 +76,24 @@ namespace Jewelry.Api.Controllers
             try
             {
                 var response = await _service.Create(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("SearchWorkerWages")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(SearchWorkerWagesResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult SearchWorkerWages([FromBody] SearchWorkerWagesRequest request)
+        {
+            try
+            {
+                var response = _service.SearchWorkerWages(request);
                 return Ok(response);
             }
             catch (HandleException ex)
