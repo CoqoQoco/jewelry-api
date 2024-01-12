@@ -13,6 +13,7 @@ namespace jewelry.Model.Mold
         public string Description { get; set; }
         public string Category { get; set; }
         public string CategoryCode { get; set; }
+        public string? MoldBy { get; set; }
         public IFormFile? Images { get; set; }
     }
 }

@@ -24,4 +24,6 @@ public partial class TbtProductMold
     public string Category { get; set; } = null!;
 
     public string? CategoryCode { get; set; }
+
+    public string? MoldBy { get; set; }
 }

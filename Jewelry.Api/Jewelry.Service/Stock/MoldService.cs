@@ -49,6 +49,8 @@ namespace Jewelry.Service.Stock
                     CategoryCode = request.CategoryCode,
                     Description = request.Description,
 
+                    MoldBy = request.MoldBy,
+
                     CreateDate = DateTime.UtcNow,
                     CreateBy = _admin,
                     IsActive = true,
@@ -117,6 +119,8 @@ namespace Jewelry.Service.Stock
                 mold.CategoryCode = request.CategoryCode;
                 mold.Description = request.Description;
 
+                mold.MoldBy = request.MoldBy;
+
                 mold.UpdateDate = DateTime.UtcNow;
                 mold.UpdateBy = _admin;
 
@@ -139,6 +143,7 @@ namespace Jewelry.Service.Stock
                         where item.Code.Contains(request.Text.ToUpper())
                         || item.Category.Contains(request.Text)
                         || item.Description.Contains(request.Text)
+                        || item.MoldBy.Contains(request.Text)
                         select item);
             }
 

@@ -348,6 +348,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("image");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.MoldBy)
+                .HasColumnType("character varying")
+                .HasColumnName("mold_by");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
