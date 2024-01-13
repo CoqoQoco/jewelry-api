@@ -483,6 +483,12 @@ namespace Jewelry.Service.ProductionPlan
                                                                                                                                                                  select item.NameTh).SingleOrDefault()
                                                                                                                                                                  : null,
 
+                                                                                          WorkerSub = detail.WorkerSub,
+                                                                                          WorkerSubName = !string.IsNullOrEmpty(detail.WorkerSub) && listWork.Any() ? (from item in listWork
+                                                                                                                                                                 where item.Code == detail.WorkerSub.ToUpper()
+                                                                                                                                                                 select item.NameTh).SingleOrDefault()
+                                                                                                                                                                 : null,
+
                                                                                           Wages = detail.Wages,
                                                                                           TotalWages = detail.TotalWages,
                                                                                       }).ToList(),
@@ -743,6 +749,7 @@ namespace Jewelry.Service.ProductionPlan
                                     ////GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck,
                                     //GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend),
                                     Worker = item.Worker,
+                                    WorkerSub = item.WorkerSub,
                                     Description = item.Description,
 
                                     Wages = item.Wages ?? 0,
@@ -930,6 +937,7 @@ namespace Jewelry.Service.ProductionPlan
                                     ////GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck,
                                     //GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend),
                                     Worker = item.Worker,
+                                    WorkerSub = item.WorkerSub,
 
                                     Description = item.Description,
                                     Wages = item.Wages ?? 0,

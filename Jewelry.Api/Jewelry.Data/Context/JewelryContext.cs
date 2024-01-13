@@ -582,6 +582,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Worker)
                 .HasColumnType("character varying")
                 .HasColumnName("worker");
+            entity.Property(e => e.WorkerSub)
+                .HasColumnType("character varying")
+                .HasColumnName("worker_sub");
 
             entity.HasOne(d => d.Header).WithMany(p => p.TbtProductionPlanStatusDetail)
                 .HasForeignKey(d => d.HeaderId)

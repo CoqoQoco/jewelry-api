@@ -35,6 +35,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
         public decimal? GoldWeightCheck { get; set; }
         public decimal? GoldQTYCheck { get; set; }
         public string? Worker { get; set; }
+        public string? WorkerSub { get; set; }
         public decimal? Wages { get; set; }
         public decimal? TotalWages { get; set; }
         public string? Description { get; set; }
