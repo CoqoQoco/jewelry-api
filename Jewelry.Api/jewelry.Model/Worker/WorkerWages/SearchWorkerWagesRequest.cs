@@ -8,7 +8,8 @@ namespace jewelry.Model.Worker.WorkerWages
 {
     public class SearchWorkerWagesRequest
     {
-        public DateTimeOffset RequestDate { get; set; }
+        public DateTimeOffset RequestDateStart { get; set; }
+        public DateTimeOffset RequestDateEnd { get; set; }
         public string Code { get; set; }
     }
 }

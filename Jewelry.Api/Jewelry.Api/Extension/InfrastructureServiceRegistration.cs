@@ -33,6 +33,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IRunningNumber, RunningNumber>();
             services.AddScoped<ICustomerService, CustomerService>();
             services.AddScoped<IWorkerService, WorkerService>();
+            services.AddScoped<IProductionPlanCostService, ProductionPlanCostService>();
 
             return services;
         }

@@ -8,7 +8,8 @@ namespace jewelry.Model.Worker.WorkerWages
 {
     public class SearchWorkerWagesResponse
     {
-        public DateTime WagesDate { get; set; }
+        public DateTime WagesDateStart { get; set; }
+        public DateTime WagesDateEnd { get; set; }
         public decimal? TotalGoldQtySend { get; set; }
         public decimal? TotalGoldWeightSend { get; set; }
         public decimal? TotalGoldQtyCheck { get; set; }

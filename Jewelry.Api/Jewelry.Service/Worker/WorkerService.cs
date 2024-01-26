@@ -149,8 +149,8 @@ namespace Jewelry.Service.Worker
                          join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
 
                          where item.Worker == request.Code.ToUpper()
-                         && item.Header.CheckDate >= request.RequestDate.StartOfDayUtc()
-                         && item.Header.CheckDate <= request.RequestDate.EndOfDayUtc()
+                         && item.Header.CheckDate >= request.RequestDateStart.StartOfDayUtc()
+                         && item.Header.CheckDate <= request.RequestDateEnd.EndOfDayUtc()
                          && item.IsActive == true
                          && item.Header.IsActive == true
 
@@ -180,7 +180,8 @@ namespace Jewelry.Service.Worker
 
             var response = new SearchWorkerWagesResponse()
             {
-                WagesDate = request.RequestDate.StartOfDayUtc().DateTime,
+                WagesDateStart = request.RequestDateStart.StartOfDayUtc().DateTime,
+                WagesDateEnd = request.RequestDateEnd.StartOfDayUtc().DateTime,
 
                 TotalGoldQtySend = query.Sum(x => x.GoldQtySend),
                 TotalGoldWeightSend = query.Sum(x => x.GoldWeightSend),
