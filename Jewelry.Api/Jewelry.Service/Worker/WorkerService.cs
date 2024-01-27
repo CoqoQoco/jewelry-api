@@ -179,7 +179,7 @@ namespace Jewelry.Service.Worker
 
                              JobDate = item.Header.CheckDate,
 
-                         }).OrderByDescending(x => x.WagesStatus).ThenByDescending(x => x.Gold);
+                         }).OrderByDescending(x => x.WagesStatus).ThenBy(x => x.JobDate).ThenByDescending(x => x.Gold);
 
             var response = new SearchWorkerWagesResponse()
             {
