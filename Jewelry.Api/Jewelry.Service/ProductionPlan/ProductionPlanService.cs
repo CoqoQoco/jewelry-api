@@ -767,7 +767,8 @@ namespace Jewelry.Service.ProductionPlan
                             }
                         }
                         break;
-                    case 70: //จ่ายขัดพลอย
+                    case 70:
+                    case 55://จ่ายขัดพลอย
                         {
                             if (request.Golds == null || request.Golds.Any() == false)
                             {
@@ -955,7 +956,8 @@ namespace Jewelry.Service.ProductionPlan
                             }
                         }
                         break;
-                    case 70: //จ่ายขัดพลอย
+                    case 70:
+                    case 55://จ่ายขัดพลอย
                         {
                             if (request.Golds == null || request.Golds.Any() == false)
                             {
