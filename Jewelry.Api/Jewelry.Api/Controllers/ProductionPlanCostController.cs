@@ -2,6 +2,7 @@
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlanCost.GoldCostCreate;
 using jewelry.Model.ProductionPlanCost.GoldCostList;
+using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
 using Jewelry.Api.Extension;
 using Jewelry.Service.ProductionPlan;
 using Kendo.DynamicLinqCore;
@@ -56,6 +57,23 @@ namespace Jewelry.Api.Controllers
             try
             {
                 var response = await _IProductionPlanCostService.CreateGoldCost(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("UpdateGoldCost")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UpdateGoldCost([FromBody] GoldCostUpdateRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanCostService.UpdateGoldCost(request);
                 return Ok(response);
             }
             catch (HandleException ex)

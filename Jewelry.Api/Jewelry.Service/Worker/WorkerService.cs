@@ -175,13 +175,16 @@ namespace Jewelry.Service.Worker
                              Description = item.Description,
                              Wages = item.Wages,
                              TotalWages = item.TotalWages,
-                             WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10
+                             WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
+
+                             JobDate = item.Header.CheckDate,
+
                          }).OrderByDescending(x => x.WagesStatus).ThenByDescending(x => x.Gold);
 
             var response = new SearchWorkerWagesResponse()
             {
-                WagesDateStart = request.RequestDateStart.StartOfDayUtc().DateTime,
-                WagesDateEnd = request.RequestDateEnd.StartOfDayUtc().DateTime,
+                WagesDateStart = request.RequestDateStart.UtcDateTime,
+                WagesDateEnd = request.RequestDateEnd.UtcDateTime,
 
                 TotalGoldQtySend = query.Sum(x => x.GoldQtySend),
                 TotalGoldWeightSend = query.Sum(x => x.GoldWeightSend),

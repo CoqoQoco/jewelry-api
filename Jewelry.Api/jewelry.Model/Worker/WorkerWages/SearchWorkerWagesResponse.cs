@@ -43,5 +43,7 @@ namespace jewelry.Model.Worker.WorkerWages
         public decimal? Wages { get; set; }
         public decimal? TotalWages { get; set; }
         public int WagesStatus { get; set; }
+
+        public DateTime? JobDate { get; set; }
     }
 }

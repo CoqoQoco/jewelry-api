@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlanCost.GoldCostCreate;
 using jewelry.Model.ProductionPlanCost.GoldCostList;
+using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
@@ -11,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static NPOI.HSSF.Util.HSSFColor;
 
 namespace Jewelry.Service.ProductionPlan
 {
@@ -18,6 +20,7 @@ namespace Jewelry.Service.ProductionPlan
     {
         IQueryable<GoldCostListResponse> ListGoldCost(GoldCostList request);
         Task<string> CreateGoldCost(GoldCostCreateRequest request);
+        Task<string> UpdateGoldCost(GoldCostUpdateRequest request);
     }
     public class ProductionPlanCostService : IProductionPlanCostService
     {
@@ -138,6 +141,56 @@ namespace Jewelry.Service.ProductionPlan
             };
 
             _jewelryContext.TbtProductionPlanCostGold.Add(create);
+            await _jewelryContext.SaveChangesAsync();
+
+            return "success";
+        }
+        public async Task<string> UpdateGoldCost(GoldCostUpdateRequest request)
+        {
+
+            var data = (from item in _jewelryContext.TbtProductionPlanCostGold
+                       where item.No == request.No.ToUpper() && item.BookNo == request.BookNo.ToUpper()
+                       select item).SingleOrDefault();
+
+            if (data == null)
+            {
+                throw new HandleException($"ไม่พบข้อมูลใบเบิกผสมทอง เลขที่:{request.No} เล่มที่:{request.BookNo} โปรดตรวจสอบความถูกต้องอีกครั้ง");
+            }
+
+
+            data.No = request.No.ToUpper();
+            data.BookNo = request.BookNo.ToUpper();
+            data.AssignDate = request.AssignDateFormat.UtcDateTime;
+
+            data.Gold = request.GoldCode;
+            data.GoldSize = request.GoldSizeCode;
+            data.GoldReceipt = request.GoldReceipt;
+
+            data.Remark = request.Remark;
+            data.AssignBy = request.AssignBy;
+            data.ReceiveBy = request.ReceiveBy;
+
+            data.MeltDate = request.MeltDateFormat.HasValue ? request.MeltDateFormat.Value.UtcDateTime : null;
+                data.MeltWeight = request.MeltWeight;
+            data.ReturnMeltWeight = request.ReturnMeltWeight;
+            data.ReturnMeltScrapWeight = request.ReturnMeltScrapWeight;
+            data.MeltWeightLoss = request.MeltWeightLoss;
+            data.MeltWeightOver = request.MeltWeightOver;
+
+            data.CastDate = request.CastDateFormat.HasValue ? request.CastDateFormat.Value.UtcDateTime : null;
+            data.CastWeight = request.CastWeight;
+            data.GemWeight = request.GemWeight;
+            data.ReturnCastWeight = request.ReturnCastWeight;
+            data.ReturnCastBodyWeight = request.ReturnCastBodyWeight;
+            data.ReturnCastScrapWeight = request.ReturnCastScrapWeight;
+            data.ReturnCastPowderWeight = request.ReturnCastPowderWeight;
+            data.CastWeightLoss = request.CastWeightLoss;
+            data.CastWeightOver = request.CastWeightOver;
+
+            data.UpdateDate = DateTime.UtcNow;
+            data.UpdateBy = _admin;
+
+            _jewelryContext.TbtProductionPlanCostGold.Update(data);
             await _jewelryContext.SaveChangesAsync();
 
             return "success";
