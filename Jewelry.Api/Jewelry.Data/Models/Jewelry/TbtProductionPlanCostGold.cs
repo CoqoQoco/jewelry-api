@@ -35,7 +35,7 @@ public partial class TbtProductionPlanCostGold
 
     public decimal? ReturnCastWeight { get; set; }
 
-    public decimal? ReturnCastBodyWeight { get; set; }
+    public decimal? ReturnCastBodyWeightTotal { get; set; }
 
     public decimal? ReturnCastScrapWeight { get; set; }
 
@@ -66,4 +66,6 @@ public partial class TbtProductionPlanCostGold
     public virtual TbmGold GoldNavigation { get; set; } = null!;
 
     public virtual TbmGoldSize GoldSizeNavigation { get; set; } = null!;
+
+    public virtual ICollection<TbtProductionPlanCostGoldItem> TbtProductionPlanCostGoldItem { get; set; } = new List<TbtProductionPlanCostGoldItem>();
 }

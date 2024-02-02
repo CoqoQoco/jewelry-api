@@ -42,6 +42,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanCostGold> TbtProductionPlanCostGold { get; set; }
 
+    public virtual DbSet<TbtProductionPlanCostGoldItem> TbtProductionPlanCostGoldItem { get; set; }
+
     public virtual DbSet<TbtProductionPlanImage> TbtProductionPlanImage { get; set; }
 
     public virtual DbSet<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; }
@@ -486,7 +488,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
-            entity.Property(e => e.ReturnCastBodyWeight).HasColumnName("return_cast_body_weight");
+            entity.Property(e => e.ReturnCastBodyWeightTotal).HasColumnName("return_cast_body_weight_total");
             entity.Property(e => e.ReturnCastPowderWeight).HasColumnName("return_cast_powder_weight");
             entity.Property(e => e.ReturnCastScrapWeight).HasColumnName("return_cast_scrap_weight");
             entity.Property(e => e.ReturnCastWeight).HasColumnName("return_cast_weight");
@@ -506,6 +508,40 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.GoldSize)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_production_plan_cost_gold_size_fk");
+        });
+
+        modelBuilder.Entity<TbtProductionPlanCostGoldItem>(entity =>
+        {
+            entity.HasKey(e => new { e.No, e.BookNo, e.ProductionPlanId }).HasName("tbt_production_plan_cost_gold_item_pk");
+
+            entity.ToTable("tbt_production_plan_cost_gold_item");
+
+            entity.Property(e => e.No)
+                .HasColumnType("character varying")
+                .HasColumnName("no");
+            entity.Property(e => e.BookNo)
+                .HasColumnType("character varying")
+                .HasColumnName("book_no");
+            entity.Property(e => e.ProductionPlanId)
+                .HasColumnType("character varying")
+                .HasColumnName("production_plan_id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.ReturnWeight).HasColumnName("return_weight");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.TbtProductionPlanCostGold).WithMany(p => p.TbtProductionPlanCostGoldItem)
+                .HasForeignKey(d => new { d.No, d.BookNo })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("newtabletbt_production_plan_cost_gold_item_fk");
         });
 
         modelBuilder.Entity<TbtProductionPlanImage>(entity =>

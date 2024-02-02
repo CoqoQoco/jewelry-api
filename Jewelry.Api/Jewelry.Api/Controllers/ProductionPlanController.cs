@@ -86,6 +86,24 @@ namespace Jewelry.Api.Controllers
                 return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
+        [Route("ProductionPlanSearchByProductionPlanId")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanTrackingResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ProductionPlanSearchByProductionPlanId([FromBody] ProductionPlanTrackingRequest request)
+        {
+            try
+            {
+                var report = _IProductionPlanService.ProductionPlanSearchByProductionPlanId(request.Search);
+                return report.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
         [Route("ProductionPlanGet")]
         [HttpGet]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(ProductionPlanGetResponse))]

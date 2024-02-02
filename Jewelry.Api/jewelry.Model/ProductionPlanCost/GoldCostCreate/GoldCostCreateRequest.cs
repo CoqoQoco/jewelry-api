@@ -37,5 +37,19 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostCreate
 
         public string? AssignBy { get; set; }
         public string? ReceiveBy { get; set; }
+
+        public List<GoldCostCreateItem> Items { get; set; }
+
+        public GoldCostCreateRequest()
+        {
+            Items = new List<GoldCostCreateItem>();
+        }
+    }
+
+    public class GoldCostCreateItem
+    {
+        public string ProductionPlanId { get; set; }
+        public decimal ReturnWeight { get; set; }
+        public string? Remark { get; set; }
     }
 }

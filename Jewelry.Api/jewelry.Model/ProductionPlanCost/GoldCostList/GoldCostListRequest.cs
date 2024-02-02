@@ -15,5 +15,7 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostList
     public class GoldCostList
     {
         public string? Text { get; set; }
+        public string? BookNo { get; set; }
+        public string? No { get; set; }
     }
 }

@@ -32,6 +32,7 @@ namespace Jewelry.Service.ProductionPlan
         Task<ProductionPlanCreateResponse> ProductionPlanCreate(ProductionPlanCreateRequest request);
         Task<ProductionPlanCreateResponse> ProductionPlanCreateImage(List<IFormFile> images, string wo, int woNumber);
         IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearch(ProductionPlanTracking request);
+        public IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearchByProductionPlanId(ProductionPlanTracking request);
 
         TbtProductionPlan ProductionPlanGet(int id);
         ProductionPlanGetResponse NewProductionPlanGet(int id);
@@ -348,6 +349,67 @@ namespace Jewelry.Service.ProductionPlan
 
             return query.OrderByDescending(x => x.CreateDate);
         }
+
+        public IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearchByProductionPlanId(ProductionPlanTracking request)
+        {
+            var query = (from item in _jewelryContext.TbtProductionPlan
+                         //.Include(x => x.TbtProductionPlanImage)
+                         //.Include(x => x.TbtProductionPlanMaterial)
+                         //.Include(x => x.StatusNavigation)
+                         where item.IsActive == true
+                         select new ProductionPlanTrackingResponse()
+                         {
+                             Id = item.Id,
+                             Wo = item.Wo,
+                             WoNumber = item.WoNumber,
+                             WoText = item.WoText,
+
+                             Mold = item.Mold,
+                             Status = item.Status,
+                             StatusName = item.StatusNavigation.NameTh,
+
+                             ProductNumber = item.ProductNumber,
+                             CustomerNumber = item.CustomerNumber,
+                             CreateDate = item.CreateDate,
+                             RequestDate = item.RequestDate,
+                         });
+
+            //query = query.Where(x => x.GIDate >= request.DateFrom.StartOfDayUtc() && x.GIDate <= request.DateTo.EndOfDayUtc());
+
+            //if (request.Start.HasValue)
+            //{
+            //    query = query.Where(x => x.RequestDate >= request.Start.Value.StartOfDayUtc());
+            //}
+            //if (request.End.HasValue)
+            //{
+            //    query = query.Where(x => x.RequestDate <= request.End.Value.StartOfDayUtc());
+            //}
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                query = (from item in query
+                          //where item.Wo.Contains(request.Text.ToUpper())
+                          where item.WoText.Contains(request.Text)
+                         //|| item.Mold.Contains(request.Text)
+                         //|| item.ProductNumber.Contains(request.Text)
+                         //|| item.CustomerNumber.Contains(request.Text)
+                         //|| item.CreateBy.Contains(request.Text)
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                query = (from item in query
+                             //where item.Wo.Contains(request.Text.ToUpper())
+                         where item.WoText == request.Text
+                         //|| item.Mold.Contains(request.Text)
+                         //|| item.ProductNumber.Contains(request.Text)
+                         //|| item.CustomerNumber.Contains(request.Text)
+                         //|| item.CreateBy.Contains(request.Text)
+                         select item);
+            }
+
+            //return query.OrderByDescending(x => x.CreateDate);
+            return query;
+        }
         public TbtProductionPlan ProductionPlanGet(int id)
         {
             var plan = (from item in _jewelryContext.TbtProductionPlan
@@ -485,8 +547,8 @@ namespace Jewelry.Service.ProductionPlan
 
                                                                                           WorkerSub = detail.WorkerSub,
                                                                                           WorkerSubName = !string.IsNullOrEmpty(detail.WorkerSub) && listWork.Any() ? (from item in listWork
-                                                                                                                                                                 where item.Code == detail.WorkerSub.ToUpper()
-                                                                                                                                                                 select item.NameTh).SingleOrDefault()
+                                                                                                                                                                       where item.Code == detail.WorkerSub.ToUpper()
+                                                                                                                                                                       select item.NameTh).SingleOrDefault()
                                                                                                                                                                  : null,
 
                                                                                           Wages = detail.Wages,

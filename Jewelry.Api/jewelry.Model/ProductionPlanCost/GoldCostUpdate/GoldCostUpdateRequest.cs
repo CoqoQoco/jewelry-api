@@ -1,4 +1,5 @@
-﻿using System;
+﻿using jewelry.Model.ProductionPlanCost.GoldCostCreate;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -37,5 +38,12 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostUpdate
 
         public string? AssignBy { get; set; }
         public string? ReceiveBy { get; set; }
+
+        public List<GoldCostCreateItem> Items { get; set; }
+
+        public GoldCostUpdateRequest()
+        {
+            Items = new List<GoldCostCreateItem>();
+        }
     }
 }

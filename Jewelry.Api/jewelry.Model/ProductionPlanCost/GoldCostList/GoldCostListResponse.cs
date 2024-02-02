@@ -1,4 +1,5 @@
-﻿using System;
+﻿using jewelry.Model.ProductionPlanCost.GoldCostCreate;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -29,7 +30,7 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostList
         public decimal? CastWeight { get; set; }
         public decimal? GemWeight { get; set; }
         public decimal? ReturnCastWeight { get; set; }
-        public decimal? ReturnCastBodyWeight { get; set; }
+        public decimal? ReturnCastBodyWeightTotal { get; set; }
         public decimal? ReturnCastScrapWeight { get; set; }
         public decimal? ReturnCastPowderWeight { get; set; }
         public decimal? CastWeightLoss { get; set; }
@@ -39,5 +40,14 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostList
 
         public string? AssignBy { get; set; }
         public string? ReceiveBy { get; set; }
+
+        public List<GoldCostCreateItem> Items { get; set; }
+
+        public GoldCostListResponse()
+        {
+            Items = new List<GoldCostCreateItem>();
+        }
     }
+
 }
+
