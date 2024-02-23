@@ -3,6 +3,7 @@ using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
+using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
@@ -24,6 +25,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace Jewelry.Service.ProductionPlan
 {
@@ -36,6 +38,7 @@ namespace Jewelry.Service.ProductionPlan
 
         TbtProductionPlan ProductionPlanGet(int id);
         ProductionPlanGetResponse NewProductionPlanGet(int id);
+        IQueryable<ProductionPlanGetResponse> ReportProductionPlan(ProductionPlanReport request);
 
         IQueryable<TbtProductionPlanMaterial> ProductionPlanMateriaGet(ProductionPlanTrackingMaterialRequest request);
         Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request);
@@ -353,9 +356,9 @@ namespace Jewelry.Service.ProductionPlan
         public IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearchByProductionPlanId(ProductionPlanTracking request)
         {
             var query = (from item in _jewelryContext.TbtProductionPlan
-                         //.Include(x => x.TbtProductionPlanImage)
-                         //.Include(x => x.TbtProductionPlanMaterial)
-                         //.Include(x => x.StatusNavigation)
+                             //.Include(x => x.TbtProductionPlanImage)
+                             //.Include(x => x.TbtProductionPlanMaterial)
+                             //.Include(x => x.StatusNavigation)
                          where item.IsActive == true
                          select new ProductionPlanTrackingResponse()
                          {
@@ -376,19 +379,19 @@ namespace Jewelry.Service.ProductionPlan
 
             //query = query.Where(x => x.GIDate >= request.DateFrom.StartOfDayUtc() && x.GIDate <= request.DateTo.EndOfDayUtc());
 
-            //if (request.Start.HasValue)
-            //{
-            //    query = query.Where(x => x.RequestDate >= request.Start.Value.StartOfDayUtc());
-            //}
-            //if (request.End.HasValue)
-            //{
-            //    query = query.Where(x => x.RequestDate <= request.End.Value.StartOfDayUtc());
-            //}
+            if (request.CreateStart.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.CreateStart.Value.StartOfDayUtc());
+            }
+            if (request.CreateEnd.HasValue)
+            {
+                query = query.Where(x => x.CreateDate <= request.CreateEnd.Value.StartOfDayUtc());
+            }
             if (!string.IsNullOrEmpty(request.Text))
             {
                 query = (from item in query
-                          //where item.Wo.Contains(request.Text.ToUpper())
-                          where item.WoText.Contains(request.Text)
+                             //where item.Wo.Contains(request.Text.ToUpper())
+                         where item.WoText.Contains(request.Text)
                          //|| item.Mold.Contains(request.Text)
                          //|| item.ProductNumber.Contains(request.Text)
                          //|| item.CustomerNumber.Contains(request.Text)
@@ -557,6 +560,76 @@ namespace Jewelry.Service.ProductionPlan
                                                  }).ToList()
             };
 
+            return response;
+        }
+        public IQueryable<ProductionPlanGetResponse> ReportProductionPlan(ProductionPlanReport request)
+        {
+            var response = (from item in _jewelryContext.TbtProductionPlan
+                         .Include(x => x.ProductTypeNavigation)
+                         .Include(x => x.CustomerTypeNavigation)
+                                //.Include(x => x.TbtProductionPlanImage)
+                                //.Include(x => x.TbtProductionPlanMaterial)
+                                //.Include(x => x.StatusNavigation)
+                                //.Include(x => x.TbtProductionPlanStatusHeader
+                                //   .Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
+                                //   .ThenInclude(x => x.TbtProductionPlanStatusDetail)
+
+                            join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code
+                            //from cj in customerJoin.DefaultIfEmpty()
+
+                            where item.IsActive == true
+                            && item.CreateDate >= request.CreateStart.StartOfDayUtc()
+                            && item.CreateDate <= request.CreateEnd.EndOfDayUtc()
+                            //&& item.WoText.Contains(request.WoText.ToUpper())
+                            //&& item.Id == id
+                            //&& item.TbtProductionPlanStatusDetail.Any(x => x.IsActive == true)
+                            select new ProductionPlanGetResponse
+                            {
+                                Id = item.Id,
+                                Wo = item.Wo,
+                                WoNumber = item.WoNumber,
+                                WoText = item.WoText,
+
+                                CreateDate = item.CreateDate,
+                                CreateBy = item.CreateBy,
+                                UpdateBy = item.UpdateBy,
+                                UpdateDate = item.UpdateDate,
+
+                                RequestDate = item.RequestDate,
+                                Mold = item.Mold,
+
+                                ProductRunning = item.ProductRunning,
+                                ProductName = item.ProductName,
+                                ProductNumber = item.ProductNumber,
+                                ProductDetail = item.ProductDetail,
+
+                                ProductType = item.ProductType,
+                                ProductTypeName = item.ProductTypeNavigation != null ? item.ProductTypeNavigation.NameTh : null,
+
+                                ProductQty = item.ProductQty,
+                                ProductQtyUnit = item.ProductQtyUnit,
+
+                                CustomerNumber = item.CustomerNumber,
+                                CustomerTypeName = item.CustomerTypeNavigation != null ? item.CustomerTypeNavigation.NameTh : null,
+                                CustomerType = item.CustomerType,
+                                //CustomerTypeName = cj != null ? cj.NameTh : null,
+                                CustomerName = customer.NameTh,
+
+                                IsActive = item.IsActive,
+                                //Status = item.Status,
+                                //StatusName = item.StatusNavigation.NameTh,
+                                Remark = item.Remark,
+                            });
+
+            if (!string.IsNullOrEmpty(request.WoText))
+            { 
+                response = response.Where(x => x.WoText.Contains(request.WoText.ToUpper()));
+            }
+
+            if (response.Any())
+            {
+                var test = response.ToList();
+            }
             return response;
         }
 
