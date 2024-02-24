@@ -41,6 +41,8 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostList
         public string? AssignBy { get; set; }
         public string? ReceiveBy { get; set; }
 
+        public string? RunningNumber { get; set; }
+
         public List<GoldCostCreateItem> Items { get; set; }
 
         public GoldCostListResponse()

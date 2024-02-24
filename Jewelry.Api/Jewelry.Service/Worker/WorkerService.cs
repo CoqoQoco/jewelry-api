@@ -2,6 +2,7 @@
 using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
 using jewelry.Model.Worker.List;
+using jewelry.Model.Worker.Report;
 using jewelry.Model.Worker.WorkerWages;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -23,6 +24,7 @@ namespace Jewelry.Service.Worker
         Task<string> Create(CreateProductionWorkerRequest request);
         IQueryable<ListWorkerProductionResponse> Search(ListWorkerProduction request);
         SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request);
+        IQueryable<ReportWorkerWagesResponse> Report(ReportWorkerWages request);
     }
     public class WorkerService : IWorkerService
     {
@@ -159,7 +161,7 @@ namespace Jewelry.Service.Worker
                              Wo = item.Header.ProductionPlan.Wo,
                              WoNumber = item.Header.ProductionPlan.WoNumber,
                              ProductNumber = item.Header.ProductionPlan.ProductNumber,
-                             ProductName= item.Header.ProductionPlan.ProductName,
+                             ProductName = item.Header.ProductionPlan.ProductName,
 
                              Status = status.Id,
                              StatusName = status.NameTh,
@@ -196,6 +198,55 @@ namespace Jewelry.Service.Worker
             };
 
             return response;
+        }
+        public IQueryable<ReportWorkerWagesResponse> Report(ReportWorkerWages request)
+        {
+            var statusCheck = new int[] { 50, 60, 80, 90 };
+            var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                         .Include(x => x.Header)
+                         .ThenInclude(x => x.ProductionPlan)
+                         join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                         join worker in _jewelryContext.TbmWorker on item.Worker equals worker.Code
+
+                         //where item.Worker == request.Code.ToUpper()
+                         where item.Header.CheckDate >= request.CreateStart.StartOfDayUtc()
+                         && item.Header.CheckDate <= request.CreateEnd.EndOfDayUtc()
+                         && item.IsActive == true
+                         && item.Header.IsActive == true
+                         && item.Wages.HasValue && item.Wages.Value > 0
+
+                         select new ReportWorkerWagesResponse()
+                         {
+                             Wo = item.Header.ProductionPlan.Wo,
+                             WoNumber = item.Header.ProductionPlan.WoNumber,
+                             ProductNumber = item.Header.ProductionPlan.ProductNumber,
+                             ProductName = item.Header.ProductionPlan.ProductName,
+
+                             WorkerCode = item.Worker,
+                             WorkerName = worker.NameTh,
+
+                             Status = status.Id,
+                             StatusName = status.NameTh,
+                             StatusDescription = status.Description,
+
+                             Gold = item.Gold,
+
+                             GoldQtySend = item.GoldQtySend,
+                             GoldWeightSend = item.GoldWeightSend,
+                             GoldQtyCheck = item.GoldQtyCheck,
+                             GoldWeightCheck = item.GoldWeightCheck,
+
+                             Description = item.Description,
+                             Wages = item.Wages,
+                             TotalWages = item.TotalWages,
+                             WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
+
+                             JobDate = item.Header.CheckDate,
+                         });
+
+
+            return query;
+
         }
 
     }

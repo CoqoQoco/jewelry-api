@@ -100,6 +100,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                 AssignBy = item.AssignBy,
                                 ReceiveBy = item.ReceiveBy,
+                                RunningNumber = item.RunningNumber,
                                 Remark = item.Remark,
                                 Items = (from subItem in item.TbtProductionPlanCostGoldItem
                                          select new GoldCostCreateItem()
@@ -123,6 +124,8 @@ namespace Jewelry.Service.ProductionPlan
             {
                 throw new HandleException($"ใบเบิกผสมทอง เลขที่:{request.No} เล่มที่:{request.BookNo} ทำซ้ำ กรุณาสร้างหมายเลขใหม่");
             }
+
+            var running = await _runningNumberService.GenerateRunningNumber("CAST");
 
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
@@ -159,6 +162,8 @@ namespace Jewelry.Service.ProductionPlan
 
                     CreateDate = DateTime.UtcNow,
                     CreateBy = _admin,
+
+                    RunningNumber = running,
 
                     IsActive = true,
                 };

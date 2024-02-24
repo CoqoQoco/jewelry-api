@@ -63,6 +63,8 @@ public partial class TbtProductionPlanCostGold
 
     public DateTime? CastDate { get; set; }
 
+    public string? RunningNumber { get; set; }
+
     public virtual TbmGold GoldNavigation { get; set; } = null!;
 
     public virtual TbmGoldSize GoldSizeNavigation { get; set; } = null!;

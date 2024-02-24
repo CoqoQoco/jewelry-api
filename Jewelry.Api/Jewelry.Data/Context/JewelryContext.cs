@@ -494,6 +494,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ReturnCastWeight).HasColumnName("return_cast_weight");
             entity.Property(e => e.ReturnMeltScrapWeight).HasColumnName("return_melt_scrap_weight");
             entity.Property(e => e.ReturnMeltWeight).HasColumnName("return_melt_weight");
+            entity.Property(e => e.RunningNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("running_number");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");

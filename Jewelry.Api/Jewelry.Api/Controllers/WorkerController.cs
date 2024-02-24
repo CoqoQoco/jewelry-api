@@ -1,8 +1,11 @@
 ﻿using jewelry.Model.Customer;
 using jewelry.Model.Exceptions;
+using jewelry.Model.ProductionPlan.ProductionPlanGet;
+using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
 using jewelry.Model.Worker.List;
+using jewelry.Model.Worker.Report;
 using jewelry.Model.Worker.WorkerWages;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Customer;
@@ -99,6 +102,25 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ReportWorkerWages")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ReportWorkerWagesRequest>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ProductionPlanSearch([FromBody] ReportWorkerWagesRequest request)
+        {
+            try
+            {
+                var report = _service.Report(request.Search);
+                return report.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
     }
