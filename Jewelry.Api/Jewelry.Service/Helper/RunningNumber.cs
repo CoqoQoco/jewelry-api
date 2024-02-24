@@ -13,6 +13,7 @@ namespace Jewelry.Service.Helper
     public interface IRunningNumber
     {
         Task<string> GenerateRunningNumber(string key);
+        Task<string> GenerateRunningNumberForGold(string key);
     }
     public class RunningNumber : IRunningNumber
     {
@@ -52,6 +53,13 @@ namespace Jewelry.Service.Helper
             var name = $"{key}{DateTime.UtcNow.ToString("yyyyMMdd")}";
             var jobRunning = await Next(name);
             name = $"{name}{jobRunning.ToString("0000")}";
+            return name;
+        }
+        public async Task<string> GenerateRunningNumberForGold(string key)
+        {
+            var name = $"{key}{DateTime.UtcNow.ToString("yyMMdd")}";
+            var jobRunning = await Next(name);
+            name = $"{name}{jobRunning.ToString("000")}";
             return name;
         }
     }

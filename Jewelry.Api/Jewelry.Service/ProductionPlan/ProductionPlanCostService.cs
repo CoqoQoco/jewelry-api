@@ -125,7 +125,7 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"ใบเบิกผสมทอง เลขที่:{request.No} เล่มที่:{request.BookNo} ทำซ้ำ กรุณาสร้างหมายเลขใหม่");
             }
 
-            var running = await _runningNumberService.GenerateRunningNumber("CAST");
+            var running = await _runningNumberService.GenerateRunningNumberForGold("CAST");
 
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
