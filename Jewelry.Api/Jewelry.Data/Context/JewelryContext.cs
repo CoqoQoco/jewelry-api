@@ -488,7 +488,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
+            entity.Property(e => e.ReturnCastBodyBrokenedWeight).HasColumnName("return_cast_body_brokened_weight");
             entity.Property(e => e.ReturnCastBodyWeightTotal).HasColumnName("return_cast_body_weight_total");
+            entity.Property(e => e.ReturnCastMoldWeight).HasColumnName("return_cast_mold_weight");
             entity.Property(e => e.ReturnCastPowderWeight).HasColumnName("return_cast_powder_weight");
             entity.Property(e => e.ReturnCastScrapWeight).HasColumnName("return_cast_scrap_weight");
             entity.Property(e => e.ReturnCastWeight).HasColumnName("return_cast_weight");
@@ -535,6 +537,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
+            entity.Property(e => e.ReturnQty).HasColumnName("return_qty");
             entity.Property(e => e.ReturnWeight).HasColumnName("return_weight");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")

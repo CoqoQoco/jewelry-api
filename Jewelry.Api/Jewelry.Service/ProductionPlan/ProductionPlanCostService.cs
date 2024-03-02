@@ -92,6 +92,8 @@ namespace Jewelry.Service.ProductionPlan
                                 CastWeight = item.CastWeight,
                                 GemWeight = item.GemWeight,
                                 ReturnCastWeight = item.ReturnCastWeight,
+                                ReturnCastMoldWeight = item.ReturnCastMoldWeight,
+                                ReturnCastBodyBrokenWeight = item.ReturnCastBodyBrokenedWeight,
                                 ReturnCastBodyWeightTotal = item.ReturnCastBodyWeightTotal,
                                 ReturnCastScrapWeight = item.ReturnCastScrapWeight,
                                 ReturnCastPowderWeight = item.ReturnCastPowderWeight,
@@ -108,6 +110,7 @@ namespace Jewelry.Service.ProductionPlan
                                              ProductionPlanId = subItem.ProductionPlanId,
                                              Remark = subItem.Remark,
                                              ReturnWeight = subItem.ReturnWeight,
+                                             ReturnQTY = subItem.ReturnQty.HasValue ? subItem.ReturnQty.Value : 0,
                                          }).ToList()
                             });
 
@@ -154,6 +157,8 @@ namespace Jewelry.Service.ProductionPlan
                     CastWeight = request.CastWeight,
                     GemWeight = request.GemWeight,
                     ReturnCastWeight = request.ReturnCastWeight,
+                    ReturnCastMoldWeight = request.ReturnCastMoldWeight,
+                    ReturnCastBodyBrokenedWeight = request.ReturnCastBodyBrokenWeight,
                     ReturnCastBodyWeightTotal = request.Items.Sum(x => x.ReturnWeight),
                     ReturnCastScrapWeight = request.ReturnCastScrapWeight,
                     ReturnCastPowderWeight = request.ReturnCastPowderWeight,
@@ -196,6 +201,7 @@ namespace Jewelry.Service.ProductionPlan
                             BookNo = request.BookNo.ToUpper(),
                             ProductionPlanId = item.ProductionPlanId,
                             ReturnWeight = item.ReturnWeight,
+                            ReturnQty = item.ReturnQTY,
                             Remark = item.Remark,
 
 
@@ -255,6 +261,8 @@ namespace Jewelry.Service.ProductionPlan
                 data.CastWeight = request.CastWeight;
                 data.GemWeight = request.GemWeight;
                 data.ReturnCastWeight = request.ReturnCastWeight;
+                data.ReturnCastMoldWeight = request.ReturnCastMoldWeight;
+                data.ReturnCastBodyBrokenedWeight = request.ReturnCastBodyBrokenWeight;
                 data.ReturnCastBodyWeightTotal = request.Items.Sum(x => x.ReturnWeight);
                 data.ReturnCastScrapWeight = request.ReturnCastScrapWeight;
                 data.ReturnCastPowderWeight = request.ReturnCastPowderWeight;
@@ -295,6 +303,7 @@ namespace Jewelry.Service.ProductionPlan
                             BookNo = data.BookNo.ToUpper(),
                             ProductionPlanId = item.ProductionPlanId,
                             ReturnWeight = item.ReturnWeight,
+                            ReturnQty = item.ReturnQTY,
                             Remark = item.Remark,
 
                             CreateDate = DateTime.UtcNow,

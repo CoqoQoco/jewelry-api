@@ -23,5 +23,7 @@ public partial class TbtProductionPlanCostGoldItem
 
     public string? Remark { get; set; }
 
+    public decimal? ReturnQty { get; set; }
+
     public virtual TbtProductionPlanCostGold TbtProductionPlanCostGold { get; set; } = null!;
 }

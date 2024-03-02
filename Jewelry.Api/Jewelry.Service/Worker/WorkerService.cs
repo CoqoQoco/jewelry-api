@@ -160,6 +160,7 @@ namespace Jewelry.Service.Worker
                          {
                              Wo = item.Header.ProductionPlan.Wo,
                              WoNumber = item.Header.ProductionPlan.WoNumber,
+                             WoText = item.Header.ProductionPlan.WoText,
                              ProductNumber = item.Header.ProductionPlan.ProductNumber,
                              ProductName = item.Header.ProductionPlan.ProductName,
 
@@ -181,7 +182,7 @@ namespace Jewelry.Service.Worker
 
                              JobDate = item.Header.CheckDate,
 
-                         }).OrderByDescending(x => x.WagesStatus).ThenBy(x => x.JobDate).ThenByDescending(x => x.Gold);
+                         }).OrderByDescending(x => x.WagesStatus).ThenBy(x => x.JobDate).ThenBy(x => x.WoText).ThenByDescending(x => x.Gold);
 
             var response = new SearchWorkerWagesResponse()
             {

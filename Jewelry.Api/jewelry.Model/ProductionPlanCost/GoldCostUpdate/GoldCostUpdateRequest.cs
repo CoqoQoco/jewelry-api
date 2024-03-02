@@ -28,7 +28,9 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostUpdate
         public decimal? CastWeight { get; set; }
         public decimal? GemWeight { get; set; }
         public decimal? ReturnCastWeight { get; set; }
+        public decimal? ReturnCastMoldWeight { get; set; }
         public decimal? ReturnCastBodyWeight { get; set; }
+        public decimal? ReturnCastBodyBrokenWeight { get; set; }
         public decimal? ReturnCastScrapWeight { get; set; }
         public decimal? ReturnCastPowderWeight { get; set; }
         public decimal? CastWeightLoss { get; set; }
