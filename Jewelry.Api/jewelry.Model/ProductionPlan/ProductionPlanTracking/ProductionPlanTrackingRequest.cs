@@ -19,6 +19,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
         public DateTimeOffset? CreateEnd { get; set; }
         public string? Text { get; set; }
         public string? WoText { get; set; }
+
+        public int[]? Status { get; set; }
     }
        
 

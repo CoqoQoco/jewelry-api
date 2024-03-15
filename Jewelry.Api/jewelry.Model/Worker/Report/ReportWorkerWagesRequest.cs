@@ -18,5 +18,6 @@ namespace jewelry.Model.Worker.Report
         public DateTimeOffset CreateStart { get; set; }
         public DateTimeOffset CreateEnd { get; set; }
         public string? WoText { get; set; }
+        public string? Text { get; set; }
     }
 }

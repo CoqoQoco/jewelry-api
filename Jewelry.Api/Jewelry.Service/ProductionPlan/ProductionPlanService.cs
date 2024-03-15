@@ -349,6 +349,10 @@ namespace Jewelry.Service.ProductionPlan
                          //|| item.CreateBy.Contains(request.Text)
                          select item);
             }
+            if (request.Status != null && request.Status.Any()) 
+            { 
+                query = query.Where(x => request.Status.Contains(x.Status));
+            }
 
             return query.OrderByDescending(x => x.CreateDate);
         }
@@ -949,7 +953,8 @@ namespace Jewelry.Service.ProductionPlan
                             }
                         }
                         break;
-                    case 85: //CVD
+                    case 85:// cvd
+                    case 95:// ประเมินราคา
                         {
                             var addStatus = new TbtProductionPlanStatusHeader
                             {
@@ -1134,6 +1139,7 @@ namespace Jewelry.Service.ProductionPlan
                         }
                         break;
                     case 85: //CVD
+                    case 95: // ประเมินราคา
                         {
 
 

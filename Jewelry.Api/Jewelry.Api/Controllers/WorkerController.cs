@@ -6,6 +6,7 @@ using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
 using jewelry.Model.Worker.List;
 using jewelry.Model.Worker.Report;
+using jewelry.Model.Worker.Update;
 using jewelry.Model.Worker.WorkerWages;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Customer;
@@ -79,6 +80,23 @@ namespace Jewelry.Api.Controllers
             try
             {
                 var response = await _service.Create(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("Update")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Update([FromBody] UpdateProductionWorkerRequest request)
+        {
+            try
+            {
+                var response = await _service.Update(request);
                 return Ok(response);
             }
             catch (HandleException ex)

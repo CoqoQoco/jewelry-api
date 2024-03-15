@@ -11,6 +11,8 @@ namespace jewelry.Model.Worker.Report
     {
         public string Wo { get; set; }
         public int WoNumber { get; set; }
+        public string WoText { get; set; }
+
         public string ProductNumber { get; set; }
         public string ProductName { get; set; }
 

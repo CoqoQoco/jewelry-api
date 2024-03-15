@@ -3,6 +3,7 @@ using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
 using jewelry.Model.Worker.List;
 using jewelry.Model.Worker.Report;
+using jewelry.Model.Worker.Update;
 using jewelry.Model.Worker.WorkerWages;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -22,6 +23,7 @@ namespace Jewelry.Service.Worker
     {
         IQueryable<MasterWorkerProductionTypeResponse> GetWorkerProductionType();
         Task<string> Create(CreateProductionWorkerRequest request);
+        Task<string> Update(UpdateProductionWorkerRequest request);
         IQueryable<ListWorkerProductionResponse> Search(ListWorkerProduction request);
         SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request);
         IQueryable<ReportWorkerWagesResponse> Report(ReportWorkerWages request);
@@ -79,6 +81,28 @@ namespace Jewelry.Service.Worker
             };
 
             _jewelryContext.TbmWorker.Add(add);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"{request.Code.ToUpper()}-{request.NameTh}";
+        }
+        public async Task<string> Update(UpdateProductionWorkerRequest request)
+        {
+            var dub = (from item in _jewelryContext.TbmWorker
+                       where item.Code == request.Code.ToUpper()
+                       select item).SingleOrDefault();
+
+            if (dub == null)
+            {
+                throw new HandleException($" ไม่พบพบรหัสพนักงาน {request.Code} ซ้ำในระบบ กรุณาสร้างรหัสใหม่");
+            }
+
+            dub.NameEn = request.NameEn;
+            dub.NameTh = request.NameTh;
+            dub.TypeId = request.Type;
+            dub.UpdateDate = DateTime.UtcNow;
+            dub.UpdateBy = _admin;
+
+            _jewelryContext.TbmWorker.Update(dub);
             await _jewelryContext.SaveChangesAsync();
 
             return $"{request.Code.ToUpper()}-{request.NameTh}";
@@ -220,6 +244,7 @@ namespace Jewelry.Service.Worker
                          {
                              Wo = item.Header.ProductionPlan.Wo,
                              WoNumber = item.Header.ProductionPlan.WoNumber,
+                             WoText = item.Header.ProductionPlan.WoText,
                              ProductNumber = item.Header.ProductionPlan.ProductNumber,
                              ProductName = item.Header.ProductionPlan.ProductName,
 
@@ -244,6 +269,17 @@ namespace Jewelry.Service.Worker
 
                              JobDate = item.Header.CheckDate,
                          });
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                query = (from item in query
+                         where item.WorkerCode.Contains(request.Text.ToUpper())
+                         || item.WorkerName.Contains(request.Text)
+                         || item.ProductNumber.Contains(request.Text)
+                         || item.ProductName.Contains(request.Text)
+                         || item.WoText.Contains(request.Text)
+                         select item);
+            }
 
 
             return query;
