@@ -188,7 +188,7 @@ namespace Jewelry.Service.Worker
                              ProductNumber = item.Header.ProductionPlan.ProductNumber,
                              ProductName = item.Header.ProductionPlan.ProductName,
 
-                             StatusActive = item.Header.Status,
+                             StatusActive = item.Header.ProductionPlan.Status,
                              Status = status.Id,
                              StatusName = status.NameTh,
                              StatusDescription = status.Description,
