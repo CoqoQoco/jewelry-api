@@ -111,7 +111,7 @@ namespace Jewelry.Service.ProductionPlan
                                              Remark = subItem.Remark,
                                              ReturnWeight = subItem.ReturnWeight,
                                              ReturnQTY = subItem.ReturnQty.HasValue ? subItem.ReturnQty.Value : 0,
-                                         }).ToList()
+                                         }).OrderBy(x => x.ProductionPlanId).ToList()
                             });
 
             return response;
