@@ -172,6 +172,7 @@ namespace Jewelry.Service.Worker
             var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                             .Include(x => x.Header)
                             .ThenInclude(x => x.ProductionPlan)
+                            .ThenInclude(x => x.StatusNavigation)
                          join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
 
                          where item.Worker == request.Code.ToUpper()
@@ -189,6 +190,7 @@ namespace Jewelry.Service.Worker
                              ProductName = item.Header.ProductionPlan.ProductName,
 
                              StatusActive = item.Header.ProductionPlan.Status,
+                             StatusActiveName = item.Header.ProductionPlan.StatusNavigation.NameTh,
                              Status = status.Id,
                              StatusName = status.NameTh,
                              StatusDescription = status.Description,
