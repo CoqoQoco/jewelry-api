@@ -203,7 +203,7 @@ namespace Jewelry.Service.Worker
                              Description = item.Description,
                              Wages = item.Wages,
                              TotalWages = item.TotalWages,
-                             WagesStatus = item.Header.Status == status.Id ? 10 : 100,
+                             WagesStatus = item.Header.ProductionPlan.Status == status.Id ? 10 : 100,
 
                              JobDate = item.Header.CheckDate,
 
