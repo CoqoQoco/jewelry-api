@@ -29,6 +29,7 @@ namespace jewelry.Model.Worker.WorkerWages
         public string ProductNumber { get; set; }
         public string ProductName { get; set; }
 
+        public int StatusActive { get; set; }
         public int Status { get; set; }
         public string StatusName { get; set; }
         public string? StatusDescription { get; set; }

@@ -26,6 +26,7 @@ namespace Jewelry.Service.Worker
         Task<string> Update(UpdateProductionWorkerRequest request);
         IQueryable<ListWorkerProductionResponse> Search(ListWorkerProduction request);
         SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request);
+        SearchWorkerWagesResponse SearchWorkerActiveStatus(SearchWorkerWagesRequest request);
         IQueryable<ReportWorkerWagesResponse> Report(ReportWorkerWages request);
     }
     public class WorkerService : IWorkerService
@@ -168,7 +169,6 @@ namespace Jewelry.Service.Worker
         }
         public SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request)
         {
-            var statusCheck = new int[] { 50, 60, 80, 90 };
             var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                             .Include(x => x.Header)
                             .ThenInclude(x => x.ProductionPlan)
@@ -179,6 +179,66 @@ namespace Jewelry.Service.Worker
                          && item.Header.CheckDate <= request.RequestDateEnd.EndOfDayUtc()
                          && item.IsActive == true
                          && item.Header.IsActive == true
+
+                         select new SearchWorkerWages()
+                         {
+                             Wo = item.Header.ProductionPlan.Wo,
+                             WoNumber = item.Header.ProductionPlan.WoNumber,
+                             WoText = item.Header.ProductionPlan.WoText,
+                             ProductNumber = item.Header.ProductionPlan.ProductNumber,
+                             ProductName = item.Header.ProductionPlan.ProductName,
+
+                             StatusActive = item.Header.Status,
+                             Status = status.Id,
+                             StatusName = status.NameTh,
+                             StatusDescription = status.Description,
+
+                             Gold = item.Gold,
+
+                             GoldQtySend = item.GoldQtySend,
+                             GoldWeightSend = item.GoldWeightSend,
+                             GoldQtyCheck = item.GoldQtyCheck,
+                             GoldWeightCheck = item.GoldWeightCheck,
+
+                             Description = item.Description,
+                             Wages = item.Wages,
+                             TotalWages = item.TotalWages,
+                             WagesStatus = item.Header.Status == status.Id ? 10 : 100,
+
+                             JobDate = item.Header.CheckDate,
+
+                         }).OrderByDescending(x => x.WagesStatus).ThenBy(x => x.JobDate).ThenBy(x => x.WoText).ThenByDescending(x => x.Gold);
+
+            var response = new SearchWorkerWagesResponse()
+            {
+                WagesDateStart = request.RequestDateStart.UtcDateTime,
+                WagesDateEnd = request.RequestDateEnd.UtcDateTime,
+
+                TotalGoldQtySend = query.Sum(x => x.GoldQtySend),
+                TotalGoldWeightSend = query.Sum(x => x.GoldWeightSend),
+                TotalGoldQtyCheck = query.Sum(x => x.GoldQtyCheck),
+                TotalGoldWeightCheck = query.Sum(x => x.GoldWeightCheck),
+
+                TotalWages = query.Sum(x => x.TotalWages),
+                Items = query.ToList(),
+            };
+
+            return response;
+        }
+
+        public SearchWorkerWagesResponse SearchWorkerActiveStatus(SearchWorkerWagesRequest request)
+        {
+            var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                            .Include(x => x.Header)
+                            .ThenInclude(x => x.ProductionPlan)
+                         join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+
+                         where item.Worker == request.Code.ToUpper()
+                         && item.Header.CheckDate >= request.RequestDateStart.StartOfDayUtc()
+                         && item.Header.CheckDate <= request.RequestDateEnd.EndOfDayUtc()
+                         && item.IsActive == true
+                         && item.Header.IsActive == true
+                         && status.Id == item.Header.Status
 
                          select new SearchWorkerWages()
                          {
