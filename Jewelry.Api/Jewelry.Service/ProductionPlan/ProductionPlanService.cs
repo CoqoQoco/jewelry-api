@@ -927,7 +927,6 @@ namespace Jewelry.Service.ProductionPlan
 
                                 CheckName = request.CheckName,
                                 CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
-
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
                                 WagesTotal = request.TotalWages ?? 0,
@@ -944,6 +943,9 @@ namespace Jewelry.Service.ProductionPlan
                                     ProductionPlanId = request.ProductionPlanId,
                                     ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
                                     IsActive = true,
+
+                                    Worker = item.Worker,
+                                    WorkerSub = item.WorkerSub,
 
                                     Gold = item.Gold,
                                     GoldQtyCheck = item.GoldQTYCheck,
@@ -1129,6 +1131,9 @@ namespace Jewelry.Service.ProductionPlan
                                     ProductionPlanId = request.ProductionPlanId,
                                     ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
                                     IsActive = true,
+
+                                    Worker = item.Worker,
+                                    WorkerSub = item.WorkerSub,
 
                                     Gold = item.Gold,
                                     GoldQtyCheck = item.GoldQTYCheck,

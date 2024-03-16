@@ -41,7 +41,7 @@ namespace Jewelry.Service.Worker
 
         public IQueryable<MasterWorkerProductionTypeResponse> GetWorkerProductionType()
         {
-            var getId = new int[] { 50, 60, 80, 90 };
+            var getId = new int[] { 50, 60, 80,70, 90 };
             var query = (from item in _jewelryContext.TbmProductionPlanStatus
                          where getId.Contains(item.Id)
                          select new MasterWorkerProductionTypeResponse()
@@ -277,7 +277,13 @@ namespace Jewelry.Service.Worker
                          || item.WorkerName.Contains(request.Text)
                          || item.ProductNumber.Contains(request.Text)
                          || item.ProductName.Contains(request.Text)
-                         || item.WoText.Contains(request.Text)
+                         //|| item.WoText.Contains(request.Text)
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                query = (from item in query
+                         where item.WoText.Contains(request.WoText.ToString())
                          select item);
             }
 
