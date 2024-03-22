@@ -336,7 +336,7 @@ namespace Jewelry.Service.ProductionPlan
             }
             if (request.End.HasValue)
             {
-                query = query.Where(x => x.RequestDate <= request.End.Value.StartOfDayUtc());
+                query = query.Where(x => x.RequestDate <= request.End.Value.EndOfDayUtc());
             }
             if (!string.IsNullOrEmpty(request.Text))
             {

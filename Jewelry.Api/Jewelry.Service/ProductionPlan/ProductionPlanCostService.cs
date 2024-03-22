@@ -57,14 +57,26 @@ namespace Jewelry.Service.ProductionPlan
             if (!string.IsNullOrEmpty(request.BookNo))
             {
                 query = (from item in query.Include(x => x.TbtProductionPlanCostGoldItem)
-                         where item.No ==request.BookNo.ToUpper()
+                         where item.BookNo.Contains(request.BookNo.ToUpper())
                          select item);
             }
             if (!string.IsNullOrEmpty(request.No))
             {
                 query = (from item in query.Include(x => x.TbtProductionPlanCostGoldItem)
-                         where item.No == request.No.ToUpper()
+                         where item.No.Contains(request.No.ToUpper())
                          select item);
+            }
+            if (!string.IsNullOrEmpty(request.RunningNumber)) 
+            { 
+                query = query.Where(x => x.RunningNumber.Contains(request.RunningNumber));
+            }
+            if (request.CreateStart.HasValue)
+            {
+                query = query.Where(x => x.AssignDate >= request.CreateStart.Value.StartOfDayUtc());
+            }
+            if (request.CreateEnd.HasValue)
+            {
+                query = query.Where(x => x.AssignDate <= request.CreateEnd.Value.EndOfDayUtc());
             }
 
 
