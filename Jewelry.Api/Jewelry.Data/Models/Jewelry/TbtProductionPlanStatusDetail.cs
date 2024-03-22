@@ -37,5 +37,7 @@ public partial class TbtProductionPlanStatusDetail
 
     public string? WorkerSub { get; set; }
 
+    public DateTime? RequestDate { get; set; }
+
     public virtual TbtProductionPlanStatusHeader Header { get; set; } = null!;
 }

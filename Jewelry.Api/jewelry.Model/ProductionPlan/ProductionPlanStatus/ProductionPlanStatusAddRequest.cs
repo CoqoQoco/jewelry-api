@@ -29,6 +29,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
 
     public class GoldItem
     {
+        public DateTimeOffset? RequestDate { get; set; }
         public string? Gold { get; set; }
         public decimal? GoldWeightSend { get; set; }
         public decimal? GoldQTYSend { get; set; }

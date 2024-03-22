@@ -533,6 +533,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                           ProductionPlanId = detail.ProductionPlanId,
                                                                                           HeaderId = detail.HeaderId,
                                                                                           ItemNo = detail.ItemNo,
+                                                                                          RequestDate = detail.RequestDate,
 
                                                                                           Gold = detail.Gold,
                                                                                           GoldQtySend = detail.GoldQtySend,
@@ -880,6 +881,8 @@ namespace Jewelry.Service.ProductionPlan
                                     ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
                                     IsActive = true,
 
+                                    RequestDate = item.RequestDate.HasValue ? item.RequestDate.Value.UtcDateTime : null,
+
                                     Gold = item.Gold,
                                     GoldQtySend = item.GoldQTYSend,
                                     GoldWeightSend = item.GoldWeightSend,
@@ -925,8 +928,11 @@ namespace Jewelry.Service.ProductionPlan
                                 UpdateDate = DateTime.UtcNow,
                                 UpdateBy = _admin,
 
+                                SendName = request.CheckName,
+                                SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
                                 CheckName = request.CheckName,
                                 CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
                                 WagesTotal = request.TotalWages ?? 0,
@@ -944,10 +950,14 @@ namespace Jewelry.Service.ProductionPlan
                                     ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
                                     IsActive = true,
 
+                                    RequestDate = item.RequestDate.HasValue ? item.RequestDate.Value.UtcDateTime : null,
+
                                     Worker = item.Worker,
                                     WorkerSub = item.WorkerSub,
 
                                     Gold = item.Gold,
+                                    GoldQtySend = item.GoldQTYCheck,
+                                    GoldWeightSend = item.GoldWeightCheck,
                                     GoldQtyCheck = item.GoldQTYCheck,
                                     GoldWeightCheck = item.GoldWeightCheck,
                                 };
@@ -969,6 +979,9 @@ namespace Jewelry.Service.ProductionPlan
                                 UpdateDate = DateTime.UtcNow,
                                 UpdateBy = _admin,
 
+
+                                SendName = request.CheckName,
+                                SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
                                 CheckName = request.CheckName,
                                 CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
 
@@ -1072,6 +1085,9 @@ namespace Jewelry.Service.ProductionPlan
                                     ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
                                     IsActive = true,
 
+                                    RequestDate = item.RequestDate.HasValue ? item.RequestDate.Value.UtcDateTime : null,
+
+
                                     Gold = item.Gold,
                                     GoldQtySend = item.GoldQTYSend,
                                     GoldWeightSend = item.GoldWeightSend,
@@ -1109,6 +1125,8 @@ namespace Jewelry.Service.ProductionPlan
                             _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(checkStatus.TbtProductionPlanStatusDetail);
                             await _jewelryContext.SaveChangesAsync();
 
+                            checkStatus.SendName = request.CheckName;
+                            checkStatus.SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
                             checkStatus.CheckName = request.CheckName;
                             checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
 
@@ -1132,6 +1150,8 @@ namespace Jewelry.Service.ProductionPlan
                                     ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
                                     IsActive = true,
 
+                                    RequestDate = item.RequestDate.HasValue ? item.RequestDate.Value.UtcDateTime : null,
+
                                     Worker = item.Worker,
                                     WorkerSub = item.WorkerSub,
 
@@ -1146,8 +1166,8 @@ namespace Jewelry.Service.ProductionPlan
                     case 85: //CVD
                     case 95: // ประเมินราคา
                         {
-
-
+                            checkStatus.SendName = request.CheckName;
+                            checkStatus.SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
                             checkStatus.CheckName = request.CheckName;
                             checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
 
@@ -1227,7 +1247,7 @@ namespace Jewelry.Service.ProductionPlan
         public IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus()
         {
             return (from item in _jewelryContext.TbmProductionPlanStatus
-                    select item);
+                    select item).OrderBy(x => x.Id);
         }
 
         #endregion

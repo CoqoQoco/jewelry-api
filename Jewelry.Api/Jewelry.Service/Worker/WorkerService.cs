@@ -176,8 +176,8 @@ namespace Jewelry.Service.Worker
                          join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
 
                          where item.Worker == request.Code.ToUpper()
-                         && item.Header.CheckDate >= request.RequestDateStart.StartOfDayUtc()
-                         && item.Header.CheckDate <= request.RequestDateEnd.EndOfDayUtc()
+                         && item.RequestDate >= request.RequestDateStart.StartOfDayUtc()
+                         && item.RequestDate <= request.RequestDateEnd.EndOfDayUtc()
                          && item.IsActive == true
                          && item.Header.IsActive == true
 
@@ -227,7 +227,6 @@ namespace Jewelry.Service.Worker
 
             return response;
         }
-
         public SearchWorkerWagesResponse SearchWorkerActiveStatus(SearchWorkerWagesRequest request)
         {
             var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
@@ -236,8 +235,8 @@ namespace Jewelry.Service.Worker
                          join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
 
                          where item.Worker == request.Code.ToUpper()
-                         && item.Header.CheckDate >= request.RequestDateStart.StartOfDayUtc()
-                         && item.Header.CheckDate <= request.RequestDateEnd.EndOfDayUtc()
+                         && item.RequestDate>= request.RequestDateStart.StartOfDayUtc()
+                         && item.RequestDate <= request.RequestDateEnd.EndOfDayUtc()
                          && item.IsActive == true
                          && item.Header.IsActive == true
                          && status.Id == item.Header.Status
@@ -296,8 +295,8 @@ namespace Jewelry.Service.Worker
                          join worker in _jewelryContext.TbmWorker on item.Worker equals worker.Code
 
                          //where item.Worker == request.Code.ToUpper()
-                         where item.Header.CheckDate >= request.CreateStart.StartOfDayUtc()
-                         && item.Header.CheckDate <= request.CreateEnd.EndOfDayUtc()
+                         where item.RequestDate >= request.CreateStart.StartOfDayUtc()
+                         && item.RequestDate <= request.CreateEnd.EndOfDayUtc()
                          && item.IsActive == true
                          && item.Header.IsActive == true
                          && item.Wages.HasValue && item.Wages.Value > 0

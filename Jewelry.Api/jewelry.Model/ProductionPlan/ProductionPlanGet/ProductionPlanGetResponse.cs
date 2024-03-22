@@ -76,6 +76,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public string ItemNo { get; set; }
         public int HeaderId { get; set; }
 
+        public DateTime? RequestDate { get; set; }
+
         public string? Gold { get; set; }
         public decimal? GoldQtySend { get; set; }
         public decimal? GoldWeightSend { get; set; }

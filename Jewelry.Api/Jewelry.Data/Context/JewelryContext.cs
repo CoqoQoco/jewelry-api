@@ -688,6 +688,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GoldWeightSend).HasColumnName("gold_weight_send");
             entity.Property(e => e.HeaderId).HasColumnName("header_id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.RequestDate).HasColumnName("request_date");
             entity.Property(e => e.TotalWages).HasColumnName("total_wages");
             entity.Property(e => e.Wages).HasColumnName("wages");
             entity.Property(e => e.Worker)
