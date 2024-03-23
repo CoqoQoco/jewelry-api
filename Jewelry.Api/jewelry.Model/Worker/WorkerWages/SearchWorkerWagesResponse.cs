@@ -48,5 +48,6 @@ namespace jewelry.Model.Worker.WorkerWages
         public int WagesStatus { get; set; }
 
         public DateTime? JobDate { get; set; }
+        public string? ItemNo { get; set; }
     }
 }

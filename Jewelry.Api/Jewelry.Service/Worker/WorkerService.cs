@@ -208,8 +208,9 @@ namespace Jewelry.Service.Worker
                              WagesStatus = item.Header.ProductionPlan.Status == status.Id ? 10 : 100,
 
                              JobDate = item.Header.CheckDate,
+                             ItemNo = item.ItemNo
 
-                         }).OrderBy(x => x.JobDate).ThenBy(x => x.WoText).ThenByDescending(x => x.Gold);
+                         }).OrderBy(x => x.JobDate).ThenBy(x => x.WoText).ThenByDescending(x => x.Gold).ThenBy(x => x.ItemNo);
 
             var response = new SearchWorkerWagesResponse()
             {

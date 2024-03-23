@@ -68,7 +68,7 @@ namespace Jewelry.Service.ProductionPlan
             }
             if (!string.IsNullOrEmpty(request.RunningNumber)) 
             { 
-                query = query.Where(x => x.RunningNumber.Contains(request.RunningNumber));
+                query = query.Where(x => x.RunningNumber.Contains(request.RunningNumber.ToUpper()));
             }
             if (request.CreateStart.HasValue)
             {
