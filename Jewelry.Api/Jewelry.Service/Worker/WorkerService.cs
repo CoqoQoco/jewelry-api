@@ -28,6 +28,7 @@ namespace Jewelry.Service.Worker
         SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request);
         SearchWorkerWagesResponse SearchWorkerActiveStatus(SearchWorkerWagesRequest request);
         IQueryable<ReportWorkerWagesResponse> Report(ReportWorkerWages request);
+        ReportWorkerSummeryResponse SummeryReport(ReportWorkerWages request);
     }
     public class WorkerService : IWorkerService
     {
@@ -288,7 +289,7 @@ namespace Jewelry.Service.Worker
         }
         public IQueryable<ReportWorkerWagesResponse> Report(ReportWorkerWages request)
         {
-            var statusCheck = new int[] { 50, 60, 80, 90 };
+            //var statusCheck = new int[] { 50, 60,70, 80, 90 };
             var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                          .Include(x => x.Header)
                          .ThenInclude(x => x.ProductionPlan)
@@ -300,7 +301,7 @@ namespace Jewelry.Service.Worker
                          && item.RequestDate <= request.CreateEnd.EndOfDayUtc()
                          && item.IsActive == true
                          && item.Header.IsActive == true
-                         && item.Wages.HasValue && item.Wages.Value > 0
+                         //&& item.Wages.HasValue && item.Wages.Value > 0
 
                          select new ReportWorkerWagesResponse()
                          {
@@ -329,7 +330,7 @@ namespace Jewelry.Service.Worker
                              TotalWages = item.TotalWages,
                              WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
 
-                             JobDate = item.Header.CheckDate,
+                             JobDate = item.RequestDate,
                          });
 
             if (!string.IsNullOrEmpty(request.Text))
@@ -351,6 +352,80 @@ namespace Jewelry.Service.Worker
 
 
             return query;
+
+        }
+
+        public ReportWorkerSummeryResponse SummeryReport(ReportWorkerWages request)
+        {
+            //var statusCheck = new int[] { 50, 60,70, 80, 90 };
+            var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                         .Include(x => x.Header)
+                         .ThenInclude(x => x.ProductionPlan)
+                         join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                         join worker in _jewelryContext.TbmWorker on item.Worker equals worker.Code
+
+                         //where item.Worker == request.Code.ToUpper()
+                         where item.RequestDate >= request.CreateStart.StartOfDayUtc()
+                         && item.RequestDate <= request.CreateEnd.EndOfDayUtc()
+                         && item.IsActive == true
+                         && item.Header.IsActive == true
+                         //&& item.Wages.HasValue && item.Wages.Value > 0
+
+                         select new ReportWorkerWagesResponse()
+                         {
+                             Wo = item.Header.ProductionPlan.Wo,
+                             WoNumber = item.Header.ProductionPlan.WoNumber,
+                             WoText = item.Header.ProductionPlan.WoText,
+                             ProductNumber = item.Header.ProductionPlan.ProductNumber,
+                             ProductName = item.Header.ProductionPlan.ProductName,
+
+                             WorkerCode = item.Worker,
+                             WorkerName = worker.NameTh,
+
+                             Status = status.Id,
+                             StatusName = status.NameTh,
+                             StatusDescription = status.Description,
+
+                             Gold = item.Gold,
+
+                             GoldQtySend = item.GoldQtySend,
+                             GoldWeightSend = item.GoldWeightSend,
+                             GoldQtyCheck = item.GoldQtyCheck,
+                             GoldWeightCheck = item.GoldWeightCheck,
+
+                             Description = item.Description,
+                             Wages = item.Wages,
+                             TotalWages = item.TotalWages,
+                             WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
+
+                             JobDate = item.RequestDate,
+                         });
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                query = (from item in query
+                         where item.WorkerCode.Contains(request.Text.ToUpper())
+                         || item.WorkerName.Contains(request.Text)
+                         || item.ProductNumber.Contains(request.Text)
+                         || item.ProductName.Contains(request.Text)
+                         //|| item.WoText.Contains(request.Text)
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                query = (from item in query
+                         where item.WoText.Contains(request.WoText.ToString())
+                         select item);
+            }
+
+           return new ReportWorkerSummeryResponse()
+           {
+                TotalGoldQtySend = query.Sum(x => x.GoldQtySend),
+                TotalGoldWeightSend = query.Sum(x => x.GoldWeightSend),
+                TotalGoldQtyCheck = query.Sum(x => x.GoldQtyCheck),
+                TotalGoldWeightCheck = query.Sum(x => x.GoldWeightCheck),
+                TotalWages = query.Sum(x => x.TotalWages),
+            };
 
         }
 

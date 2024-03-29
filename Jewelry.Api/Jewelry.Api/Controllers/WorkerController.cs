@@ -147,7 +147,7 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ReportWorkerWagesRequest>))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public DataSourceResult ProductionPlanSearch([FromBody] ReportWorkerWagesRequest request)
+        public DataSourceResult Report([FromBody] ReportWorkerWagesRequest request)
         {
             try
             {
@@ -158,6 +158,25 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
+        [Route("ReportWorkerSummeryReportWages")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(ReportWorkerSummeryResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult SummeryReport([FromBody] ReportWorkerWagesRequest request)
+        {
+            try
+            {
+                var report = _service.SummeryReport(request.Search);
+                return Ok(report);
+
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
     }

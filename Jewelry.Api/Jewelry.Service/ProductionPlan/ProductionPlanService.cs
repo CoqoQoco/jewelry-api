@@ -958,8 +958,8 @@ namespace Jewelry.Service.ProductionPlan
                                     Gold = item.Gold,
                                     GoldQtySend = item.GoldQTYCheck,
                                     GoldWeightSend = item.GoldWeightCheck,
-                                    GoldQtyCheck = item.GoldQTYCheck,
-                                    GoldWeightCheck = item.GoldWeightCheck,
+                                    //GoldQtyCheck = item.GoldQTYCheck,
+                                    //GoldWeightCheck = item.GoldWeightCheck,
                                 };
                                 addStatusItem.Add(newStatus);
                             }
@@ -1156,6 +1156,8 @@ namespace Jewelry.Service.ProductionPlan
                                     WorkerSub = item.WorkerSub,
 
                                     Gold = item.Gold,
+                                    GoldQtySend = item.GoldQTYCheck,
+                                    GoldWeightSend = item.GoldWeightCheck,
                                     GoldQtyCheck = item.GoldQTYCheck,
                                     GoldWeightCheck = item.GoldWeightCheck,
                                 };
