@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlanCost.GoldCostCreate;
 using jewelry.Model.ProductionPlanCost.GoldCostList;
+using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -20,6 +21,8 @@ namespace Jewelry.Service.ProductionPlan
     public interface IProductionPlanCostService
     {
         IQueryable<GoldCostListResponse> ListGoldCost(GoldCostList request);
+        IQueryable<GoldCostListResponse> Report(GoldCostList request);
+        GoldCostSummeryResponse SummeryReport(GoldCostList request);
         Task<string> CreateGoldCost(GoldCostCreateRequest request);
         Task<string> UpdateGoldCost(GoldCostUpdateRequest request);
     }
@@ -66,8 +69,8 @@ namespace Jewelry.Service.ProductionPlan
                          where item.No.Contains(request.No.ToUpper())
                          select item);
             }
-            if (!string.IsNullOrEmpty(request.RunningNumber)) 
-            { 
+            if (!string.IsNullOrEmpty(request.RunningNumber))
+            {
                 query = query.Where(x => x.RunningNumber.Contains(request.RunningNumber.ToUpper()));
             }
             if (request.CreateStart.HasValue)
@@ -127,6 +130,207 @@ namespace Jewelry.Service.ProductionPlan
                             });
 
             return response;
+        }
+        public IQueryable<GoldCostListResponse> Report(GoldCostList request)
+        {
+            var query = (from item in _jewelryContext.TbtProductionPlanCostGold
+                         .Include(x => x.GoldNavigation)
+                         .Include(x => x.GoldSizeNavigation)
+                         where item.IsActive == true
+                         select item);
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                query = (from item in query.Include(x => x.TbtProductionPlanCostGoldItem)
+                             //where item.No.Contains(request.Text.ToUpper())
+                             //|| item.BookNo.Contains(request.Text)
+                         where item.AssignBy.Contains(request.Text)
+                         || item.ReceiveBy.Contains(request.Text)
+                         || item.Remark.Contains(request.Text)
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.BookNo))
+            {
+                query = (from item in query.Include(x => x.TbtProductionPlanCostGoldItem)
+                         where item.BookNo.Contains(request.BookNo.ToUpper())
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.No))
+            {
+                query = (from item in query.Include(x => x.TbtProductionPlanCostGoldItem)
+                         where item.No.Contains(request.No.ToUpper())
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.RunningNumber))
+            {
+                query = query.Where(x => x.RunningNumber.Contains(request.RunningNumber.ToUpper()));
+            }
+            if (request.CreateStart.HasValue)
+            {
+                query = query.Where(x => x.AssignDate >= request.CreateStart.Value.StartOfDayUtc());
+            }
+            if (request.CreateEnd.HasValue)
+            {
+                query = query.Where(x => x.AssignDate <= request.CreateEnd.Value.EndOfDayUtc());
+            }
+
+
+            var response = (from item in query
+                            select new GoldCostListResponse()
+                            {
+                                No = item.No,
+                                BookNo = item.BookNo,
+                                AssignDate = item.AssignDate,
+
+                                GoldCode = item.GoldNavigation.Code,
+                                GoldName = item.GoldNavigation.NameTh,
+                                GoldSizeCode = item.GoldSizeNavigation.Code,
+                                GoldSizeName = item.GoldSizeNavigation.NameTh,
+                                GoldReceipt = item.GoldReceipt,
+
+                                MeltDate = item.MeltDate,
+                                MeltWeight = item.MeltWeight,
+                                ReturnMeltWeight = item.ReturnMeltWeight,
+                                ReturnMeltScrapWeight = item.ReturnMeltScrapWeight,
+                                MeltWeightLoss = item.MeltWeightLoss,
+                                MeltWeightOver = item.MeltWeightOver,
+
+                                CastDate = item.CastDate,
+                                CastWeight = item.CastWeight,
+                                GemWeight = item.GemWeight,
+                                ReturnCastWeight = item.ReturnCastWeight,
+                                ReturnCastMoldWeight = item.ReturnCastMoldWeight,
+                                ReturnCastBodyBrokenWeight = item.ReturnCastBodyBrokenedWeight,
+                                ReturnCastBodyWeightTotal = item.ReturnCastBodyWeightTotal,
+                                ReturnCastScrapWeight = item.ReturnCastScrapWeight,
+                                ReturnCastPowderWeight = item.ReturnCastPowderWeight,
+                                CastWeightLoss = item.CastWeightLoss,
+                                CastWeightOver = item.CastWeightOver,
+
+                                AssignBy = item.AssignBy,
+                                ReceiveBy = item.ReceiveBy,
+                                RunningNumber = item.RunningNumber,
+                                Remark = item.Remark,
+                                Items = (from subItem in item.TbtProductionPlanCostGoldItem
+                                         select new GoldCostCreateItem()
+                                         {
+                                             ProductionPlanId = subItem.ProductionPlanId,
+                                             Remark = subItem.Remark,
+                                             ReturnWeight = subItem.ReturnWeight,
+                                             ReturnQTY = subItem.ReturnQty.HasValue ? subItem.ReturnQty.Value : 0,
+                                         }).OrderBy(x => x.ProductionPlanId).ToList()
+                            });
+
+            return response;
+        }
+        public GoldCostSummeryResponse SummeryReport(GoldCostList request)
+        {
+            var query = (from item in _jewelryContext.TbtProductionPlanCostGold
+                         .Include(x => x.GoldNavigation)
+                         .Include(x => x.GoldSizeNavigation)
+                         where item.IsActive == true
+                         select item);
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                query = (from item in query.Include(x => x.TbtProductionPlanCostGoldItem)
+                             //where item.No.Contains(request.Text.ToUpper())
+                             //|| item.BookNo.Contains(request.Text)
+                         where item.AssignBy.Contains(request.Text)
+                         || item.ReceiveBy.Contains(request.Text)
+                         || item.Remark.Contains(request.Text)
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.BookNo))
+            {
+                query = (from item in query.Include(x => x.TbtProductionPlanCostGoldItem)
+                         where item.BookNo.Contains(request.BookNo.ToUpper())
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.No))
+            {
+                query = (from item in query.Include(x => x.TbtProductionPlanCostGoldItem)
+                         where item.No.Contains(request.No.ToUpper())
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.RunningNumber))
+            {
+                query = query.Where(x => x.RunningNumber.Contains(request.RunningNumber.ToUpper()));
+            }
+            if (request.CreateStart.HasValue)
+            {
+                query = query.Where(x => x.AssignDate >= request.CreateStart.Value.StartOfDayUtc());
+            }
+            if (request.CreateEnd.HasValue)
+            {
+                query = query.Where(x => x.AssignDate <= request.CreateEnd.Value.EndOfDayUtc());
+            }
+
+
+            var response = (from item in query
+                            select new GoldCostListResponse()
+                            {
+                                No = item.No,
+                                BookNo = item.BookNo,
+                                AssignDate = item.AssignDate,
+
+                                GoldCode = item.GoldNavigation.Code,
+                                GoldName = item.GoldNavigation.NameTh,
+                                GoldSizeCode = item.GoldSizeNavigation.Code,
+                                GoldSizeName = item.GoldSizeNavigation.NameTh,
+                                GoldReceipt = item.GoldReceipt,
+
+                                MeltDate = item.MeltDate,
+                                MeltWeight = item.MeltWeight,
+                                ReturnMeltWeight = item.ReturnMeltWeight,
+                                ReturnMeltScrapWeight = item.ReturnMeltScrapWeight,
+                                MeltWeightLoss = item.MeltWeightLoss,
+                                MeltWeightOver = item.MeltWeightOver,
+
+                                CastDate = item.CastDate,
+                                CastWeight = item.CastWeight,
+                                GemWeight = item.GemWeight,
+                                ReturnCastWeight = item.ReturnCastWeight,
+                                ReturnCastMoldWeight = item.ReturnCastMoldWeight,
+                                ReturnCastBodyBrokenWeight = item.ReturnCastBodyBrokenedWeight,
+                                ReturnCastBodyWeightTotal = item.ReturnCastBodyWeightTotal,
+                                ReturnCastScrapWeight = item.ReturnCastScrapWeight,
+                                ReturnCastPowderWeight = item.ReturnCastPowderWeight,
+                                CastWeightLoss = item.CastWeightLoss,
+                                CastWeightOver = item.CastWeightOver,
+
+                                AssignBy = item.AssignBy,
+                                ReceiveBy = item.ReceiveBy,
+                                RunningNumber = item.RunningNumber,
+                                Remark = item.Remark,
+                                //Items = (from subItem in item.TbtProductionPlanCostGoldItem
+                                //         select new GoldCostCreateItem()
+                                //         {
+                                //             ProductionPlanId = subItem.ProductionPlanId,
+                                //             Remark = subItem.Remark,
+                                //             ReturnWeight = subItem.ReturnWeight,
+                                //             ReturnQTY = subItem.ReturnQty.HasValue ? subItem.ReturnQty.Value : 0,
+                                //         }).OrderBy(x => x.ProductionPlanId).ToList()
+                            });
+
+            return new GoldCostSummeryResponse()
+            {
+                TotalCastWeight = response.Sum(x => x.CastWeight),
+                TotalCastWeightLoss = response.Sum(x => x.CastWeightLoss),
+                TotalCastWeightOver = response.Sum(x => x.CastWeightOver),
+                TotalGemWeight = response.Sum(x => x.GemWeight),
+                TotalMeltWeight = response.Sum(x => x.MeltWeight),
+                TotalMeltWeightLoss = response.Sum(x => x.MeltWeightLoss),
+                TotalMeltWeightOver = response.Sum(x => x.MeltWeightOver),
+                TotalReturnCastBodyBrokenWeight = response.Sum(x => x.ReturnCastBodyBrokenWeight),
+                TotalReturnCastBodyWeightTotal = response.Sum(x => x.ReturnCastBodyWeightTotal),
+                TotalReturnCastMoldWeight = response.Sum(x => x.ReturnCastMoldWeight),
+                TotalReturnCastPowderWeight = response.Sum(x => x.ReturnCastPowderWeight),
+                TotalReturnCastScrapWeight = response.Sum(x => x.ReturnCastScrapWeight),
+                TotalReturnCastWeight = response.Sum(x => x.ReturnCastWeight),
+                TotalReturnMeltScrapWeight = response.Sum(x => x.ReturnMeltScrapWeight),
+                TotalReturnMeltWeight = response.Sum(x => x.ReturnMeltWeight)
+            };
         }
         public async Task<string> CreateGoldCost(GoldCostCreateRequest request)
         {
