@@ -208,7 +208,7 @@ namespace Jewelry.Service.Worker
                              TotalWages = item.TotalWages,
                              WagesStatus = item.Header.ProductionPlan.Status == status.Id ? 10 : 100,
 
-                             JobDate = item.Header.CheckDate,
+                             JobDate = item.RequestDate,
                              ItemNo = item.ItemNo
 
                          }).OrderBy(x => x.JobDate).ThenBy(x => x.WoText).ThenByDescending(x => x.Gold).ThenBy(x => x.ItemNo);
@@ -267,7 +267,7 @@ namespace Jewelry.Service.Worker
                              TotalWages = item.TotalWages,
                              WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
 
-                             JobDate = item.Header.CheckDate,
+                             JobDate = item.RequestDate,
 
                          }).OrderByDescending(x => x.WagesStatus).ThenBy(x => x.JobDate).ThenBy(x => x.WoText).ThenByDescending(x => x.Gold);
 
