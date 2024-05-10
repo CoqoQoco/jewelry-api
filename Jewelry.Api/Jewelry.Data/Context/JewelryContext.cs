@@ -54,12 +54,16 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtRunningNumber> TbtRunningNumber { get; set; }
 
+    public virtual DbSet<TbtStockGem> TbtStockGem { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=jewelry_2;User Id=jewelry2023;Password=pass2023;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
+//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=postgres;User Id=postgres;Password=winsun24;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasPostgresExtension("pg_catalog", "adminpack");
+
         modelBuilder.Entity<TbmAccount>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("tbm_account_pk");
@@ -759,6 +763,64 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("key");
             entity.Property(e => e.Number).HasColumnName("number");
+        });
+
+        modelBuilder.Entity<TbtStockGem>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_gem_pk");
+
+            entity.ToTable("tbt_stock_gem");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasMaxLength(50)
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Daterec).HasColumnName("daterec");
+            entity.Property(e => e.Description)
+                .HasMaxLength(50)
+                .HasColumnName("description");
+            entity.Property(e => e.Grade)
+                .HasMaxLength(50)
+                .HasColumnName("grade");
+            entity.Property(e => e.GradeDia)
+                .HasMaxLength(50)
+                .HasColumnName("grade_dia");
+            entity.Property(e => e.GroupName)
+                .HasMaxLength(50)
+                .HasColumnName("group_name");
+            entity.Property(e => e.Original)
+                .HasMaxLength(50)
+                .HasColumnName("original");
+            entity.Property(e => e.Price).HasColumnName("price");
+            entity.Property(e => e.PriceQty).HasColumnName("price_qty");
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.Remark1)
+                .HasMaxLength(50)
+                .HasColumnName("remark_1");
+            entity.Property(e => e.Remark2)
+                .HasMaxLength(50)
+                .HasColumnName("remark_2");
+            entity.Property(e => e.Shape)
+                .HasMaxLength(50)
+                .HasColumnName("shape");
+            entity.Property(e => e.SizeGem)
+                .HasMaxLength(50)
+                .HasColumnName("size_gem");
+            entity.Property(e => e.Unit)
+                .HasMaxLength(50)
+                .HasColumnName("unit");
+            entity.Property(e => e.UnitCode)
+                .HasMaxLength(50)
+                .HasColumnName("unit_code");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.Wg).HasColumnName("wg");
         });
 
         OnModelCreatingPartial(modelBuilder);
