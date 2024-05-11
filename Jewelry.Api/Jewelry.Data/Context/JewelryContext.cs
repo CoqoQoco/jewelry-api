@@ -50,6 +50,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanStatusDetail> TbtProductionPlanStatusDetail { get; set; }
 
+    public virtual DbSet<TbtProductionPlanStatusDetailGem> TbtProductionPlanStatusDetailGem { get; set; }
+
     public virtual DbSet<TbtProductionPlanStatusHeader> TbtProductionPlanStatusHeader { get; set; }
 
     public virtual DbSet<TbtRunningNumber> TbtRunningNumber { get; set; }
@@ -703,6 +705,35 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("worker_sub");
 
             entity.HasOne(d => d.Header).WithMany(p => p.TbtProductionPlanStatusDetail)
+                .HasForeignKey(d => d.HeaderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_production_plan_status_header_fk");
+        });
+
+        modelBuilder.Entity<TbtProductionPlanStatusDetailGem>(entity =>
+        {
+            entity.HasKey(e => new { e.ProductionPlanId, e.ItemNo }).HasName("tbt_production_plan_status_detail_gem_pk");
+
+            entity.ToTable("tbt_production_plan_status_detail_gem");
+
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.ItemNo)
+                .HasColumnType("character varying")
+                .HasColumnName("item_no");
+            entity.Property(e => e.GemCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_code");
+            entity.Property(e => e.GemId).HasColumnName("gem_id");
+            entity.Property(e => e.GemName)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_name");
+            entity.Property(e => e.GemQty).HasColumnName("gem_qty");
+            entity.Property(e => e.GemWeight).HasColumnName("gem_weight");
+            entity.Property(e => e.HeaderId).HasColumnName("header_id");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.RequestDate).HasColumnName("request_date");
+
+            entity.HasOne(d => d.Header).WithMany(p => p.TbtProductionPlanStatusDetailGem)
                 .HasForeignKey(d => d.HeaderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_production_plan_status_header_fk");

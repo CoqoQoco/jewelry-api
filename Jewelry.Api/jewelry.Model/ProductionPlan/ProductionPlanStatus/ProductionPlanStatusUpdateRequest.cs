@@ -21,6 +21,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
         public DateTimeOffset? CheckDate { get; set; }
 
         public List<GoldItem>? Golds { get; set; }
+        public List<GemItem>? Gems { get; set; }
 
         public string? Remark1 { get; set; }
         public string? Remark2 { get; set; }

@@ -69,6 +69,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public decimal? WagesTotal { get; set; }
 
         public List<StatusDetailDetail>? TbtProductionPlanStatusDetail { get; set; }
+        public List<StatusDetailGem>? TbtProductionPlanStatusGem { get; set; }
     }
     public class StatusDetailDetail 
     {
@@ -96,5 +97,18 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
 
         public decimal? Wages { get; set; }
         public decimal? TotalWages { get; set; }
+    }
+    public class StatusDetailGem
+    {
+        public int ProductionPlanId { get; set; }
+        public string ItemNo { get; set; }
+        public int HeaderId { get; set; }
+
+        public int Id { get; set; }
+        public string Code { get; set; }
+        public string Name { get; set; }
+
+        public decimal? QTY { get; set; }
+        public decimal? Weight { get; set; }
     }
 }

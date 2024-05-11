@@ -40,4 +40,6 @@ public partial class TbtProductionPlanStatusHeader
     public virtual TbmProductionPlanStatus StatusNavigation { get; set; } = null!;
 
     public virtual ICollection<TbtProductionPlanStatusDetail> TbtProductionPlanStatusDetail { get; set; } = new List<TbtProductionPlanStatusDetail>();
+
+    public virtual ICollection<TbtProductionPlanStatusDetailGem> TbtProductionPlanStatusDetailGem { get; set; } = new List<TbtProductionPlanStatusDetailGem>();
 }
