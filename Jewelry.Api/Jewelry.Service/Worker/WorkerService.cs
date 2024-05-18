@@ -176,7 +176,7 @@ namespace Jewelry.Service.Worker
                             .ThenInclude(x => x.StatusNavigation)
                          join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
 
-                         where item.Worker == request.Code.ToUpper()
+                         where (item.Worker == request.Code.ToUpper() || item.WorkerSub == request.Code.ToUpper())
                          && item.RequestDate >= request.RequestDateStart.StartOfDayUtc()
                          && item.RequestDate <= request.RequestDateEnd.EndOfDayUtc()
                          && item.IsActive == true
