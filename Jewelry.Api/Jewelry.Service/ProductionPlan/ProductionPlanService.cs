@@ -978,8 +978,8 @@ namespace Jewelry.Service.ProductionPlan
                                     Gold = item.Gold,
                                     GoldQtySend = item.GoldQTYCheck,
                                     GoldWeightSend = item.GoldWeightCheck,
-                                    //GoldQtyCheck = item.GoldQTYCheck,
-                                    //GoldWeightCheck = item.GoldWeightCheck,
+                                    GoldQtyCheck = item.GoldQTYCheck,
+                                    GoldWeightCheck = item.GoldWeightCheck,
                                 };
                                 addStatusItem.Add(newStatus);
                             }
@@ -1033,8 +1033,8 @@ namespace Jewelry.Service.ProductionPlan
                                     Gold = item.Gold,
                                     GoldQtySend = item.GoldQTYCheck,
                                     GoldWeightSend = item.GoldWeightCheck,
-                                    //GoldQtyCheck = item.GoldQTYCheck,
-                                    //GoldWeightCheck = item.GoldWeightCheck,
+                                    GoldQtyCheck = item.GoldQTYCheck,
+                                    GoldWeightCheck = item.GoldWeightCheck,
                                 };
                                 addStatusItem.Add(newStatus);
                             }
@@ -1224,7 +1224,7 @@ namespace Jewelry.Service.ProductionPlan
                             }
                         }
                         break;
-                    case 55://จ่ายขัดพลอย
+                    case 55://
                         {
                             if (request.Golds == null || request.Golds.Any() == false)
                             {
