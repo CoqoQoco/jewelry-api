@@ -3,6 +3,7 @@ using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
 using jewelry.Model.Worker.List;
 using jewelry.Model.Worker.Report;
+using jewelry.Model.Worker.TrackingWorker;
 using jewelry.Model.Worker.Update;
 using jewelry.Model.Worker.WorkerWages;
 using Jewelry.Data.Context;
@@ -29,6 +30,7 @@ namespace Jewelry.Service.Worker
         SearchWorkerWagesResponse SearchWorkerActiveStatus(SearchWorkerWagesRequest request);
         IQueryable<ReportWorkerWagesResponse> Report(ReportWorkerWages request);
         ReportWorkerSummeryResponse SummeryReport(ReportWorkerWages request);
+        IQueryable<TrackingWorkerResponse> TrackingWorker(TrackingWorker request);
     }
     public class WorkerService : IWorkerService
     {
@@ -353,6 +355,71 @@ namespace Jewelry.Service.Worker
 
             return query;
 
+        }
+
+        public IQueryable<TrackingWorkerResponse> TrackingWorker(TrackingWorker request)
+        {
+            //var statusCheck = new int[] { 50, 60,70, 80, 90 };
+            var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                         .Include(x => x.Header)
+                         .ThenInclude(x => x.ProductionPlan)
+                         join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                         join worker in _jewelryContext.TbmWorker on item.Worker equals worker.Code
+
+                         where item.IsActive == true
+                         && item.Header.IsActive == true
+
+                         select new TrackingWorkerResponse()
+                         {
+                             Wo = item.Header.ProductionPlan.Wo,
+                             WoNumber = item.Header.ProductionPlan.WoNumber,
+                             WoText = item.Header.ProductionPlan.WoText,
+                             ProductNumber = item.Header.ProductionPlan.ProductNumber,
+                             ProductName = item.Header.ProductionPlan.ProductName,
+                             Mold = item.Header.ProductionPlan.Mold,
+
+                             WorkerCode = item.Worker,
+                             WorkerName = worker.NameTh,
+
+                             Status = status.Id,
+                             StatusName = status.NameTh,
+                             StatusDescription = status.Description,
+
+                             Gold = item.Gold,
+
+                             GoldQtySend = item.GoldQtySend,
+                             GoldWeightSend = item.GoldWeightSend,
+                             GoldQtyCheck = item.GoldQtyCheck,
+                             GoldWeightCheck = item.GoldWeightCheck,
+
+                             Description = item.Description,
+                             Wages = item.Wages,
+                             TotalWages = item.TotalWages,
+                             WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
+
+                             JobDate = item.RequestDate,
+                         });
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                query = (from item in query
+                         where item.WorkerCode.Contains(request.Text.ToUpper())
+                         || item.WorkerName.Contains(request.Text)
+                         || item.ProductNumber.Contains(request.Text)
+                         || item.ProductName.Contains(request.Text)
+                         || item.WoText.Contains(request.Text)
+                         select item);
+            }
+
+            if (request.CreateStart.HasValue)
+            {
+                query = query.Where(x => x.JobDate >= request.CreateStart.Value.StartOfDayUtc());
+            }
+            if (request.CreateEnd.HasValue)
+            {
+                query = query.Where(x => x.JobDate <= request.CreateEnd.Value.EndOfDayUtc());
+            }
+            return query;
         }
 
         public ReportWorkerSummeryResponse SummeryReport(ReportWorkerWages request)

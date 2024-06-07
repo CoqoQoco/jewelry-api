@@ -30,23 +30,23 @@ namespace Jewelry.Api.Controllers
 
         #region *** API ***
         #region *** Test User ***
-        [Route("GetUsers")]
-        [HttpGet]
-        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<TbmAccount>))]
-        [ProducesResponseType((int)HttpStatusCode.OK)]
-        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult GetUsers()
-        {
-            try
-            {
-                var response = _IUserService.GetUsers();
-                return Ok(response);
-            }
-            catch (HandleException ex)
-            {
-                return BadRequest(new NotFoundResponse() { Message = ex.Message });
-            }
-        }
+        //[Route("GetUsers")]
+        //[HttpGet]
+        //[ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<TbmAccount>))]
+        //[ProducesResponseType((int)HttpStatusCode.OK)]
+        //[ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        //public IActionResult GetUsers()
+        //{
+        //    try
+        //    {
+        //        var response = _IUserService.GetUsers();
+        //        return Ok(response);
+        //    }
+        //    catch (HandleException ex)
+        //    {
+        //        return BadRequest(new NotFoundResponse() { Message = ex.Message });
+        //    }
+        //}
         #endregion
         #region *** Product Excel ***
         [Route("ImportFileProduct")]

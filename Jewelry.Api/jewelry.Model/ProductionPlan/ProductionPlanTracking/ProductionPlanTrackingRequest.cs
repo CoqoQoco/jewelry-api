@@ -15,12 +15,15 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
     {
         public DateTimeOffset? Start { get; set; }
         public DateTimeOffset? End { get; set; }
+        public DateTimeOffset? SendStart { get; set; }
+        public DateTimeOffset? SendEnd { get; set; }
         public DateTimeOffset? CreateStart { get; set; }
         public DateTimeOffset? CreateEnd { get; set; }
         public string? Text { get; set; }
         public string? WoText { get; set; }
 
         public int[]? Status { get; set; }
+        public int? IsOverPlan { get; set; }
     }
        
 

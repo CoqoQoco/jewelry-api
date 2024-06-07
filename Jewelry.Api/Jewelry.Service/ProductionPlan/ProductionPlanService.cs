@@ -310,7 +310,10 @@ namespace Jewelry.Service.ProductionPlan
                          //.Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
+                         .Include(x => x.TbtProductionPlanStatusHeader
+                         .Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
                          where item.IsActive == true
+                         let currentStatus = item.TbtProductionPlanStatusHeader.Where(x => x.IsActive == true && x.Status == item.Status).FirstOrDefault()
                          select new ProductionPlanTrackingResponse()
                          {
                              Id = item.Id,
@@ -327,18 +330,41 @@ namespace Jewelry.Service.ProductionPlan
                              CustomerNumber = item.CustomerNumber,
                              CreateDate = item.CreateDate,
                              RequestDate = item.RequestDate,
+                             LastUpdateStatus = currentStatus != null
+                                                ? currentStatus.UpdateDate
+                                                : item.CreateDate,
+                             IsOverPlan = item.RequestDate < DateTime.UtcNow && item.Status != 95, // ประเมินราคา
                          });
 
             //query = query.Where(x => x.GIDate >= request.DateFrom.StartOfDayUtc() && x.GIDate <= request.DateTo.EndOfDayUtc());
 
             if (request.Start.HasValue)
             {
-                query = query.Where(x => x.RequestDate >= request.Start.Value.StartOfDayUtc());
+                query = query.Where(x => x.CreateDate >= request.Start.Value.StartOfDayUtc());
             }
             if (request.End.HasValue)
             {
-                query = query.Where(x => x.RequestDate <= request.End.Value.EndOfDayUtc());
+                query = query.Where(x => x.CreateDate <= request.End.Value.EndOfDayUtc());
             }
+
+            if (request.SendStart.HasValue)
+            {
+                query = query.Where(x => x.RequestDate >= request.SendStart.Value.StartOfDayUtc());
+            }
+            if (request.SendEnd.HasValue)
+            {
+                query = query.Where(x => x.RequestDate <= request.SendEnd.Value.EndOfDayUtc());
+            }
+
+            if (request.IsOverPlan.HasValue)
+            {
+                if (request.IsOverPlan == 1)
+                {
+                    query = query.Where(x => x.IsOverPlan == true);
+                }
+            }
+
+
             if (!string.IsNullOrEmpty(request.Text))
             {
                 query = (from item in query
@@ -392,6 +418,7 @@ namespace Jewelry.Service.ProductionPlan
             {
                 query = query.Where(x => x.CreateDate <= request.CreateEnd.Value.StartOfDayUtc());
             }
+
             if (!string.IsNullOrEmpty(request.Text))
             {
                 query = (from item in query
@@ -1442,7 +1469,7 @@ namespace Jewelry.Service.ProductionPlan
                 }
                 _jewelryContext.TbtProductionPlanStatusDetailGem.UpdateRange(statusHeader.TbtProductionPlanStatusDetailGem);
             }
-            
+
 
             await _jewelryContext.SaveChangesAsync();
 

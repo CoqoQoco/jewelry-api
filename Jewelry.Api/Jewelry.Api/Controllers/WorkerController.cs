@@ -6,6 +6,7 @@ using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
 using jewelry.Model.Worker.List;
 using jewelry.Model.Worker.Report;
+using jewelry.Model.Worker.TrackingWorker;
 using jewelry.Model.Worker.Update;
 using jewelry.Model.Worker.WorkerWages;
 using Jewelry.Api.Extension;
@@ -179,5 +180,26 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+
+        [Route("TrackingWorkerRequest")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TrackingWorkerResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult TrackingWorkerRequest([FromBody] TrackingWorkerRequest request)
+        {
+            try
+            {
+                var report = _service.TrackingWorker(request.Search);
+                return report.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
     }
 }

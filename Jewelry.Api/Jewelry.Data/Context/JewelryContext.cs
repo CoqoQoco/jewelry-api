@@ -58,6 +58,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockGem> TbtStockGem { get; set; }
 
+    public virtual DbSet<TbtUser> TbtUser { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
 //        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=postgres;User Id=postgres;Password=winsun24;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
@@ -852,6 +854,44 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
             entity.Property(e => e.Wg).HasColumnName("wg");
+        });
+
+        modelBuilder.Entity<TbtUser>(entity =>
+        {
+            entity.HasKey(e => new { e.Id, e.Username }).HasName("tbt_user_pk");
+
+            entity.ToTable("tbt_user");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Username)
+                .HasMaxLength(10)
+                .HasColumnName("username");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.FirstNameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("first_name_th");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.LastNameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("last_name_th");
+            entity.Property(e => e.PasswordHash).HasColumnName("password_hash");
+            entity.Property(e => e.PasswordSalt).HasColumnName("password_salt");
+            entity.Property(e => e.PermissionLevel).HasColumnName("permission_level");
+            entity.Property(e => e.Position)
+                .HasColumnType("character varying")
+                .HasColumnName("position");
+            entity.Property(e => e.PrefixNameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("prefix_name_th");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -36,5 +36,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
         public int Status { get; set; }
         public string StatusName { get; set; }
         public string? Remark { get; set; }
+
+        public bool IsOverPlan { get; set; }
+        public DateTime? LastUpdateStatus { get; set; }
     }
 }

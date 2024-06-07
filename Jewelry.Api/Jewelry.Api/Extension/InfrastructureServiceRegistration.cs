@@ -1,4 +1,5 @@
-﻿using Jewelry.Data.Context;
+﻿using jewelry.Model.User.PasswordHash;
+using Jewelry.Data.Context;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
@@ -35,6 +36,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IWorkerService, WorkerService>();
             services.AddScoped<IProductionPlanCostService, ProductionPlanCostService>();
             services.AddScoped<IGemStockService, GemStockService>();
+            services.AddScoped<IPasswordHash, PasswordHashService>();
 
             return services;
         }

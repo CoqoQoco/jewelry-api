@@ -4,11 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace jewelry.Model.User
+namespace jewelry.Model.User.UserCreate
 {
-    public class UserInfo
+    public class UserCreateRequest
     {
-        public int Id { get; set; }
         public string UserName { get; set; }
         public string Password { get; set; }
 
@@ -16,9 +15,7 @@ namespace jewelry.Model.User
         public string LastNameTH { get; set; }
         public string PrefixTH { get; set; }
 
-        public bool IsActive { get; set; }
-
-        public DateTime CreateDate { get; set; }
-        public string CreateBy { get; set; }
+        public string Position { get; set; }
+        public int Level { get; set; }
     }
 }
