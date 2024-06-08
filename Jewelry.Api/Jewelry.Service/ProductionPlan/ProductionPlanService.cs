@@ -1441,6 +1441,7 @@ namespace Jewelry.Service.ProductionPlan
                                 .Include(x => x.TbtProductionPlanStatusDetailGem)
                                 where item.Id == request.Id
                                 select item).SingleOrDefault();
+
             if (statusHeader == null)
             {
                 throw new HandleException($"ไม่พบสถานะงาน กรุณาตรวจสอบอีกครั้ง");
@@ -1469,6 +1470,28 @@ namespace Jewelry.Service.ProductionPlan
                 }
                 _jewelryContext.TbtProductionPlanStatusDetailGem.UpdateRange(statusHeader.TbtProductionPlanStatusDetailGem);
             }
+
+            //restore current plan status
+            if (plan.Status == statusHeader.Status)
+            {
+                var lastStatus = (from item in _jewelryContext.TbtProductionPlanStatusHeader
+                                  where item.ProductionPlanId == request.ProductionPlanId && item.IsActive
+                                  orderby item.CreateDate descending
+                                  select item).ToList();
+
+                if (lastStatus != null && lastStatus.Count > 1)
+                {
+                    plan.Status = lastStatus[1].Status;
+                }
+                else
+                {
+                    plan.Status = ProductionPlanStatus.Designed;
+                }
+            }
+
+            plan.UpdateBy = _admin;
+            plan.UpdateDate = DateTime.UtcNow;
+
 
 
             await _jewelryContext.SaveChangesAsync();
