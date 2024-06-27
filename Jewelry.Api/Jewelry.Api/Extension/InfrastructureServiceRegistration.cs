@@ -3,6 +3,7 @@ using Jewelry.Data.Context;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
+using Jewelry.Service.Mold;
 using Jewelry.Service.ProductionPlan;
 using Jewelry.Service.Stock;
 using Jewelry.Service.User;
@@ -37,6 +38,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionPlanCostService, ProductionPlanCostService>();
             services.AddScoped<IGemStockService, GemStockService>();
             services.AddScoped<IPasswordHash, PasswordHashService>();
+            services.AddScoped<IMoldPlanService, MoldPlanService>();
 
             return services;
         }

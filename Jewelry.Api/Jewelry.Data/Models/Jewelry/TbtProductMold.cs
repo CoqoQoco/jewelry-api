@@ -26,4 +26,12 @@ public partial class TbtProductMold
     public string? CategoryCode { get; set; }
 
     public string? MoldBy { get; set; }
+
+    public string? ImageDraft1 { get; set; }
+
+    public string? ImageDraft2 { get; set; }
+
+    public string? ImageDraft3 { get; set; }
+
+    public string? CodeDraft { get; set; }
 }

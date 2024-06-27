@@ -1,8 +1,11 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.Master;
 using jewelry.Model.Mold;
+using jewelry.Model.Mold.PlanDesign;
+using jewelry.Model.Mold.PlanList;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using Jewelry.Api.Extension;
+using Jewelry.Service.Mold;
 using Jewelry.Service.ProductionPlan;
 using Jewelry.Service.Stock;
 using Kendo.DynamicLinqCore;
@@ -18,14 +21,17 @@ namespace Jewelry.Api.Controllers
     {
         private readonly ILogger<MoldController> _logger;
         private readonly IMoldService _service;
+        private readonly IMoldPlanService _servicePlan;
 
         public MoldController(ILogger<MoldController> logger,
             IMoldService service,
+            IMoldPlanService servicePlan,
             IOptions<ApiBehaviorOptions> apiBehaviorOptions)
             : base(apiBehaviorOptions)
         {
             _logger = logger;
             _service = service;
+            _servicePlan = servicePlan;
         }
 
 
@@ -80,6 +86,44 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
+        //new mold plan
+
+        [Route("PlanList")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<PlanListReponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult PlanList([FromBody] PlanListRequest request)
+        {
+            try
+            {
+                var response = _servicePlan.PlanList(request.Search);
+                return response.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
+        [Route("PlanDesign")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanDesign([FromForm] PlanDesignRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanDesign(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
     }
