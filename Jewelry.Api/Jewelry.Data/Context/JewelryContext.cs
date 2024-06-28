@@ -422,6 +422,9 @@ public partial class JewelryContext : DbContext
                 .IsRequired()
                 .HasDefaultValueSql("true")
                 .HasColumnName("is_active");
+            entity.Property(e => e.RemarkUpdate)
+                .HasColumnType("character varying")
+                .HasColumnName("remark_update");
             entity.Property(e => e.Status).HasColumnName("status");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
@@ -455,11 +458,18 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.QtyBeforeSend).HasColumnName("qty_before_send");
             entity.Property(e => e.QtyDiamond).HasColumnName("qty_diamond");
             entity.Property(e => e.QtyGem).HasColumnName("qty_gem");
+            entity.Property(e => e.RemarUpdate)
+                .HasColumnType("character varying")
+                .HasColumnName("remar_update");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
-            entity.Property(e => e.SizeDiamond).HasColumnName("size_diamond");
-            entity.Property(e => e.SizeGem).HasColumnName("size_gem");
+            entity.Property(e => e.SizeDiamond)
+                .HasColumnType("character varying")
+                .HasColumnName("size_diamond");
+            entity.Property(e => e.SizeGem)
+                .HasColumnType("character varying")
+                .HasColumnName("size_gem");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");

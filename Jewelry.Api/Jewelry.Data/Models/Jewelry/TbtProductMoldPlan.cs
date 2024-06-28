@@ -19,6 +19,8 @@ public partial class TbtProductMoldPlan
 
     public bool? IsActive { get; set; }
 
+    public string? RemarkUpdate { get; set; }
+
     public virtual TbmProductMoldPlanStatus StatusNavigation { get; set; } = null!;
 
     public virtual ICollection<TbtProductMoldPlanDesign> TbtProductMoldPlanDesign { get; set; } = new List<TbtProductMoldPlanDesign>();

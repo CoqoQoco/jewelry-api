@@ -2,8 +2,11 @@
 using jewelry.Model.Master;
 using jewelry.Model.Mold;
 using jewelry.Model.Mold.PlanDesign;
+using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
+using jewelry.Model.ProductionPlan.ProductionPlanGet;
+using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Mold;
 using Jewelry.Service.ProductionPlan;
@@ -33,7 +36,6 @@ namespace Jewelry.Api.Controllers
             _service = service;
             _servicePlan = servicePlan;
         }
-
 
         [Route("CreateMold")]
         [HttpPost]
@@ -106,6 +108,26 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+        [Route("PlanGet")]
+        [HttpGet]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(PlanGetResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult PlanGet(int id)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var report = _servicePlan.PlanGet(id);
+                return Ok(report);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
 

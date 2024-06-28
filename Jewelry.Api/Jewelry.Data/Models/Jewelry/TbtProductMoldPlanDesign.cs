@@ -17,9 +17,9 @@ public partial class TbtProductMoldPlanDesign
 
     public string CodePlan { get; set; } = null!;
 
-    public decimal? SizeGem { get; set; }
+    public string? SizeGem { get; set; }
 
-    public decimal? SizeDiamond { get; set; }
+    public string? SizeDiamond { get; set; }
 
     public decimal? QtyGem { get; set; }
 
@@ -32,6 +32,8 @@ public partial class TbtProductMoldPlanDesign
     public string? Remark { get; set; }
 
     public string? ImageUrl { get; set; }
+
+    public string? RemarUpdate { get; set; }
 
     public virtual TbtProductMoldPlan Plan { get; set; } = null!;
 }

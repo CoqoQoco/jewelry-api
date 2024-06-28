@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
 using jewelry.Model.Mold.PlanDesign;
+using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -20,6 +21,8 @@ namespace Jewelry.Service.Mold
     public interface IMoldPlanService
     {
         IQueryable<PlanListReponse> PlanList(PlanListRequestModel request);
+        PlanGetResponse PlanGet(int id);
+
         Task<string> PlanDesign(PlanDesignRequest request);
     }
     public class MoldPlanService : IMoldPlanService
@@ -36,14 +39,15 @@ namespace Jewelry.Service.Mold
             _runningNumberService = runningNumberService;
         }
 
-        public IQueryable<PlanListReponse> PlanList(PlanListRequestModel request) 
+        public IQueryable<PlanListReponse> PlanList(PlanListRequestModel request)
         {
             var query = (from plan in _jewelryContext.TbtProductMoldPlan
                          .Include(x => x.StatusNavigation)
                          .Include(x => x.TbtProductMoldPlanDesign)
                          where plan.IsActive == true
                          select new PlanListReponse()
-                         { 
+                         {
+                             Id = plan.Id,
                              MoldCode = plan.TbtProductMoldPlanDesign.First().CodePlan,
 
                              CreateDate = plan.CreateDate,
@@ -55,31 +59,70 @@ namespace Jewelry.Service.Mold
                              Image = plan.TbtProductMoldPlanDesign.First().ImageUrl ?? string.Empty
                          });
 
-            if(!string.IsNullOrEmpty(request.MoldCode))
+            if (!string.IsNullOrEmpty(request.MoldCode))
             {
                 query = query.Where(x => x.MoldCode.Contains(request.MoldCode));
             }
 
-            if(request.CreateStart.HasValue)
+            if (request.CreateStart.HasValue)
             {
                 query = query.Where(x => x.CreateDate >= request.CreateStart);
             }
-            if(request.CreateEnd.HasValue)
+            if (request.CreateEnd.HasValue)
             {
                 query = query.Where(x => x.CreateDate <= request.CreateEnd);
             }
 
-            if(request.UpdateStart.HasValue)
+            if (request.UpdateStart.HasValue)
             {
                 query = query.Where(x => x.UpdateDate >= request.UpdateStart);
             }
-            if(request.UpdateEnd.HasValue)
+            if (request.UpdateEnd.HasValue)
             {
                 query = query.Where(x => x.UpdateDate <= request.UpdateEnd);
             }
 
             return query;
         }
+        public PlanGetResponse PlanGet(int id)
+        {
+            var planMold = (from plan in _jewelryContext.TbtProductMoldPlan
+                            .Include(x => x.StatusNavigation)
+                            .Include(x => x.TbtProductMoldPlanDesign)
+                            where plan.Id == id
+                            select new PlanGetResponse()
+                            {
+                                Id = plan.Id,
+                                CreateDate = plan.CreateDate,
+                                UpdateDate = plan.UpdateDate ?? default,
+
+                                Status = plan.Status,
+                                StatusName = plan.StatusNavigation.NameTh,
+
+                                Design = new PlanGetGesign()
+                                {
+                                    MoldCode = plan.TbtProductMoldPlanDesign.First().CodePlan,
+                                    Remark = plan.TbtProductMoldPlanDesign.First().Remark,
+                                    SizeGem = plan.TbtProductMoldPlanDesign.First().SizeGem,
+                                    SizeDiamond = plan.TbtProductMoldPlanDesign.First().SizeDiamond,
+                                    QtyGem = plan.TbtProductMoldPlanDesign.First().QtyGem,
+                                    QtyDiamond = plan.TbtProductMoldPlanDesign.First().QtyDiamond,
+                                    QtyBeforeCasting = plan.TbtProductMoldPlanDesign.First().QtyBeforeCasting,
+                                    QtyBeforeSend = plan.TbtProductMoldPlanDesign.First().QtyBeforeSend,
+                                    Image = plan.TbtProductMoldPlanDesign.First().ImageUrl ?? string.Empty
+                                }
+
+
+                            }).FirstOrDefault();
+
+            if (planMold == null)
+            {
+                throw new HandleException("ไม่พบข้อมูล กรุณาลองใหม่อีกครั้ง");
+            }
+
+            return planMold;
+        }
+
         public async Task<string> PlanDesign(PlanDesignRequest request)
         {
             #region *** validate ***
@@ -117,7 +160,7 @@ namespace Jewelry.Service.Mold
                 var design = new TbtProductMoldPlanDesign()
                 {
                     CodePlan = request.MoldCode,
-                    Remark = request.Description,
+                    Remark = request.Remark,
                     SizeGem = request.SizeGem,
                     SizeDiamond = request.SizeDiamond,
                     QtyGem = request.QtyGem,
@@ -135,7 +178,7 @@ namespace Jewelry.Service.Mold
                 {
                     int count = 1;
                     //array to store stirng name image url
-                 List<string> imagesUrl = new List<string>();
+                    List<string> imagesUrl = new List<string>();
                     foreach (var item in request.Images)
                     {
                         try
