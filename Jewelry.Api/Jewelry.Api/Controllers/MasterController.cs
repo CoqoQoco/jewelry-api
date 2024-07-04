@@ -1,10 +1,12 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.Master;
+using jewelry.Model.Master.SearchMaster;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using Jewelry.Api.Extension;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Master;
 using Jewelry.Service.ProductionPlan;
+using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -179,6 +181,24 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+        [Route("ListMaster")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<MasterModel>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListMaster([FromBody] SearchMasterRequest request)
+        {
+            try
+            {
+                var response = _service.SearchMaster(request.Search);
+                return response.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
         [Route("UpdateMasterModel")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]

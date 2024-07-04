@@ -13,5 +13,9 @@ namespace jewelry.Model.Master
         public string NameTh { get; set; }
         public string Code { get; set; }
         public string? Description { get; set; }
+
+        //zill
+        public string? GoldCode { get; set; }
+        public string? GoldSizeCode { get; set; }
     }
 }

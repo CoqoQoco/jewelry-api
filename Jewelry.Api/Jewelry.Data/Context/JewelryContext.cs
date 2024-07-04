@@ -38,6 +38,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmWorker> TbmWorker { get; set; }
 
+    public virtual DbSet<TbmZill> TbmZill { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
 
     public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
@@ -358,6 +360,54 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbmZill>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbm_zill_pk");
+
+            entity.ToTable("tbm_zill");
+
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.GoldCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_code");
+            entity.Property(e => e.GoldSizeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_size_code");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.GoldCodeNavigation).WithMany(p => p.TbmZill)
+                .HasForeignKey(d => d.GoldCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbm_zill_gold_fk");
+
+            entity.HasOne(d => d.GoldSizeCodeNavigation).WithMany(p => p.TbmZill)
+                .HasForeignKey(d => d.GoldSizeCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbm_zill_gold_size_fk");
         });
 
         modelBuilder.Entity<TbtProductMold>(entity =>
