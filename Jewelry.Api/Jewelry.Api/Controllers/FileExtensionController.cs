@@ -61,5 +61,22 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+        [Route("GetPlanMoldImage")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult? GetPlanMoldImage(string imageName)
+        {
+            try
+            {
+                var response = _service.GetPlanMoldImageBase64String(imageName);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }

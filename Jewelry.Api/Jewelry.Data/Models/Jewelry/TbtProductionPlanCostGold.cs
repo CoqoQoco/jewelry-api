@@ -69,6 +69,10 @@ public partial class TbtProductionPlanCostGold
 
     public decimal? ReturnCastBodyBrokenedWeight { get; set; }
 
+    public string? Zill { get; set; }
+
+    public decimal? ZillQty { get; set; }
+
     public virtual TbmGold GoldNavigation { get; set; } = null!;
 
     public virtual TbmGoldSize GoldSizeNavigation { get; set; } = null!;

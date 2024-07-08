@@ -2,6 +2,7 @@
 using jewelry.Model.Master;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.Collections.Generic;
@@ -244,6 +245,54 @@ namespace Jewelry.Service.Master
                 return response.OrderBy(x => x.Code);
             }
 
+            else if (request.Type.ToUpper() == "ZILL")
+            {
+                var response = (from item in _jewelryContext.TbmZill
+                                .Include(x => x.GoldCodeNavigation)
+                                .Include(x => x.GoldSizeCodeNavigation)
+                                where item.IsActive == true
+                                select new MasterModel()
+                                {
+                                    Id = item.Id,
+                                    NameEn = item.NameEn ?? string.Empty,
+                                    NameTh = item.NameTh ?? string.Empty,
+                                    Code = item.Code,
+                                    Description = item.Remark,
+
+                                    GoldCode = item.GoldCode,
+                                    GoldNameTH = item.GoldCodeNavigation.NameTh,
+                                    GoldNameEN = item.GoldCodeNavigation.NameEn,
+
+                                    GoldSizeCode = item.GoldSizeCode,
+                                    GoldSizeNameTH = item.GoldSizeCodeNavigation.NameTh,
+                                    GoldSizeNameEN = item.GoldSizeCodeNavigation.NameEn,
+                                });
+
+                if (!string.IsNullOrEmpty(request.Text))
+                {
+                    response = (from item in response
+                                where item.Code.Contains(request.Text.ToUpper())
+                                || item.NameTh.Contains(request.Text.ToUpper())
+                                || item.NameEn.Contains(request.Text.ToUpper())
+                                select item);
+                }
+                if (!string.IsNullOrEmpty(request.GoldCode))
+                {
+                    response = (from item in response
+                                where item.GoldCode.Contains(request.GoldCode)
+                                select item);
+                }
+                if (!string.IsNullOrEmpty(request.GoldSizeCode))
+                {
+                    response = (from item in response
+                                where item.GoldSizeCode.Contains(request.GoldSizeCode)
+                                select item);
+                }
+
+                return response;
+                //return response.OrderBy(x => x.Code);
+            }
+
             throw new HandleException("Type is required.");
 
         }
@@ -273,9 +322,9 @@ namespace Jewelry.Service.Master
             if (request.Type.ToUpper() == "GEM-SHAPE")
             {
                 var gemShape = (from item in _jewelryContext.TbmGemShape
-                           where item.Id == request.Id
-                           && item.Code == request.Code.ToUpper()
-                           select item).SingleOrDefault();
+                                where item.Id == request.Id
+                                && item.Code == request.Code.ToUpper()
+                                select item).SingleOrDefault();
 
                 if (gemShape == null)
                 {
@@ -311,9 +360,9 @@ namespace Jewelry.Service.Master
             if (request.Type.ToUpper() == "PRODUCT-TYPE")
             {
                 var productType = (from item in _jewelryContext.TbmProductType
-                                where item.Id == request.Id
-                                && item.Code == request.Code.ToUpper()
-                                select item).SingleOrDefault();
+                                   where item.Id == request.Id
+                                   && item.Code == request.Code.ToUpper()
+                                   select item).SingleOrDefault();
 
                 if (productType == null)
                 {
@@ -481,8 +530,8 @@ namespace Jewelry.Service.Master
             else if (request.Type.ToUpper() == "PRODUCT-TYPE")
             {
                 var productType = (from item in _jewelryContext.TbmProductType
-                                where item.Code == request.Code.ToUpper()
-                                select item).SingleOrDefault();
+                                   where item.Code == request.Code.ToUpper()
+                                   select item).SingleOrDefault();
 
                 if (productType != null)
                 {
@@ -500,6 +549,44 @@ namespace Jewelry.Service.Master
                 };
 
                 _jewelryContext.TbmProductType.Add(newProductType);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            else if (request.Type.ToUpper() == "ZILL")
+            {
+                var zill = (from item in _jewelryContext.TbmZill
+                            where item.Code == request.Code.ToUpper()
+                            select item).SingleOrDefault();
+
+                if (zill != null)
+                {
+                    throw new HandleException($"มีข้อมูลรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+                }
+                if (string.IsNullOrEmpty(request.GoldCode))
+                {
+                    throw new HandleException($"กรุณาระบุประเภททอง");
+                }
+                if (string.IsNullOrEmpty(request.GoldSizeCode))
+                {
+                    throw new HandleException($"กรุณาระบุเปอร์เซ็นทอง");
+                }
+
+                var newZill = new TbmZill()
+                {
+                    Code = request.Code.ToUpper(),
+                    NameEn = request.NameEn,
+                    NameTh = request.NameTh,
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = _admin,
+                    UpdateDate = DateTime.UtcNow,
+                    UpdateBy = _admin,
+                    IsActive = true,
+                    Remark = request.Description,
+                    GoldCode = request.GoldCode,
+                    GoldSizeCode = request.GoldSizeCode
+                };
+
+                _jewelryContext.TbmZill.Add(newZill);
                 await _jewelryContext.SaveChangesAsync();
             }
 

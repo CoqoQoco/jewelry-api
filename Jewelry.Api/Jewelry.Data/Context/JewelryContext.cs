@@ -30,13 +30,21 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmGoldSize> TbmGoldSize { get; set; }
 
+    public virtual DbSet<TbmProductMoldPlanStatus> TbmProductMoldPlanStatus { get; set; }
+
     public virtual DbSet<TbmProductType> TbmProductType { get; set; }
 
     public virtual DbSet<TbmProductionPlanStatus> TbmProductionPlanStatus { get; set; }
 
     public virtual DbSet<TbmWorker> TbmWorker { get; set; }
 
+    public virtual DbSet<TbmZill> TbmZill { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
+
+    public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
+
+    public virtual DbSet<TbtProductMoldPlanDesign> TbtProductMoldPlanDesign { get; set; }
 
     public virtual DbSet<TbtProductionPlan> TbtProductionPlan { get; set; }
 
@@ -262,6 +270,26 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("name_th");
         });
 
+        modelBuilder.Entity<TbmProductMoldPlanStatus>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbm_product_mold_plan_status_pk");
+
+            entity.ToTable("tbm_product_mold_plan_status");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedNever()
+                .HasColumnName("id");
+            entity.Property(e => e.Description)
+                .HasColumnType("character varying")
+                .HasColumnName("description");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+        });
+
         modelBuilder.Entity<TbmProductType>(entity =>
         {
             entity.HasKey(e => e.Code).HasName("tbm_product_type_pk");
@@ -334,6 +362,54 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
+        modelBuilder.Entity<TbmZill>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbm_zill_pk");
+
+            entity.ToTable("tbm_zill");
+
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.GoldCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_code");
+            entity.Property(e => e.GoldSizeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_size_code");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.GoldCodeNavigation).WithMany(p => p.TbmZill)
+                .HasForeignKey(d => d.GoldCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbm_zill_gold_fk");
+
+            entity.HasOne(d => d.GoldSizeCodeNavigation).WithMany(p => p.TbmZill)
+                .HasForeignKey(d => d.GoldSizeCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbm_zill_gold_size_fk");
+        });
+
         modelBuilder.Entity<TbtProductMold>(entity =>
         {
             entity.HasKey(e => e.Code).HasName("tbt_product_mold_pk");
@@ -349,6 +425,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CategoryCode)
                 .HasColumnType("character varying")
                 .HasColumnName("category_code");
+            entity.Property(e => e.CodeDraft)
+                .HasColumnType("character varying")
+                .HasColumnName("code_draft");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
@@ -359,6 +438,15 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Image)
                 .HasColumnType("character varying")
                 .HasColumnName("image");
+            entity.Property(e => e.ImageDraft1)
+                .HasColumnType("character varying")
+                .HasColumnName("image_draft_1");
+            entity.Property(e => e.ImageDraft2)
+                .HasColumnType("character varying")
+                .HasColumnName("image_draft_2");
+            entity.Property(e => e.ImageDraft3)
+                .HasColumnType("character varying")
+                .HasColumnName("image_draft_3");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.MoldBy)
                 .HasColumnType("character varying")
@@ -367,6 +455,80 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtProductMoldPlan>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_product_mold_plan_pk");
+
+            entity.ToTable("tbt_product_mold_plan");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValueSql("true")
+                .HasColumnName("is_active");
+            entity.Property(e => e.RemarkUpdate)
+                .HasColumnType("character varying")
+                .HasColumnName("remark_update");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.StatusNavigation).WithMany(p => p.TbtProductMoldPlan)
+                .HasForeignKey(d => d.Status)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_fk");
+        });
+
+        modelBuilder.Entity<TbtProductMoldPlanDesign>(entity =>
+        {
+            entity.HasKey(e => new { e.PlanId, e.CodePlan }).HasName("tbt_product_mold_plan_design_pk");
+
+            entity.ToTable("tbt_product_mold_plan_design");
+
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.CodePlan)
+                .HasColumnType("character varying")
+                .HasColumnName("code_plan");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.ImageUrl)
+                .HasColumnType("character varying")
+                .HasColumnName("image_url");
+            entity.Property(e => e.QtyBeforeCasting).HasColumnName("qty_before_casting");
+            entity.Property(e => e.QtyBeforeSend).HasColumnName("qty_before_send");
+            entity.Property(e => e.QtyDiamond).HasColumnName("qty_diamond");
+            entity.Property(e => e.QtyGem).HasColumnName("qty_gem");
+            entity.Property(e => e.RemarUpdate)
+                .HasColumnType("character varying")
+                .HasColumnName("remar_update");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.SizeDiamond)
+                .HasColumnType("character varying")
+                .HasColumnName("size_diamond");
+            entity.Property(e => e.SizeGem)
+                .HasColumnType("character varying")
+                .HasColumnName("size_gem");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanDesign)
+                .HasForeignKey(d => d.PlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_design_fk");
         });
 
         modelBuilder.Entity<TbtProductionPlan>(entity =>
@@ -511,6 +673,10 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.Zill)
+                .HasColumnType("character varying")
+                .HasColumnName("zill");
+            entity.Property(e => e.ZillQty).HasColumnName("zill_qty");
 
             entity.HasOne(d => d.GoldNavigation).WithMany(p => p.TbtProductionPlanCostGold)
                 .HasForeignKey(d => d.Gold)
