@@ -276,8 +276,21 @@ namespace Jewelry.Service.Master
                                 || item.NameEn.Contains(request.Text.ToUpper())
                                 select item);
                 }
+                if (!string.IsNullOrEmpty(request.GoldCode))
+                {
+                    response = (from item in response
+                                where item.GoldCode.Contains(request.GoldCode)
+                                select item);
+                }
+                if (!string.IsNullOrEmpty(request.GoldSizeCode))
+                {
+                    response = (from item in response
+                                where item.GoldSizeCode.Contains(request.GoldSizeCode)
+                                select item);
+                }
 
-                return response.OrderBy(x => x.Code);
+                return response;
+                //return response.OrderBy(x => x.Code);
             }
 
             throw new HandleException("Type is required.");

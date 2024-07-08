@@ -15,5 +15,8 @@ namespace jewelry.Model.Master
     {
         public string Type { get; set; }
         public string? Text { get; set; }
+
+        public string? GoldCode { get; set; }
+        public string? GoldSizeCode { get; set; }
     }
 }

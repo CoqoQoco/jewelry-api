@@ -673,6 +673,10 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.Zill)
+                .HasColumnType("character varying")
+                .HasColumnName("zill");
+            entity.Property(e => e.ZillQty).HasColumnName("zill_qty");
 
             entity.HasOne(d => d.GoldNavigation).WithMany(p => p.TbtProductionPlanCostGold)
                 .HasForeignKey(d => d.Gold)

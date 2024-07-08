@@ -19,6 +19,9 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostList
         public string GoldSizeName { get; set; }
         public string GoldReceipt { get; set; }
 
+        public string? Zill { get; set; }
+        public decimal? ZillQty { get; set; }
+
         public DateTimeOffset? MeltDate { get; set; }
         public decimal? MeltWeight { get; set; }
         public decimal? ReturnMeltWeight { get; set; }
