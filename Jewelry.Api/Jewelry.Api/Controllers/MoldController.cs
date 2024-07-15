@@ -1,9 +1,14 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.Master;
 using jewelry.Model.Mold;
+using jewelry.Model.Mold.PlanCasting;
+using jewelry.Model.Mold.PlanCastingSilver;
+using jewelry.Model.Mold.PlanCutting;
 using jewelry.Model.Mold.PlanDesign;
 using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
+using jewelry.Model.Mold.PlanResin;
+using jewelry.Model.Mold.PlanStore;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
@@ -141,6 +146,91 @@ namespace Jewelry.Api.Controllers
             try
             {
                 var response = await _servicePlan.PlanDesign(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("PlanResin")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanResin([FromForm] PlanResinRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanResin(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("PlanCastingSilver")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanCastingSilver([FromForm] PlanCastingSilverRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanCastingSilver(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("PlanCasting")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanCasting([FromForm] PlanCastingRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanCasting(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("PlanCutting")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanCutting([FromForm] PlanCuttingRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanCutting(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("PlanStore")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanStore([FromForm] PlanStoreRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanStore(request);
                 return Ok(response);
             }
             catch (HandleException ex)

@@ -12,13 +12,16 @@ namespace jewelry.Model.Mold.PlanDesign
         public string MoldCode { get; set; }
         public List<IFormFile> Images { get; set; }
 
+        public string Catagory { get; set; }
+        public string DesignBy { get; set; }
+
         public string? Remark { get; set; }
 
         public string? SizeGem { get; set; }
         public string? SizeDiamond { get; set; }
         public decimal? QtyGem { get; set; }
         public decimal? QtyDiamond { get; set; }
-        public decimal? QtyBeforeSend { get; set; }
-        public decimal? QtyBeforeCasting { get; set; }
+        public decimal QtyReceive { get; set; }
+        public decimal QtySend { get; set; }
     }
 }

@@ -25,15 +25,21 @@ public partial class TbtProductMoldPlanDesign
 
     public decimal? QtyDiamond { get; set; }
 
-    public decimal? QtyBeforeSend { get; set; }
+    public decimal QtyReceive { get; set; }
 
-    public decimal? QtyBeforeCasting { get; set; }
+    public decimal QtySend { get; set; }
 
     public string? Remark { get; set; }
 
     public string? ImageUrl { get; set; }
 
     public string? RemarUpdate { get; set; }
+
+    public string CategoryCode { get; set; } = null!;
+
+    public string? DesignBy { get; set; }
+
+    public virtual TbmProductType CategoryCodeNavigation { get; set; } = null!;
 
     public virtual TbtProductMoldPlan Plan { get; set; } = null!;
 }

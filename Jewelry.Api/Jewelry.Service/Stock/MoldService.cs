@@ -135,6 +135,7 @@ namespace Jewelry.Service.Stock
         public IQueryable<TbtProductMold> SearchMold(SearchMold request)
         {
             var mold = (from item in _jewelryContext.TbtProductMold
+                        where item.IsActive == true
                         select item);
 
             if (!string.IsNullOrEmpty(request.Text))

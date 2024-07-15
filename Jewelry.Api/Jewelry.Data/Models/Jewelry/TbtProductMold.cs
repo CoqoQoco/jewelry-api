@@ -34,4 +34,8 @@ public partial class TbtProductMold
     public string? ImageDraft3 { get; set; }
 
     public string? CodeDraft { get; set; }
+
+    public int? PlanId { get; set; }
+
+    public virtual TbtProductMoldPlan? Plan { get; set; }
 }

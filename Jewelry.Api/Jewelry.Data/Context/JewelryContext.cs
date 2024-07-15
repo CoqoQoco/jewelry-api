@@ -44,7 +44,17 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
 
+    public virtual DbSet<TbtProductMoldPlanCasting> TbtProductMoldPlanCasting { get; set; }
+
+    public virtual DbSet<TbtProductMoldPlanCastingSilver> TbtProductMoldPlanCastingSilver { get; set; }
+
+    public virtual DbSet<TbtProductMoldPlanCutting> TbtProductMoldPlanCutting { get; set; }
+
     public virtual DbSet<TbtProductMoldPlanDesign> TbtProductMoldPlanDesign { get; set; }
+
+    public virtual DbSet<TbtProductMoldPlanResin> TbtProductMoldPlanResin { get; set; }
+
+    public virtual DbSet<TbtProductMoldPlanStore> TbtProductMoldPlanStore { get; set; }
 
     public virtual DbSet<TbtProductionPlan> TbtProductionPlan { get; set; }
 
@@ -451,10 +461,15 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.MoldBy)
                 .HasColumnType("character varying")
                 .HasColumnName("mold_by");
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMold)
+                .HasForeignKey(d => d.PlanId)
+                .HasConstraintName("tbt_product_mold_fk");
         });
 
         modelBuilder.Entity<TbtProductMoldPlan>(entity =>
@@ -472,19 +487,139 @@ public partial class JewelryContext : DbContext
                 .IsRequired()
                 .HasDefaultValueSql("true")
                 .HasColumnName("is_active");
+            entity.Property(e => e.NextStatus).HasColumnName("next_status");
             entity.Property(e => e.RemarkUpdate)
                 .HasColumnType("character varying")
                 .HasColumnName("remark_update");
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
             entity.Property(e => e.Status).HasColumnName("status");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
 
-            entity.HasOne(d => d.StatusNavigation).WithMany(p => p.TbtProductMoldPlan)
+            entity.HasOne(d => d.NextStatusNavigation).WithMany(p => p.TbtProductMoldPlanNextStatusNavigation)
+                .HasForeignKey(d => d.NextStatus)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_next_fk");
+
+            entity.HasOne(d => d.StatusNavigation).WithMany(p => p.TbtProductMoldPlanStatusNavigation)
                 .HasForeignKey(d => d.Status)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_product_mold_plan_fk");
+        });
+
+        modelBuilder.Entity<TbtProductMoldPlanCasting>(entity =>
+        {
+            entity.HasKey(e => new { e.PlanId, e.CodePlan }).HasName("newtabletbt_product_mold_plan_casting_pk");
+
+            entity.ToTable("tbt_product_mold_plan_casting");
+
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.CodePlan)
+                .HasColumnType("character varying")
+                .HasColumnName("code_plan");
+            entity.Property(e => e.CastBy)
+                .HasColumnType("character varying")
+                .HasColumnName("cast_by");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.ImageUrl)
+                .HasColumnType("character varying")
+                .HasColumnName("image_url");
+            entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
+            entity.Property(e => e.QtySend).HasColumnName("qty_send");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanCasting)
+                .HasForeignKey(d => d.PlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("newtabletbt_product_mold_plan_casting_fk");
+        });
+
+        modelBuilder.Entity<TbtProductMoldPlanCastingSilver>(entity =>
+        {
+            entity.HasKey(e => new { e.PlanId, e.CodePlan }).HasName("tbt_product_mold_plan_casting_silver_pk");
+
+            entity.ToTable("tbt_product_mold_plan_casting_silver");
+
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.CodePlan)
+                .HasColumnType("character varying")
+                .HasColumnName("code_plan");
+            entity.Property(e => e.CastBy)
+                .HasColumnType("character varying")
+                .HasColumnName("cast_by");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.ImageUrl)
+                .HasColumnType("character varying")
+                .HasColumnName("image_url");
+            entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
+            entity.Property(e => e.QtySend).HasColumnName("qty_send");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanCastingSilver)
+                .HasForeignKey(d => d.PlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_casting_silver_fk");
+        });
+
+        modelBuilder.Entity<TbtProductMoldPlanCutting>(entity =>
+        {
+            entity.HasKey(e => new { e.PlanId, e.CodePlan, e.Code }).HasName("tbt_product_mold_plan_cutting_pk");
+
+            entity.ToTable("tbt_product_mold_plan_cutting");
+
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.CodePlan)
+                .HasColumnType("character varying")
+                .HasColumnName("code_plan");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CuttingBy)
+                .HasColumnType("character varying")
+                .HasColumnName("cutting_by");
+            entity.Property(e => e.ImageUrl)
+                .HasColumnType("character varying")
+                .HasColumnName("image_url");
+            entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
+            entity.Property(e => e.QtySend).HasColumnName("qty_send");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanCutting)
+                .HasForeignKey(d => d.PlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_cutting_fk");
         });
 
         modelBuilder.Entity<TbtProductMoldPlanDesign>(entity =>
@@ -497,17 +632,23 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CodePlan)
                 .HasColumnType("character varying")
                 .HasColumnName("code_plan");
+            entity.Property(e => e.CategoryCode)
+                .HasColumnType("character varying")
+                .HasColumnName("category_code");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.DesignBy)
+                .HasColumnType("character varying")
+                .HasColumnName("design_by");
             entity.Property(e => e.ImageUrl)
                 .HasColumnType("character varying")
                 .HasColumnName("image_url");
-            entity.Property(e => e.QtyBeforeCasting).HasColumnName("qty_before_casting");
-            entity.Property(e => e.QtyBeforeSend).HasColumnName("qty_before_send");
             entity.Property(e => e.QtyDiamond).HasColumnName("qty_diamond");
             entity.Property(e => e.QtyGem).HasColumnName("qty_gem");
+            entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
+            entity.Property(e => e.QtySend).HasColumnName("qty_send");
             entity.Property(e => e.RemarUpdate)
                 .HasColumnType("character varying")
                 .HasColumnName("remar_update");
@@ -525,10 +666,93 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
 
+            entity.HasOne(d => d.CategoryCodeNavigation).WithMany(p => p.TbtProductMoldPlanDesign)
+                .HasForeignKey(d => d.CategoryCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_design_type_fk");
+
             entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanDesign)
                 .HasForeignKey(d => d.PlanId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_product_mold_plan_design_fk");
+        });
+
+        modelBuilder.Entity<TbtProductMoldPlanResin>(entity =>
+        {
+            entity.HasKey(e => new { e.PlanId, e.CodePlan }).HasName("tbt_product_mold_plan_resin_pk");
+
+            entity.ToTable("tbt_product_mold_plan_resin");
+
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.CodePlan)
+                .HasColumnType("character varying")
+                .HasColumnName("code_plan");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.ImageUrl)
+                .HasColumnType("character varying")
+                .HasColumnName("image_url");
+            entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
+            entity.Property(e => e.QtySend).HasColumnName("qty_send");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.ResinBy)
+                .HasColumnType("character varying")
+                .HasColumnName("resin_by");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanResin)
+                .HasForeignKey(d => d.PlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_resin_fk");
+        });
+
+        modelBuilder.Entity<TbtProductMoldPlanStore>(entity =>
+        {
+            entity.HasKey(e => new { e.PlanId, e.CodePlan, e.Code }).HasName("tbt_product_mold_plan_store_pk");
+
+            entity.ToTable("tbt_product_mold_plan_store");
+
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.CodePlan)
+                .HasColumnType("character varying")
+                .HasColumnName("code_plan");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.ImageUrl)
+                .HasColumnType("character varying")
+                .HasColumnName("image_url");
+            entity.Property(e => e.Location)
+                .HasColumnType("character varying")
+                .HasColumnName("location");
+            entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
+            entity.Property(e => e.QtySend).HasColumnName("qty_send");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.WorkerBy)
+                .HasColumnType("character varying")
+                .HasColumnName("worker_by");
+
+            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanStore)
+                .HasForeignKey(d => d.PlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_store_fk");
         });
 
         modelBuilder.Entity<TbtProductionPlan>(entity =>

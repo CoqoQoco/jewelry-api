@@ -61,7 +61,8 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
-        [Route("GetPlanMoldImage")]
+
+        [Route("GetPlanMoldDesignImage")]
         [HttpGet]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
@@ -70,7 +71,43 @@ namespace Jewelry.Api.Controllers
         {
             try
             {
-                var response = _service.GetPlanMoldImageBase64String(imageName);
+                var response = _service.GetPlanMoldDesignImageBase64String(imageName);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("GetPlanMoldResinImage")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult? GetPlanMoldResinImage(string imageName)
+        {
+            try
+            {
+                var response = _service.GetPlanMoldResinImageBase64String(imageName);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
+        [Route("GetImage")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult? GetImageBase64String(string imageName, string path)
+        {
+            try
+            {
+                var response = _service.GetImageBase64String(imageName, path);
                 return Ok(response);
             }
             catch (HandleException ex)

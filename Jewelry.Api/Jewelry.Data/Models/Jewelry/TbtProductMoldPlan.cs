@@ -21,7 +21,25 @@ public partial class TbtProductMoldPlan
 
     public string? RemarkUpdate { get; set; }
 
+    public int NextStatus { get; set; }
+
+    public string Running { get; set; } = null!;
+
+    public virtual TbmProductMoldPlanStatus NextStatusNavigation { get; set; } = null!;
+
     public virtual TbmProductMoldPlanStatus StatusNavigation { get; set; } = null!;
 
+    public virtual ICollection<TbtProductMold> TbtProductMold { get; set; } = new List<TbtProductMold>();
+
+    public virtual ICollection<TbtProductMoldPlanCasting> TbtProductMoldPlanCasting { get; set; } = new List<TbtProductMoldPlanCasting>();
+
+    public virtual ICollection<TbtProductMoldPlanCastingSilver> TbtProductMoldPlanCastingSilver { get; set; } = new List<TbtProductMoldPlanCastingSilver>();
+
+    public virtual ICollection<TbtProductMoldPlanCutting> TbtProductMoldPlanCutting { get; set; } = new List<TbtProductMoldPlanCutting>();
+
     public virtual ICollection<TbtProductMoldPlanDesign> TbtProductMoldPlanDesign { get; set; } = new List<TbtProductMoldPlanDesign>();
+
+    public virtual ICollection<TbtProductMoldPlanResin> TbtProductMoldPlanResin { get; set; } = new List<TbtProductMoldPlanResin>();
+
+    public virtual ICollection<TbtProductMoldPlanStore> TbtProductMoldPlanStore { get; set; } = new List<TbtProductMoldPlanStore>();
 }
