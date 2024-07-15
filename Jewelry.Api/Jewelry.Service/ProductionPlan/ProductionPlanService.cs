@@ -500,6 +500,9 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException("ไม่พบข้อมูล กรุณาลองใหม่อีกครั้ง");
             }
 
+            var stockGem = (from item in _jewelryContext.TbtStockGem
+                            select item);
+
             var response = new ProductionPlanGetResponse()
             {
                 Id = plan.item.Id,
@@ -595,6 +598,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                       }).ToList(),
 
                                                      TbtProductionPlanStatusGem = (from gem in item.TbtProductionPlanStatusDetailGem
+                                                                                   let price = stockGem.Where(x => x.Code == gem.GemCode)
                                                                                    select new StatusDetailGem()
                                                                                    {
                                                                                        ProductionPlanId = gem.ProductionPlanId,
@@ -604,7 +608,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        Id = gem.GemId,
                                                                                        Code = gem.GemCode,
                                                                                        Name = gem.GemName,
-                                                                                       QTY = gem.GemQty,
+                                                                                       Price = price.Any() ? price.FirstOrDefault().Price.Value : default,
                                                                                        Weight = gem.GemWeight,
                                                                                    }).ToList()
 

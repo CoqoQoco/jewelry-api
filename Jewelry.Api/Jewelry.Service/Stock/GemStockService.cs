@@ -32,7 +32,8 @@ namespace Jewelry.Service.Stock
                          {
                              Id = item.Id,
                              Name = $"{item.Code}-{item.Description}-{item.Shape}-{item.SizeGem}-{item.Grade}",
-                             Code = item.Code
+                             Code = item.Code,
+                             Price = item.Price.HasValue ? item.Price.Value : 0
                          }).ToList();
 
             if (!string.IsNullOrEmpty(request.Text))
@@ -63,7 +64,8 @@ namespace Jewelry.Service.Stock
 
                              Size = item.SizeGem,
                              Shape = item.Shape,
-                             Grade = item.Grade
+                             Grade = item.Grade,
+                             Price = item.Price.HasValue ? item.Price.Value : 0
                          }).ToList();
 
             if (!string.IsNullOrEmpty(request.Text))

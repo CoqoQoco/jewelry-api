@@ -107,6 +107,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public int Id { get; set; }
         public string Code { get; set; }
         public string Name { get; set; }
+        public decimal? Price { get; set; }
 
         public decimal? QTY { get; set; }
         public decimal? Weight { get; set; }

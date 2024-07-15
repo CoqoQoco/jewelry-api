@@ -465,10 +465,10 @@ namespace Jewelry.Service.ProductionPlan
                                         UpdateDate = DateTime.UtcNow,
                                         UpdateBy = _admin,
 
-                                        SendName = request.AssignBy,
-                                        SendDate = request.AssignDateFormat.UtcDateTime,
-                                        CheckName = request.ReceiveBy,
-                                        CheckDate = request.AssignDateFormat.UtcDateTime,
+                                        //SendName = request.AssignBy,
+                                        //SendDate = request.AssignDateFormat.UtcDateTime,
+                                        //CheckName = request.ReceiveBy,
+                                        //CheckDate = request.AssignDateFormat.UtcDateTime,
 
                                         Remark1 = request.Remark,
                                         Remark2 = string.Empty,

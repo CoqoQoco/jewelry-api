@@ -17,6 +17,8 @@ namespace jewelry.Model.Stock.Gem
         public string Size { get; set; }
         public string Shape { get; set; }
         public string Grade { get; set; }
+
+        public decimal Price { get; set; }
     }
 }
  
