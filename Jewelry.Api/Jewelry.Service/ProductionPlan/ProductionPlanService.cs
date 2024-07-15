@@ -608,6 +608,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        Id = gem.GemId,
                                                                                        Code = gem.GemCode,
                                                                                        Name = gem.GemName,
+                                                                                       QTY = gem.GemQty,
                                                                                        Price = price.Any() ? price.FirstOrDefault().Price.Value : default,
                                                                                        Weight = gem.GemWeight,
                                                                                    }).ToList()
