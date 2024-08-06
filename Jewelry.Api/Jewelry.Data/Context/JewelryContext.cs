@@ -7,10 +7,6 @@ namespace Jewelry.Data.Context;
 
 public partial class JewelryContext : DbContext
 {
-    public JewelryContext()
-    {
-    }
-
     public JewelryContext(DbContextOptions<JewelryContext> options)
         : base(options)
     {
@@ -40,6 +36,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmZill> TbmZill { get; set; }
 
+    public virtual DbSet<TbtMoldCheckOutList> TbtMoldCheckOutList { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
 
     public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
@@ -51,6 +49,8 @@ public partial class JewelryContext : DbContext
     public virtual DbSet<TbtProductMoldPlanCutting> TbtProductMoldPlanCutting { get; set; }
 
     public virtual DbSet<TbtProductMoldPlanDesign> TbtProductMoldPlanDesign { get; set; }
+
+    public virtual DbSet<TbtProductMoldPlanGem> TbtProductMoldPlanGem { get; set; }
 
     public virtual DbSet<TbtProductMoldPlanResin> TbtProductMoldPlanResin { get; set; }
 
@@ -77,10 +77,6 @@ public partial class JewelryContext : DbContext
     public virtual DbSet<TbtStockGem> TbtStockGem { get; set; }
 
     public virtual DbSet<TbtUser> TbtUser { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
-//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=postgres;User Id=postgres;Password=winsun24;Trust Server Certificate=true;", x => x.UseNetTopologySuite());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -420,6 +416,53 @@ public partial class JewelryContext : DbContext
                 .HasConstraintName("tbm_zill_gold_size_fk");
         });
 
+        modelBuilder.Entity<TbtMoldCheckOutList>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_mold_picking_list_pk");
+
+            entity.ToTable("tbt_mold_check_out_list");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('tbt_mold_picking_list_id_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.CheckOutDate).HasColumnName("check_out_date");
+            entity.Property(e => e.CheckOutDescription)
+                .HasColumnType("character varying")
+                .HasColumnName("check_out_description");
+            entity.Property(e => e.CheckOutName)
+                .HasColumnType("character varying")
+                .HasColumnName("check_out_name");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.MoldCode)
+                .HasColumnType("character varying")
+                .HasColumnName("mold_code");
+            entity.Property(e => e.ReturnDateFinish).HasColumnName("return_date_finish");
+            entity.Property(e => e.ReturnDateSet).HasColumnName("return_date_set");
+            entity.Property(e => e.ReturnDescription)
+                .HasColumnType("character varying")
+                .HasColumnName("return_description");
+            entity.Property(e => e.ReturnName)
+                .HasColumnType("character varying")
+                .HasColumnName("return_name");
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.MoldCodeNavigation).WithMany(p => p.TbtMoldCheckOutList)
+                .HasForeignKey(d => d.MoldCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_mold_picking_list_fk");
+        });
+
         modelBuilder.Entity<TbtProductMold>(entity =>
         {
             entity.HasKey(e => e.Code).HasName("tbt_product_mold_pk");
@@ -462,6 +505,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("mold_by");
             entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.Status)
+                .HasDefaultValueSql("1")
+                .HasColumnName("status");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
@@ -645,8 +691,6 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ImageUrl)
                 .HasColumnType("character varying")
                 .HasColumnName("image_url");
-            entity.Property(e => e.QtyDiamond).HasColumnName("qty_diamond");
-            entity.Property(e => e.QtyGem).HasColumnName("qty_gem");
             entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
             entity.Property(e => e.QtySend).HasColumnName("qty_send");
             entity.Property(e => e.RemarUpdate)
@@ -655,12 +699,6 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
-            entity.Property(e => e.SizeDiamond)
-                .HasColumnType("character varying")
-                .HasColumnName("size_diamond");
-            entity.Property(e => e.SizeGem)
-                .HasColumnType("character varying")
-                .HasColumnName("size_gem");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
@@ -675,6 +713,51 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.PlanId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_product_mold_plan_design_fk");
+        });
+
+        modelBuilder.Entity<TbtProductMoldPlanGem>(entity =>
+        {
+            entity.HasKey(e => new { e.Id, e.PlanId }).HasName("tbt_product_mold_plan_gem_pk");
+
+            entity.ToTable("tbt_product_mold_plan_gem");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.GemCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_code");
+            entity.Property(e => e.GemShapeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_shape_code");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.Size)
+                .HasColumnType("character varying")
+                .HasColumnName("size");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.GemCodeNavigation).WithMany(p => p.TbtProductMoldPlanGem)
+                .HasForeignKey(d => d.GemCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_gem_code_fk");
+
+            entity.HasOne(d => d.GemShapeCodeNavigation).WithMany(p => p.TbtProductMoldPlanGem)
+                .HasForeignKey(d => d.GemShapeCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_gem_shape_code_fk");
+
+            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanGem)
+                .HasForeignKey(d => d.PlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_product_mold_plan_gem_fk");
         });
 
         modelBuilder.Entity<TbtProductMoldPlanResin>(entity =>

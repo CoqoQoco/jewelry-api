@@ -9,17 +9,17 @@ using System.Threading.Tasks;
 
 namespace Jewelry.Service.Stock
 {
-    public interface IGemStockService
+    public interface IStockGemService
     {
         List<SearchGemResponse> SearchGem(SearchGem request);
         IQueryable<SearchGemResponse> SearchGemData(SearchGem request);
     }
-    public class GemStockService : IGemStockService
+    public class StockGemService : IStockGemService
     {
         private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
-        public GemStockService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
+        public StockGemService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;

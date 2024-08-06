@@ -14,10 +14,10 @@ namespace Jewelry.Api.Controllers
     public class GemStockController : ApiControllerBase
     {
         private readonly ILogger<MoldController> _logger;
-        private readonly IGemStockService _service;
+        private readonly IStockGemService _service;
 
         public GemStockController(ILogger<MoldController> logger,
-            IGemStockService service,
+            IStockGemService service,
             IOptions<ApiBehaviorOptions> apiBehaviorOptions)
             : base(apiBehaviorOptions)
         {

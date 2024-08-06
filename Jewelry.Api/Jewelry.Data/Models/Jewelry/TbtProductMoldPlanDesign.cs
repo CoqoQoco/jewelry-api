@@ -17,14 +17,6 @@ public partial class TbtProductMoldPlanDesign
 
     public string CodePlan { get; set; } = null!;
 
-    public string? SizeGem { get; set; }
-
-    public string? SizeDiamond { get; set; }
-
-    public decimal? QtyGem { get; set; }
-
-    public decimal? QtyDiamond { get; set; }
-
     public decimal QtyReceive { get; set; }
 
     public decimal QtySend { get; set; }

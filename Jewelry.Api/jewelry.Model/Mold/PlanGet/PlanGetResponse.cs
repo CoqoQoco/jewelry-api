@@ -21,6 +21,8 @@ namespace jewelry.Model.Mold.PlanGet
 
         public string? Remark { get; set; }
 
+        public List<ModelGem> Gems { get; set; }
+
         public PlanGetItemStatus? Design { get; set; }
         public PlanGetItemStatus? Resin { get; set; }
         public PlanGetItemStatus? CastingSilver { get; set; }

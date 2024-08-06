@@ -17,11 +17,18 @@ namespace jewelry.Model.Mold.PlanDesign
 
         public string? Remark { get; set; }
 
-        public string? SizeGem { get; set; }
-        public string? SizeDiamond { get; set; }
-        public decimal? QtyGem { get; set; }
-        public decimal? QtyDiamond { get; set; }
+        //public string? SizeGem { get; set; }
+        //public string? SizeDiamond { get; set; }
+        //public decimal? QtyGem { get; set; }
+        //public decimal? QtyDiamond { get; set; }
         public decimal QtyReceive { get; set; }
         public decimal QtySend { get; set; }
+
+        public List<ModelGem> Gems { get; set; }
+
+        public PlanDesignRequest()
+        {
+            Gems = new List<ModelGem>();
+        }
     }
 }

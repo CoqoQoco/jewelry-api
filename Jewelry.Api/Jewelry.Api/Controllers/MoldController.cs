@@ -5,6 +5,7 @@ using jewelry.Model.Mold.PlanCasting;
 using jewelry.Model.Mold.PlanCastingSilver;
 using jewelry.Model.Mold.PlanCutting;
 using jewelry.Model.Mold.PlanDesign;
+using jewelry.Model.Mold.PlanGems;
 using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
 using jewelry.Model.Mold.PlanResin;
@@ -136,6 +137,24 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+
+        [Route("PlanGems")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanGems([FromBody] PlanGemsRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanGems(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
         [Route("PlanDesign")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]

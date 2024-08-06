@@ -39,6 +39,8 @@ public partial class TbtProductMoldPlan
 
     public virtual ICollection<TbtProductMoldPlanDesign> TbtProductMoldPlanDesign { get; set; } = new List<TbtProductMoldPlanDesign>();
 
+    public virtual ICollection<TbtProductMoldPlanGem> TbtProductMoldPlanGem { get; set; } = new List<TbtProductMoldPlanGem>();
+
     public virtual ICollection<TbtProductMoldPlanResin> TbtProductMoldPlanResin { get; set; } = new List<TbtProductMoldPlanResin>();
 
     public virtual ICollection<TbtProductMoldPlanStore> TbtProductMoldPlanStore { get; set; } = new List<TbtProductMoldPlanStore>();

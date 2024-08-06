@@ -37,5 +37,9 @@ public partial class TbtProductMold
 
     public int? PlanId { get; set; }
 
+    public int Status { get; set; }
+
     public virtual TbtProductMoldPlan? Plan { get; set; }
+
+    public virtual ICollection<TbtMoldCheckOutList> TbtMoldCheckOutList { get; set; } = new List<TbtMoldCheckOutList>();
 }

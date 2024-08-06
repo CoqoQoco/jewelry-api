@@ -2,10 +2,12 @@
 using ICSharpCode.SharpZipLib.Zip;
 using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
+using jewelry.Model.Mold;
 using jewelry.Model.Mold.PlanCasting;
 using jewelry.Model.Mold.PlanCastingSilver;
 using jewelry.Model.Mold.PlanCutting;
 using jewelry.Model.Mold.PlanDesign;
+using jewelry.Model.Mold.PlanGems;
 using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
 using jewelry.Model.Mold.PlanResin;
@@ -31,6 +33,7 @@ namespace Jewelry.Service.Mold
         IQueryable<PlanListReponse> PlanList(PlanListRequestModel request);
         PlanGetResponse PlanGet(int id);
 
+        Task<string> PlanGems(PlanGemsRequest request);
         Task<string> PlanDesign(PlanDesignRequest request);
         Task<string> PlanResin(PlanResinRequest request);
         Task<string> PlanCastingSilver(PlanCastingSilverRequest request);
@@ -120,6 +123,10 @@ namespace Jewelry.Service.Mold
         public PlanGetResponse PlanGet(int id)
         {
             var planMold = (from plan in _jewelryContext.TbtProductMoldPlan
+                            .Include(x => x.TbtProductMoldPlanGem)
+                                .ThenInclude(x => x.GemCodeNavigation)
+                            .Include(x => x.TbtProductMoldPlanGem)
+                                .ThenInclude(x => x.GemShapeCodeNavigation)
                             .Include(x => x.StatusNavigation)
                             .Include(x => x.TbtProductMoldPlanDesign)
                             .Include(x => x.TbtProductMoldPlanResin)
@@ -140,10 +147,10 @@ namespace Jewelry.Service.Mold
                                 {
                                     MoldCode = plan.TbtProductMoldPlanDesign.First().CodePlan,
                                     Remark = plan.TbtProductMoldPlanDesign.First().Remark,
-                                    SizeGem = plan.TbtProductMoldPlanDesign.First().SizeGem,
-                                    SizeDiamond = plan.TbtProductMoldPlanDesign.First().SizeDiamond,
-                                    QtyGem = plan.TbtProductMoldPlanDesign.First().QtyGem,
-                                    QtyDiamond = plan.TbtProductMoldPlanDesign.First().QtyDiamond,
+                                    //SizeGem = plan.TbtProductMoldPlanDesign.First().SizeGem,
+                                    //SizeDiamond = plan.TbtProductMoldPlanDesign.First().SizeDiamond,
+                                    //QtyGem = plan.TbtProductMoldPlanDesign.First().QtyGem,
+                                    //QtyDiamond = plan.TbtProductMoldPlanDesign.First().QtyDiamond,
                                     QtyReceive = plan.TbtProductMoldPlanDesign.First().QtyReceive,
                                     QtySend = plan.TbtProductMoldPlanDesign.First().QtySend,
                                     Image = plan.TbtProductMoldPlanDesign.First().ImageUrl ?? string.Empty,
@@ -157,6 +164,21 @@ namespace Jewelry.Service.Mold
                                     CatagoryName = plan.TbtProductMoldPlanDesign.First().CategoryCodeNavigation.NameTh,
                                     WorkBy = plan.TbtProductMoldPlanDesign.First().DesignBy
                                 },
+
+                                Gems = plan.TbtProductMoldPlanGem.Any() ? plan.TbtProductMoldPlanGem.Select(x => new ModelGem()
+                                {
+                                    GemCode = x.GemCode,
+                                    GemNameTH = x.GemCodeNavigation.NameTh,
+                                    GemNameEN = x.GemCodeNavigation.NameEn,
+
+                                    GemShapeCode = x.GemShapeCode,
+                                    GemShapeNameTH = x.GemShapeCodeNavigation.NameTh,
+                                    GemShapeNameEN = x.GemShapeCodeNavigation.NameEn,
+
+                                    Size = x.Size,
+                                    Qty = x.Qty
+                                }).ToList()
+                                : new List<ModelGem>(),
 
                                 Resin = plan.TbtProductMoldPlanResin.Any() ? new PlanGetItemStatus()
                                 {
@@ -251,6 +273,60 @@ namespace Jewelry.Service.Mold
             return planMold;
         }
 
+        public async Task<string> PlanGems(PlanGemsRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductMoldPlan
+                        where item.Id == request.Id
+                        select item).FirstOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException("ไม่พบข้อมูลเเบบเเม่พิมพ์ กรุณาลองใหม่อีกครั้ง");
+            }
+
+            var oldGems = (from item in _jewelryContext.TbtProductMoldPlanGem
+                           where item.PlanId == request.Id
+                           select item).ToList();
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var gems = new List<TbtProductMoldPlanGem>();
+
+                foreach (var item in request.Gems)
+                {
+                    var gem = new TbtProductMoldPlanGem()
+                    {
+                        PlanId = plan.Id,
+                        CreateBy = _admin,
+                        CreateDate = DateTime.UtcNow,
+                        UpdateBy = _admin,
+                        UpdateDate = DateTime.UtcNow,
+
+                        Size = item.Size,
+                        Qty = item.Qty,
+
+                        GemCode = item.GemCode,
+                        GemShapeCode = item.GemShapeCode,
+                    };
+
+                    gems.Add(gem);
+                }
+
+                if (oldGems.Any())
+                {
+                    _jewelryContext.TbtProductMoldPlanGem.RemoveRange(oldGems);
+                }
+                if (gems.Any())
+                {
+                    _jewelryContext.TbtProductMoldPlanGem.AddRange(gems);
+                }
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
+
+            return "success";
+        }
         public async Task<string> PlanDesign(PlanDesignRequest request)
         {
             #region *** validate ***
@@ -295,10 +371,6 @@ namespace Jewelry.Service.Mold
                 {
                     CodePlan = request.MoldCode.ToUpper(),
                     Remark = request.Remark,
-                    SizeGem = request.SizeGem,
-                    SizeDiamond = request.SizeDiamond,
-                    QtyGem = request.QtyGem,
-                    QtyDiamond = request.QtyDiamond,
                     QtySend = request.QtySend,
                     QtyReceive = request.QtyReceive,
                     CreateBy = _admin,
@@ -357,6 +429,37 @@ namespace Jewelry.Service.Mold
 
                 _jewelryContext.TbtProductMoldPlanDesign.Add(design);
                 await _jewelryContext.SaveChangesAsync();
+
+                if (request.Gems.Any())
+                {
+                    var gems = new List<TbtProductMoldPlanGem>();
+
+                    foreach (var item in request.Gems)
+                    {
+                        var gem = new TbtProductMoldPlanGem()
+                        {
+                            PlanId = plan.Id,
+                            CreateBy = _admin,
+                            CreateDate = DateTime.UtcNow,
+                            UpdateBy = _admin,
+                            UpdateDate = DateTime.UtcNow,
+
+                            Size = item.Size,
+                            Qty = item.Qty,
+
+                            GemCode = item.GemCode,
+                            GemShapeCode = item.GemShapeCode,
+                        };
+
+                        gems.Add(gem);
+                    }
+
+                    if (gems.Any())
+                    {
+                        _jewelryContext.TbtProductMoldPlanGem.AddRange(gems);
+                        await _jewelryContext.SaveChangesAsync();
+                    }
+                }
 
                 scope.Complete();
             }

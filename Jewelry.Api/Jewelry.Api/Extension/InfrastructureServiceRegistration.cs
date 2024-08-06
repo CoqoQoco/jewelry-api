@@ -36,9 +36,10 @@ namespace Jewelry.Api.Extension
             services.AddScoped<ICustomerService, CustomerService>();
             services.AddScoped<IWorkerService, WorkerService>();
             services.AddScoped<IProductionPlanCostService, ProductionPlanCostService>();
-            services.AddScoped<IGemStockService, GemStockService>();
+            services.AddScoped<IStockGemService, StockGemService>();
             services.AddScoped<IPasswordHash, PasswordHashService>();
             services.AddScoped<IMoldPlanService, MoldPlanService>();
+            services.AddScoped<IStockMoldService, StockMoldService>();
 
             return services;
         }

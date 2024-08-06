@@ -19,5 +19,7 @@ public partial class TbmGemShape
 
     public string CreateBy { get; set; } = null!;
 
+    public virtual ICollection<TbtProductMoldPlanGem> TbtProductMoldPlanGem { get; set; } = new List<TbtProductMoldPlanGem>();
+
     public virtual ICollection<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; } = new List<TbtProductionPlanMaterial>();
 }
