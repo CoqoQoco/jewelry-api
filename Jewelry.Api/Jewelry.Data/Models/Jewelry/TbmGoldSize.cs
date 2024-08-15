@@ -24,4 +24,6 @@ public partial class TbmGoldSize
     public virtual ICollection<TbtProductionPlanCostGold> TbtProductionPlanCostGold { get; set; } = new List<TbtProductionPlanCostGold>();
 
     public virtual ICollection<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; } = new List<TbtProductionPlanMaterial>();
+
+    public virtual ICollection<TbtStockGem> TbtStockGem { get; set; } = new List<TbtStockGem>();
 }

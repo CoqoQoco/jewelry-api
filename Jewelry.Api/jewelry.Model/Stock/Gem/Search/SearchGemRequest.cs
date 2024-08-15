@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace jewelry.Model.Stock.Gem
+namespace jewelry.Model.Stock.Gem.Search
 {
     public class SearchGemRequest : DataSourceRequest
     {
@@ -14,7 +14,13 @@ namespace jewelry.Model.Stock.Gem
 
     public class SearchGem
     {
-        public string? Text { get; set; }
         public int? Id { get; set; }
+
+        public string? Code { get; set; }
+
+        public string[]? GroupName { get; set; }
+        public string[]? Size { get; set; }
+        public string[]? Shape { get; set; }
+        public string[]? Grade { get; set; }
     }
 }

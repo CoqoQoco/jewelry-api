@@ -22,4 +22,6 @@ public partial class TbmGemShape
     public virtual ICollection<TbtProductMoldPlanGem> TbtProductMoldPlanGem { get; set; } = new List<TbtProductMoldPlanGem>();
 
     public virtual ICollection<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; } = new List<TbtProductionPlanMaterial>();
+
+    public virtual ICollection<TbtStockGem> TbtStockGem { get; set; } = new List<TbtStockGem>();
 }

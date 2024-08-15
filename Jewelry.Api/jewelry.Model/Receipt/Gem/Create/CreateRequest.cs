@@ -4,21 +4,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace jewelry.Model.Stock.Gem
+namespace jewelry.Model.Receipt.Gem.Create
 {
-    public class SearchGemResponse
+    public class CreateRequest
     {
-        public int Id { get; set; }
-
-        public string Name { get; set; }
         public string Code { get; set; }
-        public string Description { get; set; }
+        public string GroupName { get; set; }
 
         public string Size { get; set; }
         public string Shape { get; set; }
         public string Grade { get; set; }
+        public string GradeCode { get; set; }
 
-        public decimal Price { get; set; }
+        public string Remark { get; set; }
     }
 }
- 

@@ -1273,11 +1273,13 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbtStockGem>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("tbt_stock_gem_pk");
+            entity.HasKey(e => new { e.Id, e.Code }).HasName("tbt_stock_gem_pk");
 
             entity.ToTable("tbt_stock_gem");
 
-            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
             entity.Property(e => e.Code)
                 .HasMaxLength(50)
                 .HasColumnName("code");
@@ -1286,12 +1288,12 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.Daterec).HasColumnName("daterec");
-            entity.Property(e => e.Description)
-                .HasMaxLength(50)
-                .HasColumnName("description");
             entity.Property(e => e.Grade)
                 .HasMaxLength(50)
                 .HasColumnName("grade");
+            entity.Property(e => e.GradeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("grade_code");
             entity.Property(e => e.GradeDia)
                 .HasMaxLength(50)
                 .HasColumnName("grade_dia");
@@ -1313,9 +1315,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Shape)
                 .HasMaxLength(50)
                 .HasColumnName("shape");
-            entity.Property(e => e.SizeGem)
+            entity.Property(e => e.Size)
                 .HasMaxLength(50)
-                .HasColumnName("size_gem");
+                .HasColumnName("size");
             entity.Property(e => e.Unit)
                 .HasMaxLength(50)
                 .HasColumnName("unit");
@@ -1327,6 +1329,15 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
             entity.Property(e => e.Wg).HasColumnName("wg");
+
+            entity.HasOne(d => d.GradeCodeNavigation).WithMany(p => p.TbtStockGem)
+                .HasForeignKey(d => d.GradeCode)
+                .HasConstraintName("tbt_stock_gem_gold_size_fk");
+
+            entity.HasOne(d => d.ShapeNavigation).WithMany(p => p.TbtStockGem)
+                .HasForeignKey(d => d.Shape)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_gem_shape_fk");
         });
 
         modelBuilder.Entity<TbtUser>(entity =>

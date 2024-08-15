@@ -5,6 +5,7 @@ using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
 using Jewelry.Service.Mold;
 using Jewelry.Service.ProductionPlan;
+using Jewelry.Service.Receipt.Gem;
 using Jewelry.Service.Stock;
 using Jewelry.Service.User;
 using Jewelry.Service.Worker;
@@ -40,6 +41,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IPasswordHash, PasswordHashService>();
             services.AddScoped<IMoldPlanService, MoldPlanService>();
             services.AddScoped<IStockMoldService, StockMoldService>();
+            services.AddScoped<IReceiptStockGemService, ReceiptStockGemService>();
 
             return services;
         }
