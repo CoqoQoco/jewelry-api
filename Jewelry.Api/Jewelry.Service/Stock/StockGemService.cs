@@ -14,7 +14,7 @@ namespace Jewelry.Service.Stock
 {
     public interface IStockGemService
     {
-        //List<SearchGemResponse> SearchGem(SearchGem request);
+        List<SearchGemResponse> SearchGem(SearchGem request);
         IQueryable<SearchGemResponse> SearchGemData(SearchGem request);
         IQueryable<OptionResponse> GroupGemData(OptionRequest request);
     }
@@ -29,32 +29,32 @@ namespace Jewelry.Service.Stock
             _hostingEnvironment = HostingEnvironment;
         }
 
-        //public List<SearchGemResponse> SearchGem(SearchGem request)
-        //{
-        //    var query = (from item in _jewelryContext.TbtStockGem
-        //                 select new SearchGemResponse()
-        //                 {
-        //                     Id = item.Id,
-        //                     Name = $"{item.Code}-{item.Description}-{item.Shape}-{item.SizeGem}-{item.Grade}",
-        //                     Code = item.Code,
-        //                     Price = item.Price.HasValue ? item.Price.Value : 0
-        //                 }).ToList();
+        public List<SearchGemResponse> SearchGem(SearchGem request)
+        {
+            var query = (from item in _jewelryContext.TbtStockGem
+                         select new SearchGemResponse()
+                         {
+                             Id = item.Id,
+                             Name = $"{item.Code}-{item.GroupName}-{item.Shape}-{item.Size}-{item.Grade}",
+                             Code = item.Code,
+                             Price = item.Price
+                         }).ToList();
 
-        //    if (!string.IsNullOrEmpty(request.Text))
-        //    {
-        //        query = (from item in query
-        //                 where item.Name.Contains(request.Text)
-        //                 select item).ToList();
-        //    }
-        //    if (request.Id.HasValue)
-        //    {
-        //        query = (from item in query
-        //                 where item.Id == request.Id.Value
-        //                 select item).ToList();
-        //    }
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                query = (from item in query
+                         where item.Name.Contains(request.Text)
+                         select item).ToList();
+            }
+            if (request.Id.HasValue)
+            {
+                query = (from item in query
+                         where item.Id == request.Id.Value
+                         select item).ToList();
+            }
 
-        //    return query;
-        //}
+            return query;
+        }
 
         public IQueryable<SearchGemResponse> SearchGemData(SearchGem request)
         {

@@ -27,26 +27,26 @@ namespace Jewelry.Api.Controllers.Stock
             _service = service;
         }
 
-        //[Route("Search")]
-        //[HttpPost]
-        //[ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(List<SearchGemResponse>))]
-        //[ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
-        //[ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        //public IActionResult Search([FromBody] SearchGemRequest request)
-        //{
-        //    try
-        //    {
-        //        var report = _service.SearchGem(request.Search);
-        //        return Ok(report);
-        //        //return report.ToDataSource(request);
+        [Route("Search")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(List<SearchGemResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult Search([FromBody] SearchGemRequest request)
+        {
+            try
+            {
+                var report = _service.SearchGem(request.Search);
+                return Ok(report);
+                //return report.ToDataSource(request);
 
-        //    }
-        //    catch (HandleException ex)
-        //    {
-        //        //return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
-        //        return BadRequest(new NotFoundResponse() { Message = ex.Message });
-        //    }
-        //}
+            }
+            catch (HandleException ex)
+            {
+                //return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
 
         [Route("SearchData")]
         [HttpPost]
