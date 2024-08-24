@@ -13,7 +13,7 @@ public partial class TbtStockGem
 
     public string GroupName { get; set; } = null!;
 
-    public string? Size { get; set; }
+    public string Size { get; set; } = null!;
 
     public string Shape { get; set; } = null!;
 
@@ -48,6 +48,8 @@ public partial class TbtStockGem
     public string? UpdateBy { get; set; }
 
     public string? GradeCode { get; set; }
+
+    public decimal QuantityOnProcess { get; set; }
 
     public virtual TbmGoldSize? GradeCodeNavigation { get; set; }
 

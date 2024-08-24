@@ -72,6 +72,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanStatusHeader> TbtProductionPlanStatusHeader { get; set; }
 
+    public virtual DbSet<TbtReceiptStockCreate> TbtReceiptStockCreate { get; set; }
+
     public virtual DbSet<TbtRunningNumber> TbtRunningNumber { get; set; }
 
     public virtual DbSet<TbtStockGem> TbtStockGem { get; set; }
@@ -1259,6 +1261,31 @@ public partial class JewelryContext : DbContext
                 .HasConstraintName("tbt_production_plan_status_fk");
         });
 
+        modelBuilder.Entity<TbtReceiptStockCreate>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_receipt_stock_request_pk");
+
+            entity.ToTable("tbt_receipt_stock_create");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('tbt_receipt_stock_request_id_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.Type).HasColumnName("type");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
         modelBuilder.Entity<TbtRunningNumber>(entity =>
         {
             entity.HasKey(e => e.Key).HasName("tbt_running_number_pk");
@@ -1306,6 +1333,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Price).HasColumnName("price");
             entity.Property(e => e.PriceQty).HasColumnName("price_qty");
             entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.QuantityOnProcess).HasColumnName("quantity_on_process");
             entity.Property(e => e.Remark1)
                 .HasMaxLength(50)
                 .HasColumnName("remark_1");

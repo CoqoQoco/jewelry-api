@@ -15,5 +15,6 @@ namespace jewelry.Model.Constant
         public static int Cuttig = 50;
         public static int Store = 60;
         public static int Success = 100;
+        public static int Melting = 500;
     }
 }

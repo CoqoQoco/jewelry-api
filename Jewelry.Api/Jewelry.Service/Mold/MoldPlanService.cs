@@ -10,6 +10,7 @@ using jewelry.Model.Mold.PlanDesign;
 using jewelry.Model.Mold.PlanGems;
 using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
+using jewelry.Model.Mold.PlanMelting;
 using jewelry.Model.Mold.PlanResin;
 using jewelry.Model.Mold.PlanStore;
 using Jewelry.Data.Context;
@@ -32,6 +33,7 @@ namespace Jewelry.Service.Mold
     {
         IQueryable<PlanListReponse> PlanList(PlanListRequestModel request);
         PlanGetResponse PlanGet(int id);
+        Task<string> PlanMelting(PlanMeltingRequest request);
 
         Task<string> PlanGems(PlanGemsRequest request);
         Task<string> PlanDesign(PlanDesignRequest request);
@@ -327,6 +329,31 @@ namespace Jewelry.Service.Mold
 
             return "success";
         }
+        public async Task<string> PlanMelting(PlanMeltingRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductMoldPlan
+                        where item.Id == request.Id
+                        select item).FirstOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException("ไม่พบเเม่พิมพ์");
+            }
+            if (plan.Status == MoldPlanStatus.Success || plan.Status == MoldPlanStatus.Melting)
+            {
+                throw new HandleException("เเม่พิมพ์ถูกหลอมหรืออยู่ในการจัดเก็บเเล้ว ไม่สามารถดำเนินการได้");
+            }
+
+            plan.UpdateBy = _admin;
+            plan.UpdateDate = DateTime.UtcNow;
+            plan.Status = MoldPlanStatus.Melting;
+
+            _jewelryContext.TbtProductMoldPlan.Update(plan);
+            await _jewelryContext.SaveChangesAsync();
+
+            return "success";
+        }
+
         public async Task<string> PlanDesign(PlanDesignRequest request)
         {
             #region *** validate ***

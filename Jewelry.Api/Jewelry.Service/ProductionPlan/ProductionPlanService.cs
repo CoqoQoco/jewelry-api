@@ -609,7 +609,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        Code = gem.GemCode,
                                                                                        Name = gem.GemName,
                                                                                        QTY = gem.GemQty,
-                                                                                       Price = price.Any() ? price.FirstOrDefault().Price : default,
+                                                                                       Price = price.Any() ? price.FirstOrDefault().Price : 0,
                                                                                        Weight = gem.GemWeight,
                                                                                    }).ToList()
 

@@ -8,6 +8,7 @@ using jewelry.Model.Mold.PlanDesign;
 using jewelry.Model.Mold.PlanGems;
 using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
+using jewelry.Model.Mold.PlanMelting;
 using jewelry.Model.Mold.PlanResin;
 using jewelry.Model.Mold.PlanStore;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
@@ -130,6 +131,24 @@ namespace Jewelry.Api.Controllers
 
                 var report = _servicePlan.PlanGet(id);
                 return Ok(report);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("PlanMelting")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanMelting([FromBody] PlanMeltingRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanMelting(request);
+                return Ok(response);
             }
             catch (HandleException ex)
             {
