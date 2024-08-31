@@ -1,10 +1,14 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.Receipt.Gem.Create;
+using jewelry.Model.Receipt.Gem.Inbound;
+using jewelry.Model.Receipt.Gem.List;
+using jewelry.Model.Receipt.Gem.Outbound;
 using jewelry.Model.Receipt.Gem.Scan;
 using jewelry.Model.Stock.Mold.CheckOut;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Receipt.Gem;
 using Jewelry.Service.Stock;
+using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -13,13 +17,13 @@ namespace Jewelry.Api.Controllers.Receipt
 {
     [Route("/[controller]")]
     [ApiController]
-    public class ReceiptStockGemController : ApiControllerBase
+    public class ReceiptAndIssueStockGemController : ApiControllerBase
     {
         private readonly ILogger<MoldController> _logger;
-        private readonly IReceiptStockGemService _service;
+        private readonly IReceiptAndIssueStockGemService _service;
 
-        public ReceiptStockGemController(ILogger<MoldController> logger,
-           IReceiptStockGemService service,
+        public ReceiptAndIssueStockGemController(ILogger<MoldController> logger,
+           IReceiptAndIssueStockGemService service,
            IOptions<ApiBehaviorOptions> apiBehaviorOptions)
            : base(apiBehaviorOptions)
         {
@@ -71,6 +75,59 @@ namespace Jewelry.Api.Controllers.Receipt
                 //}
 
                 return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
+        [Route("ListTransection")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<ListResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListTransection([FromBody] ListRequest request)
+        {
+            try
+            {
+                var response = _service.ListTransection(request.Search);
+                return response.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+        [Route("InboundGem")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> InboundGem([FromBody] InboundRequest request)
+        {
+            try
+            {
+                var result = await _service.InboundGem(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("OutboundGem")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> OutboundGem([FromBody] OutboundRequest request)
+        {
+            try
+            {
+                var result = await _service.OutboundGem(request);
+                return Ok(result);
             }
             catch (HandleException ex)
             {

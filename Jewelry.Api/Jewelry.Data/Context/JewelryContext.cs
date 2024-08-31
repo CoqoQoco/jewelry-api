@@ -78,6 +78,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockGem> TbtStockGem { get; set; }
 
+    public virtual DbSet<TbtStockGemTransection> TbtStockGemTransection { get; set; }
+
     public virtual DbSet<TbtUser> TbtUser { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -97,6 +99,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.LastName)
                 .HasMaxLength(20)
                 .HasColumnName("last_name");
+            entity.Property(e => e.TempPass)
+                .HasColumnType("character varying")
+                .HasColumnName("temp_pass");
             entity.Property(e => e.Username)
                 .HasMaxLength(10)
                 .HasColumnName("username");
@@ -1366,6 +1371,47 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.Shape)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_stock_gem_shape_fk");
+        });
+
+        modelBuilder.Entity<TbtStockGemTransection>(entity =>
+        {
+            entity.HasKey(e => new { e.Running, e.Code }).HasName("tbt_stock_gem_transection_pk");
+
+            entity.ToTable("tbt_stock_gem_transection");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.JobOrPo)
+                .HasColumnType("character varying")
+                .HasColumnName("job_or_po");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.Remark1)
+                .HasColumnType("character varying")
+                .HasColumnName("remark_1");
+            entity.Property(e => e.Remark2)
+                .HasColumnType("character varying")
+                .HasColumnName("remark_2");
+            entity.Property(e => e.RequestDate).HasColumnName("request_date");
+            entity.Property(e => e.Stastus)
+                .HasColumnType("character varying")
+                .HasColumnName("stastus");
+            entity.Property(e => e.SubpplierName)
+                .HasColumnType("character varying")
+                .HasColumnName("subpplier_name");
+            entity.Property(e => e.SupplierCost).HasColumnName("supplier_cost");
+            entity.Property(e => e.Type).HasColumnName("type");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         modelBuilder.Entity<TbtUser>(entity =>

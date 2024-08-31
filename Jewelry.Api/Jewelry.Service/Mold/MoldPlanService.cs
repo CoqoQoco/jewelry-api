@@ -11,6 +11,7 @@ using jewelry.Model.Mold.PlanGems;
 using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
 using jewelry.Model.Mold.PlanMelting;
+using jewelry.Model.Mold.PlanRemodel;
 using jewelry.Model.Mold.PlanResin;
 using jewelry.Model.Mold.PlanStore;
 using Jewelry.Data.Context;
@@ -42,6 +43,7 @@ namespace Jewelry.Service.Mold
         Task<string> PlanCasting(PlanCastingRequest request);
         Task<string> PlanCutting(PlanCuttingRequest request);
         Task<string> PlanStore(PlanStoreRequest request);
+        Task<string> PlanRemodel(PlanRemodelRequest request);
     }
     public class MoldPlanService : IMoldPlanService
     {
@@ -1108,5 +1110,74 @@ namespace Jewelry.Service.Mold
             return "success";
         }
 
+        public async Task<string> PlanRemodel(PlanRemodelRequest request)
+        {
+            var mold = (from item in _jewelryContext.TbtProductMold
+                        where item.Code == request.Code.ToUpper()
+                        select item).FirstOrDefault();
+
+            if (mold != null)
+            {
+                throw new HandleException($"มีข้อมูลเเม่พิมพ์สำเร็จรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+            }
+
+            if (!request.Images.Any())
+            {
+                throw new HandleException("โปรดระบุรูปแแม่พิมพ์");
+            }
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var addMold = new TbtProductMold()
+                {
+                    Code = request.Code.Trim().ToUpper(),
+                    Category = request.Catagory,
+                    CategoryCode = request.CatagoryCode,
+                    Description = request.Remark,
+                  
+                    MoldBy = request.WorkBy,
+                    IsActive = true,
+
+                    CreateBy = _admin,
+                    CreateDate = DateTime.UtcNow,
+                };
+
+                if (request.Images.Any())
+                {
+                    var img = request.Images[0];
+                    try
+                    {
+                        string imageName = $"{request.Code.ToUpper().Trim()}-Mold.png";
+                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
+                        if (!Directory.Exists(imagePath))
+                        {
+                            Directory.CreateDirectory(imagePath);
+                        }
+                        string imagePathWithFileName = Path.Combine(imagePath, imageName);
+
+                        //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
+                        using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                        {
+                            img.CopyTo(fileStream);
+                            fileStream.Close();
+                        }
+
+                        addMold.Image = imageName;
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                    }
+
+                }
+
+                _jewelryContext.TbtProductMold.Add(addMold);
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
+
+            return "success";
+        }
     }
 }

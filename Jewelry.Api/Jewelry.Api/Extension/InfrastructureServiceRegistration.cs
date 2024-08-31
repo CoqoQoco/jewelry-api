@@ -41,7 +41,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IPasswordHash, PasswordHashService>();
             services.AddScoped<IMoldPlanService, MoldPlanService>();
             services.AddScoped<IStockMoldService, StockMoldService>();
-            services.AddScoped<IReceiptStockGemService, ReceiptStockGemService>();
+            services.AddScoped<IReceiptAndIssueStockGemService, ReceiptAndIssueStockGemService>();
 
             return services;
         }
