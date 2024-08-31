@@ -1136,6 +1136,7 @@ namespace Jewelry.Service.Mold
                     Description = request.Remark,
                   
                     MoldBy = request.WorkBy,
+                    ReModelMold = request.Remodel,
                     IsActive = true,
 
                     CreateBy = _admin,

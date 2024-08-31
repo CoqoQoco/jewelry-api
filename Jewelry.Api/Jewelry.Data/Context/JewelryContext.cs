@@ -512,6 +512,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("mold_by");
             entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.ReModelMold)
+                .HasColumnType("character varying")
+                .HasColumnName("re_model_mold");
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("1")
                 .HasColumnName("status");

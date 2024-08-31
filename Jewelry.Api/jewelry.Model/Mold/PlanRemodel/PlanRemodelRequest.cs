@@ -17,7 +17,7 @@ namespace jewelry.Model.Mold.PlanRemodel
         public string WorkBy { get; set; }
 
         public string? Remark { get; set; }
-        public string? RemodelBy { get; set; }
+        public string? Remodel { get; set; }
         public string Location { get; set; }
     }
 }
