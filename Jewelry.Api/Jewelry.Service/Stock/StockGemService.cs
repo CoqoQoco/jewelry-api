@@ -71,6 +71,10 @@ namespace Jewelry.Service.Stock
                              Grade = item.Grade,
 
                              Quantity = item.Quantity,
+                             QuantityOnProcess = item.QuantityOnProcess,
+                             QuantityWeight = item.QuantityWeight,
+                             QuantityWeightOnProcess = item.QuantityWeightOnProcess,
+
                              Price = item.Price,
                              PriceQty = item.PriceQty,
                              Unit = item.Unit,

@@ -1342,6 +1342,8 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.PriceQty).HasColumnName("price_qty");
             entity.Property(e => e.Quantity).HasColumnName("quantity");
             entity.Property(e => e.QuantityOnProcess).HasColumnName("quantity_on_process");
+            entity.Property(e => e.QuantityWeight).HasColumnName("quantity_weight");
+            entity.Property(e => e.QuantityWeightOnProcess).HasColumnName("quantity_weight_on_process");
             entity.Property(e => e.Remark1)
                 .HasMaxLength(50)
                 .HasColumnName("remark_1");
@@ -1364,7 +1366,6 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
-            entity.Property(e => e.Wg).HasColumnName("wg");
 
             entity.HasOne(d => d.GradeCodeNavigation).WithMany(p => p.TbtStockGem)
                 .HasForeignKey(d => d.GradeCode)
@@ -1396,6 +1397,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("job_or_po");
             entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.QtyWeight).HasColumnName("qty_weight");
             entity.Property(e => e.Remark1)
                 .HasColumnType("character varying")
                 .HasColumnName("remark_1");

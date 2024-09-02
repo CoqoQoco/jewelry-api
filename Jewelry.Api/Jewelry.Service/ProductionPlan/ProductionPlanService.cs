@@ -5,14 +5,17 @@ using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
+using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
+using jewelry.Model.Worker.TrackingWorker;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Tokens;
 using NetTopologySuite.Index.HPRtree;
 using Newtonsoft.Json;
 using NPOI.HPSF;
@@ -41,6 +44,9 @@ namespace Jewelry.Service.ProductionPlan
         IQueryable<ProductionPlanGetResponse> ReportProductionPlan(ProductionPlanReport request);
 
         IQueryable<TbtProductionPlanMaterial> ProductionPlanMateriaGet(ProductionPlanTrackingMaterialRequest request);
+        IQueryable<ProductionPlanStatusListResponse> ListProductionPlanStatus(ProductionPlanStatusList request);
+
+
         Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request);
         Task<string> ProductionPlanUpdateHeader(ProductionPlanUpdateHeaderRequest request);
         Task<string> ProductionPlanDeleteMaterial(ProductionPlanMaterialDeleteRequest request);
@@ -704,6 +710,83 @@ namespace Jewelry.Service.ProductionPlan
             return query.OrderByDescending(x => x.Gold == "WG").ThenBy(x => x.GoldQty);
             //return query.OrderBy(x => x.Gold);
         }
+
+        // ----- list plan status -----//
+        public IQueryable<ProductionPlanStatusListResponse> ListProductionPlanStatus(ProductionPlanStatusList request)
+        {
+            var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                         .Include(x => x.Header)
+                         .ThenInclude(x => x.ProductionPlan)
+                         //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                         join _worker in _jewelryContext.TbmWorker on item.Worker equals _worker.Code into _workerJpined
+                         from worker in _workerJpined.DefaultIfEmpty()
+
+                         where item.IsActive == true
+                         && item.Header.IsActive == true
+                         && item.Header.SendDate >= request.Start.StartOfDayUtc()
+                         && item.Header.SendDate <= request.End.EndOfDayUtc()
+
+                         select new ProductionPlanStatusListResponse()
+                         {
+                             Wo = item.Header.ProductionPlan.Wo,
+                             WoNumber = item.Header.ProductionPlan.WoNumber,
+                             WoText = item.Header.ProductionPlan.WoText,
+                             ProductNumber = item.Header.ProductionPlan.ProductNumber,
+                             ProductName = item.Header.ProductionPlan.ProductName,
+                             Mold = item.Header.ProductionPlan.Mold,
+
+                             HeaderId = item.HeaderId,
+
+                             WorkerCode = item.Worker,
+                             WorkerName = worker != null ? worker.NameTh : "",
+
+                             Status = item.Header.ProductionPlan.Id,
+                             StatusName = item.Header.ProductionPlan.StatusNavigation.NameTh,
+
+
+                             TypeStatus = item.Header.Status,
+                             TypeStatusName = item.Header.StatusNavigation.NameTh,
+                             TypeStatusDescription = item.Header.StatusNavigation.Description,
+
+                             Gold = item.Gold,
+
+                             GoldQtySend = item.GoldQtySend,
+                             GoldWeightSend = item.GoldWeightSend,
+                             GoldQtyCheck = item.GoldQtyCheck,
+                             GoldWeightCheck = item.GoldWeightCheck,
+
+                             Description = item.Description,
+                             Wages = item.Wages,
+                             TotalWages = item.TotalWages,
+                             WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
+
+                             ReceiveDate = item.Header.SendDate,
+                             JobDate = item.RequestDate,
+                         });
+
+            //var test = query.ToList();
+
+
+            if (request.Status != null && request.Status.Any())
+            {
+                query = query.Where(x => request.Status.Contains(x.TypeStatus));
+            }
+            if(!string.IsNullOrEmpty(request.WoText))
+            {
+                query = query.Where(x => x.WoText.Contains(request.WoText.ToUpper()));
+            }
+            if(request.Gold !=null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Gold));
+            }
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.WoText.Contains(request.ProductNumber));
+            }
+
+            return query;
+        }
+
 
         // ----- Update ----- //
         public async Task<string> ProductionPlanUpdateStatus(ProductionPlanUpdateStatusRequest request)

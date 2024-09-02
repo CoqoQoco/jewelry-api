@@ -34,4 +34,6 @@ public partial class TbtStockGemTransection
     public DateTime RequestDate { get; set; }
 
     public string Stastus { get; set; } = null!;
+
+    public decimal QtyWeight { get; set; }
 }

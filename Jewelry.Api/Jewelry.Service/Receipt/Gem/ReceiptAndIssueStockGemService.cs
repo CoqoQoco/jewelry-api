@@ -83,7 +83,7 @@ namespace Jewelry.Service.Receipt.Gem
                         select new ScanResponse()
                         {
                             Id = item.Id,
-                            Name = $"{item.Code}-{item.Shape}-{item.Size}-{item.Grade}",
+                            Name = $"{item.Code}-{item.GroupName}-{item.Shape}-{item.Size}-{item.Grade}",
                             Code = item.Code,
                             GroupName = item.GroupName,
 
@@ -93,6 +93,9 @@ namespace Jewelry.Service.Receipt.Gem
 
                             Quantity = item.Quantity,
                             QuantityOnProcess = item.QuantityOnProcess,
+                            QuantityWeight = item.QuantityWeight,
+                            QuantityWeightOnProcess = item.QuantityWeightOnProcess,
+
                             Price = item.Price,
                             PriceQty = item.PriceQty,
                             Unit = item.Unit,
@@ -101,7 +104,6 @@ namespace Jewelry.Service.Receipt.Gem
                             Remark1 = item.Remark1,
                             Remark2 = item.Remark2,
 
-                            Wg = item.Wg,
                             Daterec = item.Daterec,
                             Original = item.Original,
                         };
@@ -147,6 +149,8 @@ namespace Jewelry.Service.Receipt.Gem
                              Remark1 = tran.Remark1,
 
                              Qty = tran.Qty,
+                             QtyWeight = tran.QtyWeight,
+
                              SupplierCost = tran.SupplierCost,
                              Remark2 = tran.Remark2,
 
@@ -263,6 +267,8 @@ namespace Jewelry.Service.Receipt.Gem
                     }
 
                     gemData.Quantity += gem.ReceiveQty;
+                    gemData.QuantityWeight += gem.ReceiveQtyWeight;
+
                     gemData.UpdateDate = DateTime.UtcNow;
                     gemData.UpdateBy = _admin;
                     UpdateGems.Add(gemData);
@@ -277,7 +283,9 @@ namespace Jewelry.Service.Receipt.Gem
                         Code = gem.Code,
                         SupplierCost = gem.SupplierCost,
                         Remark2 = gem.Remark,
+
                         Qty = gem.ReceiveQty,
+                        QtyWeight = gem.ReceiveQtyWeight,
 
                         Stastus = "completed",
 
@@ -349,15 +357,21 @@ namespace Jewelry.Service.Receipt.Gem
                     var gemData = gems.FirstOrDefault(x => x.Code == gem.Code);
                     if (gemData == null)
                     {
-                        throw new HandleException($"{ErrorMessage.NotFound} --> {gem.Code}");
+                        throw new HandleException($"{gem.Code} --> {ErrorMessage.NotFound}");
                     }
 
                     if (gem.IssueQty > gemData.Quantity)
                     {
-                        throw new HandleException(ErrorMessage.InvalidRequest);
+                        throw new HandleException($"{gem.Code} --> {ErrorMessage.QtyLessThanAction}");
+                    }
+                    if (gem.IssueQtyWeight > gemData.QuantityWeight)
+                    {
+                        throw new HandleException($"{gem.Code} --> {ErrorMessage.QtyWeightLessThanAction}");
                     }
 
                     gemData.Quantity -= gem.IssueQty;
+                    gemData.QuantityWeight -= gem.IssueQtyWeight;
+
                     gemData.UpdateDate = DateTime.UtcNow;
                     gemData.UpdateBy = _admin;
                     UpdateGems.Add(gemData);
@@ -369,7 +383,9 @@ namespace Jewelry.Service.Receipt.Gem
 
                         Code = gem.Code,
                         Remark2 = gem.Remark,
+
                         Qty = gem.IssueQty,
+                        QtyWeight = gem.IssueQtyWeight,
 
                         Stastus = "completed",
 

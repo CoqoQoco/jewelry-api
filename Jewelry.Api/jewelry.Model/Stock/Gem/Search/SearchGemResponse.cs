@@ -20,6 +20,10 @@ namespace jewelry.Model.Stock.Gem.Search
         public string? GradeDia { get; set; }
 
         public decimal Quantity { get; set; }
+        public decimal QuantityOnProcess { get; set; }
+        public decimal QuantityWeight { get; set; }
+        public decimal QuantityWeightOnProcess { get; set; }
+
         public decimal Price { get; set; }
         public decimal PriceQty { get; set; }
         public string? Unit { get; set; }

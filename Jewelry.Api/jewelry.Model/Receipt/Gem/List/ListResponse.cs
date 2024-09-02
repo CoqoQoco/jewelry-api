@@ -29,8 +29,9 @@ namespace jewelry.Model.Receipt.Gem.List
         public string? Remark2 { get; set; }
 
         public decimal Qty { get; set; }
-        public string? SubpplierName { get; set; }
+        public decimal QtyWeight { get; set; }
 
+        public string? SubpplierName { get; set; }
         public DateTime CreateDate { get; set; }
         public string CreateBy { get; set; }
         public DateTime? UpdateDate { get; set; }

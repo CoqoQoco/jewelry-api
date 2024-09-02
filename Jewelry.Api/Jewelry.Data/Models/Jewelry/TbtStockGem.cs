@@ -33,8 +33,6 @@ public partial class TbtStockGem
 
     public string? Remark1 { get; set; }
 
-    public int? Wg { get; set; }
-
     public decimal Quantity { get; set; }
 
     public string? Remark2 { get; set; }
@@ -50,6 +48,10 @@ public partial class TbtStockGem
     public string? GradeCode { get; set; }
 
     public decimal QuantityOnProcess { get; set; }
+
+    public decimal QuantityWeight { get; set; }
+
+    public decimal QuantityWeightOnProcess { get; set; }
 
     public virtual TbmGoldSize? GradeCodeNavigation { get; set; }
 

@@ -20,6 +20,7 @@ namespace jewelry.Model.Receipt.Gem.Outbound
     {
         public string Code { get; set; }
         public decimal IssueQty { get; set; }
+        public decimal IssueQtyWeight { get; set; }
         public string? Remark { get; set; }
     }
 }

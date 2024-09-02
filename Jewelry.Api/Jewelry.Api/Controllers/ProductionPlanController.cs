@@ -4,6 +4,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
+using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
 using Jewelry.Api.Extension;
@@ -125,6 +126,27 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("ListProductionPlanStatus")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanStatusListResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListProductionPlanStatus([FromBody] ProductionPlanStatusListRequest request)
+        {
+            try
+            {
+                var report = _IProductionPlanService.ListProductionPlanStatus(request.Search);
+                return report.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
+
         [Route("ProductionPlanMateriaGet")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
@@ -145,6 +167,8 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+
         [Route("ProductionPlanUpdateStatus")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
