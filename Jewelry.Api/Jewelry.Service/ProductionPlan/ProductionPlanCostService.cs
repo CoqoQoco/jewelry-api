@@ -504,29 +504,32 @@ namespace Jewelry.Service.ProductionPlan
                             }
                             else
                             {
-                                var addStatusHeaderItem = new TbtProductionPlanStatusDetail()
+                                if (getPlan.Status != ProductionPlanStatus.Completed)
                                 {
-                                    HeaderId = oldStatusHearder.Id,
-                                    ProductionPlanId = item.Id,
-                                    ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{item.Id}-{ProductionPlanStatus.Casting}"),
-                                    IsActive = true,
+                                    var addStatusHeaderItem = new TbtProductionPlanStatusDetail()
+                                    {
+                                        HeaderId = oldStatusHearder.Id,
+                                        ProductionPlanId = item.Id,
+                                        ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{item.Id}-{ProductionPlanStatus.Casting}"),
+                                        IsActive = true,
 
-                                    RequestDate = null,
+                                        RequestDate = null,
 
-                                    Gold = request.GoldCode,
-                                    GoldQtySend = item.ReturnQTY,
-                                    GoldWeightSend = item.ReturnWeight,
-                                    GoldQtyCheck = null,
-                                    GoldWeightCheck = null,
-                                    Worker = null,
-                                    WorkerSub = null,
-                                    Description = request.Remark,
+                                        Gold = request.GoldCode,
+                                        GoldQtySend = item.ReturnQTY,
+                                        GoldWeightSend = item.ReturnWeight,
+                                        GoldQtyCheck = null,
+                                        GoldWeightCheck = null,
+                                        Worker = null,
+                                        WorkerSub = null,
+                                        Description = request.Remark,
 
-                                    Wages = 0,
-                                    TotalWages = 0,
+                                        Wages = 0,
+                                        TotalWages = 0,
 
-                                };
-                                _jewelryContext.TbtProductionPlanStatusDetail.Add(addStatusHeaderItem);
+                                    };
+                                    _jewelryContext.TbtProductionPlanStatusDetail.Add(addStatusHeaderItem);
+                                }
                             }
 
                             //update status plan

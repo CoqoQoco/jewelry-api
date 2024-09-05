@@ -717,7 +717,7 @@ namespace Jewelry.Service.ProductionPlan
             var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                          .Include(x => x.Header)
                          .ThenInclude(x => x.ProductionPlan)
-                         //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                             //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
                          join _worker in _jewelryContext.TbmWorker on item.Worker equals _worker.Code into _workerJpined
                          from worker in _workerJpined.DefaultIfEmpty()
 
@@ -771,11 +771,11 @@ namespace Jewelry.Service.ProductionPlan
             {
                 query = query.Where(x => request.Status.Contains(x.TypeStatus));
             }
-            if(!string.IsNullOrEmpty(request.WoText))
+            if (!string.IsNullOrEmpty(request.WoText))
             {
                 query = query.Where(x => x.WoText.Contains(request.WoText.ToUpper()));
             }
-            if(request.Gold !=null && request.Gold.Any())
+            if (request.Gold != null && request.Gold.Any())
             {
                 query = query.Where(x => request.Gold.Contains(x.Gold));
             }
@@ -802,6 +802,11 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"ไม่พบใบจ่ายขรับคืนงาน {request.Wo}-{request.WoNumber}");
             }
 
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+            }
+
             plan.Status = request.Status;
             plan.UpdateDate = DateTime.UtcNow;
             plan.UpdateBy = _admin;
@@ -823,6 +828,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan == null)
             {
                 throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
             }
 
             plan.Mold = request.Mold.ToUpper();
@@ -870,6 +879,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan == null)
             {
                 throw new HandleException($"ไม่พบใบจ่ายขรับคืนงาน {request.Wo}-{request.WoNumber}");
+            }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
             }
 
             var createMaterial = new TbtProductionPlanMaterial()
@@ -919,6 +932,10 @@ namespace Jewelry.Service.ProductionPlan
             {
                 throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
             }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+            }
 
             if (plan.TbtProductionPlanMaterial.Any() == false)
             {
@@ -958,6 +975,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan.Status == ProductionPlanStatus.Completed)
             {
                 throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
+            }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
             }
 
             var checkDubStatus = (from item in _jewelryContext.TbtProductionPlanStatusHeader
@@ -1183,6 +1204,7 @@ namespace Jewelry.Service.ProductionPlan
                         break;
                     case 85:// cvd
                     case 95:// ประเมินราคา
+                    case 100: //สำเร็จ
                         {
                             var addStatus = new TbtProductionPlanStatusHeader
                             {
@@ -1209,6 +1231,7 @@ namespace Jewelry.Service.ProductionPlan
                             await _jewelryContext.SaveChangesAsync();
                         }
                         break;
+
                 }
 
                 _jewelryContext.TbtProductionPlanStatusDetail.AddRange(addStatusItem);
@@ -1247,6 +1270,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan.Status == ProductionPlanStatus.Completed)
             {
                 throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
+            }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
             }
 
 
