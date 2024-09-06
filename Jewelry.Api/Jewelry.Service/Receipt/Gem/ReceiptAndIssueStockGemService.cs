@@ -166,6 +166,11 @@ namespace Jewelry.Service.Receipt.Gem
                              Grade = gem.Grade,
 
                              Status = tran.Stastus,
+
+                             WO = tran.ProductionPlanWo,
+                             WONumber = tran.ProductionPlanWoNumber,
+                             WOText = tran.ProductionPlanWoText,
+                             Mold = tran.ProductionPlanMold,
                          });
 
             if (!string.IsNullOrEmpty(request.Status))
@@ -221,6 +226,12 @@ namespace Jewelry.Service.Receipt.Gem
             {
                 query = (from item in query
                          where item.SubpplierName.Contains(request.SupplierName)
+                         select item);
+            }
+            if (!string.IsNullOrEmpty(request.WO))
+            {
+                query = (from item in query
+                         where item.WOText.Contains(request.WO)
                          select item);
             }
 
@@ -392,6 +403,12 @@ namespace Jewelry.Service.Receipt.Gem
                         RequestDate = request.RequestDate.UtcDateTime,
                         CreateBy = _admin,
                         CreateDate = DateTime.UtcNow,
+
+                        ProductionPlanWo = gem.WO,
+                        ProductionPlanWoNumber = gem.WONumber,
+                        ProductionPlanWoText = gem.WOText,
+                        ProductionPlanMold = gem.Mold,
+
                     };
                     newInbounds.Add(newInbound);
 

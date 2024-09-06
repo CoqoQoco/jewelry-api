@@ -1396,6 +1396,18 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.JobOrPo)
                 .HasColumnType("character varying")
                 .HasColumnName("job_or_po");
+            entity.Property(e => e.ProductionPlanMold)
+                .HasColumnType("character varying")
+                .HasColumnName("production_plan_mold");
+            entity.Property(e => e.ProductionPlanWo)
+                .HasColumnType("character varying")
+                .HasColumnName("production_plan_wo");
+            entity.Property(e => e.ProductionPlanWoNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("production_plan_wo_number");
+            entity.Property(e => e.ProductionPlanWoText)
+                .HasColumnType("character varying")
+                .HasColumnName("production_plan_wo_text");
             entity.Property(e => e.Qty).HasColumnName("qty");
             entity.Property(e => e.QtyWeight).HasColumnName("qty_weight");
             entity.Property(e => e.Remark1)

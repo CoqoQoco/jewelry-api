@@ -22,5 +22,10 @@ namespace jewelry.Model.Receipt.Gem.Outbound
         public decimal IssueQty { get; set; }
         public decimal IssueQtyWeight { get; set; }
         public string? Remark { get; set; }
+
+        public string? WO { get; set; }
+        public string? WONumber { get; set; }
+        public string? WOText { get; set; }
+        public string? Mold { get; set; }
     }
 }

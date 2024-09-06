@@ -36,4 +36,12 @@ public partial class TbtStockGemTransection
     public string Stastus { get; set; } = null!;
 
     public decimal QtyWeight { get; set; }
+
+    public string? ProductionPlanWo { get; set; }
+
+    public string? ProductionPlanMold { get; set; }
+
+    public string? ProductionPlanWoNumber { get; set; }
+
+    public string? ProductionPlanWoText { get; set; }
 }

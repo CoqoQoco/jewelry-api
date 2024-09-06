@@ -36,6 +36,10 @@ namespace jewelry.Model.Receipt.Gem.List
         public string CreateBy { get; set; }
         public DateTime? UpdateDate { get; set; }
         public string? UpdateBy { get; set; }
-       
+
+        public string? WO { get; set; }
+        public string? WONumber { get; set; }
+        public string? WOText { get; set; }
+        public string? Mold { get; set; }
     }
 }

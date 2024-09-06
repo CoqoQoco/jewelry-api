@@ -28,5 +28,7 @@ namespace jewelry.Model.Receipt.Gem.List
         public string[]? Grade { get; set; }
 
         public string? Status { get; set; }
+
+        public string? WO { get; set; }
     }
 }
