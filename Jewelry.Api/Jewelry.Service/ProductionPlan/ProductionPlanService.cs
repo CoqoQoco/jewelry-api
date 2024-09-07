@@ -312,6 +312,7 @@ namespace Jewelry.Service.ProductionPlan
         }
         public IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearch(ProductionPlanTracking request)
         {
+            var succesStatus = new List<int> { ProductionPlanStatus.Completed, ProductionPlanStatus.Price };
             var query = (from item in _jewelryContext.TbtProductionPlan
                          //.Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
@@ -339,7 +340,7 @@ namespace Jewelry.Service.ProductionPlan
                              LastUpdateStatus = currentStatus != null
                                                 ? currentStatus.UpdateDate
                                                 : item.CreateDate,
-                             IsOverPlan = item.RequestDate < DateTime.UtcNow && item.Status != 95, // ประเมินราคา
+                             IsOverPlan = item.RequestDate < DateTime.UtcNow && !succesStatus.Contains(item.Status), // ประเมินราคา
                          });
 
             //query = query.Where(x => x.GIDate >= request.DateFrom.StartOfDayUtc() && x.GIDate <= request.DateTo.EndOfDayUtc());

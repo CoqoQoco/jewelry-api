@@ -14,6 +14,7 @@ namespace jewelry.Model.Constant
         public static int GemPick = 70; // คัดพลอย
         public static int Embed = 80; // ฝัง
         public static int Plating = 90;
+        public static int Price = 95;
         public static int Completed = 100;
     }
 }
