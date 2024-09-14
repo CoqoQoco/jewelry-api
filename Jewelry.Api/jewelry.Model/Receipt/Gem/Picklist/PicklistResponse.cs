@@ -4,9 +4,29 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace jewelry.Model.Receipt.Gem.List
+namespace jewelry.Model.Receipt.Gem.Picklist
 {
-    public class ListResponse
+    public class PicklistResponse
+    {
+        public string Running { get; set; }
+        public int Type { get; set; }
+
+        public DateTime RequestDate { get; set; }
+        public DateTime? ReturnDate { get; set; }
+        public string Stastus { get; set; } 
+        public string? Remark { get; set; }
+        public bool IsOverPick { get; set; }
+
+
+        public DateTime CreateDate { get; set; }
+        public string CreateBy { get; set; } 
+        public DateTime? UpdateDate { get; set; }
+        public string? UpdateBy { get; set; }
+
+        public IEnumerable<PicklistItem> Items { get; set; }
+    }
+
+    public class PicklistItem
     {
         public string Code { get; set; }
         public string GroupName { get; set; }
@@ -21,7 +41,6 @@ namespace jewelry.Model.Receipt.Gem.List
 
         public DateTime RequestDate { get; set; }
         public string Running { get; set; }
-        public string? RefRunning { get; set; }
         public int Type { get; set; }
 
         public string? JobOrPo { get; set; }

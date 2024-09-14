@@ -25,5 +25,9 @@ public partial class TbtProductionPlanStatusDetailGem
 
     public string? GemName { get; set; }
 
+    public decimal? GemPrice { get; set; }
+
+    public string? Remark { get; set; }
+
     public virtual TbtProductionPlanStatusHeader Header { get; set; } = null!;
 }

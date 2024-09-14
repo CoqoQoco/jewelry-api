@@ -41,7 +41,13 @@ public partial class TbtStockGemTransection
 
     public string? ProductionPlanMold { get; set; }
 
-    public string? ProductionPlanWoNumber { get; set; }
+    public int? ProductionPlanWoNumber { get; set; }
 
     public string? ProductionPlanWoText { get; set; }
+
+    public DateTime? ReturnDate { get; set; }
+
+    public string? RefRunning { get; set; }
+
+    public long Id { get; set; }
 }

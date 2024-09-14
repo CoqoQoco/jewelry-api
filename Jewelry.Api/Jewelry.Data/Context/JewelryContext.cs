@@ -1212,10 +1212,14 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GemName)
                 .HasColumnType("character varying")
                 .HasColumnName("gem_name");
+            entity.Property(e => e.GemPrice).HasColumnName("gem_price");
             entity.Property(e => e.GemQty).HasColumnName("gem_qty");
             entity.Property(e => e.GemWeight).HasColumnName("gem_weight");
             entity.Property(e => e.HeaderId).HasColumnName("header_id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
             entity.Property(e => e.RequestDate).HasColumnName("request_date");
 
             entity.HasOne(d => d.Header).WithMany(p => p.TbtProductionPlanStatusDetailGem)
@@ -1379,13 +1383,11 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbtStockGemTransection>(entity =>
         {
-            entity.HasKey(e => new { e.Running, e.Code }).HasName("tbt_stock_gem_transection_pk");
+            entity.HasKey(e => e.Id).HasName("tbt_stock_gem_transection_pk");
 
             entity.ToTable("tbt_stock_gem_transection");
 
-            entity.Property(e => e.Running)
-                .HasColumnType("character varying")
-                .HasColumnName("running");
+            entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
@@ -1402,14 +1404,15 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ProductionPlanWo)
                 .HasColumnType("character varying")
                 .HasColumnName("production_plan_wo");
-            entity.Property(e => e.ProductionPlanWoNumber)
-                .HasColumnType("character varying")
-                .HasColumnName("production_plan_wo_number");
+            entity.Property(e => e.ProductionPlanWoNumber).HasColumnName("production_plan_wo_number");
             entity.Property(e => e.ProductionPlanWoText)
                 .HasColumnType("character varying")
                 .HasColumnName("production_plan_wo_text");
             entity.Property(e => e.Qty).HasColumnName("qty");
             entity.Property(e => e.QtyWeight).HasColumnName("qty_weight");
+            entity.Property(e => e.RefRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("ref_running");
             entity.Property(e => e.Remark1)
                 .HasColumnType("character varying")
                 .HasColumnName("remark_1");
@@ -1417,6 +1420,10 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("remark_2");
             entity.Property(e => e.RequestDate).HasColumnName("request_date");
+            entity.Property(e => e.ReturnDate).HasColumnName("return_date");
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
             entity.Property(e => e.Stastus)
                 .HasColumnType("character varying")
                 .HasColumnName("stastus");

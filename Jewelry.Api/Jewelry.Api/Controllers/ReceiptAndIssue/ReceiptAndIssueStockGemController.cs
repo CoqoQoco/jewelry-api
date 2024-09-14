@@ -3,6 +3,9 @@ using jewelry.Model.Receipt.Gem.Create;
 using jewelry.Model.Receipt.Gem.Inbound;
 using jewelry.Model.Receipt.Gem.List;
 using jewelry.Model.Receipt.Gem.Outbound;
+using jewelry.Model.Receipt.Gem.Picklist;
+using jewelry.Model.Receipt.Gem.PickOff;
+using jewelry.Model.Receipt.Gem.Return;
 using jewelry.Model.Receipt.Gem.Scan;
 using jewelry.Model.Stock.Mold.CheckOut;
 using Jewelry.Api.Extension;
@@ -127,6 +130,58 @@ namespace Jewelry.Api.Controllers.Receipt
             try
             {
                 var result = await _service.OutboundGem(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("Picklist")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<PicklistResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult Picklist([FromBody] PicklistRequest request)
+        {
+            try
+            {
+                var response = _service.Picklist(request.Search);
+                return response.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+        [Route("PickOffGem")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PickOffGem([FromBody] PickOffRequest request)
+        {
+            try
+            {
+                var result = await _service.PickOffGem(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("PickReturnGem")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(PickReturnResponse))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PickReturnGem([FromBody] PickReturnRequest request)
+        {
+            try
+            {
+                var result = await _service.PickReturnGem(request);
                 return Ok(result);
             }
             catch (HandleException ex)

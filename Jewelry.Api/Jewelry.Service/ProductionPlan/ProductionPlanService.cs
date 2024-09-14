@@ -449,6 +449,11 @@ namespace Jewelry.Service.ProductionPlan
                          select item);
             }
 
+            if (request.Status != null && request.Status.Any())
+            { 
+                query = query.Where(x => request.Status.Contains(x.Status));
+            }
+
             //return query.OrderByDescending(x => x.CreateDate);
             return query;
         }
