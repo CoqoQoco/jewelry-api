@@ -159,8 +159,12 @@ namespace Jewelry.Service.Receipt.Gem
                              SubpplierName = tran.SubpplierName,
                              Remark1 = tran.Remark1,
 
+                             PreviousRemianQty = tran.PreviousRemainQty,
+                             PreviousRemianQtyWeight = tran.PreviousRemianQtyWeight,
                              Qty = tran.Qty,
                              QtyWeight = tran.QtyWeight,
+                             PointRemianQty = tran.PointRemianQty,
+                             PointRemianQtyWeight = tran.PointRemianQtyWeight,
 
                              SupplierCost = tran.SupplierCost,
                              Remark2 = tran.Remark2,
@@ -288,6 +292,9 @@ namespace Jewelry.Service.Receipt.Gem
                         throw new HandleException($"{ErrorMessage.NotFound} --> {gem.Code}");
                     }
 
+                    var previousQty = gemData.Quantity;
+                    var previousQtyWeight = gemData.QuantityWeight;
+
                     gemData.Quantity += gem.ReceiveQty;
                     gemData.QuantityWeight += gem.ReceiveQtyWeight;
 
@@ -309,6 +316,12 @@ namespace Jewelry.Service.Receipt.Gem
                         Qty = gem.ReceiveQty,
                         QtyWeight = gem.ReceiveQtyWeight,
 
+                        PreviousRemainQty = previousQty,
+                        PreviousRemianQtyWeight = previousQtyWeight,
+
+                        PointRemianQty = gemData.Quantity,
+                        PointRemianQtyWeight = gemData.QuantityWeight,
+
                         Stastus = "completed",
 
                         RequestDate = request.RequestDate.UtcDateTime,
@@ -327,7 +340,7 @@ namespace Jewelry.Service.Receipt.Gem
                 if (newInbounds.Any())
                 {
                     //set all running number
-                    runningNo = await _runningNumberService.GenerateRunningNumber($"INB");
+                    runningNo = await _runningNumberService.GenerateRunningNumberForGold($"INB");
                     foreach (var item in newInbounds)
                     {
                         item.Running = runningNo;
@@ -433,7 +446,7 @@ namespace Jewelry.Service.Receipt.Gem
                 if (newInbounds.Any())
                 {
                     //set all running number
-                    runningNo = await _runningNumberService.GenerateRunningNumber($"OUT");
+                    runningNo = await _runningNumberService.GenerateRunningNumberForGold($"OUT");
                     foreach (var item in newInbounds)
                     {
                         item.Running = runningNo;
@@ -645,7 +658,7 @@ namespace Jewelry.Service.Receipt.Gem
                 if (newPickOff.Any())
                 {
                     //set all running number
-                    runningNo = await _runningNumberService.GenerateRunningNumber($"PIF");
+                    runningNo = await _runningNumberService.GenerateRunningNumberForGold($"PIF");
                     foreach (var item in newPickOff)
                     {
                         item.Running = runningNo;
@@ -862,7 +875,7 @@ namespace Jewelry.Service.Receipt.Gem
                             {
                                 HeaderId = headerId,
                                 ProductionPlanId = matchPlanGroup.Id,
-                                ItemNo = await _runningNumberService.GenerateRunningNumber($"G-{matchPlanGroup.Id}-{ProductionPlanStatus.GemPick}"),
+                                ItemNo = await _runningNumberService.GenerateRunningNumberForGold($"G-{matchPlanGroup.Id}-{ProductionPlanStatus.GemPick}"),
                                 IsActive = true,
 
                                 GemId = gemData.Id,
@@ -893,8 +906,8 @@ namespace Jewelry.Service.Receipt.Gem
                 if (newTransection.Any())
                 {
                     //set all running number
-                    runningNoPickReturn = await _runningNumberService.GenerateRunningNumber($"PIR");
-                    runningNoOutbound = await _runningNumberService.GenerateRunningNumber($"PIO");
+                    runningNoPickReturn = await _runningNumberService.GenerateRunningNumberForGold($"PIR");
+                    runningNoOutbound = await _runningNumberService.GenerateRunningNumberForGold($"PIO");
                     foreach (var item in newTransection)
                     {
                         if (item.Type == 6)

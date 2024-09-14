@@ -17,6 +17,7 @@ namespace jewelry.Model.Exceptions
         public static string QtyWeightLessThanAction = "น้ำหนักคงคลังไม่เพียงพอ";
         public static string InvalidQty = "จำนวนที่ส่งมาไม่ถูกต้อง";
 
-        public static string  PlanCompleted = "แผนการผลิตนี้ได้ทำการผลิตเสร็จสิ้นแล้ว";
+        public static string PlanCompleted = "แผนการผลิตนี้ได้ทำการผลิตเสร็จสิ้นแล้ว";
+        public static string PlanMelted = "แผนการผลิตนี้ได้ทำการหลอมเเล้ว";
     }
 }

@@ -15,6 +15,8 @@ namespace jewelry.Model.Constant
         public static int Embed = 80; // ฝัง
         public static int Plating = 90;
         public static int Price = 95;
+
         public static int Completed = 100;
+        public static int Melted = 500;
     }
 }

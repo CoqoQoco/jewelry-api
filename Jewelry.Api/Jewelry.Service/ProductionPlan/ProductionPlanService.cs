@@ -450,7 +450,7 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             if (request.Status != null && request.Status.Any())
-            { 
+            {
                 query = query.Where(x => request.Status.Contains(x.Status));
             }
 
@@ -812,6 +812,10 @@ namespace Jewelry.Service.ProductionPlan
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
             }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
+            }
 
             plan.Status = request.Status;
             plan.UpdateDate = DateTime.UtcNow;
@@ -838,6 +842,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan.Status == ProductionPlanStatus.Completed)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+            }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
             }
 
             plan.Mold = request.Mold.ToUpper();
@@ -889,6 +897,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan.Status == ProductionPlanStatus.Completed)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+            }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
             }
 
             var createMaterial = new TbtProductionPlanMaterial()
@@ -942,6 +954,10 @@ namespace Jewelry.Service.ProductionPlan
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
             }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
+            }
 
             if (plan.TbtProductionPlanMaterial.Any() == false)
             {
@@ -985,6 +1001,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan.Status == ProductionPlanStatus.Completed)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+            }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
             }
 
             var checkDubStatus = (from item in _jewelryContext.TbtProductionPlanStatusHeader
@@ -1237,6 +1257,55 @@ namespace Jewelry.Service.ProductionPlan
                             await _jewelryContext.SaveChangesAsync();
                         }
                         break;
+                    case 500:
+                        {
+                            var addStatus = new TbtProductionPlanStatusHeader
+                            {
+                                ProductionPlanId = request.ProductionPlanId,
+                                Status = request.Status,
+                                IsActive = true,
+
+                                CreateDate = DateTime.UtcNow,
+                                CreateBy = _admin,
+                                UpdateDate = DateTime.UtcNow,
+                                UpdateBy = _admin,
+
+                                SendName = request.SendName,
+                                SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null,
+                                CheckName = request.CheckName,
+                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+
+                                Remark1 = request.Remark1,
+                                Remark2 = request.Remark2,
+                            };
+                            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatus);
+                            await _jewelryContext.SaveChangesAsync();
+
+                            if (request.Golds != null && request.Golds.Any())
+                            {
+                                foreach (var item in request.Golds)
+                                {
+
+                                    var newStatusItem = new TbtProductionPlanStatusDetail()
+                                    {
+                                        HeaderId = addStatus.Id,
+                                        ProductionPlanId = request.ProductionPlanId,
+                                        ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
+                                        IsActive = true,
+
+                                        RequestDate = item.RequestDate.HasValue ? item.RequestDate.Value.UtcDateTime : null,
+
+                                        Gold = item.Gold,
+                                        GoldQtySend = item.GoldQTYSend,
+                                        GoldWeightSend = item.GoldWeightSend,
+                                        GoldQtyCheck = item.GoldQTYSend,
+                                        GoldWeightCheck = item.GoldWeightSend,
+                                    };
+                                    addStatusItem.Add(newStatusItem);
+                                }
+                            }
+                        }
+                        break;
 
                 }
 
@@ -1280,6 +1349,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan.Status == ProductionPlanStatus.Completed)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+            }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
             }
 
 
@@ -1555,6 +1628,10 @@ namespace Jewelry.Service.ProductionPlan
             if (plan.Status == ProductionPlanStatus.Completed)
             {
                 throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
+            }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
             }
 
             var statusHeader = (from item in _jewelryContext.TbtProductionPlanStatusHeader

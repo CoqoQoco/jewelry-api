@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -29,8 +30,12 @@ namespace jewelry.Model.Receipt.Gem.List
         public string? Remark1 { get; set; }
         public string? Remark2 { get; set; }
 
+        public decimal? PreviousRemianQty { get; set; }
+        public decimal? PreviousRemianQtyWeight { get; set; }
         public decimal Qty { get; set; }
         public decimal QtyWeight { get; set; }
+        public decimal? PointRemianQty { get; set; }
+        public decimal? PointRemianQtyWeight { get; set; }
 
         public string? SubpplierName { get; set; }
         public DateTime CreateDate { get; set; }

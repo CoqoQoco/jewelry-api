@@ -50,4 +50,12 @@ public partial class TbtStockGemTransection
     public string? RefRunning { get; set; }
 
     public long Id { get; set; }
+
+    public decimal? PreviousRemainQty { get; set; }
+
+    public decimal? PreviousRemianQtyWeight { get; set; }
+
+    public decimal? PointRemianQty { get; set; }
+
+    public decimal? PointRemianQtyWeight { get; set; }
 }
