@@ -404,6 +404,9 @@ namespace Jewelry.Service.Receipt.Gem
                         throw new HandleException($"{gem.Code} --> {ErrorMessage.QtyWeightLessThanAction}");
                     }
 
+                    var previousQty = gemData.Quantity;
+                    var previousQtyWeight = gemData.QuantityWeight;
+
                     gemData.Quantity -= gem.IssueQty;
                     gemData.QuantityWeight -= gem.IssueQtyWeight;
 
@@ -419,8 +422,14 @@ namespace Jewelry.Service.Receipt.Gem
                         Code = gem.Code,
                         Remark2 = gem.Remark,
 
+                        PreviousRemainQty = previousQty,
+                        PreviousRemianQtyWeight = previousQtyWeight,
+
                         Qty = gem.IssueQty,
                         QtyWeight = gem.IssueQtyWeight,
+
+                        PointRemianQty = gemData.Quantity,
+                        PointRemianQtyWeight = gemData.QuantityWeight,
 
                         Stastus = "completed",
 
@@ -616,6 +625,9 @@ namespace Jewelry.Service.Receipt.Gem
                         throw new HandleException($"{gem.Code} --> {ErrorMessage.QtyWeightLessThanAction}");
                     }
 
+                    var previousQty = gemData.Quantity;
+                    var previousQtyWeight = gemData.QuantityWeight;
+
                     gemData.Quantity -= gem.IssueQty;
                     gemData.QuantityWeight -= gem.IssueQtyWeight;
 
@@ -634,8 +646,14 @@ namespace Jewelry.Service.Receipt.Gem
                         Code = gem.Code,
                         Remark2 = gem.Remark,
 
+                        PreviousRemainQty = previousQty,
+                        PreviousRemianQtyWeight = previousQtyWeight,
+
                         Qty = gem.IssueQty,
                         QtyWeight = gem.IssueQtyWeight,
+
+                        PointRemianQty = gemData.Quantity,
+                        PointRemianQtyWeight = gemData.QuantityWeight,
 
                         Stastus = "process",
 
@@ -723,10 +741,14 @@ namespace Jewelry.Service.Receipt.Gem
                 foreach (var gemsReturn in request.GemsReturn)
                 {
                     var gemData = gems.FirstOrDefault(x => x.Code == gemsReturn.Code);
+
                     if (gemData == null)
                     {
                         throw new HandleException($"{gemsReturn.Code} --> {ErrorMessage.NotFound}");
                     }
+
+                    var previousQty = gemData.Quantity;
+                    var previousQtyWeight = gemData.QuantityWeight;
 
                     decimal checkQty = gemsReturn.ReturnQty;
                     decimal checkQtyWeight = gemsReturn.ReturnQtyWeight;
@@ -748,6 +770,11 @@ namespace Jewelry.Service.Receipt.Gem
                         throw new HandleException(ErrorMessage.InvalidQty);
                     }
 
+                    gemData.Quantity += gemsReturn.ReturnQty;
+                    gemData.QuantityOnProcess -= gemsPickOff.Qty;
+                    gemData.QuantityWeight += gemsReturn.ReturnQtyWeight;
+                    gemData.QuantityWeightOnProcess -= gemsPickOff.QtyWeight;
+
                     if (gemsReturn.GemsOutbound.Any())
                     {
                         foreach (var outbound in gemsReturn.GemsOutbound)
@@ -766,8 +793,14 @@ namespace Jewelry.Service.Receipt.Gem
                                 Code = gemsReturn.Code,
                                 Remark2 = outbound.Remark,
 
+                                PreviousRemainQty = gemData.Quantity,
+                                PreviousRemianQtyWeight = gemData.QuantityWeight,
+
                                 Qty = outbound.IssueQty,
                                 QtyWeight = outbound.IssueQtyWeight,
+
+                                PointRemianQty = gemData.Quantity,
+                                PointRemianQtyWeight = gemData.QuantityWeight,
 
                                 Stastus = "completed",
 
@@ -791,8 +824,14 @@ namespace Jewelry.Service.Receipt.Gem
                         Code = gemsReturn.Code,
                         Remark1 = request.Remark,
 
+                        PreviousRemainQty = previousQty,
+                        PreviousRemianQtyWeight = previousQtyWeight,
+
                         Qty = gemsReturn.ReturnQty,
                         QtyWeight = gemsReturn.ReturnQtyWeight,
+
+                        PointRemianQty = gemData.Quantity,
+                        PointRemianQtyWeight = gemData.QuantityWeight,
 
                         Stastus = "completed",
                         RequestDate = request.RequestDate.UtcDateTime,
@@ -801,10 +840,10 @@ namespace Jewelry.Service.Receipt.Gem
                     };
                     newTransection.Add(pickReturn);
 
-                    gemData.Quantity += gemsReturn.ReturnQty;
-                    gemData.QuantityOnProcess -= gemsPickOff.Qty;
-                    gemData.QuantityWeight += gemsReturn.ReturnQtyWeight;
-                    gemData.QuantityWeightOnProcess -= gemsPickOff.QtyWeight;
+                    //gemData.Quantity += gemsReturn.ReturnQty;
+                    //gemData.QuantityOnProcess -= gemsPickOff.Qty;
+                    //gemData.QuantityWeight += gemsReturn.ReturnQtyWeight;
+                    //gemData.QuantityWeightOnProcess -= gemsPickOff.QtyWeight;
 
                     gemData.UpdateDate = DateTime.UtcNow;
                     gemData.UpdateBy = _admin;

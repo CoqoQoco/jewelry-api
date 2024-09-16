@@ -579,7 +579,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                           ProductionPlanId = detail.ProductionPlanId,
                                                                                           HeaderId = detail.HeaderId,
                                                                                           ItemNo = detail.ItemNo,
-                                                                                          RequestDate = detail.RequestDate,
+                                                                                          RequestDate = detail.RequestDate.HasValue ? detail.RequestDate.Value : null,
 
                                                                                           Gold = detail.Gold,
                                                                                           GoldQtySend = detail.GoldQtySend,
@@ -610,7 +610,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                       }).ToList(),
 
                                                      TbtProductionPlanStatusGem = (from gem in item.TbtProductionPlanStatusDetailGem
-                                                                                   let price = stockGem.Where(x => x.Code == gem.GemCode)
+                                                                                       //let price = stockGem.Where(x => x.Code == gem.GemCode)
                                                                                    select new StatusDetailGem()
                                                                                    {
                                                                                        ProductionPlanId = gem.ProductionPlanId,
@@ -621,8 +621,12 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        Code = gem.GemCode,
                                                                                        Name = gem.GemName,
                                                                                        QTY = gem.GemQty,
-                                                                                       Price = price.Any() ? price.FirstOrDefault().Price : 0,
+                                                                                       Price = gem.GemPrice,
                                                                                        Weight = gem.GemWeight,
+
+                                                                                       OutboundDate = gem.OutboundDate,
+                                                                                       OutboundName = gem.OutboundName,
+                                                                                       OutboundRunning = gem.OutboundRunning,
                                                                                    }).ToList()
 
                                                  }).ToList(),
@@ -1221,6 +1225,7 @@ namespace Jewelry.Service.ProductionPlan
                                             GemQty = item.QTY,
                                             GemWeight = item.Weight,
                                             GemName = item.Name,
+                                            GemPrice = item.Price,
                                         };
                                         addStatusItemGem.Add(newGem);
                                     }
@@ -1374,6 +1379,7 @@ namespace Jewelry.Service.ProductionPlan
             {
                 var addStatusItem = new List<TbtProductionPlanStatusDetail>();
                 var addStatusItemGem = new List<TbtProductionPlanStatusDetailGem>();
+                var updateStatusItemGem = new List<TbtProductionPlanStatusDetailGem>();
 
                 switch (request.Status)
                 {
@@ -1503,7 +1509,18 @@ namespace Jewelry.Service.ProductionPlan
                             }
 
                             _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(checkStatus.TbtProductionPlanStatusDetail);
-                            _jewelryContext.TbtProductionPlanStatusDetailGem.RemoveRange(checkStatus.TbtProductionPlanStatusDetailGem);
+
+                            //
+                            var removeGem = (from item in checkStatus.TbtProductionPlanStatusDetailGem
+                                             where string.IsNullOrEmpty(item.OutboundRunning)
+                                             select item);
+
+
+                            //_jewelryContext.TbtProductionPlanStatusDetailGem.RemoveRange(checkStatus.TbtProductionPlanStatusDetailGem);
+                            if (removeGem.Any())
+                            {
+                                _jewelryContext.TbtProductionPlanStatusDetailGem.RemoveRange(removeGem);
+                            }
                             await _jewelryContext.SaveChangesAsync();
 
 
@@ -1554,20 +1571,31 @@ namespace Jewelry.Service.ProductionPlan
                                 {
                                     foreach (var item in request.Gems)
                                     {
-                                        var newGem = new TbtProductionPlanStatusDetailGem()
-                                        {
-                                            HeaderId = checkStatus.Id,
-                                            ProductionPlanId = request.ProductionPlanId,
-                                            ItemNo = await _runningNumberService.GenerateRunningNumber($"G-{request.ProductionPlanId}-{request.Status}"),
-                                            IsActive = true,
+                                        var matchGem = checkStatus.TbtProductionPlanStatusDetailGem.Where(x => x.OutboundRunning == item.OutboundRunning && x.ItemNo == item.ItemNo).SingleOrDefault();
 
-                                            GemId = item.Id.Value,
-                                            GemCode = item.Code,
-                                            GemQty = item.QTY,
-                                            GemWeight = item.Weight,
-                                            GemName = item.Name,
-                                        };
-                                        addStatusItemGem.Add(newGem);
+                                        if (matchGem != null)
+                                        {
+                                            matchGem.GemPrice = item.Price;
+                                            updateStatusItemGem.Add(matchGem);
+                                        }
+                                        else
+                                        {
+                                            var newGem = new TbtProductionPlanStatusDetailGem()
+                                            {
+                                                HeaderId = checkStatus.Id,
+                                                ProductionPlanId = request.ProductionPlanId,
+                                                ItemNo = await _runningNumberService.GenerateRunningNumber($"G-{request.ProductionPlanId}-{request.Status}"),
+                                                IsActive = true,
+
+                                                GemId = item.Id.Value,
+                                                GemCode = item.Code,
+                                                GemQty = item.QTY,
+                                                GemWeight = item.Weight,
+                                                GemName = item.Name,
+                                                GemPrice = item.Price,
+                                            };
+                                            addStatusItemGem.Add(newGem);
+                                        }
                                     }
                                 }
                             }
@@ -1597,6 +1625,10 @@ namespace Jewelry.Service.ProductionPlan
                 if (addStatusItemGem.Any())
                 {
                     _jewelryContext.TbtProductionPlanStatusDetailGem.AddRange(addStatusItemGem);
+                }
+                if (updateStatusItemGem.Any()) 
+                { 
+                    _jewelryContext.TbtProductionPlanStatusDetailGem.UpdateRange(updateStatusItemGem);
                 }
 
                 await _jewelryContext.SaveChangesAsync();
@@ -1632,6 +1664,11 @@ namespace Jewelry.Service.ProductionPlan
             if (plan.Status == ProductionPlanStatus.Melted)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
+            }
+
+            if (plan.Status == ProductionPlanStatus.GemPick)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PermissionFail}");
             }
 
             var statusHeader = (from item in _jewelryContext.TbtProductionPlanStatusHeader

@@ -29,5 +29,11 @@ public partial class TbtProductionPlanStatusDetailGem
 
     public string? Remark { get; set; }
 
+    public string? OutboundRunning { get; set; }
+
+    public string? OutboundName { get; set; }
+
+    public DateTime? OutboundDate { get; set; }
+
     public virtual TbtProductionPlanStatusHeader Header { get; set; } = null!;
 }

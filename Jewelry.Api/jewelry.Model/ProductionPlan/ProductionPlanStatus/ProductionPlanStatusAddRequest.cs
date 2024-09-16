@@ -45,6 +45,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
 
     public class GemItem
     {
+        public string? OutboundRunning { get; set; }
+        public string? ItemNo { get; set; }
         public int? Id { get; set; }
 
         public string? Name { get; set; }
@@ -52,5 +54,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
 
         public decimal? QTY { get; set; }
         public decimal? Weight { get; set; }
+
+        public decimal? Price { get; set; }
     }
 }

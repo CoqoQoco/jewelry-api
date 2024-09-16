@@ -1217,6 +1217,13 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GemWeight).HasColumnName("gem_weight");
             entity.Property(e => e.HeaderId).HasColumnName("header_id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.OutboundDate).HasColumnName("outbound_date");
+            entity.Property(e => e.OutboundName)
+                .HasColumnType("character varying")
+                .HasColumnName("outbound_name");
+            entity.Property(e => e.OutboundRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("outbound_running");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
