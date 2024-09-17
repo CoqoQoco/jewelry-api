@@ -981,7 +981,10 @@ namespace Jewelry.Service.Receipt.Gem
                     foreach (var item in addStatusDetailGem)
                     {
                         //item.re = request.RequestDate.UtcDateTime;
-                        item.Remark = $"เลขที่เบิก: {runningNoOutbound}";
+                        //item.Remark = $"เลขที่เบิก: {runningNoOutbound}";
+                        item.OutboundRunning = runningNoOutbound;
+                        item.OutboundName = request.Remark;
+                        item.OutboundDate = request.RequestDate.UtcDateTime;
                     }
                     _jewelryContext.TbtProductionPlanStatusDetailGem.AddRange(addStatusDetailGem);
                 }
