@@ -881,8 +881,8 @@ namespace Jewelry.Service.Receipt.Gem
                                 ProductionPlanMold = outbound.Mold,
                             };
 
-                            previousQty -= outbound.IssueQty;
-                            previousQtyWeight -= outbound.IssueQtyWeight;
+                            //previousQty -= outbound.IssueQty;
+                            //previousQtyWeight -= outbound.IssueQtyWeight;
 
                             PickOutbound.PointRemianQty = previousQty;
                             PickOutbound.PointRemianQtyWeight = previousQtyWeight;
@@ -890,8 +890,8 @@ namespace Jewelry.Service.Receipt.Gem
                             newTransection.Add(PickOutbound);
 
                             //cal qty
-                            gemData.Quantity -= outbound.IssueQty;
-                            gemData.QuantityWeight -= outbound.IssueQtyWeight;
+                            //gemData.Quantity -= outbound.IssueQty;
+                            //gemData.QuantityWeight -= outbound.IssueQtyWeight;
 
                             gemData.QuantityOnProcess -= outbound.IssueQty;
                             gemData.QuantityWeightOnProcess -= outbound.IssueQtyWeight;

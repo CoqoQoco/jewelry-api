@@ -172,6 +172,7 @@ namespace Jewelry.Service.Worker
         }
         public SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request)
         {
+            var requestDate = request.RequestDateStart.StartOfDayUtc();
             var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                             .Include(x => x.Header)
                             .ThenInclude(x => x.ProductionPlan)
