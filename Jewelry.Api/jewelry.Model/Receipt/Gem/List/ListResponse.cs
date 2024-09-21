@@ -22,7 +22,8 @@ namespace jewelry.Model.Receipt.Gem.List
 
         public DateTime RequestDate { get; set; }
         public string Running { get; set; }
-        public string? RefRunning { get; set; }
+        public string? RefRunning1 { get; set; }
+        public string? RefRunning2 { get; set; }
         public int Type { get; set; }
 
         public string? JobOrPo { get; set; }

@@ -10,12 +10,13 @@ namespace jewelry.Model.Receipt.Gem.Return
 {
     public class PickReturnRequest
     {
-        public string ReferenceRunning { get; set; }
+        public string PickOffRunning { get; set; }
         public int Type { get; set; }
         public string? Remark { get; set; }
         public string? Pass { get; set; }
         public DateTimeOffset RequestDate { get; set; }
         public IEnumerable<ReturnItem> GemsReturn { get; set; } = new List<ReturnItem>();
+        public bool IsFullReturn { get; set; }
     }
 
     public class ReturnItem

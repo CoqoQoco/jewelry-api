@@ -18,6 +18,7 @@ using NetTopologySuite.Index.HPRtree;
 using NetTopologySuite.Triangulate.QuadEdge;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -144,14 +145,15 @@ namespace Jewelry.Service.Receipt.Gem
         public IQueryable<ListResponse> ListTransection(ListSearch request)
         {
             var query = (from tran in _jewelryContext.TbtStockGemTransection
-                         where tran.RequestDate >= request.RequestDateStart.StartOfDayUtc()
-                         && tran.RequestDate <= request.RequestDateEnd.EndOfDayUtc()
+                             //where tran.RequestDate >= request.RequestDateStart.StartOfDayUtc()
+                             //&& tran.RequestDate <= request.RequestDateEnd.EndOfDayUtc()
                          join gem in _jewelryContext.TbtStockGem on tran.Code equals gem.Code
                          select new ListResponse()
                          {
                              RequestDate = tran.RequestDate,
                              Running = tran.Running,
-                             RefRunning = tran.RefRunning,
+                             RefRunning1 = tran.RefRunning,
+                             RefRunning2 = tran.Ref2Running,
                              Code = tran.Code,
 
                              Type = tran.Type,
@@ -188,12 +190,40 @@ namespace Jewelry.Service.Receipt.Gem
                              Mold = tran.ProductionPlanMold,
                          });
 
-            //if (!string.IsNullOrEmpty(request.Status))
-            //{
-            //    query = (from item in query
-            //             where item.Status == request.Status
-            //             select item);
-            //}
+            if (request.RequestDateStart.HasValue)
+            {
+                query = (from item in query
+                         where item.RequestDate >= request.RequestDateStart.Value.StartOfDayUtc()
+                         select item);
+            }
+            if (request.RequestDateEnd.HasValue)
+            {
+                query = (from item in query
+                         where item.RequestDate <= request.RequestDateEnd.Value.EndOfDayUtc()
+                         select item);
+            }
+
+            if (!string.IsNullOrEmpty(request.Running))
+            {
+                query = (from item in query
+                         where item.Running == request.Running
+                         select item);
+            }
+
+            if (!string.IsNullOrEmpty(request.RefRunning1))
+            {
+                query = (from item in query
+                         where item.RefRunning1 == request.RefRunning1
+                         select item);
+            }
+
+            if (!string.IsNullOrEmpty(request.RefRunning2))
+            {
+                query = (from item in query
+                         where item.RefRunning2 == request.RefRunning2
+                         select item);
+            }
+
             if (request.Type != null && request.Type.Length > 0)
             {
                 query = (from item in query
@@ -698,10 +728,10 @@ namespace Jewelry.Service.Receipt.Gem
 
             var updateGems = new List<TbtStockGem>();
             var newTransection = new List<TbtStockGemTransection>();
+            var updateTransection = new List<TbtStockGemTransection>();
             var updatePlan = new List<TbtProductionPlan>();
             var updatePlanHeader = new List<TbtProductionPlanStatusHeader>();
             var addStatusDetailGem = new List<TbtProductionPlanStatusDetailGem>();
-            var updateTransection = new List<TbtStockGemTransection>();
 
             if (_valPass)
             {
@@ -722,9 +752,30 @@ namespace Jewelry.Service.Receipt.Gem
                             where request.GemsReturn.Select(x => x.Code).Contains(item.Code)
                             select item);
 
-                var pickOffs = (from item in _jewelryContext.TbtStockGemTransection
-                                    where item.Running == request.ReferenceRunning
-                                    select item);
+                var transection = (from item in _jewelryContext.TbtStockGemTransection
+                                   select item);
+
+                //already pick off
+                var pickOffs = (from item in transection
+                                where item.Running == request.PickOffRunning
+                                select item);
+
+                //already pick return
+                var pickReturns = (from item in transection
+                                   where item.RefRunning == pickOffs.First().Running && item.Type == 6
+                                   select item);
+
+                if (pickReturns.Any())
+                {
+                    throw new HandleException(ErrorMessage.PickReturned);
+                }
+
+                //already pick outbound
+                var pickOutbounds = (from item in transection
+                                     where item.Ref2Running == pickOffs.First().Running && item.Stastus == "completed" && item.Type == 7
+                                     select item);
+
+                var pickOutboundsTest = pickOutbounds.ToList();
 
                 var aviStatus = new int[] { 10, 50, 55, 60, 70, 80, 90, 95 };
                 var plan = (from item in _jewelryContext.TbtProductionPlan
@@ -738,27 +789,44 @@ namespace Jewelry.Service.Receipt.Gem
                     throw new HandleException(ErrorMessage.NotFound);
                 }
 
+                int countError = 0;
+
                 foreach (var gemsReturn in request.GemsReturn)
                 {
-                    var gemData = gems.FirstOrDefault(x => x.Code == gemsReturn.Code);
-
-                    if (gemData == null)
-                    {
-                        throw new HandleException($"{gemsReturn.Code} --> {ErrorMessage.NotFound}");
-                    }
-
-                    var previousQty = gemData.Quantity;
-                    var previousQtyWeight = gemData.QuantityWeight;
-
-                    decimal checkQty = gemsReturn.ReturnQty;
-                    decimal checkQtyWeight = gemsReturn.ReturnQtyWeight;
-
+                    //check gem pick off
                     var gemsPickOff = pickOffs.FirstOrDefault(x => x.Code == gemsReturn.Code);
                     if (gemsPickOff == null)
                     {
                         throw new HandleException(ErrorMessage.NotFound);
                     }
+                    //check gem code
+                    var gemData = gems.FirstOrDefault(x => x.Code == gemsReturn.Code);
+                    if (gemData == null)
+                    {
+                        throw new HandleException($"{gemsReturn.Code} --> {ErrorMessage.NotFound}");
+                    }
+                    decimal previousQty = gemData.Quantity;
+                    decimal previousQtyWeight = gemData.QuantityWeight;
 
+                    //already outbound
+                    var PickOutbounded = pickOutbounds.Where(x => x.Code == gemsReturn.Code);
+                    decimal qtyOutbounded = 0;
+                    decimal qtyWeightOutbounded = 0;
+                    if (PickOutbounded.Any())
+                    {
+                        qtyOutbounded = PickOutbounded.Sum(x => x.Qty);
+                        qtyWeightOutbounded = PickOutbounded.Sum(x => x.QtyWeight);
+                    }
+
+                    //sum can be qty returning 
+                    decimal checkQty = gemsReturn.ReturnQty;
+                    decimal checkQtyWeight = gemsReturn.ReturnQtyWeight;
+
+                    //sum qry already outbound
+                    checkQty += qtyOutbounded;
+                    checkQtyWeight += qtyWeightOutbounded;
+
+                    //sum qty outbounding
                     if (gemsReturn.GemsOutbound.Any())
                     {
                         checkQty += gemsReturn.GemsOutbound.Sum(x => x.IssueQty);
@@ -770,11 +838,8 @@ namespace Jewelry.Service.Receipt.Gem
                         throw new HandleException(ErrorMessage.InvalidQty);
                     }
 
-                    gemData.Quantity += gemsReturn.ReturnQty;
-                    gemData.QuantityOnProcess -= gemsPickOff.Qty;
-                    gemData.QuantityWeight += gemsReturn.ReturnQtyWeight;
-                    gemData.QuantityWeightOnProcess -= gemsPickOff.QtyWeight;
-
+                    
+                    //outbound transection
                     if (gemsReturn.GemsOutbound.Any())
                     {
                         foreach (var outbound in gemsReturn.GemsOutbound)
@@ -793,14 +858,14 @@ namespace Jewelry.Service.Receipt.Gem
                                 Code = gemsReturn.Code,
                                 Remark2 = outbound.Remark,
 
-                                PreviousRemainQty = gemData.Quantity,
-                                PreviousRemianQtyWeight = gemData.QuantityWeight,
+                                PreviousRemainQty = previousQty,
+                                PreviousRemianQtyWeight = previousQtyWeight,
 
                                 Qty = outbound.IssueQty,
                                 QtyWeight = outbound.IssueQtyWeight,
 
-                                PointRemianQty = gemData.Quantity,
-                                PointRemianQtyWeight = gemData.QuantityWeight,
+                                //PointRemianQty = (previousQty -= outbound.IssueQty),
+                                //PointRemianQtyWeight = (previousQtyWeight -= outbound.IssueQtyWeight),
 
                                 Stastus = "completed",
 
@@ -808,57 +873,82 @@ namespace Jewelry.Service.Receipt.Gem
                                 CreateBy = _admin,
                                 CreateDate = DateTime.UtcNow,
 
+                                Ref2Running = request.PickOffRunning,
+
                                 ProductionPlanWo = outbound.WO,
                                 ProductionPlanWoNumber = outbound.WONumber,
                                 ProductionPlanWoText = matchPlan.WoText,
                                 ProductionPlanMold = outbound.Mold,
                             };
+
+                            previousQty -= outbound.IssueQty;
+                            previousQtyWeight -= outbound.IssueQtyWeight;
+
+                            PickOutbound.PointRemianQty = previousQty;
+                            PickOutbound.PointRemianQtyWeight = previousQtyWeight;
+
                             newTransection.Add(PickOutbound);
+
+                            //cal qty
+                            gemData.Quantity -= outbound.IssueQty;
+                            gemData.QuantityWeight -= outbound.IssueQtyWeight;
+
+                            gemData.QuantityOnProcess -= outbound.IssueQty;
+                            gemData.QuantityWeightOnProcess -= outbound.IssueQtyWeight;
                         }
                     }
 
-                    var pickReturn = new TbtStockGemTransection()
+                    if (request.IsFullReturn)
                     {
-                        Type = request.Type,
+                        var pickReturn = new TbtStockGemTransection()
+                        {
+                            Type = request.Type,
 
-                        Code = gemsReturn.Code,
-                        Remark1 = request.Remark,
+                            Code = gemsReturn.Code,
+                            Remark1 = request.Remark,
 
-                        PreviousRemainQty = previousQty,
-                        PreviousRemianQtyWeight = previousQtyWeight,
+                            PreviousRemainQty = previousQty,
+                            PreviousRemianQtyWeight = previousQtyWeight,
 
-                        Qty = gemsReturn.ReturnQty,
-                        QtyWeight = gemsReturn.ReturnQtyWeight,
+                            Qty = gemsReturn.ReturnQty,
+                            QtyWeight = gemsReturn.ReturnQtyWeight,
 
-                        PointRemianQty = gemData.Quantity,
-                        PointRemianQtyWeight = gemData.QuantityWeight,
+                            //PointRemianQty = gemData.Quantity,
+                            //PointRemianQtyWeight = gemData.QuantityWeight,
 
-                        Stastus = "completed",
-                        RequestDate = request.RequestDate.UtcDateTime,
-                        CreateBy = _admin,
-                        CreateDate = DateTime.UtcNow,
-                    };
-                    newTransection.Add(pickReturn);
+                            Stastus = "completed",
+                            RequestDate = request.RequestDate.UtcDateTime,
+                            CreateBy = _admin,
+                            CreateDate = DateTime.UtcNow,
+                        };
+                        newTransection.Add(pickReturn);
 
-                    //gemData.Quantity += gemsReturn.ReturnQty;
-                    //gemData.QuantityOnProcess -= gemsPickOff.Qty;
-                    //gemData.QuantityWeight += gemsReturn.ReturnQtyWeight;
-                    //gemData.QuantityWeightOnProcess -= gemsPickOff.QtyWeight;
+                        gemData.Quantity += gemsReturn.ReturnQty;
+                        gemData.QuantityWeight += gemsReturn.ReturnQtyWeight;
+
+                        pickReturn.PointRemianQty = gemData.Quantity;
+                        pickReturn.PointRemianQtyWeight = gemData.QuantityWeight;
+
+                        gemData.QuantityOnProcess -= gemsReturn.ReturnQty;
+                        gemData.QuantityWeightOnProcess -= gemsReturn.ReturnQtyWeight;
+
+                        gemsPickOff.Stastus = "completed";
+                        gemsPickOff.UpdateDate = DateTime.UtcNow;
+                        gemsPickOff.UpdateBy = _admin;
+
+
+                        updateTransection.Add(gemsPickOff);
+                        updateTransection.AddRange(pickOutbounds);
+                    }
 
                     gemData.UpdateDate = DateTime.UtcNow;
                     gemData.UpdateBy = _admin;
                     updateGems.Add(gemData);
-
-                    gemsPickOff.Stastus = "completed";
-                    gemsPickOff.UpdateDate = DateTime.UtcNow;
-                    gemsPickOff.UpdateBy = _admin;
-                    updateTransection.Add(gemsPickOff);
-
                 }
 
                 var getOutbound = newTransection.Where(x => x.Type == 7).ToList();
                 if (getOutbound.Any())
-                { 
+                {
                     var groupOutbound = getOutbound.GroupBy(x => new { x.ProductionPlanWo, x.ProductionPlanWoNumber }).ToList();
                     foreach (var group in groupOutbound)
                     {
@@ -896,7 +986,7 @@ namespace Jewelry.Service.Receipt.Gem
                             headerId = addStatusHeader.Id;
                             updatePlanHeader.Add(addStatusHeader);
                         }
-                        else 
+                        else
                         {
                             headerId = planGemPick.Id;
                             planGemPick.UpdateDate = DateTime.UtcNow;
@@ -922,7 +1012,7 @@ namespace Jewelry.Service.Receipt.Gem
                                 GemQty = gem.Qty,
                                 GemWeight = gem.QtyWeight,
                                 GemName = $"{gemData.Code}-{gemData.GroupName}-{gemData.Shape}-{gemData.Size}-{gemData.Grade}",
-                               
+
                                 RequestDate = request.RequestDate.UtcDateTime,
                             };
                             addStatusDetailGem.Add(newGem);
@@ -944,32 +1034,45 @@ namespace Jewelry.Service.Receipt.Gem
                 }
                 if (newTransection.Any())
                 {
-                    //set all running number
-                    runningNoPickReturn = await _runningNumberService.GenerateRunningNumberForGold($"PIR");
-                    runningNoOutbound = await _runningNumberService.GenerateRunningNumberForGold($"PIO");
-                    foreach (var item in newTransection)
+                    var pickReturn = newTransection.Where(x => x.Type == 6).ToList();
+                    if (pickReturn.Any())
                     {
-                        if (item.Type == 6)
+                        runningNoPickReturn = await _runningNumberService.GenerateRunningNumberForGold($"PIR");
+                        foreach (var item in pickReturn)
                         {
                             item.Running = runningNoPickReturn;
-                            item.RefRunning = request.ReferenceRunning;
-                        }
-                        else if (item.Type == 7)
-                        {
-                            item.Running = runningNoOutbound;
-                            item.RefRunning = runningNoPickReturn;
+
+                            //ref pick off
+                            item.RefRunning = request.PickOffRunning;
                         }
                     }
+
+                    var pickOutbount = newTransection.Where(x => x.Type == 7).ToList();
+                    if (pickOutbount.Any())
+                    {
+                        runningNoOutbound = await _runningNumberService.GenerateRunningNumberForGold($"PIO");
+                        foreach (var item in pickOutbount)
+                        {
+                            item.Running = runningNoOutbound;
+
+                            //ref pick return
+                            item.RefRunning = runningNoPickReturn ?? string.Empty;
+
+                            //ref pick off
+                            item.Ref2Running = request.PickOffRunning;
+                        }
+                    }
+
                     _jewelryContext.TbtStockGemTransection.AddRange(newTransection);
                 }
                 if (updatePlan.Any())
-                { 
+                {
                     _jewelryContext.TbtProductionPlan.UpdateRange(updatePlan);
                 }
                 if (updatePlanHeader.Any())
                 {
                     foreach (var item in updatePlanHeader)
-                    { 
+                    {
                         item.SendName = $"เลขที่เบิก: {runningNoOutbound}";
                         item.CheckName = $"เลขที่เบิก: {runningNoOutbound}";
                         item.Remark2 = $"เลขที่เบิก: {runningNoOutbound}";
@@ -977,11 +1080,9 @@ namespace Jewelry.Service.Receipt.Gem
                     _jewelryContext.TbtProductionPlanStatusHeader.UpdateRange(updatePlanHeader);
                 }
                 if (addStatusDetailGem.Any())
-                { 
+                {
                     foreach (var item in addStatusDetailGem)
                     {
-                        //item.re = request.RequestDate.UtcDateTime;
-                        //item.Remark = $"เลขที่เบิก: {runningNoOutbound}";
                         item.OutboundRunning = runningNoOutbound;
                         item.OutboundName = request.Remark;
                         item.OutboundDate = request.RequestDate.UtcDateTime;
@@ -991,8 +1092,19 @@ namespace Jewelry.Service.Receipt.Gem
                 if (updateTransection.Any())
                 {
                     foreach (var item in updateTransection)
-                    { 
-                        item.RefRunning = runningNoPickReturn;
+                    {
+                        //pick off
+                        if (item.Type == 5)
+                        {
+                            item.RefRunning = runningNoPickReturn;
+                        }
+                        if (item.Type == 7)
+                        {
+                            item.RefRunning = runningNoPickReturn;
+
+                            item.UpdateBy = _admin;
+                            item.UpdateDate = DateTime.UtcNow;
+                        }
                     }
                     _jewelryContext.TbtStockGemTransection.UpdateRange(updateTransection);
                 }
@@ -1003,7 +1115,7 @@ namespace Jewelry.Service.Receipt.Gem
 
             return new PickReturnResponse()
             {
-                RunningPickReturn = runningNoPickReturn,
+                RunningPickReturn = runningNoPickReturn ?? string.Empty,
                 RunningPickOutbound = runningNoOutbound,
             };
         }

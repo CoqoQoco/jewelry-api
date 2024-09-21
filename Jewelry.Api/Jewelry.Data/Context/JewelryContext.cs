@@ -80,6 +80,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockGemTransection> TbtStockGemTransection { get; set; }
 
+    public virtual DbSet<TbtStockGemTransectionPrice> TbtStockGemTransectionPrice { get; set; }
+
     public virtual DbSet<TbtUser> TbtUser { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -1421,6 +1423,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("production_plan_wo_text");
             entity.Property(e => e.Qty).HasColumnName("qty");
             entity.Property(e => e.QtyWeight).HasColumnName("qty_weight");
+            entity.Property(e => e.Ref2Running)
+                .HasColumnType("character varying")
+                .HasColumnName("ref2_running");
             entity.Property(e => e.RefRunning)
                 .HasColumnType("character varying")
                 .HasColumnName("ref_running");
@@ -1443,6 +1448,39 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("subpplier_name");
             entity.Property(e => e.SupplierCost).HasColumnName("supplier_cost");
             entity.Property(e => e.Type).HasColumnName("type");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtStockGemTransectionPrice>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_gem_transection_price_pk");
+
+            entity.ToTable("tbt_stock_gem_transection_price");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.NewPrice).HasColumnName("new_price");
+            entity.Property(e => e.NewPriceUnit).HasColumnName("new_price_unit");
+            entity.Property(e => e.PreviousPrice).HasColumnName("previous_price");
+            entity.Property(e => e.PreviousPriceUnit).HasColumnName("previous_price_unit");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.Unit)
+                .HasColumnType("character varying")
+                .HasColumnName("unit");
+            entity.Property(e => e.UnitCode)
+                .HasColumnType("character varying")
+                .HasColumnName("unit_code");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using jewelry.Model.Mold.PlanCasting;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,5 +20,7 @@ namespace jewelry.Model.Exceptions
 
         public static string PlanCompleted = "แผนการผลิตนี้ได้ทำการผลิตเสร็จสิ้นแล้ว";
         public static string PlanMelted = "แผนการผลิตนี้ได้ทำการหลอมเเล้ว";
+
+        public static string PickReturned = "รายการนี้ได้ทำการคืนเเล้ว";
     }
 }

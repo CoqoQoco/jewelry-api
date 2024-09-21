@@ -14,10 +14,11 @@ namespace jewelry.Model.Receipt.Gem.List
 
     public class ListSearch
     {
-        public DateTimeOffset RequestDateStart { get; set; }
-        public DateTimeOffset RequestDateEnd { get; set; }
+        public DateTimeOffset? RequestDateStart { get; set; }
+        public DateTimeOffset? RequestDateEnd { get; set; }
         public string? Code { get; set; }
         public string[]? GroupName { get; set; }
+        
 
         public int[]? Type { get; set; }
         public string? JobNoOrPONo { get; set; }
@@ -30,5 +31,9 @@ namespace jewelry.Model.Receipt.Gem.List
         public string? Status { get; set; }
 
         public string? WO { get; set; }
+
+        public string? Running { get; set; }
+        public string? RefRunning1 { get; set; }
+        public string? RefRunning2 { get; set; }
     }
 }

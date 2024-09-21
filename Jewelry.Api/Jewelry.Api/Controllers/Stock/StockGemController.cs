@@ -1,5 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.Stock.Gem.Option;
+using jewelry.Model.Stock.Gem.Price;
+using jewelry.Model.Stock.Gem.PriceEdit;
 using jewelry.Model.Stock.Gem.Search;
 using jewelry.Model.Stock.Mold.Return;
 using Jewelry.Api.Extension;
@@ -81,6 +83,42 @@ namespace Jewelry.Api.Controllers.Stock
             catch (HandleException ex)
             {
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("Price")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(OptionResponse))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Price([FromBody] PriceEditRequest request)
+        {
+            try
+            {
+                var response = _service.Price(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("PriceHistory")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<SearchGemResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult SearchData([FromBody] PriceRequest request)
+        {
+            try
+            {
+                var report = _service.PriceHistory(request.Search);
+                return report.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
     }
