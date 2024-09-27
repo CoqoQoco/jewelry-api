@@ -188,6 +188,11 @@ namespace Jewelry.Service.Receipt.Gem
                              WONumber = tran.ProductionPlanWoNumber,
                              WOText = tran.ProductionPlanWoText,
                              Mold = tran.ProductionPlanMold,
+
+                             Price = gem.Price,
+                             PriceQty = gem.PriceQty,
+                             Unit = gem.Unit,
+                             UnitCode = gem.UnitCode,
                          });
 
             if (request.RequestDateStart.HasValue)
@@ -835,10 +840,10 @@ namespace Jewelry.Service.Receipt.Gem
 
                     if (checkQty != gemsPickOff.Qty || checkQtyWeight != gemsPickOff.QtyWeight)
                     {
-                        throw new HandleException(ErrorMessage.InvalidQty);
+                        throw new HandleException($"{gemsReturn.Code} --> {ErrorMessage.InvalidQty}");
                     }
 
-                    
+
                     //outbound transection
                     if (gemsReturn.GemsOutbound.Any())
                     {

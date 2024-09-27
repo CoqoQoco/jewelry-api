@@ -17,6 +17,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatusList
         public DateTimeOffset Start { get; set; }
         public DateTimeOffset End { get; set; }
 
+        public DateTimeOffset UpdateStart { get; set; }
+        public DateTimeOffset UpdateEnd { get; set; }
+
         public int[]? Status { get; set; }
         public string[]? Gold { get; set; }
         

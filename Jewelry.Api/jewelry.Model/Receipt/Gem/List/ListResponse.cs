@@ -48,5 +48,10 @@ namespace jewelry.Model.Receipt.Gem.List
         public int? WONumber { get; set; }
         public string? WOText { get; set; }
         public string? Mold { get; set; }
+
+        public decimal Price { get; set; }
+        public decimal PriceQty { get; set; }
+        public string? Unit { get; set; }
+        public string? UnitCode { get; set; }
     }
 }
