@@ -10,6 +10,7 @@ namespace jewelry.Model.Receipt.Gem.Inbound
     {
         public int Type { get; set; }
         public string? JobNoOrPO { get; set; }
+        public string? OperatorBy { get; set; }
         public string? SubplierName { get; set; }
         public string? Remark { get; set; }
         public string? Pass { get; set; }

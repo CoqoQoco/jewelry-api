@@ -356,11 +356,13 @@ namespace Jewelry.Service.ProductionPlan
 
             if (request.SendStart.HasValue)
             {
-                query = query.Where(x => x.RequestDate >= request.SendStart.Value.StartOfDayUtc());
+                //query = query.Where(x => x.RequestDate >= request.SendStart.Value.StartOfDayUtc());
+                query = query.Where(x => x.LastUpdateStatus >= request.SendStart.Value.StartOfDayUtc());
             }
             if (request.SendEnd.HasValue)
             {
-                query = query.Where(x => x.RequestDate <= request.SendEnd.Value.EndOfDayUtc());
+                //query = query.Where(x => x.RequestDate <= request.SendEnd.Value.EndOfDayUtc());
+                query = query.Where(x => x.LastUpdateStatus <= request.SendEnd.Value.EndOfDayUtc());
             }
 
             if (request.IsOverPlan.HasValue)
@@ -1633,7 +1635,8 @@ namespace Jewelry.Service.ProductionPlan
 
                 await _jewelryContext.SaveChangesAsync();
 
-                plan.Status = request.Status;
+                //TODO: 28/09/2024 not update plan status
+                //plan.Status = request.Status;
                 plan.UpdateDate = DateTime.UtcNow;
                 plan.UpdateBy = _admin;
 

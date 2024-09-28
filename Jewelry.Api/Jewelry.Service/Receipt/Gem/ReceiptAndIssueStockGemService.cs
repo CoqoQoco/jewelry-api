@@ -193,6 +193,8 @@ namespace Jewelry.Service.Receipt.Gem
                              PriceQty = gem.PriceQty,
                              Unit = gem.Unit,
                              UnitCode = gem.UnitCode,
+
+                             OperatorBy = tran.OperatorBy,
                          });
 
             if (request.RequestDateStart.HasValue)
@@ -554,6 +556,11 @@ namespace Jewelry.Service.Receipt.Gem
                                  WONumber = g.item.ProductionPlanWoNumber,
                                  WOText = g.item.ProductionPlanWoText,
                                  Mold = g.item.ProductionPlanMold,
+
+                                 Price = g.gem.Price,
+                                 PriceQty = g.gem.PriceQty,
+                                 Unit = g.gem.Unit,
+                                 UnitCode = g.gem.UnitCode,
                              })
                          });
 
@@ -884,6 +891,8 @@ namespace Jewelry.Service.Receipt.Gem
                                 ProductionPlanWoNumber = outbound.WONumber,
                                 ProductionPlanWoText = matchPlan.WoText,
                                 ProductionPlanMold = outbound.Mold,
+
+                                OperatorBy = request.OperatorBy,
                             };
 
                             //previousQty -= outbound.IssueQty;
@@ -925,6 +934,8 @@ namespace Jewelry.Service.Receipt.Gem
                             RequestDate = request.RequestDate.UtcDateTime,
                             CreateBy = _admin,
                             CreateDate = DateTime.UtcNow,
+
+                            OperatorBy = request.OperatorBy,
                         };
                         newTransection.Add(pickReturn);
 
@@ -1017,6 +1028,7 @@ namespace Jewelry.Service.Receipt.Gem
                                 GemQty = gem.Qty,
                                 GemWeight = gem.QtyWeight,
                                 GemName = $"{gemData.Code}-{gemData.GroupName}-{gemData.Shape}-{gemData.Size}-{gemData.Grade}",
+                                GemPrice = gemData.UnitCode == "K" ? gemData.Price : gemData.PriceQty,
 
                                 RequestDate = request.RequestDate.UtcDateTime,
                             };
@@ -1078,8 +1090,8 @@ namespace Jewelry.Service.Receipt.Gem
                 {
                     foreach (var item in updatePlanHeader)
                     {
-                        item.SendName = $"เลขที่เบิก: {runningNoOutbound}";
-                        item.CheckName = $"เลขที่เบิก: {runningNoOutbound}";
+                        //item.SendName = $"เลขที่เบิก: {runningNoOutbound}";
+                        //item.CheckName = $"เลขที่เบิก: {runningNoOutbound}";
                         item.Remark2 = $"เลขที่เบิก: {runningNoOutbound}";
                     }
                     _jewelryContext.TbtProductionPlanStatusHeader.UpdateRange(updatePlanHeader);
@@ -1089,7 +1101,7 @@ namespace Jewelry.Service.Receipt.Gem
                     foreach (var item in addStatusDetailGem)
                     {
                         item.OutboundRunning = runningNoOutbound;
-                        item.OutboundName = request.Remark;
+                        item.OutboundName = request.OperatorBy;
                         item.OutboundDate = request.RequestDate.UtcDateTime;
                     }
                     _jewelryContext.TbtProductionPlanStatusDetailGem.AddRange(addStatusDetailGem);

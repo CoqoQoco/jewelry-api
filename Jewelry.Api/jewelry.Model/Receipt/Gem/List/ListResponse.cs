@@ -53,5 +53,7 @@ namespace jewelry.Model.Receipt.Gem.List
         public decimal PriceQty { get; set; }
         public string? Unit { get; set; }
         public string? UnitCode { get; set; }
+
+        public string? OperatorBy { get; set; }
     }
 }

@@ -1407,6 +1407,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.JobOrPo)
                 .HasColumnType("character varying")
                 .HasColumnName("job_or_po");
+            entity.Property(e => e.OperatorBy)
+                .HasColumnType("character varying")
+                .HasColumnName("operator_by");
             entity.Property(e => e.PointRemianQty).HasColumnName("point_remian_qty");
             entity.Property(e => e.PointRemianQtyWeight).HasColumnName("point_remian_qty_weight");
             entity.Property(e => e.PreviousRemainQty).HasColumnName("previous_remain_qty");

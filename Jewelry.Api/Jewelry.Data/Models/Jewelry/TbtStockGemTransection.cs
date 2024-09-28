@@ -60,4 +60,6 @@ public partial class TbtStockGemTransection
     public decimal? PointRemianQtyWeight { get; set; }
 
     public string? Ref2Running { get; set; }
+
+    public string? OperatorBy { get; set; }
 }
