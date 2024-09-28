@@ -1028,7 +1028,7 @@ namespace Jewelry.Service.Receipt.Gem
                                 GemQty = gem.Qty,
                                 GemWeight = gem.QtyWeight,
                                 GemName = $"{gemData.Code}-{gemData.GroupName}-{gemData.Shape}-{gemData.Size}-{gemData.Grade}",
-                                GemPrice = gemData.UnitCode == "K" ? gemData.Price : gemData.PriceQty,
+                                GemPrice = gemData.UnitCode == "Q" ? gemData.Price : gemData.PriceQty,
 
                                 RequestDate = request.RequestDate.UtcDateTime,
                             };
