@@ -16,7 +16,7 @@ namespace jewelry.Model.Receipt.Gem.Picklist
         public string Stastus { get; set; } 
         public string? Remark { get; set; }
         public bool IsOverPick { get; set; }
-
+        public string? OperatorBy { get; set; }
 
         public DateTime CreateDate { get; set; }
         public string CreateBy { get; set; } 
@@ -66,5 +66,7 @@ namespace jewelry.Model.Receipt.Gem.Picklist
         public decimal PriceQty { get; set; }
         public string? Unit { get; set; }
         public string? UnitCode { get; set; }
+
+        public string? OperatorBy { get; set; }
     }
 }

@@ -7,6 +7,7 @@ using jewelry.Model.Receipt.Gem.Picklist;
 using jewelry.Model.Receipt.Gem.PickOff;
 using jewelry.Model.Receipt.Gem.Return;
 using jewelry.Model.Receipt.Gem.Scan;
+using jewelry.Model.Receipt.Gem.Update;
 using jewelry.Model.Stock.Mold.CheckOut;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Receipt.Gem;
@@ -44,6 +45,24 @@ namespace Jewelry.Api.Controllers.Receipt
             try
             {
                 var response = await _service.CreateGem(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("UpdateGem")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UpdateGem([FromBody] UpdateRequest request)
+        {
+            try
+            {
+                var response = await _service.UpdateGem(request);
                 return Ok(response);
             }
             catch (HandleException ex)

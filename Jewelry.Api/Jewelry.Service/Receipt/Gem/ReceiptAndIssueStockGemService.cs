@@ -8,6 +8,7 @@ using jewelry.Model.Receipt.Gem.Picklist;
 using jewelry.Model.Receipt.Gem.PickOff;
 using jewelry.Model.Receipt.Gem.Return;
 using jewelry.Model.Receipt.Gem.Scan;
+using jewelry.Model.Receipt.Gem.Update;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
@@ -29,6 +30,7 @@ namespace Jewelry.Service.Receipt.Gem
     public interface IReceiptAndIssueStockGemService
     {
         Task<string> CreateGem(CreateRequest request);
+        Task<string> UpdateGem(UpdateRequest request);
         Task<IQueryable<ScanResponse>> Scan(ScanRequest request);
 
         IQueryable<ListResponse> ListTransection(ListSearch request);
@@ -88,6 +90,34 @@ namespace Jewelry.Service.Receipt.Gem
 
             return "success";
         }
+        public async Task<string> UpdateGem(UpdateRequest request)
+        {
+            var gem = (from item in _jewelryContext.TbtStockGem
+                       where item.Code == request.Code.ToUpper().Trim()
+                       select item).SingleOrDefault();
+
+            if (gem == null)
+            {
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            gem.Grade = request.Grade;
+            gem.GradeCode = request.GradeCode;
+
+            gem.Remark1 = request.Remark;
+
+            gem.UpdateDate = DateTime.UtcNow;
+            gem.UpdateBy = _admin;
+
+            _jewelryContext.TbtStockGem.Update(gem);
+            await _jewelryContext.SaveChangesAsync();
+
+            return "success";
+        }
+
+
+
+
         public async Task<IQueryable<ScanResponse>> Scan(ScanRequest request)
         {
             var query = from item in _jewelryContext.TbtStockGem
@@ -528,6 +558,7 @@ namespace Jewelry.Service.Receipt.Gem
                              UpdateBy = grouped.First().item.UpdateBy,
                              UpdateDate = grouped.First().item.UpdateDate,
                              IsOverPick = grouped.First().item.ReturnDate != null && grouped.First().item.ReturnDate < DateTime.UtcNow,
+                             OperatorBy = grouped.First().item.OperatorBy,
                              Items = grouped.Select(g => new PicklistItem
                              {
                                  Code = g.item.Code,
@@ -561,6 +592,8 @@ namespace Jewelry.Service.Receipt.Gem
                                  PriceQty = g.gem.PriceQty,
                                  Unit = g.gem.Unit,
                                  UnitCode = g.gem.UnitCode,
+
+                                 OperatorBy = g.item.OperatorBy,
                              })
                          });
 
@@ -704,6 +737,8 @@ namespace Jewelry.Service.Receipt.Gem
 
                         CreateBy = _admin,
                         CreateDate = DateTime.UtcNow,
+
+                        OperatorBy = request.OperatorBy,
 
                     };
                     newPickOff.Add(newInbound);
