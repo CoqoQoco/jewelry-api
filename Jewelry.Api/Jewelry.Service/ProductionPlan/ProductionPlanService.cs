@@ -1660,10 +1660,12 @@ namespace Jewelry.Service.ProductionPlan
             {
                 throw new HandleException($"ไม่พบใบจ่ายรับคืนงาน {request.Wo}-{request.WoNumber}");
             }
-            if (plan.Status == ProductionPlanStatus.Completed)
-            {
-                throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
-            }
+
+            //fix miss 
+            //if (plan.Status == ProductionPlanStatus.Completed)
+            //{
+            //    throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
+            //}
             if (plan.Status == ProductionPlanStatus.Melted)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
