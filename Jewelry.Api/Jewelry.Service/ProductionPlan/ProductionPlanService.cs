@@ -1,13 +1,16 @@
-﻿using jewelry.Model.Constant;
+﻿using Azure.Core;
+using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
+using jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
+using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using jewelry.Model.Worker.TrackingWorker;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -57,6 +60,7 @@ namespace Jewelry.Service.ProductionPlan
         Task<string> ProductionPlanDeleteStatusDetail(ProductionPlanStatusDeleteRequest request);
 
         IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus();
+        Task<TransectionResponse> GetAllTransectionPrice(string wo, int woNumber);
     }
     public class ProductionPlanService : IProductionPlanService
     {
@@ -483,6 +487,7 @@ namespace Jewelry.Service.ProductionPlan
             return plan;
         }
         public ProductionPlanGetResponse NewProductionPlanGet(int id)
+
         {
             var plan = (from item in _jewelryContext.TbtProductionPlan
                          .Include(x => x.ProductTypeNavigation)
@@ -1628,8 +1633,8 @@ namespace Jewelry.Service.ProductionPlan
                 {
                     _jewelryContext.TbtProductionPlanStatusDetailGem.AddRange(addStatusItemGem);
                 }
-                if (updateStatusItemGem.Any()) 
-                { 
+                if (updateStatusItemGem.Any())
+                {
                     _jewelryContext.TbtProductionPlanStatusDetailGem.UpdateRange(updateStatusItemGem);
                 }
 
@@ -1662,10 +1667,10 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             //fix miss 
-            //if (plan.Status == ProductionPlanStatus.Completed)
-            //{
-            //    throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
-            //}
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
+            }
             if (plan.Status == ProductionPlanStatus.Melted)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
@@ -1744,6 +1749,141 @@ namespace Jewelry.Service.ProductionPlan
         {
             return (from item in _jewelryContext.TbmProductionPlanStatus
                     select item).OrderBy(x => x.Id);
+        }
+
+        // ----- get all transaction ----- //
+        public async Task<TransectionResponse> GetAllTransectionPrice(string wo, int woNumber)
+        {
+            var response = new TransectionResponse();
+
+            var masterGoldSize = (from item in _jewelryContext.TbmGoldSize
+                                  select item).ToList();
+
+            var masterGold = (from item in _jewelryContext.TbmGold
+                              select item).ToList();
+
+            //group 1 --> get gold
+            var transectionGold = (from item in _jewelryContext.TbtProductionPlanCostGoldItem
+                                   .Include(x => x.TbtProductionPlanCostGold)
+                                   where item.TbtProductionPlanCostGold.IsActive == true
+                                   && item.ProductionPlanId == $"{wo}-{woNumber}"
+                                   select new TransectionItem()
+                                   {
+                                       Name = item.TbtProductionPlanCostGold.Gold,
+                                       NameGroup = TypeofPrice.Gold,
+
+                                       Reference1 = item.TbtProductionPlanCostGold.GoldSize,
+                                       Date = item.CreateDate,
+
+                                       Qty = item.ReturnQty,
+                                       Price = 0,
+                                       PriceReference = item.TbtProductionPlanCostGold.Cost,
+                                   }).ToList();
+
+            if (transectionGold.Any())
+            {
+                foreach (var gold in transectionGold)
+                {
+                    var goldSizeMaster = masterGoldSize.Where(x => x.Code == gold.Reference1).FirstOrDefault();
+                    var goldMaster = masterGold.Where(x => x.Code == gold.Name).FirstOrDefault();   
+
+                    gold.NameDescription = $"{gold.Name}-{goldMaster.NameEn}-{goldSizeMaster.NameTh}";
+                }
+
+                var goldtest = transectionGold.ToList();
+                response.Items.AddRange(transectionGold);
+            }
+
+            ////group 2 --> get worker 
+            //var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+            //                         .Include(x => x.Header)
+            //                         .ThenInclude(x => x.ProductionPlan)
+            //                         .ThenInclude(x => x.StatusNavigation)
+
+            //                         join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+
+            //                         where item.Header.ProductionPlan.Wo == wo
+            //                         && item.Header.ProductionPlan.WoNumber == woNumber
+            //                         && item.IsActive == true
+            //                         && item.Header.IsActive == true
+
+            //                         select new TransectionItem()
+            //                         {
+            //                             Name = status.NameTh,
+            //                             NameGroup = TypeofPrice.Worker,
+
+            //                             Date = item.RequestDate,
+
+            //                             Qty = item.GoldQtyCheck,
+            //                             Price = item.TotalWages,
+            //                             PriceReference = item.Wages,
+            //                         });
+            var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusHeader
+                                    .Include(x => x.ProductionPlan)
+                                    .ThenInclude(x => x.StatusNavigation)
+
+                                     join status in _jewelryContext.TbmProductionPlanStatus on item.Status equals status.Id
+
+                                     where item.ProductionPlan.Wo == wo
+                                     && item.ProductionPlan.WoNumber == woNumber
+                                     && item.IsActive == true
+                                     && item.IsActive == true
+
+                                     select new TransectionItem()
+                                     {
+                                         Name = status.NameTh,
+                                         NameDescription = status.NameTh,
+                                         NameGroup = TypeofPrice.Worker,
+
+                                         Date = item.CreateDate,
+
+                                         Qty = 1,
+                                         Price = item.WagesTotal,
+                                         //PriceReference = item.Wages,
+                                     }).ToList();
+
+            if (transectionWorker.Any())
+            {
+                response.Items.AddRange(transectionWorker);
+            }
+
+            //group 3 --> get gem
+            var transectionGem = (from item in _jewelryContext.TbtProductionPlanStatusDetailGem
+                                     .Include(x => x.Header)
+                                     .ThenInclude(x => x.ProductionPlan)
+                                     .ThenInclude(x => x.StatusNavigation)
+
+                                      //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                                  join gem in _jewelryContext.TbtStockGem on item.GemCode equals gem.Code
+
+                                  where item.Header.ProductionPlan.Wo == wo
+
+
+                                  where item.Header.ProductionPlan.Wo == wo
+                                  && item.Header.ProductionPlan.WoNumber == woNumber
+                                  && item.IsActive == true
+                                  && item.Header.IsActive == true
+
+                                  select new TransectionItem()
+                                  {
+                                      Name = item.GemName ?? item.GemCode,
+                                      NameDescription = item.GemName ?? item.GemCode,
+                                      NameGroup = TypeofPrice.Gem,
+
+                                      Date = item.RequestDate,
+
+                                      Qty = gem.Unit == "K" ? item.GemWeight : item.GemQty,
+                                      Price = gem.Unit == "K" ? (item.GemWeight * gem.Price) : (item.GemQty * gem.PriceQty)
+
+                                      //Reference1 = item.GemPrice,
+                                  }).ToList();
+
+            if (transectionGem.Any())
+            {
+                response.Items.AddRange(transectionGem);
+            }
+
+            return response;
         }
 
         #endregion

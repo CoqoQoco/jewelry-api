@@ -952,6 +952,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CastWeight).HasColumnName("cast_weight");
             entity.Property(e => e.CastWeightLoss).HasColumnName("cast_weight_loss");
             entity.Property(e => e.CastWeightOver).HasColumnName("cast_weight_over");
+            entity.Property(e => e.Cost).HasColumnName("cost");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");

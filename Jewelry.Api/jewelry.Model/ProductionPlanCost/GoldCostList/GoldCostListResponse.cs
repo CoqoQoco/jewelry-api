@@ -48,6 +48,8 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostList
 
         public string? RunningNumber { get; set; }
 
+        public decimal Cost { get; set; }
+
         public List<GoldCostCreateItem> Items { get; set; }
 
         public GoldCostListResponse()

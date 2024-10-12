@@ -2,6 +2,7 @@
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
+using jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
 using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
@@ -318,8 +319,8 @@ namespace Jewelry.Api.Controllers
 
         [Route("ReportProductionPlan")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanGetResponse>))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(TransectionResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
         public DataSourceResult ProductionPlanSearch([FromBody] ProductionPlanReportRequest request)
         {
@@ -332,6 +333,26 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
+
+        [Route("GetAllTransectionPrice")]
+        [HttpGet]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanGetResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(TransectionResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetAllTransectionPrice(string wo, int woNumber)
+        {
+            try
+            {
+                var report = await _IProductionPlanService.GetAllTransectionPrice(wo, woNumber);
+                return Ok(report);
+
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
 

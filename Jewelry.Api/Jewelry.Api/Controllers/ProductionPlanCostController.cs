@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlanCost.GoldCostCreate;
+using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using jewelry.Model.ProductionPlanCost.GoldCostList;
 using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
@@ -117,6 +118,25 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListGoldCostItem")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<GoldCostItemResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListGoldCostItem([FromBody] GoldCostItemRequest request)
+        {
+            try
+            {
+                var report = _IProductionPlanCostService.ListGoldCostItem(request.Search);
+                return report.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
     }

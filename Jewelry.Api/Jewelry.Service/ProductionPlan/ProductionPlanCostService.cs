@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlanCost.GoldCostCreate;
+using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using jewelry.Model.ProductionPlanCost.GoldCostList;
 using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
@@ -9,6 +10,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using NPOI.OpenXmlFormats.Spreadsheet;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,6 +28,8 @@ namespace Jewelry.Service.ProductionPlan
         GoldCostSummeryResponse SummeryReport(GoldCostList request);
         Task<string> CreateGoldCost(GoldCostCreateRequest request);
         Task<string> UpdateGoldCost(GoldCostUpdateRequest request);
+
+        IQueryable<GoldCostItemResponse> ListGoldCostItem(GoldCostItemSearch request);
     }
     public class ProductionPlanCostService : IProductionPlanCostService
     {
@@ -118,6 +122,8 @@ namespace Jewelry.Service.ProductionPlan
                                 ReturnCastPowderWeight = item.ReturnCastPowderWeight,
                                 CastWeightLoss = item.CastWeightLoss,
                                 CastWeightOver = item.CastWeightOver,
+
+                                Cost = item.Cost,
 
                                 AssignBy = item.AssignBy,
                                 ReceiveBy = item.ReceiveBy,
@@ -392,6 +398,7 @@ namespace Jewelry.Service.ProductionPlan
                     CreateBy = _admin,
 
                     RunningNumber = running,
+                    Cost = request.Cost,
 
                     IsActive = true,
                 };
@@ -664,6 +671,66 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             return "success";
+        }
+
+        public IQueryable<GoldCostItemResponse> ListGoldCostItem(GoldCostItemSearch request)
+        {
+            var query = (from item in _jewelryContext.TbtProductionPlanCostGoldItem
+                         .Include(x => x.TbtProductionPlanCostGold)
+                         where item.TbtProductionPlanCostGold.IsActive == true
+                         select new GoldCostItemResponse()
+                         {
+                             No = item.No,
+                             BookNo = item.BookNo,
+                             AssignDate = item.TbtProductionPlanCostGold.AssignDate,
+
+                             GoldCode = item.TbtProductionPlanCostGold.GoldNavigation.Code,
+                             GoldName = item.TbtProductionPlanCostGold.GoldNavigation.NameTh,
+                             GoldSizeCode = item.TbtProductionPlanCostGold.GoldSizeNavigation.Code,
+                             GoldSizeName = item.TbtProductionPlanCostGold.GoldSizeNavigation.NameTh,
+                             GoldReceipt = item.TbtProductionPlanCostGold.GoldReceipt,
+
+                             Zill = item.TbtProductionPlanCostGold.Zill,
+                             ZillQty = item.TbtProductionPlanCostGold.ZillQty,
+
+                             MeltDate = item.TbtProductionPlanCostGold.MeltDate,
+                             MeltWeight = item.TbtProductionPlanCostGold.MeltWeight,
+                             ReturnMeltWeight = item.TbtProductionPlanCostGold.ReturnMeltWeight,
+                             ReturnMeltScrapWeight = item.TbtProductionPlanCostGold.ReturnMeltScrapWeight,
+                             MeltWeightLoss = item.TbtProductionPlanCostGold.MeltWeightLoss,
+                             MeltWeightOver = item.TbtProductionPlanCostGold.MeltWeightOver,
+
+                             CastDate = item.TbtProductionPlanCostGold.CastDate,
+                             CastWeight = item.TbtProductionPlanCostGold.CastWeight,
+                             GemWeight = item.TbtProductionPlanCostGold.GemWeight,
+                             ReturnCastWeight = item.TbtProductionPlanCostGold.ReturnCastWeight,
+                             ReturnCastMoldWeight = item.TbtProductionPlanCostGold.ReturnCastMoldWeight,
+                             ReturnCastBodyBrokenWeight = item.TbtProductionPlanCostGold.ReturnCastBodyBrokenedWeight,
+                             ReturnCastBodyWeightTotal = item.TbtProductionPlanCostGold.ReturnCastBodyWeightTotal,
+                             ReturnCastScrapWeight = item.TbtProductionPlanCostGold.ReturnCastScrapWeight,
+                             ReturnCastPowderWeight = item.TbtProductionPlanCostGold.ReturnCastPowderWeight,
+                             CastWeightLoss = item.TbtProductionPlanCostGold.CastWeightLoss,
+                             CastWeightOver = item.TbtProductionPlanCostGold.CastWeightOver,
+
+                             Cost = item.TbtProductionPlanCostGold.Cost,
+
+                             AssignBy = item.TbtProductionPlanCostGold.AssignBy,
+                             ReceiveBy = item.TbtProductionPlanCostGold.ReceiveBy,
+                             RunningNumber = item.TbtProductionPlanCostGold.RunningNumber,
+                             Remark1 = item.TbtProductionPlanCostGold.Remark,
+
+                             ProductionPlanId = item.ProductionPlanId,
+                             ReturnWeight = item.ReturnWeight,
+                             ReturnQTY = item.ReturnQty.HasValue ? item.ReturnQty.Value : 0,
+                             Remark2 = item.Remark,
+                         });
+
+            if (!string.IsNullOrEmpty(request.ProductionPlanNumber))
+            { 
+                query = query.Where(x => x.ProductionPlanId == request.ProductionPlanNumber);
+            }
+
+            return query;
         }
     }
 }
