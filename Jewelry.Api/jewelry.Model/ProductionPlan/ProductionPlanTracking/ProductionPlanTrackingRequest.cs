@@ -24,6 +24,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
 
         public int[]? Status { get; set; }
         public int? IsOverPlan { get; set; }
+        public string? CustomerCode { get; set; }
     }
        
 

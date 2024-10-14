@@ -206,7 +206,7 @@ namespace Jewelry.Service.Receipt.Gem
                              UpdateDate = tran.UpdateDate,
                              UpdateBy = tran.UpdateBy,
 
-                             Name = $"{gem.Code}-{gem.Shape}-{gem.Size}-{gem.Grade}",
+                             Name = $"{gem.Code}-{gem.Shape}-{gem.Size}-{gem.Grade}-{gem.GroupName}",
                              GroupName = gem.GroupName,
                              Size = gem.Size,
                              Shape = gem.Shape,
@@ -563,7 +563,7 @@ namespace Jewelry.Service.Receipt.Gem
                              {
                                  Code = g.item.Code,
                                  GroupName = g.item.Code,
-                                 Name = $"{g.item.Code}-{g.gem.Shape}-{g.gem.Size}-{g.gem.Grade}",
+                                 Name = $"{g.item.Code}-{g.gem.Shape}-{g.gem.Size}-{g.gem.Grade}-{g.gem.GroupName}",
                                  Size = g.gem.Size,
                                  Shape = g.gem.Shape,
                                  Grade = g.gem.Grade,

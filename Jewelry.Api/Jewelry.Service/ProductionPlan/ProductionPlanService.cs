@@ -393,6 +393,10 @@ namespace Jewelry.Service.ProductionPlan
             {
                 query = query.Where(x => request.Status.Contains(x.Status));
             }
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                query = query.Where(x => x.CustomerNumber.Contains(request.CustomerCode));
+            }
 
             return query.OrderByDescending(x => x.CreateDate);
         }
@@ -459,6 +463,10 @@ namespace Jewelry.Service.ProductionPlan
             {
                 query = query.Where(x => request.Status.Contains(x.Status));
             }
+            //if (!string.IsNullOrEmpty(request.CustomerCode))
+            //{
+            //    query = query.Where(x => x.CustomerNumber == request.CustomerCode);
+            //}
 
             //return query.OrderByDescending(x => x.CreateDate);
             return query;
