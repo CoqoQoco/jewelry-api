@@ -2,6 +2,7 @@
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
+using jewelry.Model.ProductionPlan.ProductionPlanPrice.CreatePrice;
 using jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
@@ -348,6 +349,24 @@ namespace Jewelry.Api.Controllers
             {
                 var report = await _IProductionPlanService.GetAllTransectionPrice(wo, woNumber);
                 return Ok(report);
+
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+        [Route("CreatePrice")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CreatePrice([FromBody] CreatePriceRequest request)
+        {
+            try
+            {
+                var result = await _IProductionPlanService.CreatePrice(request);
+                return Ok(result);
 
             }
             catch (HandleException ex)

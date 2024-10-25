@@ -4,6 +4,7 @@ using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
+using jewelry.Model.ProductionPlan.ProductionPlanPrice.CreatePrice;
 using jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
@@ -20,6 +21,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using NetTopologySuite.Index.HPRtree;
+using NetTopologySuite.Noding;
 using Newtonsoft.Json;
 using NPOI.HPSF;
 using System;
@@ -60,7 +62,9 @@ namespace Jewelry.Service.ProductionPlan
         Task<string> ProductionPlanDeleteStatusDetail(ProductionPlanStatusDeleteRequest request);
 
         IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus();
+
         Task<TransectionResponse> GetAllTransectionPrice(string wo, int woNumber);
+        Task<string> CreatePrice(CreatePriceRequest request);
     }
     public class ProductionPlanService : IProductionPlanService
     {
@@ -509,6 +513,7 @@ namespace Jewelry.Service.ProductionPlan
                          .Include(x => x.TbtProductionPlanStatusHeader
                             .Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
                             .ThenInclude(x => x.TbtProductionPlanStatusDetailGem)
+                        .Include(x => x.TbtProductionPlanPrice)
 
                         join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
                         from cj in customerJoin.DefaultIfEmpty()
@@ -646,6 +651,25 @@ namespace Jewelry.Service.ProductionPlan
 
                                                  }).ToList(),
 
+                PriceItems = plan.item.TbtProductionPlanPrice.Any() ?
+                              ((from item in plan.item.TbtProductionPlanPrice
+                              select new Price()
+                              {
+                                  No = item.No,
+                                  Name = item.Name,
+                                  NameDescription = item.NameDescription,
+                                  NameGroup = item.NameGroup,
+
+                                  Date = item.Date,
+
+                                  Qty = item.Qty,
+                                  QtyPrice = item.QtyPrice,
+                                  QtyWeight = item.QtyWeight,
+                                  QtyWeightPrice = item.QtyWeightPrice,
+
+                                  TotalPrice = item.TotalPrice,
+                              }).ToList()) 
+                              : new List<Price>(),
             };
 
             return response;
@@ -1783,8 +1807,12 @@ namespace Jewelry.Service.ProductionPlan
                                        Reference1 = item.TbtProductionPlanCostGold.GoldSize,
                                        Date = item.CreateDate,
 
-                                       Qty = item.ReturnQty,
-                                       Price = 0,
+                                       Qty = 0,
+                                       QtyPrice = 0,
+
+                                       QtyWeight = item.ReturnQty,
+                                       QtyWeightPrice = 0,
+
                                        PriceReference = item.TbtProductionPlanCostGold.Cost,
                                    }).ToList();
 
@@ -1793,7 +1821,7 @@ namespace Jewelry.Service.ProductionPlan
                 foreach (var gold in transectionGold)
                 {
                     var goldSizeMaster = masterGoldSize.Where(x => x.Code == gold.Reference1).FirstOrDefault();
-                    var goldMaster = masterGold.Where(x => x.Code == gold.Name).FirstOrDefault();   
+                    var goldMaster = masterGold.Where(x => x.Code == gold.Name).FirstOrDefault();
 
                     gold.NameDescription = $"{gold.Name}-{goldMaster.NameEn}-{goldSizeMaster.NameTh}";
                 }
@@ -1802,53 +1830,58 @@ namespace Jewelry.Service.ProductionPlan
                 response.Items.AddRange(transectionGold);
             }
 
-            ////group 2 --> get worker 
-            //var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusDetail
-            //                         .Include(x => x.Header)
-            //                         .ThenInclude(x => x.ProductionPlan)
-            //                         .ThenInclude(x => x.StatusNavigation)
+            //group 2 --> get worker 
+            var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                                     .Include(x => x.Header)
+                                     .ThenInclude(x => x.ProductionPlan)
+                                     .ThenInclude(x => x.StatusNavigation)
 
-            //                         join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                                     join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
 
-            //                         where item.Header.ProductionPlan.Wo == wo
-            //                         && item.Header.ProductionPlan.WoNumber == woNumber
-            //                         && item.IsActive == true
-            //                         && item.Header.IsActive == true
-
-            //                         select new TransectionItem()
-            //                         {
-            //                             Name = status.NameTh,
-            //                             NameGroup = TypeofPrice.Worker,
-
-            //                             Date = item.RequestDate,
-
-            //                             Qty = item.GoldQtyCheck,
-            //                             Price = item.TotalWages,
-            //                             PriceReference = item.Wages,
-            //                         });
-            var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusHeader
-                                    .Include(x => x.ProductionPlan)
-                                    .ThenInclude(x => x.StatusNavigation)
-
-                                     join status in _jewelryContext.TbmProductionPlanStatus on item.Status equals status.Id
-
-                                     where item.ProductionPlan.Wo == wo
-                                     && item.ProductionPlan.WoNumber == woNumber
+                                     where item.Header.ProductionPlan.Wo == wo
+                                     && item.Header.ProductionPlan.WoNumber == woNumber
                                      && item.IsActive == true
-                                     && item.IsActive == true
+                                     && item.Header.IsActive == true
 
                                      select new TransectionItem()
                                      {
                                          Name = status.NameTh,
-                                         NameDescription = status.NameTh,
+                                         NameDescription = $"[{status.NameTh}] {item.Description}",
                                          NameGroup = TypeofPrice.Worker,
 
-                                         Date = item.CreateDate,
+                                         Date = item.RequestDate,
 
-                                         Qty = 1,
-                                         Price = item.WagesTotal,
-                                         //PriceReference = item.Wages,
-                                     }).ToList();
+                                         Qty = item.GoldQtyCheck,
+                                         QtyPrice = item.Wages,
+
+                                         QtyWeight = 0,
+                                         QtyWeightPrice = 0,
+
+                                         PriceReference = item.TotalWages,
+                                     });
+            //var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusHeader
+            //                        .Include(x => x.ProductionPlan)
+            //                        .ThenInclude(x => x.StatusNavigation)
+
+            //                         join status in _jewelryContext.TbmProductionPlanStatus on item.Status equals status.Id
+
+            //                         where item.ProductionPlan.Wo == wo
+            //                         && item.ProductionPlan.WoNumber == woNumber
+            //                         && item.IsActive == true
+            //                         && item.IsActive == true
+
+            //                         select new TransectionItem()
+            //                         {
+            //                             Name = status.NameTh,
+            //                             NameDescription = status.NameTh,
+            //                             NameGroup = TypeofPrice.Worker,
+
+            //                             Date = item.CreateDate,
+
+            //                             Qty = 1,
+            //                             Price = item.WagesTotal,
+            //                             //PriceReference = item.Wages,
+            //                         }).ToList();
 
             if (transectionWorker.Any())
             {
@@ -1880,10 +1913,12 @@ namespace Jewelry.Service.ProductionPlan
 
                                       Date = item.RequestDate,
 
-                                      Qty = gem.Unit == "K" ? item.GemWeight : item.GemQty,
-                                      Price = gem.Unit == "K" ? (item.GemWeight * gem.Price) : (item.GemQty * gem.PriceQty)
+                                      Qty = item.GemQty,
+                                      QtyPrice = gem.PriceQty,
 
-                                      //Reference1 = item.GemPrice,
+                                      QtyWeight = item.GemWeight,
+                                      QtyWeightPrice = gem.Price,
+
                                   }).ToList();
 
             if (transectionGem.Any())
@@ -1892,6 +1927,82 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             return response;
+        }
+
+        public async Task<string> CreatePrice(CreatePriceRequest request)
+        {
+
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                        where item.Wo == request.Wo
+                        && item.WoNumber == request.WoNumber
+                        && item.Id == request.ProductionPlanId
+                        select item).FirstOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.NotFound}");
+            }
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+            }
+
+            var oldPrice = (from item in _jewelryContext.TbtProductionPlanPrice
+                            where item.Wo == request.Wo
+                            && item.WoNumber == request.WoNumber
+                            select item);
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var newPrices = new List<TbtProductionPlanPrice>();
+                var running = await _runningNumberService.GenerateRunningNumberForGold("PRI");
+
+                foreach (var item in request.Item)
+                {
+                    var newPrice = new TbtProductionPlanPrice()
+                    {
+                        ProductionId = plan.Id,
+                        Running = running,
+
+                        Wo = request.Wo,
+                        WoNumber = request.WoNumber,
+                        WoText = request.WoText,
+
+                        No = item.No,
+                        Name = item.Name,
+                        NameDescription = item.NameDescription,
+                        NameGroup = item.NameGroup,
+
+                        Qty = item.Qty,
+                        QtyPrice = item.QtyPrice,
+
+                        QtyWeight = item.QtyWeight,
+                        QtyWeightPrice = item.QtyWeightPrice,
+
+                        TotalPrice = item.TotalPrice,
+
+                        Date = item.Date.HasValue ? item.Date.Value.UtcDateTime : null,
+
+                        CreateBy = _admin,
+                        CreateDate = DateTime.UtcNow,
+                    };
+                    newPrices.Add(newPrice);
+                }
+
+                if (oldPrice.Any())
+                {
+                    _jewelryContext.TbtProductionPlanPrice.RemoveRange(oldPrice);
+                }
+                if (newPrices.Any())
+                {
+                    _jewelryContext.TbtProductionPlanPrice.AddRange(newPrices);
+                }
+
+                await _jewelryContext.SaveChangesAsync();
+                scope.Complete();
+            }
+
+            return "success";
         }
 
         #endregion

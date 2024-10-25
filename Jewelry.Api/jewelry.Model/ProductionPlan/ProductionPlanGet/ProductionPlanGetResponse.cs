@@ -43,6 +43,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public string? Remark { get; set; }
 
         public List<StatusDetailHeader>? TbtProductionPlanStatusHeader { get; set; }
+        public List<Price> PriceItems { get; set; } = new List<Price>();
     }
 
     public class StatusDetailHeader 
@@ -115,5 +116,19 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public string? OutboundRunning { get; set; }
         public string? OutboundName { get; set; }
         public DateTime? OutboundDate { get; set; }
+    }
+
+    public class Price
+    {
+        public int No { get; set; }
+        public string Name { get; set; }
+        public string NameDescription { get; set; }
+        public string NameGroup { get; set; }
+        public DateTimeOffset? Date { get; set; }
+        public decimal Qty { get; set; }
+        public decimal QtyPrice { get; set; }
+        public decimal QtyWeight { get; set; }
+        public decimal QtyWeightPrice { get; set; }
+        public decimal TotalPrice { get; set; }
     }
 }

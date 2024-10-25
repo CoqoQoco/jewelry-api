@@ -71,5 +71,7 @@ public partial class TbtProductionPlan
 
     public virtual ICollection<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; } = new List<TbtProductionPlanMaterial>();
 
+    public virtual ICollection<TbtProductionPlanPrice> TbtProductionPlanPrice { get; set; } = new List<TbtProductionPlanPrice>();
+
     public virtual ICollection<TbtProductionPlanStatusHeader> TbtProductionPlanStatusHeader { get; set; } = new List<TbtProductionPlanStatusHeader>();
 }
