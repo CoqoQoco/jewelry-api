@@ -23,6 +23,8 @@ namespace jewelry.Model.Receipt.Gem.Picklist
         public DateTime? UpdateDate { get; set; }
         public string? UpdateBy { get; set; }
 
+        public string[] Code { get; set; }
+
         public IEnumerable<PicklistItem> Items { get; set; }
     }
 

@@ -23,13 +23,15 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
 
         public string? ProductRunning { get; set; }
         public string ProductName { get; set; } 
-        public string ProductType { get; set; } 
+        public string ProductType { get; set; }
+        public string ProductTypeName { get; set; }
         public string ProductNumber { get; set; }
         public string ProductDetail { get; set; } 
         public int ProductQty { get; set; }
         public string ProductQtyUnit { get; set; } 
 
-        public string CustomerNumber { get; set; } 
+        public string CustomerNumber { get; set; }
+        public string CustomerName { get; set; }
         public string? CustomerType { get; set; }
 
         public bool? IsActive { get; set; }

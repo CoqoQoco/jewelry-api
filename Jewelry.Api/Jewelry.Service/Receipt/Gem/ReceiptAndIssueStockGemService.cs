@@ -20,6 +20,7 @@ using NetTopologySuite.Triangulate.QuadEdge;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -101,8 +102,12 @@ namespace Jewelry.Service.Receipt.Gem
                 throw new HandleException(ErrorMessage.NotFound);
             }
 
-            gem.Grade = request.Grade;
-            gem.GradeCode = request.GradeCode;
+            gem.GroupName = request.GroupName.Trim();
+            gem.Size = request.Size.Trim();
+
+
+            gem.Grade = request.Grade.Trim();
+            gem.GradeCode = request.GradeCode.Trim();
 
             gem.Remark1 = request.Remark;
 
@@ -594,62 +599,72 @@ namespace Jewelry.Service.Receipt.Gem
                                  UnitCode = g.gem.UnitCode,
 
                                  OperatorBy = g.item.OperatorBy,
-                             })
-                         });
+                             }),
+
+                             //Code = grouped.Select(g => g.item.Code).ToArray(),
+                         }).ToList();
 
             if (!string.IsNullOrEmpty(request.Running))
             {
                 query = (from item in query
                          where item.Running.Contains(request.Running)
-                         select item);
+                         select item).ToList();
             }
             if (request.Type != null && request.Type.Any())
             {
                 query = (from item in query
                          where request.Type.Contains(item.Type)
-                         select item);
+                         select item).ToList();
             }
             if (request.Status != null && request.Status.Any())
             {
                 query = (from item in query
                          where request.Status.Contains(item.Stastus)
-                         select item);
+                         select item).ToList();
             }
 
             if (request.RequestDateStart.HasValue)
             {
                 query = (from item in query
                          where item.RequestDate >= request.RequestDateStart.Value.StartOfDayUtc()
-                         select item);
+                         select item).ToList();
             }
             if (request.RequestDateEnd.HasValue)
             {
                 query = (from item in query
                          where item.RequestDate <= request.RequestDateEnd.Value.EndOfDayUtc()
-                         select item);
+                         select item).ToList();
             }
 
             if (request.ReturnDateStart.HasValue)
             {
                 query = (from item in query
                          where item.ReturnDate >= request.ReturnDateStart.Value.StartOfDayUtc()
-                         select item);
+                         select item).ToList();
             }
             if (request.ReturnDateEnd.HasValue)
             {
                 query = (from item in query
                          where item.ReturnDate <= request.ReturnDateEnd.Value.EndOfDayUtc()
-                         select item);
+                         select item).ToList();
             }
 
             if (!string.IsNullOrEmpty(request.GetRunning))
             {
                 query = (from item in query
                          where item.Running == request.GetRunning
-                         select item);
+                         select item).ToList();
             }
 
-            return query;
+            if (!string.IsNullOrEmpty(request.Code))
+            {
+                query = (from item in query
+                         where item.Items.Any(x => x.Code.Contains(request.Code.ToUpper()))
+                         //where item.Code.Contains(request.Code.ToUpper())
+                         select item).ToList();
+            }
+
+            return query.AsQueryable();
         }
         public async Task<string> PickOffGem(PickOffRequest request)
         {

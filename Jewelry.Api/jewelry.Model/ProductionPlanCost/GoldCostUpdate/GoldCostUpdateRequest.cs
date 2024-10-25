@@ -44,6 +44,8 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostUpdate
         public string? AssignBy { get; set; }
         public string? ReceiveBy { get; set; }
 
+        public decimal Cost { get; set; }
+
         public List<GoldCostCreateItem> Items { get; set; }
 
         public GoldCostUpdateRequest()

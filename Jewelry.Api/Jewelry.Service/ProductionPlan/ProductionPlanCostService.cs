@@ -619,6 +619,8 @@ namespace Jewelry.Service.ProductionPlan
                 data.UpdateDate = DateTime.UtcNow;
                 data.UpdateBy = _admin;
 
+                data.Cost = request.Cost;
+
                 _jewelryContext.TbtProductionPlanCostGold.Update(data);
 
                 if (data.TbtProductionPlanCostGoldItem.Any())

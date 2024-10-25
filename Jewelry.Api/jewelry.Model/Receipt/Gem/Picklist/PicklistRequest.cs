@@ -15,6 +15,7 @@ namespace jewelry.Model.Receipt.Gem.Picklist
     public class PicklistFilter
     {
         public string? Running { get; set; }
+        public string? Code { get; set; }
         public int[]? Type { get; set; }
         public string[]? Status { get; set; }
 

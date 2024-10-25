@@ -327,6 +327,11 @@ namespace Jewelry.Service.ProductionPlan
                          .Include(x => x.StatusNavigation)
                          .Include(x => x.TbtProductionPlanStatusHeader
                          .Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
+                         .Include(o => o.ProductTypeNavigation)
+
+                         join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
+                         from cj in customerJoin.DefaultIfEmpty()
+
                          where item.IsActive == true
                          let currentStatus = item.TbtProductionPlanStatusHeader.Where(x => x.IsActive == true && x.Status == item.Status).FirstOrDefault()
                          select new ProductionPlanTrackingResponse()
@@ -342,13 +347,20 @@ namespace Jewelry.Service.ProductionPlan
 
                              ProductNumber = item.ProductNumber,
                              ProductQty = item.ProductQty,
+
                              CustomerNumber = item.CustomerNumber,
+                             CustomerName = cj != null ? cj.NameTh : null,
+
+
                              CreateDate = item.CreateDate,
                              RequestDate = item.RequestDate,
                              LastUpdateStatus = currentStatus != null
                                                 ? currentStatus.UpdateDate
                                                 : item.CreateDate,
                              IsOverPlan = item.RequestDate < DateTime.UtcNow && !succesStatus.Contains(item.Status), // ประเมินราคา
+
+                             ProductType = item.ProductType,
+                             ProductTypeName = item.ProductTypeNavigation.NameTh
                          });
 
             //query = query.Where(x => x.GIDate >= request.DateFrom.StartOfDayUtc() && x.GIDate <= request.DateTo.EndOfDayUtc());
@@ -653,22 +665,22 @@ namespace Jewelry.Service.ProductionPlan
 
                 PriceItems = plan.item.TbtProductionPlanPrice.Any() ?
                               ((from item in plan.item.TbtProductionPlanPrice
-                              select new Price()
-                              {
-                                  No = item.No,
-                                  Name = item.Name,
-                                  NameDescription = item.NameDescription,
-                                  NameGroup = item.NameGroup,
+                                select new Price()
+                                {
+                                    No = item.No,
+                                    Name = item.Name,
+                                    NameDescription = item.NameDescription,
+                                    NameGroup = item.NameGroup,
 
-                                  Date = item.Date,
+                                    Date = item.Date,
 
-                                  Qty = item.Qty,
-                                  QtyPrice = item.QtyPrice,
-                                  QtyWeight = item.QtyWeight,
-                                  QtyWeightPrice = item.QtyWeightPrice,
+                                    Qty = item.Qty,
+                                    QtyPrice = item.QtyPrice,
+                                    QtyWeight = item.QtyWeight,
+                                    QtyWeightPrice = item.QtyWeightPrice,
 
-                                  TotalPrice = item.TotalPrice,
-                              }).ToList()) 
+                                    TotalPrice = item.TotalPrice,
+                                }).ToList())
                               : new List<Price>(),
             };
 
@@ -1128,7 +1140,9 @@ namespace Jewelry.Service.ProductionPlan
                                 if (item.GoldWeightSend.HasValue && item.GoldWeightCheck.HasValue)
                                 {
                                     newStatusItem.GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck;
-                                    newStatusItem.GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend);
+                                    
+                                    decimal divide = item.GoldWeightSend.Value <= 0 ? 1 : item.GoldWeightSend.Value;
+                                    newStatusItem.GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / divide);
                                 }
 
                                 addStatusItem.Add(newStatusItem);
@@ -1483,7 +1497,9 @@ namespace Jewelry.Service.ProductionPlan
                                 if (item.GoldWeightSend.HasValue && item.GoldWeightCheck.HasValue)
                                 {
                                     newStatusItem.GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck;
-                                    newStatusItem.GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / item.GoldWeightSend);
+
+                                    decimal divide = item.GoldWeightSend.Value <= 0 ? 1 : item.GoldWeightSend.Value;
+                                    newStatusItem.GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / divide);
                                 }
 
                                 addStatusItem.Add(newStatusItem);
@@ -1831,6 +1847,8 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             //group 2 --> get worker 
+
+            int[] getSatus = new int[] { 50, 60, 80, 90 };
             var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                                      .Include(x => x.Header)
                                      .ThenInclude(x => x.ProductionPlan)
@@ -1842,6 +1860,7 @@ namespace Jewelry.Service.ProductionPlan
                                      && item.Header.ProductionPlan.WoNumber == woNumber
                                      && item.IsActive == true
                                      && item.Header.IsActive == true
+                                     && getSatus.Contains(item.Header.Status)
 
                                      select new TransectionItem()
                                      {
