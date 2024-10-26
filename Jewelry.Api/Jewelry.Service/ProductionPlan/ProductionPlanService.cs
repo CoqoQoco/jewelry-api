@@ -331,6 +331,7 @@ namespace Jewelry.Service.ProductionPlan
                          .Include(x => x.TbtProductionPlanStatusHeader
                          .Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
                          .Include(o => o.ProductTypeNavigation)
+                         .Include(o => o.CustomerTypeNavigation)
 
                          join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
                          from cj in customerJoin.DefaultIfEmpty()
@@ -354,6 +355,9 @@ namespace Jewelry.Service.ProductionPlan
                              CustomerNumber = item.CustomerNumber,
                              CustomerName = cj != null ? cj.NameTh : null,
 
+                             CustomerType = item.CustomerType,
+                             CustomerTypeName = item.CustomerTypeNavigation.NameTh,
+
 
                              CreateDate = item.CreateDate,
                              RequestDate = item.RequestDate,
@@ -363,7 +367,10 @@ namespace Jewelry.Service.ProductionPlan
                              IsOverPlan = item.RequestDate < DateTime.UtcNow && !succesStatus.Contains(item.Status), // ประเมินราคา
 
                              ProductType = item.ProductType,
-                             ProductTypeName = item.ProductTypeNavigation.NameTh
+                             ProductTypeName = item.ProductTypeNavigation.NameTh,
+
+                             Gold = item.Type,
+                             GoldSize = item.TypeSize,
                          });
 
             //query = query.Where(x => x.GIDate >= request.DateFrom.StartOfDayUtc() && x.GIDate <= request.DateTo.EndOfDayUtc());
@@ -396,7 +403,6 @@ namespace Jewelry.Service.ProductionPlan
                 }
             }
 
-
             if (!string.IsNullOrEmpty(request.Text))
             {
                 query = (from item in query
@@ -415,6 +421,33 @@ namespace Jewelry.Service.ProductionPlan
             if (!string.IsNullOrEmpty(request.CustomerCode))
             {
                 query = query.Where(x => x.CustomerNumber.Contains(request.CustomerCode));
+            }
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Gold));
+            }
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => request.GoldSize.Contains(x.GoldSize));
+            }
+            if (request.CustomerType != null && request.CustomerType.Any())
+            {
+                query = query.Where(x => request.CustomerType.Contains(x.CustomerType));
+            }
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+           
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.Mold.Contains(request.Mold));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
             }
 
             return query.OrderByDescending(x => x.CreateDate);
@@ -584,6 +617,9 @@ namespace Jewelry.Service.ProductionPlan
                 Status = plan.item.Status,
                 StatusName = plan.item.StatusNavigation.NameTh,
                 Remark = plan.item.Remark,
+
+                Gold = plan.item.Type,
+                GoldSize = plan.item.TypeSize,
 
                 TbtProductionPlanStatusHeader = (from item in plan.item.TbtProductionPlanStatusHeader
                                                  select new StatusDetailHeader()

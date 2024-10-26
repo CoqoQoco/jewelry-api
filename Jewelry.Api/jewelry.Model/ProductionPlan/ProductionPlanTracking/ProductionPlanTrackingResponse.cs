@@ -32,12 +32,17 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
 
         public string CustomerNumber { get; set; }
         public string CustomerName { get; set; }
+
         public string? CustomerType { get; set; }
+        public string? CustomerTypeName { get; set; }
 
         public bool? IsActive { get; set; }
         public int Status { get; set; }
         public string StatusName { get; set; }
         public string? Remark { get; set; }
+
+        public string? Gold { get; set; }
+        public string? GoldSize { get; set; }
 
         public bool IsOverPlan { get; set; }
         public DateTime? LastUpdateStatus { get; set; }

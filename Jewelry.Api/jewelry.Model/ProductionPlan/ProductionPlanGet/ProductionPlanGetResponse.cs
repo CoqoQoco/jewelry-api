@@ -41,6 +41,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public int Status { get; set; }
         public string? StatusName { get; set; }
         public string? Remark { get; set; }
+        public string? Gold { get; set; }
+        public string? GoldSize { get; set; }
 
         public List<StatusDetailHeader>? TbtProductionPlanStatusHeader { get; set; }
         public List<Price> PriceItems { get; set; } = new List<Price>();

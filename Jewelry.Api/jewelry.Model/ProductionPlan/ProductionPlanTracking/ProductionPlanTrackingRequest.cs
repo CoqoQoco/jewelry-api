@@ -24,7 +24,17 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
 
         public int[]? Status { get; set; }
         public int? IsOverPlan { get; set; }
+
+        public string[]? CustomerType { get; set; }
         public string? CustomerCode { get; set; }
+
+        public string[]? Gold { get; set; }
+        public string[]? GoldSize { get; set; }
+
+        public string? Mold { get; set; }
+
+        public string? ProductNumber { get; set; }
+        public string[]? ProductType { get; set; }
     }
        
 
