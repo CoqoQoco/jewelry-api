@@ -903,6 +903,12 @@ public partial class JewelryContext : DbContext
                 .HasComment("วันสร้างใบงาน")
                 .HasColumnName("request_date");
             entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.Type)
+                .HasColumnType("character varying")
+                .HasColumnName("type");
+            entity.Property(e => e.TypeSize)
+                .HasColumnType("character varying")
+                .HasColumnName("type_size");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");

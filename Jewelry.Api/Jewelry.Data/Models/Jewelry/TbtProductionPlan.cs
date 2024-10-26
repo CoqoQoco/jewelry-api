@@ -61,6 +61,10 @@ public partial class TbtProductionPlan
 
     public string WoText { get; set; } = null!;
 
+    public string? Type { get; set; }
+
+    public string? TypeSize { get; set; }
+
     public virtual TbmCustomerType CustomerTypeNavigation { get; set; } = null!;
 
     public virtual TbmProductType ProductTypeNavigation { get; set; } = null!;

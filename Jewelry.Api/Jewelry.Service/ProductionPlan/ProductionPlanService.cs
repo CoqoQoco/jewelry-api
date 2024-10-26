@@ -135,6 +135,9 @@ namespace Jewelry.Service.ProductionPlan
 
                         CreateDate = DateTime.UtcNow,
                         CreateBy = _admin,
+
+                        Type = request.Gold,
+                        TypeSize = request.GoldSize
                     };
                     _jewelryContext.TbtProductionPlan.Add(createPlan);
                     _jewelryContext.SaveChanges();
