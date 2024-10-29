@@ -2,6 +2,7 @@
 using jewelry.Model.Master;
 using jewelry.Model.Master.SearchMaster;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
+using Jewelry.Api.Controllers.Production;
 using Jewelry.Api.Extension;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Master;

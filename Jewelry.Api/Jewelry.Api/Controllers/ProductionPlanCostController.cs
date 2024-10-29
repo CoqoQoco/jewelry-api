@@ -5,6 +5,7 @@ using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using jewelry.Model.ProductionPlanCost.GoldCostList;
 using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
+using Jewelry.Api.Controllers.Production;
 using Jewelry.Api.Extension;
 using Jewelry.Service.ProductionPlan;
 using Kendo.DynamicLinqCore;

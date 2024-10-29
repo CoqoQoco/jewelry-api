@@ -74,6 +74,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanStatusHeader> TbtProductionPlanStatusHeader { get; set; }
 
+    public virtual DbSet<TbtProductionPlanTransferStatus> TbtProductionPlanTransferStatus { get; set; }
+
     public virtual DbSet<TbtReceiptStockCreate> TbtReceiptStockCreate { get; set; }
 
     public virtual DbSet<TbtRunningNumber> TbtRunningNumber { get; set; }
@@ -1337,6 +1339,44 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.Status)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_production_plan_status_fk");
+        });
+
+        modelBuilder.Entity<TbtProductionPlanTransferStatus>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_production_plan_transfer_status_pk");
+
+            entity.ToTable("tbt_production_plan_transfer_status");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.FormerStatus).HasColumnName("former_status");
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.TargetStatus).HasColumnName("target_status");
+            entity.Property(e => e.TargetStatusId).HasColumnName("target_status_id");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.Wo)
+                .HasColumnType("character varying")
+                .HasColumnName("wo");
+            entity.Property(e => e.WoNumber).HasColumnName("wo_number");
+
+            entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanTransferStatus)
+                .HasForeignKey(d => d.ProductionPlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_production_plan_transfer_status_plan_fk");
+
+            entity.HasOne(d => d.TargetStatusNavigation).WithMany(p => p.TbtProductionPlanTransferStatus)
+                .HasForeignKey(d => d.TargetStatusId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_production_plan_transfer_status_target_fk");
         });
 
         modelBuilder.Entity<TbtReceiptStockCreate>(entity =>

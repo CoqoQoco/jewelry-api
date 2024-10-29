@@ -22,5 +22,7 @@ namespace jewelry.Model.Exceptions
         public static string PlanMelted = "แผนการผลิตนี้ได้ทำการหลอมเเล้ว";
 
         public static string PickReturned = "รายการนี้ได้ทำการคืนเเล้ว";
+
+        public static string StatusAlready = "สร้างข้อมูลซ้ำไม่ได้";
     }
 }

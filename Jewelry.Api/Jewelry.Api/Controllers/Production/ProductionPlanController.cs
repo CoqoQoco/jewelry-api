@@ -6,6 +6,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanPrice.CreatePrice;
 using jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
+using jewelry.Model.ProductionPlan.ProductionPlanStatus.Transfer;
 using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
@@ -20,7 +21,7 @@ using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 using System.Net;
 
-namespace Jewelry.Api.Controllers
+namespace Jewelry.Api.Controllers.Production
 {
     [Route("/[controller]")]
     [ApiController]
@@ -74,9 +75,9 @@ namespace Jewelry.Api.Controllers
         }
         [Route("ProductionPlanSearch")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanTrackingResponse>))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanTrackingResponse>))]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public DataSourceResult ProductionPlanSearch([FromBody] ProductionPlanTrackingRequest request)
         {
             try
@@ -92,9 +93,9 @@ namespace Jewelry.Api.Controllers
         }
         [Route("ProductionPlanSearchByProductionPlanId")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanTrackingResponse>))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanTrackingResponse>))]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public DataSourceResult ProductionPlanSearchByProductionPlanId([FromBody] ProductionPlanTrackingRequest request)
         {
             try
@@ -110,9 +111,9 @@ namespace Jewelry.Api.Controllers
         }
         [Route("ProductionPlanGet")]
         [HttpGet]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(ProductionPlanGetResponse))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(ProductionPlanGetResponse))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public IActionResult ProductionPlanGet(int id)
         {
             try
@@ -131,9 +132,9 @@ namespace Jewelry.Api.Controllers
 
         [Route("ListProductionPlanStatus")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanStatusListResponse>))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanStatusListResponse>))]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public DataSourceResult ListProductionPlanStatus([FromBody] ProductionPlanStatusListRequest request)
         {
             try
@@ -151,9 +152,9 @@ namespace Jewelry.Api.Controllers
 
         [Route("ProductionPlanMateriaGet")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<TbtProductionPlan>))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public IActionResult ProductionPlanMaterialSearch([FromBody] ProductionPlanTrackingMaterialRequest request)
         {
             try
@@ -191,9 +192,9 @@ namespace Jewelry.Api.Controllers
 
         [Route("GetProductionPlanStatus")]
         [HttpGet]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<TbmProductionPlanStatus>))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<TbmProductionPlanStatus>))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public IActionResult GetProductionPlanStatus()
         {
             try
@@ -266,6 +267,26 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+
+        [Route("ProductionPlanTransfer")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(TransferResponse))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionPlanTransfer([FromBody] TransferRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.ProductionPlanTransfer(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
         [Route("ProductionPlanAddStatusDetail")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
@@ -320,9 +341,9 @@ namespace Jewelry.Api.Controllers
 
         [Route("ReportProductionPlan")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(TransectionResponse))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(TransectionResponse))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public DataSourceResult ProductionPlanSearch([FromBody] ProductionPlanReportRequest request)
         {
             try
@@ -340,9 +361,9 @@ namespace Jewelry.Api.Controllers
 
         [Route("GetAllTransectionPrice")]
         [HttpGet]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanGetResponse>))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(TransectionResponse))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<ProductionPlanGetResponse>))]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(TransectionResponse))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public async Task<IActionResult> GetAllTransectionPrice(string wo, int woNumber)
         {
             try
@@ -358,9 +379,9 @@ namespace Jewelry.Api.Controllers
         }
         [Route("CreatePrice")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public async Task<IActionResult> CreatePrice([FromBody] CreatePriceRequest request)
         {
             try

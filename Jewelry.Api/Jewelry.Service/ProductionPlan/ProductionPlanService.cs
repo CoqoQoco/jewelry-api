@@ -8,6 +8,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanPrice.CreatePrice;
 using jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus;
+using jewelry.Model.ProductionPlan.ProductionPlanStatus.Transfer;
 using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
@@ -19,6 +20,7 @@ using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Identity.Client;
 using Microsoft.IdentityModel.Tokens;
 using NetTopologySuite.Index.HPRtree;
 using NetTopologySuite.Noding;
@@ -56,6 +58,8 @@ namespace Jewelry.Service.ProductionPlan
         Task<string> ProductionPlanUpdateHeader(ProductionPlanUpdateHeaderRequest request);
         Task<string> ProductionPlanDeleteMaterial(ProductionPlanMaterialDeleteRequest request);
         Task<string> ProductionPlanUpdateMaterial(ProductionPlanUpdateMaterialRequest request);
+
+        Task<TransferResponse> ProductionPlanTransfer(TransferRequest request);
 
         Task<string> ProductionPlanAddStatusDetail(ProductionPlanStatusAddRequest request);
         Task<string> ProductionPlanUpdateStatusDetail(ProductionPlanStatusUpdateRequest request);
@@ -439,7 +443,7 @@ namespace Jewelry.Service.ProductionPlan
             {
                 query = query.Where(x => request.ProductType.Contains(x.ProductType));
             }
-           
+
             if (!string.IsNullOrEmpty(request.Mold))
             {
                 query = query.Where(x => x.Mold.Contains(request.Mold));
@@ -1075,6 +1079,138 @@ namespace Jewelry.Service.ProductionPlan
             return $"{plan.Wo}-{plan.WoNumber}";
         }
 
+        // ------- transfer ------ //
+        public async Task<TransferResponse> ProductionPlanTransfer(TransferRequest request)
+        {
+            var dateNow = DateTime.UtcNow;  
+
+            var planIds = request.Plans.Select(x => x.Id).ToArray();
+            var plans = (from item in _jewelryContext.TbtProductionPlan
+                         .Include(x => x.TbtProductionPlanStatusHeader)
+                         where planIds.Contains(item.Id)
+                         select item).ToList();
+
+            if (!plans.Any())
+            {
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            var response = new TransferResponse()
+            {
+                Message = "success",
+            };
+            var addNewStatus = new List<TbtProductionPlanStatusHeader>();
+            var addTransferStatus = new List<TbtProductionPlanTransferStatus>();
+            var updatePlans = new List<TbtProductionPlan>();
+
+            var running = await _runningNumberService.GenerateRunningNumberForGold("PLT");
+
+            foreach (var plan in request.Plans)
+            {
+                var error = new TransferResponseItem()
+                {
+                    Id = plan.Id,
+                    Wo = plan.Wo,
+                    WoNumber = plan.WoNumber,
+                };
+
+                var targetPlan = plans.Where(x => x.Id == plan.Id).FirstOrDefault();
+                if (targetPlan == null)
+                {
+                    error.Message = ErrorMessage.NotFound;
+                    response.Errors.Add(error);
+                    continue;
+                }
+
+
+                if (targetPlan.TbtProductionPlanStatusHeader.Any())
+                { 
+                    var alreadyStatus = targetPlan.TbtProductionPlanStatusHeader
+                                                   .Where(x => x.IsActive == true)
+                                                   .Select(x => x.Status).ToArray();
+
+                    if (alreadyStatus.Contains(request.TargetStatus))
+                    {
+                        error.Message = ErrorMessage.StatusAlready;
+                        response.Errors.Add(error);
+                        continue;
+                    }
+                }
+
+                var newStatus = new TbtProductionPlanStatusHeader()
+                { 
+                    CreateDate = dateNow,
+                    CreateBy = request.TransferBy ?? _admin,
+                    UpdateDate = dateNow,
+                    UpdateBy = request.TransferBy ?? _admin,
+
+                    IsActive = true,
+
+                    ProductionPlanId = targetPlan.Id,
+                    Status = request.TargetStatus,
+                };
+                addNewStatus.Add(newStatus);
+
+                var newTransferStatus = new TbtProductionPlanTransferStatus()
+                { 
+                    Running = running,
+
+                    Wo = targetPlan.Wo,
+                    WoNumber = targetPlan.WoNumber,
+                    ProductionPlanId = targetPlan.Id,
+
+                    CreateDate = dateNow,
+                    CreateBy = request.TransferBy ?? _admin,
+
+                    FormerStatus = request.FormerStatus,
+                    TargetStatus = request.TargetStatus,    
+                };
+                addTransferStatus.Add(newTransferStatus);
+
+                targetPlan.Status = request.TargetStatus;
+                targetPlan.UpdateDate = dateNow;
+                targetPlan.UpdateBy = request.TransferBy ?? _admin;
+                updatePlans.Add(targetPlan);
+
+            }
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                if (addNewStatus.Any())
+                {
+                    _jewelryContext.TbtProductionPlanStatusHeader.AddRange(addNewStatus);
+                    await _jewelryContext.SaveChangesAsync();
+                }
+                if (addTransferStatus.Any())
+                {
+                    foreach (var transfer in addTransferStatus)
+                    { 
+                        var match = addNewStatus.Where(x => x.ProductionPlanId == transfer.ProductionPlanId).FirstOrDefault();
+                        if (match == null)
+                        {
+                            throw new HandleException($"{ErrorMessage.NotFound}");
+                        }
+
+                        transfer.TargetStatusId = match.Id;
+                    }
+
+                    _jewelryContext.TbtProductionPlanTransferStatus.AddRange(addTransferStatus);
+                    await _jewelryContext.SaveChangesAsync();
+                }
+                if (updatePlans.Any())
+                {
+                    _jewelryContext.TbtProductionPlan.UpdateRange(updatePlans);
+                    await _jewelryContext.SaveChangesAsync();
+                }
+
+                scope.Complete();
+            }
+
+            return response;
+        }
+
+
+
         // ----- Add/Update Status Detail -----//
         public async Task<string> ProductionPlanAddStatusDetail(ProductionPlanStatusAddRequest request)
         {
@@ -1179,7 +1315,7 @@ namespace Jewelry.Service.ProductionPlan
                                 if (item.GoldWeightSend.HasValue && item.GoldWeightCheck.HasValue)
                                 {
                                     newStatusItem.GoldWeightDiff = item.GoldWeightSend - item.GoldWeightCheck;
-                                    
+
                                     decimal divide = item.GoldWeightSend.Value <= 0 ? 1 : item.GoldWeightSend.Value;
                                     newStatusItem.GoldWeightDiffPercent = 100 - ((item.GoldWeightCheck * 100) / divide);
                                 }
