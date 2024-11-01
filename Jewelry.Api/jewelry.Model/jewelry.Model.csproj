@@ -14,4 +14,9 @@
     <ProjectReference Include="..\DynamicLinqCore\DynamicLinqCore.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Production\Plan\Create\" />
+    <Folder Include="Production\Plan\Update\" />
+  </ItemGroup>
+
 </Project>

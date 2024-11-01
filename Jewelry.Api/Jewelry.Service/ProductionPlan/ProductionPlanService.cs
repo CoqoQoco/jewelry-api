@@ -60,6 +60,7 @@ namespace Jewelry.Service.ProductionPlan
         Task<string> ProductionPlanUpdateMaterial(ProductionPlanUpdateMaterialRequest request);
 
         Task<TransferResponse> ProductionPlanTransfer(TransferRequest request);
+        Task<string> UpdateProductionPlan(ProductionPlanStatusUpdateRequest request);
 
         Task<string> ProductionPlanAddStatusDetail(ProductionPlanStatusAddRequest request);
         Task<string> ProductionPlanUpdateStatusDetail(ProductionPlanStatusUpdateRequest request);
@@ -1079,139 +1080,649 @@ namespace Jewelry.Service.ProductionPlan
             return $"{plan.Wo}-{plan.WoNumber}";
         }
 
-        // ------- transfer ------ //
+        #region --- transfer production plan ---
+        //public async Task<TransferResponse> ProductionPlanTransfer(TransferRequest request)
+        //{
+        //    if (request.FormerStatus == request.TargetStatus)
+        //    {
+        //        throw new HandleException($"{ErrorMessage.InvalidRequest}");
+        //    }
+
+        //    var dateNow = DateTime.UtcNow;
+
+        //    var planIds = request.Plans.Select(x => x.Id).ToArray();
+        //    var plans = (from item in _jewelryContext.TbtProductionPlan
+        //                 .Include(x => x.TbtProductionPlanStatusHeader)
+        //                 where planIds.Contains(item.Id)
+        //                 select item).ToList();
+
+        //    if (!plans.Any())
+        //    {
+        //        throw new HandleException(ErrorMessage.NotFound);
+        //    }
+
+        //    var response = new TransferResponse()
+        //    {
+        //        Message = "success",
+        //    };
+        //    var addNewStatus = new List<TbtProductionPlanStatusHeader>();
+        //    var addTransferStatus = new List<TbtProductionPlanTransferStatus>();
+        //    var updatePlans = new List<TbtProductionPlan>();
+
+        //    var running = await _runningNumberService.GenerateRunningNumberForGold("PLT");
+
+        //    foreach (var plan in request.Plans)
+        //    {
+        //        var error = new TransferResponseItem()
+        //        {
+        //            Id = plan.Id,
+        //            Wo = plan.Wo,
+        //            WoNumber = plan.WoNumber,
+        //        };
+
+        //        var targetPlan = plans.Where(x => x.Id == plan.Id).FirstOrDefault();
+        //        if (targetPlan == null)
+        //        {
+        //            error.Message = ErrorMessage.NotFound;
+        //            response.Errors.Add(error);
+        //            continue;
+        //        }
+        //        if (targetPlan.Status == ProductionPlanStatus.Completed)
+        //        {
+        //            error.Message = ErrorMessage.PlanCompleted;
+        //            response.Errors.Add(error);
+        //            continue;
+        //        }
+        //        if (request.TargetStatus == ProductionPlanStatus.Completed && targetPlan.Status != ProductionPlanStatus.Price)
+        //        {
+        //            error.Message = ErrorMessage.PlanNeedPrice;
+        //            response.Errors.Add(error);
+        //            continue;
+        //        }
+
+        //        if (targetPlan.TbtProductionPlanStatusHeader.Any())
+        //        {
+        //            var alreadyStatus = targetPlan.TbtProductionPlanStatusHeader
+        //                                           .Where(x => x.IsActive == true)
+        //                                           .Select(x => x.Status).ToArray();
+
+        //            if (alreadyStatus.Contains(request.TargetStatus))
+        //            {
+        //                error.Message = ErrorMessage.StatusAlready;
+        //                response.Errors.Add(error);
+        //                continue;
+        //            }
+        //        }
+
+        //        var newStatus = new TbtProductionPlanStatusHeader()
+        //        {
+        //            CreateDate = dateNow,
+        //            CreateBy = request.TransferBy ?? _admin,
+        //            UpdateDate = dateNow,
+        //            UpdateBy = request.TransferBy ?? _admin,
+
+        //            IsActive = true,
+
+        //            ProductionPlanId = targetPlan.Id,
+        //            Status = request.TargetStatus,
+        //        };
+        //        addNewStatus.Add(newStatus);
+
+        //        var newTransferStatus = new TbtProductionPlanTransferStatus()
+        //        {
+        //            Running = running,
+
+        //            Wo = targetPlan.Wo,
+        //            WoNumber = targetPlan.WoNumber,
+        //            ProductionPlanId = targetPlan.Id,
+
+        //            CreateDate = dateNow,
+        //            CreateBy = request.TransferBy ?? _admin,
+
+        //            FormerStatus = request.FormerStatus,
+        //            TargetStatus = request.TargetStatus,
+        //        };
+        //        addTransferStatus.Add(newTransferStatus);
+
+        //        targetPlan.Status = request.TargetStatus;
+        //        targetPlan.UpdateDate = dateNow;
+        //        targetPlan.UpdateBy = request.TransferBy ?? _admin;
+        //        updatePlans.Add(targetPlan);
+
+        //    }
+
+        //    using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+        //    {
+        //        if (addNewStatus.Any())
+        //        {
+        //            _jewelryContext.TbtProductionPlanStatusHeader.AddRange(addNewStatus);
+        //            await _jewelryContext.SaveChangesAsync();
+        //        }
+        //        if (addTransferStatus.Any())
+        //        {
+        //            foreach (var transfer in addTransferStatus)
+        //            {
+        //                var match = addNewStatus.Where(x => x.ProductionPlanId == transfer.ProductionPlanId).FirstOrDefault();
+        //                if (match == null)
+        //                {
+        //                    throw new HandleException($"{ErrorMessage.NotFound}");
+        //                }
+
+        //                transfer.TargetStatusId = match.Id;
+        //            }
+
+        //            _jewelryContext.TbtProductionPlanTransferStatus.AddRange(addTransferStatus);
+        //            await _jewelryContext.SaveChangesAsync();
+        //        }
+        //        if (updatePlans.Any())
+        //        {
+        //            _jewelryContext.TbtProductionPlan.UpdateRange(updatePlans);
+        //            await _jewelryContext.SaveChangesAsync();
+        //        }
+
+        //        scope.Complete();
+        //    }
+
+        //    return response;
+        //}
+        #region --- method transfer plan ---
         public async Task<TransferResponse> ProductionPlanTransfer(TransferRequest request)
         {
-            var dateNow = DateTime.UtcNow;  
+            ValidateRequest(request);
 
-            var planIds = request.Plans.Select(x => x.Id).ToArray();
-            var plans = (from item in _jewelryContext.TbtProductionPlan
-                         .Include(x => x.TbtProductionPlanStatusHeader)
-                         where planIds.Contains(item.Id)
-                         select item).ToList();
+            var plans = await GetProductionPlans(request.Plans.Select(x => x.Id).ToArray());
+            var response = new TransferResponse { Message = "success" };
+
+            var transferData = await PrepareTransferData(request, plans);
+
+            if (transferData.HasAnyValidPlans)
+            {
+                await ProcessTransfer(transferData);
+            }
+
+            response.Errors.AddRange(transferData.Errors);
+            return response;
+        }
+        private void ValidateRequest(TransferRequest request)
+        {
+            if (request.FormerStatus == request.TargetStatus)
+            {
+                throw new HandleException(ErrorMessage.InvalidRequest);
+            }
+        }
+        private async Task<List<TbtProductionPlan>> GetProductionPlans(int[] planIds)
+        {
+            var plans = await _jewelryContext.TbtProductionPlan
+                .Include(x => x.TbtProductionPlanStatusHeader)
+                .Where(item => planIds.Contains(item.Id))
+                .ToListAsync();
 
             if (!plans.Any())
             {
                 throw new HandleException(ErrorMessage.NotFound);
             }
 
-            var response = new TransferResponse()
+            return plans;
+        }
+        private async Task<TransferData> PrepareTransferData(TransferRequest request, List<TbtProductionPlan> plans)
+        {
+            var data = new TransferData
             {
-                Message = "success",
+                DateNow = DateTime.UtcNow,
+                Running = await _runningNumberService.GenerateRunningNumberForGold("PLT")
             };
-            var addNewStatus = new List<TbtProductionPlanStatusHeader>();
-            var addTransferStatus = new List<TbtProductionPlanTransferStatus>();
-            var updatePlans = new List<TbtProductionPlan>();
 
-            var running = await _runningNumberService.GenerateRunningNumberForGold("PLT");
-
-            foreach (var plan in request.Plans)
+            foreach (var planRequest in request.Plans)
             {
-                var error = new TransferResponseItem()
-                {
-                    Id = plan.Id,
-                    Wo = plan.Wo,
-                    WoNumber = plan.WoNumber,
-                };
+                var validationResult = ValidatePlanForTransfer(planRequest, plans, request);
 
-                var targetPlan = plans.Where(x => x.Id == plan.Id).FirstOrDefault();
-                if (targetPlan == null)
+                if (validationResult.IsValid)
                 {
-                    error.Message = ErrorMessage.NotFound;
-                    response.Errors.Add(error);
-                    continue;
+                    var targetPlan = plans.First(x => x.Id == planRequest.Id);
+                    AddValidPlanData(data, targetPlan, request);
                 }
-
-
-                if (targetPlan.TbtProductionPlanStatusHeader.Any())
-                { 
-                    var alreadyStatus = targetPlan.TbtProductionPlanStatusHeader
-                                                   .Where(x => x.IsActive == true)
-                                                   .Select(x => x.Status).ToArray();
-
-                    if (alreadyStatus.Contains(request.TargetStatus))
+                else
+                {
+                    data.Errors.Add(new TransferResponseItem
                     {
-                        error.Message = ErrorMessage.StatusAlready;
-                        response.Errors.Add(error);
-                        continue;
-                    }
+                        Id = planRequest.Id,
+                        Wo = planRequest.Wo,
+                        WoNumber = planRequest.WoNumber,
+                        Message = validationResult.ErrorMessage
+                    });
                 }
-
-                var newStatus = new TbtProductionPlanStatusHeader()
-                { 
-                    CreateDate = dateNow,
-                    CreateBy = request.TransferBy ?? _admin,
-                    UpdateDate = dateNow,
-                    UpdateBy = request.TransferBy ?? _admin,
-
-                    IsActive = true,
-
-                    ProductionPlanId = targetPlan.Id,
-                    Status = request.TargetStatus,
-                };
-                addNewStatus.Add(newStatus);
-
-                var newTransferStatus = new TbtProductionPlanTransferStatus()
-                { 
-                    Running = running,
-
-                    Wo = targetPlan.Wo,
-                    WoNumber = targetPlan.WoNumber,
-                    ProductionPlanId = targetPlan.Id,
-
-                    CreateDate = dateNow,
-                    CreateBy = request.TransferBy ?? _admin,
-
-                    FormerStatus = request.FormerStatus,
-                    TargetStatus = request.TargetStatus,    
-                };
-                addTransferStatus.Add(newTransferStatus);
-
-                targetPlan.Status = request.TargetStatus;
-                targetPlan.UpdateDate = dateNow;
-                targetPlan.UpdateBy = request.TransferBy ?? _admin;
-                updatePlans.Add(targetPlan);
-
             }
+
+            return data;
+        }
+        private (bool IsValid, string ErrorMessage) ValidatePlanForTransfer(
+            TransferRequestItem planRequest,
+            List<TbtProductionPlan> plans,
+            TransferRequest request)
+        {
+            var targetPlan = plans.FirstOrDefault(x => x.Id == planRequest.Id);
+
+            if (targetPlan == null)
+                return (false, ErrorMessage.NotFound);
+
+            if (targetPlan.Status == ProductionPlanStatus.Completed)
+                return (false, ErrorMessage.PlanCompleted);
+
+            if (request.TargetStatus == ProductionPlanStatus.Completed && targetPlan.Status != ProductionPlanStatus.Price)
+                return (false, ErrorMessage.PlanNeedPrice);
+
+            if (targetPlan.TbtProductionPlanStatusHeader.Any(x =>
+                x.IsActive && x.Status == request.TargetStatus))
+            {
+                return (false, ErrorMessage.StatusAlready);
+            }
+
+            return (true, null);
+        }
+        private void AddValidPlanData(TransferData data, TbtProductionPlan plan, TransferRequest request)
+        {
+            var newStatus = CreateNewStatus(plan, request, data.DateNow);
+            data.NewStatuses.Add(newStatus);
+
+            var transferStatus = CreateTransferStatus(plan, request, data.Running, data.DateNow);
+            data.TransferStatuses.Add(transferStatus);
+
+            plan.Status = request.TargetStatus;
+            plan.UpdateDate = data.DateNow;
+            plan.UpdateBy = request.TransferBy ?? _admin;
+            data.UpdatePlans.Add(plan);
+        }
+        private TbtProductionPlanStatusHeader CreateNewStatus(
+            TbtProductionPlan plan,
+            TransferRequest request,
+            DateTime dateNow)
+        {
+            return new TbtProductionPlanStatusHeader
+            {
+                CreateDate = dateNow,
+                CreateBy = request.TransferBy ?? _admin,
+                UpdateDate = dateNow,
+                UpdateBy = request.TransferBy ?? _admin,
+                IsActive = true,
+                ProductionPlanId = plan.Id,
+                Status = request.TargetStatus
+            };
+        }
+        private TbtProductionPlanTransferStatus CreateTransferStatus(
+            TbtProductionPlan plan,
+            TransferRequest request,
+            string running,
+            DateTime dateNow)
+        {
+            return new TbtProductionPlanTransferStatus
+            {
+                Running = running,
+                Wo = plan.Wo,
+                WoNumber = plan.WoNumber,
+                ProductionPlanId = plan.Id,
+                CreateDate = dateNow,
+                CreateBy = request.TransferBy ?? _admin,
+                FormerStatus = request.FormerStatus,
+                TargetStatus = request.TargetStatus
+            };
+        }
+        private async Task ProcessTransfer(TransferData data)
+        {
+            using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
+
+            if (data.NewStatuses.Any())
+            {
+                await _jewelryContext.TbtProductionPlanStatusHeader.AddRangeAsync(data.NewStatuses);
+                await _jewelryContext.SaveChangesAsync();
+
+                // Link transfer statuses with new status headers
+                foreach (var transfer in data.TransferStatuses)
+                {
+                    var match = data.NewStatuses.First(x => x.ProductionPlanId == transfer.ProductionPlanId);
+                    transfer.TargetStatusId = match.Id;
+                }
+            }
+
+            if (data.TransferStatuses.Any())
+            {
+                await _jewelryContext.TbtProductionPlanTransferStatus.AddRangeAsync(data.TransferStatuses);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            if (data.UpdatePlans.Any())
+            {
+                _jewelryContext.TbtProductionPlan.UpdateRange(data.UpdatePlans);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            scope.Complete();
+        }
+        private class TransferData
+        {
+            public DateTime DateNow { get; set; }
+            public string Running { get; set; }
+            public List<TbtProductionPlanStatusHeader> NewStatuses { get; } = new();
+            public List<TbtProductionPlanTransferStatus> TransferStatuses { get; } = new();
+            public List<TbtProductionPlan> UpdatePlans { get; } = new();
+            public List<TransferResponseItem> Errors { get; } = new();
+            public bool HasAnyValidPlans => NewStatuses.Any();
+        }
+
+        #endregion
+        #region --- method update production plan ---
+        public async Task<string> UpdateProductionPlan(ProductionPlanStatusUpdateRequest request)
+        {
+            var plan = await GetProductionPlan(request);
+            ValidatePlanStatus(plan, request);
+            var statusHeader = await GetStatusHeader(request);
 
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                if (addNewStatus.Any())
-                {
-                    _jewelryContext.TbtProductionPlanStatusHeader.AddRange(addNewStatus);
-                    await _jewelryContext.SaveChangesAsync();
-                }
-                if (addTransferStatus.Any())
-                {
-                    foreach (var transfer in addTransferStatus)
-                    { 
-                        var match = addNewStatus.Where(x => x.ProductionPlanId == transfer.ProductionPlanId).FirstOrDefault();
-                        if (match == null)
-                        {
-                            throw new HandleException($"{ErrorMessage.NotFound}");
-                        }
 
-                        transfer.TargetStatusId = match.Id;
-                    }
-
-                    _jewelryContext.TbtProductionPlanTransferStatus.AddRange(addTransferStatus);
-                    await _jewelryContext.SaveChangesAsync();
-                }
-                if (updatePlans.Any())
-                {
-                    _jewelryContext.TbtProductionPlan.UpdateRange(updatePlans);
-                    await _jewelryContext.SaveChangesAsync();
-                }
+                await UpdateStatusHeaderAndDetails(statusHeader, request);
+                await UpdatePlan(plan, request);
 
                 scope.Complete();
             }
 
-            return response;
+            return $"{plan.Wo}-{plan.WoNumber}";
+        }
+        private async Task<TbtProductionPlan> GetProductionPlan(ProductionPlanStatusUpdateRequest request)
+        {
+            var plan = await _jewelryContext.TbtProductionPlan
+                    .SingleOrDefaultAsync(item =>
+                    item.Id == request.ProductionPlanId &&
+                    item.Wo == request.Wo.ToUpper() &&
+                    item.WoNumber == request.WoNumber);
+
+            if (plan == null)
+            {
+                throw new HandleException($"{ErrorMessage.NotFound} --> {request.Wo}-{request.WoNumber}");
+            }
+
+            return plan;
+        }
+        private void ValidatePlanStatus(TbtProductionPlan plan, ProductionPlanStatusUpdateRequest request)
+        {
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{ErrorMessage.PlanCompleted} --> {request.Wo}-{request.WoNumber}");
+            }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{ErrorMessage.PlanMelted} --> {request.Wo}-{request.WoNumber}");
+            }
+        }
+        private async Task<TbtProductionPlanStatusHeader> GetStatusHeader(ProductionPlanStatusUpdateRequest request)
+        {
+            var header = (from item in _jewelryContext.TbtProductionPlanStatusHeader
+                              .Include(x => x.TbtProductionPlanStatusDetail)
+                              .Include(x => x.TbtProductionPlanStatusDetailGem)
+                          where item.ProductionPlanId == request.ProductionPlanId
+                          && item.Status == request.Status
+                          && item.Id == request.HeaderId
+                          && item.IsActive
+                          select item).SingleOrDefault();
+
+            if (header == null)
+            {
+                throw new HandleException(ErrorMessage.PlanNeedTransfer);
+            }
+
+            return header;
+        }
+        private async Task UpdateStatusHeaderAndDetails(TbtProductionPlanStatusHeader header, ProductionPlanStatusUpdateRequest request)
+        {
+            var addStatusItems = new List<TbtProductionPlanStatusDetail>();
+            var addStatusItemGems = new List<TbtProductionPlanStatusDetailGem>();
+            var updateStatusItemGems = new List<TbtProductionPlanStatusDetailGem>();
+
+            await UpdateStatusHeaderCommonFields(header, request);
+
+            var status = (ProductionPlanStatusEnum)request.Status;
+            switch (status)
+            {
+                case ProductionPlanStatusEnum.Casting:
+                case ProductionPlanStatusEnum.Scrub:
+                case ProductionPlanStatusEnum.Embed:
+                case ProductionPlanStatusEnum.Plated:
+                    await HandleProductionWoker(header, request, addStatusItems);
+                    break;
+
+                case ProductionPlanStatusEnum.Gems:
+                    await HandleProductionGems(header, request, addStatusItems, addStatusItemGems, updateStatusItemGems);
+                    break;
+
+                case ProductionPlanStatusEnum.CVD:
+                case ProductionPlanStatusEnum.Price:
+                    await HandleProductionPrice(header, request);
+                    break;
+            }
+
+            if (addStatusItems.Any())
+                await _jewelryContext.TbtProductionPlanStatusDetail.AddRangeAsync(addStatusItems);
+
+            if (addStatusItemGems.Any())
+                await _jewelryContext.TbtProductionPlanStatusDetailGem.AddRangeAsync(addStatusItemGems);
+
+            if (updateStatusItemGems.Any())
+                _jewelryContext.TbtProductionPlanStatusDetailGem.UpdateRange(updateStatusItemGems);
+
+            await _jewelryContext.SaveChangesAsync();
+        }
+        private async Task UpdateStatusHeaderCommonFields(TbtProductionPlanStatusHeader header, ProductionPlanStatusUpdateRequest request)
+        {
+            header.SendName = request.SendName;
+            header.SendDate = request.SendDate?.UtcDateTime;
+            header.CheckName = request.CheckName;
+            header.CheckDate = request.CheckDate?.UtcDateTime;
+            header.Remark1 = request.Remark1;
+            header.Remark2 = request.Remark2;
+            header.UpdateDate = DateTime.UtcNow;
+            header.UpdateBy = _admin;
+
+            _jewelryContext.TbtProductionPlanStatusHeader.Update(header);
+            await _jewelryContext.SaveChangesAsync();
+        }
+        private async Task HandleProductionWoker(
+           TbtProductionPlanStatusHeader header,
+           ProductionPlanStatusUpdateRequest request,
+           List<TbtProductionPlanStatusDetail> addStatusItems)
+        {
+            if (!request.Golds?.Any() ?? true)
+            {
+                throw new HandleException($"{ErrorMessage.PlanNeedGold}");
+            }
+
+            await RemoveExistingHeaderDetail(header);
+
+            header.WagesTotal = request.Golds.Sum(x => x.TotalWages);
+
+            foreach (var gold in request.Golds)
+            {
+                var detail = await CreateProductionHeaderDetail(request, header.Id, gold);
+                addStatusItems.Add(detail);
+            }
+        }
+        private async Task HandleReceiveStatus(
+           TbtProductionPlanStatusHeader header,
+           ProductionPlanStatusUpdateRequest request,
+           List<TbtProductionPlanStatusDetail> addStatusItems)
+        {
+            if (!request.Golds?.Any() ?? true)
+            {
+                throw new HandleException("โปรดระบุรายละเอียดของทอง");
+            }
+
+            await RemoveExistingHeaderDetail(header);
+
+            foreach (var gold in request.Golds)
+            {
+                var detail = await CreateReceiveStatusDetail(request, header.Id, gold);
+                addStatusItems.Add(detail);
+            }
+        }
+        private async Task HandleProductionGems(
+           TbtProductionPlanStatusHeader header,
+           ProductionPlanStatusUpdateRequest request,
+           List<TbtProductionPlanStatusDetail> addStatusItems,
+           List<TbtProductionPlanStatusDetailGem> addStatusItemGems,
+           List<TbtProductionPlanStatusDetailGem> updateStatusItemGems)
+        {
+            if (!request.Golds?.Any() ?? true)
+            {
+                throw new HandleException("โปรดระบุรายละเอียดของทอง");
+            }
+
+            await RemoveExistingDetailsAndGems(header);
+
+            foreach (var gold in request.Golds)
+            {
+                var detail = await CreateReceiveStatusDetail(request, header.Id, gold);
+                addStatusItems.Add(detail);
+            }
+
+            if (request.Gems?.Any() == true)
+            {
+                await HandleGemDetails(header, request, addStatusItemGems, updateStatusItemGems);
+            }
+        }
+        private async Task HandleProductionPrice(TbtProductionPlanStatusHeader header, ProductionPlanStatusUpdateRequest request)
+        {
+            // Simple status only updates header fields, which is handled in UpdateStatusHeaderCommonFields
+            await Task.CompletedTask;
+        }
+        private async Task RemoveExistingHeaderDetail(TbtProductionPlanStatusHeader header)
+        {
+            _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(header.TbtProductionPlanStatusDetail);
+            await _jewelryContext.SaveChangesAsync();
+        }
+        private async Task RemoveExistingDetailsAndGems(TbtProductionPlanStatusHeader header)
+        {
+            _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(header.TbtProductionPlanStatusDetail);
+
+            var removeGems = header.TbtProductionPlanStatusDetailGem
+                .Where(item => string.IsNullOrEmpty(item.OutboundRunning));
+
+            if (removeGems.Any())
+            {
+                _jewelryContext.TbtProductionPlanStatusDetailGem.RemoveRange(removeGems);
+            }
+
+            await _jewelryContext.SaveChangesAsync();
+        }
+        private async Task<TbtProductionPlanStatusDetail> CreateProductionHeaderDetail(
+            ProductionPlanStatusUpdateRequest request,
+            int headerId,
+            GoldItem gold)
+        {
+            var detail = new TbtProductionPlanStatusDetail
+            {
+                HeaderId = headerId,
+                ProductionPlanId = request.ProductionPlanId,
+                ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
+                IsActive = true,
+                RequestDate = gold.RequestDate?.UtcDateTime,
+                Gold = gold.Gold,
+                GoldQtySend = gold.GoldQTYSend,
+                GoldWeightSend = gold.GoldWeightSend,
+                GoldQtyCheck = gold.GoldQTYCheck,
+                GoldWeightCheck = gold.GoldWeightCheck,
+                Worker = gold.Worker,
+                WorkerSub = gold.WorkerSub,
+                Description = gold.Description,
+                Wages = gold.Wages ?? 0,
+                TotalWages = gold.TotalWages ?? 0
+            };
+
+            if (gold.GoldWeightSend.HasValue && gold.GoldWeightCheck.HasValue)
+            {
+                detail.GoldWeightDiff = gold.GoldWeightSend - gold.GoldWeightCheck;
+                decimal divide = gold.GoldWeightSend.Value <= 0 ? 1 : gold.GoldWeightSend.Value;
+                detail.GoldWeightDiffPercent = 100 - ((gold.GoldWeightCheck.Value * 100) / divide);
+            }
+
+            return detail;
+        }
+        private async Task<TbtProductionPlanStatusDetail> CreateReceiveStatusDetail(
+            ProductionPlanStatusUpdateRequest request,
+            int headerId,
+            GoldItem gold)
+        {
+            return new TbtProductionPlanStatusDetail
+            {
+                HeaderId = headerId,
+                ProductionPlanId = request.ProductionPlanId,
+                ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{request.ProductionPlanId}-{request.Status}"),
+                IsActive = true,
+                RequestDate = gold.RequestDate?.UtcDateTime,
+                Worker = gold.Worker,
+                WorkerSub = gold.WorkerSub,
+                Gold = gold.Gold,
+                GoldQtySend = gold.GoldQTYCheck,
+                GoldWeightSend = gold.GoldWeightCheck,
+                GoldQtyCheck = gold.GoldQTYCheck,
+                GoldWeightCheck = gold.GoldWeightCheck
+            };
+        }
+        private async Task HandleGemDetails(
+            TbtProductionPlanStatusHeader header,
+            ProductionPlanStatusUpdateRequest request,
+            List<TbtProductionPlanStatusDetailGem> addStatusItemGems,
+            List<TbtProductionPlanStatusDetailGem> updateStatusItemGems)
+        {
+            var validGems = request.Gems.Where(x => !string.IsNullOrEmpty(x.Code) && x.Id.HasValue).ToList();
+
+            foreach (var gem in validGems)
+            {
+                var existingGem = header.TbtProductionPlanStatusDetailGem
+                    .SingleOrDefault(x => x.OutboundRunning == gem.OutboundRunning && x.ItemNo == gem.ItemNo);
+
+                if (existingGem != null)
+                {
+                    existingGem.GemPrice = gem.Price;
+                    updateStatusItemGems.Add(existingGem);
+                }
+                else
+                {
+                    var newGem = new TbtProductionPlanStatusDetailGem
+                    {
+                        HeaderId = header.Id,
+                        ProductionPlanId = request.ProductionPlanId,
+                        ItemNo = await _runningNumberService.GenerateRunningNumber($"G-{request.ProductionPlanId}-{request.Status}"),
+                        IsActive = true,
+                        GemId = gem.Id.Value,
+                        GemCode = gem.Code,
+                        GemQty = gem.QTY,
+                        GemWeight = gem.Weight,
+                        GemName = gem.Name,
+                        GemPrice = gem.Price
+                    };
+                    addStatusItemGems.Add(newGem);
+                }
+            }
+        }
+        private async Task UpdatePlan(TbtProductionPlan plan, ProductionPlanStatusUpdateRequest request)
+        {
+            var currentStatus = (ProductionPlanStatusEnum)plan.Status;
+            var targetStatus = (ProductionPlanStatusEnum)request.Status;
+
+            if (currentStatus.IsUpdateByWatingStatus(targetStatus))
+            {
+                plan.Status = currentStatus.GetNextStatus();
+                plan.UpdateDate = DateTime.UtcNow;
+                plan.UpdateBy = _admin;
+
+                _jewelryContext.TbtProductionPlan.Update(plan);
+                await _jewelryContext.SaveChangesAsync();
+            }
         }
 
+        #endregion
+        #endregion
 
-
-        // ----- Add/Update Status Detail -----//
+        #region --- old plan add/update ---
+        // ----- old Add/Update Status Detail -----//
         public async Task<string> ProductionPlanAddStatusDetail(ProductionPlanStatusAddRequest request)
         {
             var plan = (from item in _jewelryContext.TbtProductionPlan
@@ -1579,10 +2090,10 @@ namespace Jewelry.Service.ProductionPlan
             //{
             //    throw new HandleException($"ใบจ่าย-รับคืนงาน {request.Wo}-{request.WoNumber} อยู่ในสถานะดำเนินการเสร็จสิ้น กรุณาตรวจสอบอีกครั้ง");
             //}
-            //if (plan.Status == ProductionPlanStatus.Completed)
-            //{
-            //    throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
-            //}
+            if (plan.Status == ProductionPlanStatus.Completed)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+            }
             if (plan.Status == ProductionPlanStatus.Melted)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
@@ -1899,7 +2410,7 @@ namespace Jewelry.Service.ProductionPlan
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
             }
 
-            if (plan.Status == ProductionPlanStatus.GemPick)
+            if (plan.Status == ProductionPlanStatus.Gems)
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PermissionFail}");
             }
@@ -1966,6 +2477,7 @@ namespace Jewelry.Service.ProductionPlan
 
             return $"{plan.Wo}-{plan.WoNumber}";
         }
+        #endregion
 
         // ----- Master ----- //
         public IQueryable<TbmProductionPlanStatus> GetProductionPlanStatus()
@@ -2200,5 +2712,26 @@ namespace Jewelry.Service.ProductionPlan
         }
 
         #endregion
+
+        //private int GetTransferStatus(int status)
+        //{
+        //    switch (status)
+        //    {
+        //        case ProductionPlanStatus.Casting:
+        //            return 60;
+        //        case 60:
+        //            return 70;
+        //        case 70:
+        //            return 80;
+        //        case 80:
+        //            return 90;
+        //        case 90:
+        //            return 100;
+        //        case 100:
+        //            return 500;
+        //        default:
+        //            return 0;
+        //    }
+        //}
     }
 }

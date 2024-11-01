@@ -1025,13 +1025,13 @@ namespace Jewelry.Service.Receipt.Gem
                             throw new HandleException(ErrorMessage.NotFound);
                         }
 
-                        var planGemPick = matchPlanGroup.TbtProductionPlanStatusHeader.FirstOrDefault(x => x.Status == ProductionPlanStatus.GemPick);
+                        var planGemPick = matchPlanGroup.TbtProductionPlanStatusHeader.FirstOrDefault(x => x.Status == ProductionPlanStatus.Gems);
                         if (planGemPick == null)
                         {
                             var addStatusHeader = new TbtProductionPlanStatusHeader
                             {
                                 ProductionPlanId = matchPlanGroup.Id,
-                                Status = ProductionPlanStatus.GemPick,
+                                Status = ProductionPlanStatus.Gems,
                                 IsActive = true,
 
                                 SendDate = request.RequestDate.UtcDateTime,
@@ -1070,7 +1070,7 @@ namespace Jewelry.Service.Receipt.Gem
                             {
                                 HeaderId = headerId,
                                 ProductionPlanId = matchPlanGroup.Id,
-                                ItemNo = await _runningNumberService.GenerateRunningNumberForGold($"G-{matchPlanGroup.Id}-{ProductionPlanStatus.GemPick}"),
+                                ItemNo = await _runningNumberService.GenerateRunningNumberForGold($"G-{matchPlanGroup.Id}-{ProductionPlanStatus.Gems}"),
                                 IsActive = true,
 
                                 GemId = gemData.Id,
@@ -1086,7 +1086,7 @@ namespace Jewelry.Service.Receipt.Gem
 
                             if (matchPlanGroup.Status == ProductionPlanStatus.Designed)
                             {
-                                matchPlanGroup.Status = ProductionPlanStatus.GemPick;
+                                matchPlanGroup.Status = ProductionPlanStatus.Gems;
                                 matchPlanGroup.UpdateDate = DateTime.UtcNow;
                                 matchPlanGroup.UpdateBy = _admin;
                                 updatePlan.Add(matchPlanGroup);

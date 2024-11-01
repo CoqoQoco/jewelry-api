@@ -86,6 +86,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockGemTransectionPrice> TbtStockGemTransectionPrice { get; set; }
 
+    public virtual DbSet<TbtStockProduct> TbtStockProduct { get; set; }
+
+    public virtual DbSet<TbtStockProductReceipt> TbtStockProductReceipt { get; set; }
+
     public virtual DbSet<TbtUser> TbtUser { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -1374,9 +1378,9 @@ public partial class JewelryContext : DbContext
                 .HasConstraintName("tbt_production_plan_transfer_status_plan_fk");
 
             entity.HasOne(d => d.TargetStatusNavigation).WithMany(p => p.TbtProductionPlanTransferStatus)
-                .HasForeignKey(d => d.TargetStatusId)
+                .HasForeignKey(d => d.TargetStatus)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("tbt_production_plan_transfer_status_target_fk");
+                .HasConstraintName("tbt_production_plan_transfer_status_former_fk");
         });
 
         modelBuilder.Entity<TbtReceiptStockCreate>(entity =>
@@ -1581,6 +1585,59 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UnitCode)
                 .HasColumnType("character varying")
                 .HasColumnName("unit_code");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtStockProduct>(entity =>
+        {
+            entity.HasKey(e => new { e.Running, e.ProductionPlanId }).HasName("tbt_stock_product_pk");
+
+            entity.ToTable("tbt_stock_product");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsReceipt).HasColumnName("is_receipt");
+            entity.Property(e => e.Location)
+                .HasColumnType("character varying")
+                .HasColumnName("location");
+            entity.Property(e => e.ReceiptNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("receipt_number");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.ReceiptNumberNavigation).WithMany(p => p.TbtStockProduct)
+                .HasForeignKey(d => d.ReceiptNumber)
+                .HasConstraintName("tbt_stock_product_receipt_fk");
+        });
+
+        modelBuilder.Entity<TbtStockProductReceipt>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_stock_product_receipt_pk");
+
+            entity.ToTable("tbt_stock_product_receipt");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Type)
+                .HasColumnType("character varying")
+                .HasColumnName("type");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");

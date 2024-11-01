@@ -20,6 +20,9 @@ namespace jewelry.Model.Exceptions
 
         public static string PlanCompleted = "แผนการผลิตนี้ได้ทำการผลิตเสร็จสิ้นแล้ว";
         public static string PlanMelted = "แผนการผลิตนี้ได้ทำการหลอมเเล้ว";
+        public static string PlanNeedTransfer = "โปรดทำรายการโอนงาน";
+        public static string PlanNeedPrice = "โปรดทำรายการบัตรต้นทุนก่อน";
+        public static string PlanNeedGold = "โปรดระบุรายการทอง";
 
         public static string PickReturned = "รายการนี้ได้ทำการคืนเเล้ว";
 

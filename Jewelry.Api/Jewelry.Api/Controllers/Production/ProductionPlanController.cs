@@ -286,6 +286,24 @@ namespace Jewelry.Api.Controllers.Production
             }
         }
 
+        [Route("ProductionPlanUpdateStatusDetail")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UpdateProductionPlan([FromBody] ProductionPlanStatusUpdateRequest request)
+        {
+            try
+            {
+                var response = await _IProductionPlanService.UpdateProductionPlan(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
 
         [Route("ProductionPlanAddStatusDetail")]
         [HttpPost]
@@ -304,7 +322,7 @@ namespace Jewelry.Api.Controllers.Production
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
-        [Route("ProductionPlanUpdateStatusDetail")]
+        [Route("OldProductionPlanUpdateStatusDetail")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]

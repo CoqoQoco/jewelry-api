@@ -31,5 +31,5 @@ public partial class TbtProductionPlanTransferStatus
 
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 
-    public virtual TbtProductionPlanStatusHeader TargetStatusNavigation { get; set; } = null!;
+    public virtual TbmProductionPlanStatus TargetStatusNavigation { get; set; } = null!;
 }
