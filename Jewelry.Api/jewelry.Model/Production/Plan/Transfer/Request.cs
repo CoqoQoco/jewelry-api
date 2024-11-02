@@ -12,7 +12,7 @@ namespace jewelry.Model.Production.Plan.Transfer
         public int FormerStatus { get; set; }
         public int TargetStatus { get; set; }
         public string? TransferBy { get; set; }
-        public IEnumerable<RequestItem> Plans { get; set; } = new List<RequestItem>();
+        public List<RequestItem> Plans { get; set; } = new List<RequestItem>();
     }
 
     public class RequestItem

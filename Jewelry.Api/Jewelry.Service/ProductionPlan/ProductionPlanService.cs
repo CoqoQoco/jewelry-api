@@ -686,7 +686,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                       }).ToList(),
 
                                                      TbtProductionPlanStatusGem = (from gem in item.TbtProductionPlanStatusDetailGem
-                                                                                       //let price = stockGem.Where(x => x.Code == gem.GemCode)
+                                                                                   let gemStock = stockGem.Where(x => x.Code == gem.GemCode).FirstOrDefault()
                                                                                    select new StatusDetailGem()
                                                                                    {
                                                                                        ProductionPlanId = gem.ProductionPlanId,
@@ -699,6 +699,8 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        QTY = gem.GemQty,
                                                                                        Price = gem.GemPrice,
                                                                                        Weight = gem.GemWeight,
+
+                                                                                       Unit = gemStock != null ? gemStock.Unit : "",
 
                                                                                        OutboundDate = gem.OutboundDate,
                                                                                        OutboundName = gem.OutboundName,
@@ -2652,6 +2654,10 @@ namespace Jewelry.Service.ProductionPlan
             {
                 throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
             }
+            if (plan.Status == ProductionPlanStatus.Melted)
+            {
+                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanMelted}");
+            }
 
             var oldPrice = (from item in _jewelryContext.TbtProductionPlanPrice
                             where item.Wo == request.Wo
@@ -2703,6 +2709,16 @@ namespace Jewelry.Service.ProductionPlan
                 {
                     _jewelryContext.TbtProductionPlanPrice.AddRange(newPrices);
                 }
+
+                plan.UpdateDate = DateTime.UtcNow;
+                plan.UpdateBy = _admin;
+
+                if (plan.Status == ProductionPlanStatus.WaitPrice)
+                {
+                    plan.Status = ProductionPlanStatus.Price;
+                }
+
+                _jewelryContext.TbtProductionPlan.Update(plan);
 
                 await _jewelryContext.SaveChangesAsync();
                 scope.Complete();

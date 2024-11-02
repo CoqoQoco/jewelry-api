@@ -104,6 +104,7 @@ namespace Jewelry.Service.Receipt.Gem
 
             gem.GroupName = request.GroupName.Trim();
             gem.Size = request.Size.Trim();
+            gem.Shape = request.Shape.Trim();
 
 
             gem.Grade = request.Grade.Trim();

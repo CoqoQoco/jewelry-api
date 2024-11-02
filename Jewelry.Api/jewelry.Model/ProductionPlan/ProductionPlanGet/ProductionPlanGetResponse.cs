@@ -118,6 +118,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public string? OutboundRunning { get; set; }
         public string? OutboundName { get; set; }
         public DateTime? OutboundDate { get; set; }
+
+        public string Unit { get; set; }
     }
 
     public class Price

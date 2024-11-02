@@ -8,11 +8,13 @@ using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
+using Jewelry.Service.Production.Plan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NPOI.OpenXmlFormats.Spreadsheet;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -37,11 +39,15 @@ namespace Jewelry.Service.ProductionPlan
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
-        public ProductionPlanCostService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService)
+        private readonly IPlanService _planService;
+        public ProductionPlanCostService(JewelryContext JewelryContext, 
+            IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService, 
+            IPlanService planService)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
             _runningNumberService = runningNumberService;
+            _planService = planService;
         }
 
         public IQueryable<GoldCostListResponse> ListGoldCost(GoldCostList request)
@@ -427,7 +433,12 @@ namespace Jewelry.Service.ProductionPlan
                                            where planIds.Contains(plan.Id)
                                            select plan).ToList();
 
-                    var updateproductionPlans = new List<TbtProductionPlan>();
+                    var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
+                    {
+                        FormerStatus = ProductionPlanStatus.Designed,
+                        TargetStatus = ProductionPlanStatus.Casting,
+                        TransferBy = $"ใบผสมทอง : {request.BookNo}- {request.No}/{request.ReceiveBy}",
+                    };
 
                     foreach (var item in request.Items)
                     {
@@ -446,112 +457,149 @@ namespace Jewelry.Service.ProductionPlan
                         };
                         createItems.Add(createItem);
 
+
                         // set auto status paln when plan is design
                         var getPlan = productionPlans.Where(x => x.Id == item.Id).FirstOrDefault();
-                        if (getPlan != null)
+                        if (getPlan == null)
                         {
-                            var oldStatusHearder = (from heaader in _jewelryContext.TbtProductionPlanStatusHeader
-                                                    .Include(x => x.TbtProductionPlanStatusDetail)
-                                                    where heaader.ProductionPlanId == item.Id
-                                                    && heaader.Status == ProductionPlanStatus.Casting
-                                                    && heaader.IsActive
-                                                    select item).FirstOrDefault();
-
-                            if (oldStatusHearder == null)
-                            {
-                                if (getPlan.Status == ProductionPlanStatus.Designed)
-                                {
-                                    var addStatusHeader = new TbtProductionPlanStatusHeader
-                                    {
-                                        ProductionPlanId = item.Id,
-                                        Status = ProductionPlanStatus.Casting,
-                                        IsActive = true,
-
-                                        CreateDate = DateTime.UtcNow,
-                                        CreateBy = _admin,
-                                        UpdateDate = DateTime.UtcNow,
-                                        UpdateBy = _admin,
-
-                                        //SendName = request.AssignBy,
-                                        //SendDate = request.AssignDateFormat.UtcDateTime,
-                                        //CheckName = request.ReceiveBy,
-                                        //CheckDate = request.AssignDateFormat.UtcDateTime,
-
-                                        Remark1 = request.Remark,
-                                        Remark2 = string.Empty,
-                                        WagesTotal = 0,
-                                    };
-                                    _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatusHeader);
-                                    await _jewelryContext.SaveChangesAsync();
-
-                                    var addStatusHeaderItem = new TbtProductionPlanStatusDetail()
-                                    {
-                                        HeaderId = addStatusHeader.Id,
-                                        ProductionPlanId = item.Id,
-                                        ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{item.Id}-{ProductionPlanStatus.Casting}"),
-                                        IsActive = true,
-
-                                        RequestDate = null,
-
-                                        Gold = request.GoldCode,
-                                        GoldQtySend = item.ReturnQTY,
-                                        GoldWeightSend = item.ReturnWeight,
-                                        GoldQtyCheck = null,
-                                        GoldWeightCheck = null,
-                                        Worker = null,
-                                        WorkerSub = null,
-                                        Description = request.Remark,
-
-                                        Wages = 0,
-                                        TotalWages = 0,
-
-                                    };
-                                    _jewelryContext.TbtProductionPlanStatusDetail.Add(addStatusHeaderItem);
-                                }
-                            }
-                            else
-                            {
-                                if (getPlan.Status != ProductionPlanStatus.Completed)
-                                {
-                                    var addStatusHeaderItem = new TbtProductionPlanStatusDetail()
-                                    {
-                                        HeaderId = oldStatusHearder.Id,
-                                        ProductionPlanId = item.Id,
-                                        ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{item.Id}-{ProductionPlanStatus.Casting}"),
-                                        IsActive = true,
-
-                                        RequestDate = null,
-
-                                        Gold = request.GoldCode,
-                                        GoldQtySend = item.ReturnQTY,
-                                        GoldWeightSend = item.ReturnWeight,
-                                        GoldQtyCheck = null,
-                                        GoldWeightCheck = null,
-                                        Worker = null,
-                                        WorkerSub = null,
-                                        Description = request.Remark,
-
-                                        Wages = 0,
-                                        TotalWages = 0,
-
-                                    };
-                                    _jewelryContext.TbtProductionPlanStatusDetail.Add(addStatusHeaderItem);
-                                }
-                            }
-
-                            //update status plan
-                            if (getPlan.Status == ProductionPlanStatus.Designed)
-                            {
-                                getPlan.Status = ProductionPlanStatus.Casting;
-                                getPlan.UpdateBy = _admin;
-                                getPlan.UpdateDate = DateTime.UtcNow;
-                                updateproductionPlans.Add(getPlan);
-                            }
+                            throw new HandleException($"{ErrorMessage.NotFound} --> ไม่พบแผนผลิต");
                         }
+
+                        if (getPlan.Status == ProductionPlanStatus.Designed)
+                        {
+                            var createheaderPlan = new jewelry.Model.Production.Plan.Transfer.RequestItem()
+                            {
+                                Id = item.Id,
+                                Wo = getPlan.Wo,
+                                WoNumber = getPlan.WoNumber
+                            };
+                            requestTransfer.Plans.Add(createheaderPlan);
+                            //create header status wating cast
+                            //var newHeaderWaitingCast = new TbtProductionPlanStatusHeader()
+                            //{
+                            //    CreateDate = DateTime.UtcNow,
+                            //    CreateBy = $"{request.BookNo}- {request.No}/{request.ReceiveBy}",
+                            //    UpdateDate = DateTime.UtcNow,
+                            //    UpdateBy = $"{request.BookNo}- {request.No}/{request.ReceiveBy}",
+                            //    IsActive = true,
+                            //    ProductionPlanId = getPlan.Id,
+                            //    Status = ProductionPlanStatus.WaitCasting
+                            //};
+                            //createHeaderStatus.Add(newHeaderWaitingCast);
+
+                            //getPlan.UpdateDate = DateTime.UtcNow;
+                            //getPlan.UpdateBy = request.ReceiveBy;
+                            //getPlan.Status = ProductionPlanStatus.WaitCasting;
+                            //updateproductionPlans.Add(getPlan);
+                        }
+
+                        #region --- old  method ---
+                        //if (getPlan != null)
+                        //{
+                        //    var oldStatusHearder = (from heaader in _jewelryContext.TbtProductionPlanStatusHeader
+                        //                            .Include(x => x.TbtProductionPlanStatusDetail)
+                        //                            where heaader.ProductionPlanId == item.Id
+                        //                            && heaader.Status == ProductionPlanStatus.Casting
+                        //                            && heaader.IsActive
+                        //                            select item).FirstOrDefault();
+
+                        //    if (oldStatusHearder == null)
+                        //    {
+                        //        if (getPlan.Status == ProductionPlanStatus.Designed)
+                        //        {
+                        //            var addStatusHeader = new TbtProductionPlanStatusHeader
+                        //            {
+                        //                ProductionPlanId = item.Id,
+                        //                Status = ProductionPlanStatus.Casting,
+                        //                IsActive = true,
+
+                        //                CreateDate = DateTime.UtcNow,
+                        //                CreateBy = _admin,
+                        //                UpdateDate = DateTime.UtcNow,
+                        //                UpdateBy = _admin,
+
+                        //                //SendName = request.AssignBy,
+                        //                //SendDate = request.AssignDateFormat.UtcDateTime,
+                        //                //CheckName = request.ReceiveBy,
+                        //                //CheckDate = request.AssignDateFormat.UtcDateTime,
+
+                        //                Remark1 = request.Remark,
+                        //                Remark2 = string.Empty,
+                        //                WagesTotal = 0,
+                        //            };
+                        //            _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatusHeader);
+                        //            await _jewelryContext.SaveChangesAsync();
+
+                        //            var addStatusHeaderItem = new TbtProductionPlanStatusDetail()
+                        //            {
+                        //                HeaderId = addStatusHeader.Id,
+                        //                ProductionPlanId = item.Id,
+                        //                ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{item.Id}-{ProductionPlanStatus.Casting}"),
+                        //                IsActive = true,
+
+                        //                RequestDate = null,
+
+                        //                Gold = request.GoldCode,
+                        //                GoldQtySend = item.ReturnQTY,
+                        //                GoldWeightSend = item.ReturnWeight,
+                        //                GoldQtyCheck = null,
+                        //                GoldWeightCheck = null,
+                        //                Worker = null,
+                        //                WorkerSub = null,
+                        //                Description = request.Remark,
+
+                        //                Wages = 0,
+                        //                TotalWages = 0,
+
+                        //            };
+                        //            _jewelryContext.TbtProductionPlanStatusDetail.Add(addStatusHeaderItem);
+                        //        }
+                        //    }
+                        //    else
+                        //    {
+                        //        if (getPlan.Status != ProductionPlanStatus.Completed)
+                        //        {
+                        //            var addStatusHeaderItem = new TbtProductionPlanStatusDetail()
+                        //            {
+                        //                HeaderId = oldStatusHearder.Id,
+                        //                ProductionPlanId = item.Id,
+                        //                ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{item.Id}-{ProductionPlanStatus.Casting}"),
+                        //                IsActive = true,
+
+                        //                RequestDate = null,
+
+                        //                Gold = request.GoldCode,
+                        //                GoldQtySend = item.ReturnQTY,
+                        //                GoldWeightSend = item.ReturnWeight,
+                        //                GoldQtyCheck = null,
+                        //                GoldWeightCheck = null,
+                        //                Worker = null,
+                        //                WorkerSub = null,
+                        //                Description = request.Remark,
+
+                        //                Wages = 0,
+                        //                TotalWages = 0,
+
+                        //            };
+                        //            _jewelryContext.TbtProductionPlanStatusDetail.Add(addStatusHeaderItem);
+                        //        }
+                        //    }
+
+                        //    //update status plan
+                        //    if (getPlan.Status == ProductionPlanStatus.Designed)
+                        //    {
+                        //        getPlan.Status = ProductionPlanStatus.Casting;
+                        //        getPlan.UpdateBy = _admin;
+                        //        getPlan.UpdateDate = DateTime.UtcNow;
+                        //        updateproductionPlans.Add(getPlan);
+                        //    }
+                        //} 
+                        #endregion
                     }
-                    if (updateproductionPlans.Any())
-                    {
-                        _jewelryContext.TbtProductionPlan.UpdateRange(updateproductionPlans);
+
+                    if (requestTransfer.Plans != null && requestTransfer.Plans.Count > 0)
+                    { 
+                        var result = await _planService.Transfer(requestTransfer);
                     }
                 }
                 if (createItems.Any())
@@ -728,7 +776,7 @@ namespace Jewelry.Service.ProductionPlan
                          });
 
             if (!string.IsNullOrEmpty(request.ProductionPlanNumber))
-            { 
+            {
                 query = query.Where(x => x.ProductionPlanId == request.ProductionPlanNumber);
             }
 
