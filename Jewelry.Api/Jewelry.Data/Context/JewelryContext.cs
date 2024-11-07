@@ -879,6 +879,7 @@ public partial class JewelryContext : DbContext
                 .IsRequired()
                 .HasDefaultValueSql("true")
                 .HasColumnName("is_active");
+            entity.Property(e => e.IsReceipt).HasColumnName("is_receipt");
             entity.Property(e => e.Mold)
                 .HasComment("เเม่พิมพ์")
                 .HasColumnType("character varying")
@@ -1376,11 +1377,6 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.ProductionPlanId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_production_plan_transfer_status_plan_fk");
-
-            entity.HasOne(d => d.TargetStatusNavigation).WithMany(p => p.TbtProductionPlanTransferStatus)
-                .HasForeignKey(d => d.TargetStatus)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("tbt_production_plan_transfer_status_former_fk");
         });
 
         modelBuilder.Entity<TbtReceiptStockCreate>(entity =>
@@ -1616,6 +1612,11 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtStockProduct)
+                .HasForeignKey(d => d.ProductionPlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_product_plan_fk");
 
             entity.HasOne(d => d.ReceiptNumberNavigation).WithMany(p => p.TbtStockProduct)
                 .HasForeignKey(d => d.ReceiptNumber)

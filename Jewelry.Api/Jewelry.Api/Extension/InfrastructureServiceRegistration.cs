@@ -8,6 +8,7 @@ using Jewelry.Service.Production.Plan;
 using Jewelry.Service.ProductionPlan;
 using Jewelry.Service.Receipt.Gem;
 using Jewelry.Service.Stock;
+using Jewelry.Service.Stock.Product;
 using Jewelry.Service.User;
 using Jewelry.Service.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IReceiptAndIssueStockGemService, ReceiptAndIssueStockGemService>();
 
             services.AddScoped<IPlanService, PlanService>();
+            services.AddScoped<IProductService, ProductService>();
 
             return services;
         }

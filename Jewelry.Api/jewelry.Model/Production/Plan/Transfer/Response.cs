@@ -10,6 +10,8 @@ namespace jewelry.Model.Production.Plan.Transfer
     public class Response
     {
         public string Message { get; set; }
+        public string? ReceiptNumber { get; set; }
+        public string TransferNumber { get; set; }
         public List<TransferResponseItem> Errors { get; set; } = new List<TransferResponseItem>();
     }
 

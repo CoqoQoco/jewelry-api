@@ -65,6 +65,8 @@ public partial class TbtProductionPlan
 
     public string? TypeSize { get; set; }
 
+    public bool IsReceipt { get; set; }
+
     public virtual TbmCustomerType CustomerTypeNavigation { get; set; } = null!;
 
     public virtual TbmProductType ProductTypeNavigation { get; set; } = null!;
@@ -80,4 +82,6 @@ public partial class TbtProductionPlan
     public virtual ICollection<TbtProductionPlanStatusHeader> TbtProductionPlanStatusHeader { get; set; } = new List<TbtProductionPlanStatusHeader>();
 
     public virtual ICollection<TbtProductionPlanTransferStatus> TbtProductionPlanTransferStatus { get; set; } = new List<TbtProductionPlanTransferStatus>();
+
+    public virtual ICollection<TbtStockProduct> TbtStockProduct { get; set; } = new List<TbtStockProduct>();
 }

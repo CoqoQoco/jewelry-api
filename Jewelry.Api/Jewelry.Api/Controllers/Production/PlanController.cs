@@ -3,6 +3,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanStatus.Transfer;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Production.Plan;
 using Jewelry.Service.ProductionPlan;
+using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -25,6 +26,25 @@ namespace Jewelry.Api.Controllers.Production
         {
             _logger = logger;
             _planService = planService;
+        }
+
+        [Route("TransferList")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Production.Plan.TransferList.Response>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult TransferList([FromBody] jewelry.Model.Production.Plan.TransferList.Request request)
+        {
+            try
+            {
+                var response = _planService.TransferList(request.Search);
+                return response.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
         }
 
         [Route("Transfer")]

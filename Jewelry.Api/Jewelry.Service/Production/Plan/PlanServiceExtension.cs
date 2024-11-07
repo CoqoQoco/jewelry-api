@@ -33,6 +33,7 @@ namespace Jewelry.Service.Production.Plan
                 ProductionPlanStatusEnum.Embed => (int)ProductionPlanStatusEnum.WaitEmbed,
                 ProductionPlanStatusEnum.Plated => (int)ProductionPlanStatusEnum.WaitPlated,
                 ProductionPlanStatusEnum.Price => (int)ProductionPlanStatusEnum.WaitPrice,
+                ProductionPlanStatusEnum.Completed => (int)ProductionPlanStatusEnum.Completed,
                 _ => (int)currentStatus
             };
         }

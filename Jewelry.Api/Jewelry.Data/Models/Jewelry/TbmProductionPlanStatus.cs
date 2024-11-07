@@ -16,6 +16,4 @@ public partial class TbmProductionPlanStatus
     public virtual ICollection<TbtProductionPlan> TbtProductionPlan { get; set; } = new List<TbtProductionPlan>();
 
     public virtual ICollection<TbtProductionPlanStatusHeader> TbtProductionPlanStatusHeader { get; set; } = new List<TbtProductionPlanStatusHeader>();
-
-    public virtual ICollection<TbtProductionPlanTransferStatus> TbtProductionPlanTransferStatus { get; set; } = new List<TbtProductionPlanTransferStatus>();
 }
