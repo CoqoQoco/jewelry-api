@@ -31,13 +31,14 @@ namespace Jewelry.Service.Stock.Product
             var query = (from item in _jewelryContext.TbtStockProduct
                          .Include(x => x.ProductionPlan)
                          .Include(o => o.ProductionPlan.ProductTypeNavigation)
-                         //.Include(o => o.ProductionPlan.CustomerTypeNavigation)
+                         .Include(o => o.ProductionPlan.CustomerTypeNavigation)
                          .Include(x => x.ReceiptNumberNavigation)
                          select new jewelry.Model.Stock.Product.List.Response()
                          {
                              Id = item.ProductionPlan.Id,
                              Wo = item.ProductionPlan.Wo,
                              WoNumber = item.ProductionPlan.WoNumber,
+                             WoText = item.ProductionPlan.WoText,
 
                              ReceiptNumber = item.ReceiptNumber,
                              ReceiptDate = item.ReceiptNumberNavigation.CreateDate,
@@ -45,6 +46,7 @@ namespace Jewelry.Service.Stock.Product
 
                              ProductNumber = item.ProductionPlan.ProductNumber,
                              ProductTypeName = item.ProductionPlan.ProductTypeNavigation.NameTh,
+                             ProductType = item.ProductionPlan.ProductType,
                              ProductQty = item.ProductionPlan.ProductQty,
 
                              Mold = item.ProductionPlan.Mold,
@@ -54,11 +56,11 @@ namespace Jewelry.Service.Stock.Product
 
             if (request.RecieptStart.HasValue)
             {
-                query = query.Where(x => x.CreateDate >= request.RecieptStart.Value.StartOfDayUtc());
+                query = query.Where(x => x.ReceiptDate >= request.RecieptStart.Value.StartOfDayUtc());
             }
             if (request.ReceiptEnd.HasValue)
             {
-                query = query.Where(x => x.CreateDate >= request.ReceiptEnd.Value.EndOfDayUtc());
+                query = query.Where(x => x.ReceiptDate >= request.ReceiptEnd.Value.EndOfDayUtc());
             }
 
             if (!string.IsNullOrEmpty(request.ReceiptNumber))
@@ -68,6 +70,34 @@ namespace Jewelry.Service.Stock.Product
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
                 query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
+            }
+
+
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                query = query.Where(x => x.WoText.Contains(request.WoText));
+            }
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.Mold.Contains(request.Mold));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+            }
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Gold));
+            }
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => request.GoldSize.Contains(x.GoldSize));
             }
 
             return query;
