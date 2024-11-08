@@ -28,6 +28,25 @@ namespace Jewelry.Api.Controllers.Production
             _planService = planService;
         }
 
+        [Route("StatusDetailList")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Production.Plan.StatusDetailList.Response>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult StatusDetailList([FromBody] jewelry.Model.Production.Plan.StatusDetailList.Request request)
+        {
+            try
+            {
+                var response = _planService.StatusDetailList(request.Search);
+                return response.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
         [Route("TransferList")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Production.Plan.TransferList.Response>))]
