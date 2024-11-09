@@ -174,17 +174,10 @@ namespace Jewelry.Service.Production.Plan
 
             if (transferData.HasAnyValidPlans)
             {
-                if (!string.IsNullOrEmpty(transferData.ReceiptRunning))
-                {
-                    transferData.NewReceipt = new TbtStockProductReceipt()
-                    { 
-                        Running = transferData.ReceiptRunning,
-
-                        CreateDate = DateTime.UtcNow,
-                        CreateBy = request.TransferBy ?? _admin,
-                        Type = "Receipt-Plan"
-                    };
-                }
+                //if (!string.IsNullOrEmpty(transferData.ReceiptRunning))
+                //{
+                   
+                //}
 
                 await ProcessTransfer(transferData);
             }
@@ -291,12 +284,17 @@ namespace Jewelry.Service.Production.Plan
             var currentStatus = (ProductionPlanStatusEnum)request.TargetStatus;
 
             if (request.TargetStatus == ProductionPlanStatus.Completed)
-            { 
-                var newStock = await CreateNewStock(plan, request, receiptRunning, data.DateNow);
-                data.NewStock.Add(newStock);
-                data.ReceiptRunning = receiptRunning;
+            {
+                //create new stock receipt plan
+                var newStockReceiptPlan = await CreateNewStockReceiptPlan(plan, request, receiptRunning, data.DateNow);
+                data.newStockReceiptPlan.Add(newStockReceiptPlan);
+
+                //create new stock receipt item
+                var newStockReceiptItem = await CreateNewStockReceiptItem(plan, request, receiptRunning, data.DateNow);
+                data.newStockReceiptItem.AddRange(newStockReceiptItem);
 
                 plan.IsReceipt = true;
+                data.ReceiptRunning = receiptRunning;
             }
 
             plan.Status = currentStatus.GetWatingStatus();
@@ -338,22 +336,56 @@ namespace Jewelry.Service.Production.Plan
                 TargetStatus = request.TargetStatus
             };
         }
-        private async Task<TbtStockProduct> CreateNewStock(TbtProductionPlan plan,
+        private async Task<TbtStockProductReceiptPlan> CreateNewStockReceiptPlan(TbtProductionPlan plan,
             jewelry.Model.Production.Plan.Transfer.Request request,
             string running,
             DateTime dateNow)
         {
-            var productRunning = await _runningNumberService.GenerateRunningNumberForGold("DKP");
-            return new TbtStockProduct
+            return new TbtStockProductReceiptPlan
             { 
-                Running = productRunning,
-                ReceiptNumber = running,
-                ProductionPlanId = plan.Id,
+                Running = running,
 
                 CreateDate = dateNow,
                 CreateBy = request.TransferBy ?? _admin,
-                IsReceipt = true
+
+                ProductionPlanId = plan.Id,
+                Wo = plan.Wo,
+                WoNumber = plan.WoNumber,
+                WoText = plan.WoText,
+
+                Qty = plan.ProductQty,
+                IsComplete = false,
             };
+        }
+
+        private async Task<List<TbtStockProductReceiptItem>> CreateNewStockReceiptItem(TbtProductionPlan plan,
+           jewelry.Model.Production.Plan.Transfer.Request request,
+           string running,
+           DateTime dateNow)
+        {
+            var NewStockReceiptItem = new List<TbtStockProductReceiptItem>();
+
+            for (int i = 1; i <= plan.ProductQty; i++)
+            {
+                var item = new TbtStockProductReceiptItem
+                {
+                    Running = running,
+                    Wo = plan.Wo,
+                    WoNumber = plan.WoNumber,
+
+                    StockReceiptNumber = await _runningNumberService.GenerateRunningNumberForGold("STR"),
+                    IsReceipt = false,
+
+                    CreateDate = dateNow,
+                    CreateBy = request.TransferBy ?? _admin,
+
+
+                };
+
+                NewStockReceiptItem.Add(item);
+            }
+
+            return NewStockReceiptItem;
         }
         private async Task ProcessTransfer(TransferData data)
         {
@@ -384,14 +416,14 @@ namespace Jewelry.Service.Production.Plan
                 await _jewelryContext.SaveChangesAsync();
             }
 
-            if (data.NewReceipt != null && !string.IsNullOrEmpty(data.ReceiptRunning))
+            if (data.newStockReceiptPlan != null && !string.IsNullOrEmpty(data.ReceiptRunning))
             {
-                await _jewelryContext.TbtStockProductReceipt.AddAsync(data.NewReceipt);
+                await _jewelryContext.TbtStockProductReceiptPlan.AddRangeAsync(data.newStockReceiptPlan);
                 await _jewelryContext.SaveChangesAsync();
             }
-            if (data.NewStock.Any())
+            if (data.newStockReceiptItem.Any() && !string.IsNullOrEmpty(data.ReceiptRunning))
             {
-                await _jewelryContext.TbtStockProduct.AddRangeAsync(data.NewStock);
+                await _jewelryContext.TbtStockProductReceiptItem.AddRangeAsync(data.newStockReceiptItem);
                 await _jewelryContext.SaveChangesAsync();
             }
 
@@ -408,8 +440,9 @@ namespace Jewelry.Service.Production.Plan
             public List<TransferResponseItem> Errors { get; } = new();
 
             //new product to stock
-            public List<TbtStockProduct> NewStock { get; } = new();
-            public TbtStockProductReceipt? NewReceipt { get; set; }
+            public List<TbtStockProductReceiptPlan> newStockReceiptPlan { get; } = new();
+            public List<TbtStockProductReceiptItem> newStockReceiptItem { get; } = new();
+
             public bool HasAnyValidPlans => NewStatuses.Any();
         }
         #endregion

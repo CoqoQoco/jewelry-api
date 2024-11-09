@@ -32,7 +32,7 @@ namespace Jewelry.Service.Stock.Product
                          .Include(x => x.ProductionPlan)
                          .Include(o => o.ProductionPlan.ProductTypeNavigation)
                          .Include(o => o.ProductionPlan.CustomerTypeNavigation)
-                         .Include(x => x.ReceiptNumberNavigation)
+                         //.Include(x => x.ReceiptNumberNavigation)
                          select new jewelry.Model.Stock.Product.List.Response()
                          {
                              Id = item.ProductionPlan.Id,
@@ -41,7 +41,7 @@ namespace Jewelry.Service.Stock.Product
                              WoText = item.ProductionPlan.WoText,
 
                              ReceiptNumber = item.ReceiptNumber,
-                             ReceiptDate = item.ReceiptNumberNavigation.CreateDate,
+                             //ReceiptDate = item.ReceiptNumberNavigation.CreateDate,
                              StockNumber = item.Running,
 
                              ProductNumber = item.ProductionPlan.ProductNumber,

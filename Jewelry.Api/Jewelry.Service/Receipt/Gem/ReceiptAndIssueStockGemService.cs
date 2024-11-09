@@ -545,8 +545,115 @@ namespace Jewelry.Service.Receipt.Gem
 
         }
 
-
         public IQueryable<PicklistResponse> Picklist(PicklistFilter request)
+        {
+            // Start with the base query
+            var query = from item in _jewelryContext.TbtStockGemTransection
+                        join gem in _jewelryContext.TbtStockGem on item.Code equals gem.Code
+                        group new { item, gem } by item.Running into grouped
+                        select new PicklistResponse
+                        {
+                            Running = grouped.Key,
+                            Type = grouped.First().item.Type,
+                            RequestDate = grouped.First().item.RequestDate,
+                            ReturnDate = grouped.First().item.ReturnDate,
+                            Remark = grouped.First().item.Remark1,
+                            Stastus = grouped.First().item.Stastus,
+                            CreateBy = grouped.First().item.CreateBy,
+                            CreateDate = grouped.First().item.CreateDate,
+                            UpdateBy = grouped.First().item.UpdateBy,
+                            UpdateDate = grouped.First().item.UpdateDate,
+                            IsOverPick = grouped.First().item.ReturnDate != null && grouped.First().item.ReturnDate < DateTime.UtcNow,
+                            OperatorBy = grouped.First().item.OperatorBy,
+                            Items = grouped.Select(g => new PicklistItem
+                            {
+                                Code = g.item.Code,
+                                GroupName = g.item.Code,
+                                Name = $"{g.item.Code}-{g.gem.Shape}-{g.gem.Size}-{g.gem.Grade}-{g.gem.GroupName}",
+                                Size = g.gem.Size,
+                                Shape = g.gem.Shape,
+                                Grade = g.gem.Grade,
+                                GradeDia = g.gem.GradeDia,
+                                Status = g.item.Stastus,
+                                RequestDate = g.item.RequestDate,
+                                Running = g.item.Running,
+                                Type = g.item.Type,
+                                JobOrPo = g.item.JobOrPo,
+                                SupplierCost = g.item.SupplierCost,
+                                Remark1 = g.item.Remark1,
+                                Remark2 = g.item.Remark2,
+                                Qty = g.item.Qty,
+                                QtyWeight = g.item.QtyWeight,
+                                SubpplierName = g.item.SubpplierName,
+                                CreateDate = g.item.CreateDate,
+                                CreateBy = g.item.CreateBy,
+                                UpdateDate = g.item.UpdateDate,
+                                UpdateBy = g.item.UpdateBy,
+
+                                WO = g.item.ProductionPlanWo,
+                                WONumber = g.item.ProductionPlanWoNumber,
+                                WOText = g.item.ProductionPlanWoText,
+                                Mold = g.item.ProductionPlanMold,
+
+                                Price = g.gem.Price,
+                                PriceQty = g.gem.PriceQty,
+                                Unit = g.gem.Unit,
+                                UnitCode = g.gem.UnitCode,
+                                OperatorBy = g.item.OperatorBy,
+                            })
+                        };
+
+            // Apply all filters before executing the query
+            if (!string.IsNullOrEmpty(request.Running))
+            {
+                query = query.Where(item => item.Running.Contains(request.Running));
+            }
+
+            if (request.Type != null && request.Type.Any())
+            {
+                query = query.Where(item => request.Type.Contains(item.Type));
+            }
+
+            if (request.Status != null && request.Status.Any())
+            {
+                query = query.Where(item => request.Status.Contains(item.Stastus));
+            }
+
+            if (request.RequestDateStart.HasValue)
+            {
+                query = query.Where(item => item.RequestDate >= request.RequestDateStart.Value.StartOfDayUtc());
+            }
+
+            if (request.RequestDateEnd.HasValue)
+            {
+                query = query.Where(item => item.RequestDate <= request.RequestDateEnd.Value.EndOfDayUtc());
+            }
+
+            if (request.ReturnDateStart.HasValue)
+            {
+                query = query.Where(item => item.ReturnDate >= request.ReturnDateStart.Value.StartOfDayUtc());
+            }
+
+            if (request.ReturnDateEnd.HasValue)
+            {
+                query = query.Where(item => item.ReturnDate <= request.ReturnDateEnd.Value.EndOfDayUtc());
+            }
+
+            if (!string.IsNullOrEmpty(request.GetRunning))
+            {
+                query = query.Where(item => item.Running == request.GetRunning);
+            }
+
+            if (!string.IsNullOrEmpty(request.Code))
+            {
+                var upperCode = request.Code.ToUpper();
+                query = query.Where(item => item.Items.Any(x => x.Code.Contains(upperCode)));
+            }
+
+            return query;
+        }
+
+        public IQueryable<PicklistResponse> OldPicklist(PicklistFilter request)
         {
             var query = (from item in _jewelryContext.TbtStockGemTransection
                          join gem in _jewelryContext.TbtStockGem on item.Code equals gem.Code
@@ -602,7 +709,6 @@ namespace Jewelry.Service.Receipt.Gem
                                  OperatorBy = g.item.OperatorBy,
                              }),
 
-                             //Code = grouped.Select(g => g.item.Code).ToArray(),
                          }).ToList();
 
             if (!string.IsNullOrEmpty(request.Running))

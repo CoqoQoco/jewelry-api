@@ -24,6 +24,4 @@ public partial class TbtStockProduct
     public bool IsReceipt { get; set; }
 
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
-
-    public virtual TbtStockProductReceipt? ReceiptNumberNavigation { get; set; }
 }
