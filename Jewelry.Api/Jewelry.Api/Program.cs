@@ -80,6 +80,9 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// Add HttpContextAccessor
+builder.Services.AddHttpContextAccessor();
+
 //Register DB, Service 
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
