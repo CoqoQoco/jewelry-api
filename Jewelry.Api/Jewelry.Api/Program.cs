@@ -1,3 +1,4 @@
+using Jewelry.Api.Controllers;
 using Jewelry.Api.Extension;
 using Jewelry.Data.Context;
 using Jewelry.Service.Helper;
@@ -28,13 +29,19 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 //allow cors origin
 builder.Services.AddCors(c =>
 {
-    c.AddPolicy("AllowAnyOrigin", options => options.WithOrigins("http://localhost:5173")
+    c.AddPolicy("AllowAnyOrigin", options => options.WithOrigins(
+                                        "http://localhost:7000",
+                                        "https://localhost:7001",
+                                        "http://localhost:5173"  // Frontend port ถ้ามี
+                                         )
                           .AllowAnyOrigin()
                           .AllowAnyHeader()
                           .AllowAnyMethod());
 });
 
 var app = builder.Build();
+
+app.UseExceptionMiddleware();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -17,6 +17,7 @@
   <ItemGroup>
     <Folder Include="Production\Plan\Create\" />
     <Folder Include="Production\Plan\Update\" />
+    <Folder Include="User\" />
   </ItemGroup>
 
 </Project>

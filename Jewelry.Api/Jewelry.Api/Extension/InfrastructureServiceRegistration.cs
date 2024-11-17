@@ -1,5 +1,5 @@
-﻿using jewelry.Model.User.PasswordHash;
-using Jewelry.Data.Context;
+﻿using Jewelry.Data.Context;
+using Jewelry.Service.Authentication.Login;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
@@ -41,7 +41,6 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IWorkerService, WorkerService>();
             services.AddScoped<IProductionPlanCostService, ProductionPlanCostService>();
             services.AddScoped<IStockGemService, StockGemService>();
-            services.AddScoped<IPasswordHash, PasswordHashService>();
             services.AddScoped<IMoldPlanService, MoldPlanService>();
             services.AddScoped<IStockMoldService, StockMoldService>();
             services.AddScoped<IReceiptAndIssueStockGemService, ReceiptAndIssueStockGemService>();
@@ -49,6 +48,8 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IPlanService, PlanService>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<IPlanReceiptService, PlanReceiptService>();
+
+            services.AddScoped<ILoginService, LoginService>();
 
             return services;
         }
