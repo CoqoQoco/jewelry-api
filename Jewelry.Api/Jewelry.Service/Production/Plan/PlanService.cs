@@ -130,11 +130,13 @@ namespace Jewelry.Service.Production.Plan
                          .Include(x => x.ProductionPlan)
                          .Include(x => x.ProductionPlan.ProductTypeNavigation)
                          select new jewelry.Model.Production.Plan.TransferList.Response()
-                         { 
+                         {
+                             TransferNumber = item.Running,
+
                              Wo = item.Wo,
                              WoNumber = item.WoNumber,
+                             WoText = item.ProductionPlan.WoText,
 
-                             TransferNumber = item.Running,
                              FormerStatus = item.FormerStatus,
                              TargetStatus = item.TargetStatus,
 
@@ -151,19 +153,63 @@ namespace Jewelry.Service.Production.Plan
 
                              Gold = item.ProductionPlan.Type,
                              GoldSize = item.ProductionPlan.TypeSize,
-
                          });
 
+            if (request.Start.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.Start.Value.StartOfDayUtc());
+            }
+            if (request.End.HasValue)
+            {
+                query = query.Where(x => x.CreateDate <= request.End.Value.EndOfDayUtc());
+            }
+
             if (!string.IsNullOrEmpty(request.TransferNumber))
-            { 
+            {
                 query = query.Where(x => x.TransferNumber.Contains(request.TransferNumber));
+            }
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                query = query.Where(x => x.WoText.Contains(request.WoText));
+            }
+
+            if (request.StatusFormer.HasValue)
+            {
+                query = query.Where(x => x.FormerStatus == request.StatusFormer.Value);
+            }
+            if (request.StatusTarget.HasValue)
+            {
+                query = query.Where(x => x.TargetStatus == request.StatusTarget.Value);
+            }
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Gold));
+            }
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => request.GoldSize.Contains(x.GoldSize));
+            }
+
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+            }
+
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.Mold.Contains(request.Mold));
             }
 
             return query;
         }
         #endregion
         #region --- Transfer Plan ---
-        public async Task<jewelry.Model.Production.Plan.Transfer.Response> Transfer(jewelry.Model.Production.Plan.Transfer.Request  request)
+        public async Task<jewelry.Model.Production.Plan.Transfer.Response> Transfer(jewelry.Model.Production.Plan.Transfer.Request request)
         {
             ValidateRequest(request);
 
@@ -176,7 +222,7 @@ namespace Jewelry.Service.Production.Plan
             {
                 //if (!string.IsNullOrEmpty(transferData.ReceiptRunning))
                 //{
-                   
+
                 //}
 
                 await ProcessTransfer(transferData);
@@ -218,7 +264,7 @@ namespace Jewelry.Service.Production.Plan
             var receiptRunning = string.Empty;
 
             if (request.TargetStatus == ProductionPlanStatus.Completed)
-            { 
+            {
                 receiptRunning = await _runningNumberService.GenerateRunningNumberForGold("REP");
             }
 
@@ -258,7 +304,7 @@ namespace Jewelry.Service.Production.Plan
             if (targetPlan.Status == ProductionPlanStatus.Completed)
                 return (false, ErrorMessage.PlanCompleted);
 
-            if (request.TargetStatus == ProductionPlanStatus.Completed  && (targetPlan.Status != ProductionPlanStatus.Price))
+            if (request.TargetStatus == ProductionPlanStatus.Completed && (targetPlan.Status != ProductionPlanStatus.Price))
                 return (false, ErrorMessage.PlanNeedPrice);
 
             if (targetPlan.TbtProductionPlanStatusHeader.Any(x =>
@@ -269,8 +315,8 @@ namespace Jewelry.Service.Production.Plan
 
             return (true, null);
         }
-        private async Task AddValidPlanData(TransferData data, 
-            TbtProductionPlan plan, 
+        private async Task AddValidPlanData(TransferData data,
+            TbtProductionPlan plan,
             jewelry.Model.Production.Plan.Transfer.Request request,
             string receiptRunning)
         {
@@ -342,7 +388,7 @@ namespace Jewelry.Service.Production.Plan
             DateTime dateNow)
         {
             return new TbtStockProductReceiptPlan
-            { 
+            {
                 Running = running,
 
                 CreateDate = dateNow,
