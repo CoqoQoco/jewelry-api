@@ -32,6 +32,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmProductionPlanStatus> TbmProductionPlanStatus { get; set; }
 
+    public virtual DbSet<TbmUserRole> TbmUserRole { get; set; }
+
     public virtual DbSet<TbmWorker> TbmWorker { get; set; }
 
     public virtual DbSet<TbmZill> TbmZill { get; set; }
@@ -93,6 +95,8 @@ public partial class JewelryContext : DbContext
     public virtual DbSet<TbtStockProductReceiptPlan> TbtStockProductReceiptPlan { get; set; }
 
     public virtual DbSet<TbtUser> TbtUser { get; set; }
+
+    public virtual DbSet<TbtUserRole> TbtUserRole { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -358,6 +362,31 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.NameTh)
                 .HasColumnType("character varying")
                 .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmUserRole>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbm_user_role_pk");
+
+            entity.ToTable("tbm_user_role");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Description)
+                .HasColumnType("character varying")
+                .HasColumnName("description");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.Level).HasColumnName("level");
+            entity.Property(e => e.Name)
+                .HasColumnType("character varying")
+                .HasColumnName("name");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         modelBuilder.Entity<TbmWorker>(entity =>
@@ -1698,7 +1727,7 @@ public partial class JewelryContext : DbContext
                 .ValueGeneratedOnAdd()
                 .HasColumnName("id");
             entity.Property(e => e.Username)
-                .HasMaxLength(10)
+                .HasMaxLength(20)
                 .HasColumnName("username");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
@@ -1708,22 +1737,57 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("first_name_th");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.IsNew).HasColumnName("is_new");
             entity.Property(e => e.LastNameTh)
                 .HasColumnType("character varying")
                 .HasColumnName("last_name_th");
-            entity.Property(e => e.PasswordHash).HasColumnName("password_hash");
-            entity.Property(e => e.PasswordSalt).HasColumnName("password_salt");
-            entity.Property(e => e.PermissionLevel).HasColumnName("permission_level");
-            entity.Property(e => e.Position)
+            entity.Property(e => e.Password)
                 .HasColumnType("character varying")
-                .HasColumnName("position");
+                .HasColumnName("password");
             entity.Property(e => e.PrefixNameTh)
                 .HasColumnType("character varying")
                 .HasColumnName("prefix_name_th");
+            entity.Property(e => e.Role)
+                .HasColumnType("character varying")
+                .HasColumnName("role");
+            entity.Property(e => e.Salt)
+                .HasColumnType("character varying")
+                .HasColumnName("salt");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtUserRole>(entity =>
+        {
+            entity.HasKey(e => new { e.Username, e.Role, e.UserId }).HasName("tbt_user_role_pk");
+
+            entity.ToTable("tbt_user_role");
+
+            entity.Property(e => e.Username)
+                .HasColumnType("character varying")
+                .HasColumnName("username");
+            entity.Property(e => e.Role).HasColumnName("role");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.RoleNavigation).WithMany(p => p.TbtUserRole)
+                .HasForeignKey(d => d.Role)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_user_role_master_fk");
+
+            entity.HasOne(d => d.User).WithMany(p => p.TbtUserRole)
+                .HasForeignKey(d => new { d.UserId, d.Username })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_user_role_user_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 
-namespace Jewelry.Api.Controllers
+namespace Jewelry.Api.Extension
 {
     internal class ErrorDetails
     {
@@ -69,7 +69,7 @@ namespace Jewelry.Api.Controllers
                 await HandleExceptionAsync(context, ex);
             }
         }
-      
+
 
         private async Task HandleValidationExceptionAsync(HttpContext context, ValidationException exception)
         {

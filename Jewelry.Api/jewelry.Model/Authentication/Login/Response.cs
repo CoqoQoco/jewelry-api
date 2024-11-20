@@ -9,8 +9,9 @@ namespace jewelry.Model.Authentication.Login
     public class Response
     {
         public string Token { get; set; }
-        public string Username { get; set; }
-        public string FullName { get; set; }
-        public int PermissionLevel { get; set; }
+
+        //public string Username { get; set; }
+        //public string FullName { get; set; }
+        //public int PermissionLevel { get; set; }
     }
 }

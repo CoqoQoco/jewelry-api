@@ -15,10 +15,6 @@ public partial class TbtUser
 
     public string PrefixNameTh { get; set; } = null!;
 
-    public byte[] PasswordHash { get; set; } = null!;
-
-    public byte[] PasswordSalt { get; set; } = null!;
-
     public bool IsActive { get; set; }
 
     public DateTime CreateDate { get; set; }
@@ -29,7 +25,13 @@ public partial class TbtUser
 
     public string? UpdateBy { get; set; }
 
-    public string Position { get; set; } = null!;
+    public string? Role { get; set; }
 
-    public int PermissionLevel { get; set; }
+    public string Password { get; set; } = null!;
+
+    public string Salt { get; set; } = null!;
+
+    public bool IsNew { get; set; }
+
+    public virtual ICollection<TbtUserRole> TbtUserRole { get; set; } = new List<TbtUserRole>();
 }

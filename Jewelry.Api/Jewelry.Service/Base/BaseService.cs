@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Jewelry.Data.Context;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,10 +13,12 @@ namespace Jewelry.Service.Base
     public abstract class BaseService
     {
         protected readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly JewelryContext _jewelryContext;
 
-        protected BaseService(IHttpContextAccessor httpContextAccessor)
+        protected BaseService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor)
         {
             _httpContextAccessor = httpContextAccessor;
+            _jewelryContext = jewelryContext;
         }
 
         // Property สำหรับดึง username
@@ -35,5 +39,35 @@ namespace Jewelry.Service.Base
         // Method สำหรับตรวจสอบ role
         protected bool IsInRole(string role) =>
             CurrentUserRoles.Contains(role);
+
+        protected void CheckPermissionLevel(string topic)
+        {
+            // ถ้าไม่มี user roles ให้ throw unauthorized ทันที
+            if (!CurrentUserRoles.Any())
+            {
+                throw new UnauthorizedAccessException("ไม่พบข้อมูลสิทธิ์การใช้งาน");
+            }
+
+            // กำหนด permission map
+            var permissionMap = new Dictionary<string, string[]>
+            {
+                ["new_user"] = new[] { "Admin"},
+                ["edit_user"] = new[] { "Admin"},
+                ["delete_user"] = new[] { "Admin" },
+            };
+
+            // ตรวจสอบว่ามี topic นั้นใน map หรือไม่
+            if (!permissionMap.ContainsKey(topic))
+            {
+                throw new KeyNotFoundException($"ไม่พบการกำหนดสิทธิ์สำหรับ {topic}");
+            }
+
+            // ตรวจสอบสิทธิ์
+            var allowedRoles = permissionMap[topic];
+            if (!allowedRoles.Any(role => CurrentUserRoles.Contains(role)))
+            {
+                throw new UnauthorizedAccessException($"คุณไม่มีสิทธิ์เข้าถึง: {topic}");
+            }
+        }
     }
 }

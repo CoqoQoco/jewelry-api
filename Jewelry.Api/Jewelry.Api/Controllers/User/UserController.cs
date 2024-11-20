@@ -29,13 +29,22 @@ namespace Jewelry.Api.Controllers.User
 
 
         [Route("Get")]
-        [HttpPost]
+        [HttpGet]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.User.Get.Response))]
-        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public async Task<IActionResult> Get()
         {
             var response =  _service.Get();
+            return Ok(response);
+        }
+
+        [Route("Create")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Create([FromBody] jewelry.Model.User.Create.Request request)
+        {
+            var response = await _service.Create(request);
             return Ok(response);
         }
     }

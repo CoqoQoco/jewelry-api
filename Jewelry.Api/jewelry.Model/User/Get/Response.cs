@@ -16,7 +16,11 @@ namespace jewelry.Model.User.Get
         public string FirstNameEn { get; set; }
         public string LastNameEN { get; set; }
 
-        public string Position { get; set; }
-        public int PermissionLevel { get; set; }
+    }
+
+    public class Role
+    { 
+        public string Name { get; set; }
+        public string Description { get; set; }
     }
 }
