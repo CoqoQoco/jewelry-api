@@ -1733,23 +1733,17 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
-            entity.Property(e => e.FirstNameTh)
+            entity.Property(e => e.FirstName)
                 .HasColumnType("character varying")
-                .HasColumnName("first_name_th");
+                .HasColumnName("first_name");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.IsNew).HasColumnName("is_new");
-            entity.Property(e => e.LastNameTh)
+            entity.Property(e => e.LastName)
                 .HasColumnType("character varying")
-                .HasColumnName("last_name_th");
+                .HasColumnName("last_name");
             entity.Property(e => e.Password)
                 .HasColumnType("character varying")
                 .HasColumnName("password");
-            entity.Property(e => e.PrefixNameTh)
-                .HasColumnType("character varying")
-                .HasColumnName("prefix_name_th");
-            entity.Property(e => e.Role)
-                .HasColumnType("character varying")
-                .HasColumnName("role");
             entity.Property(e => e.Salt)
                 .HasColumnType("character varying")
                 .HasColumnName("salt");

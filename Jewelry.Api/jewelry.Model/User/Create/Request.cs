@@ -11,13 +11,8 @@ namespace jewelry.Model.User.Create
         public string Username { get; set; }
         public string Password { get; set; }
 
-        public string PrefixNameTh { get; set; }
-        public string FirstNameTh { get; set; }
-        public string LastNameTh { get; set; }
-
-        public string? PrefixNameEn { get; set; }
-        public string? FirstNameEn { get; set; }
-        public string? LastNameEn { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
 
         public List<Role>? Roles { get; set; }
     }

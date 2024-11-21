@@ -9,11 +9,9 @@ public partial class TbtUser
 
     public string Username { get; set; } = null!;
 
-    public string FirstNameTh { get; set; } = null!;
+    public string FirstName { get; set; } = null!;
 
-    public string LastNameTh { get; set; } = null!;
-
-    public string PrefixNameTh { get; set; } = null!;
+    public string LastName { get; set; } = null!;
 
     public bool IsActive { get; set; }
 
@@ -24,8 +22,6 @@ public partial class TbtUser
     public DateTime? UpdateDate { get; set; }
 
     public string? UpdateBy { get; set; }
-
-    public string? Role { get; set; }
 
     public string Password { get; set; } = null!;
 

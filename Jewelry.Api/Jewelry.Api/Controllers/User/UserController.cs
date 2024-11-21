@@ -34,8 +34,29 @@ namespace Jewelry.Api.Controllers.User
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public async Task<IActionResult> Get()
         {
-            var response =  _service.Get();
+            var response = _service.Get();
             return Ok(response);
+        }
+
+        [Route("GetAccount")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.User.Get.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetAccount(int id)
+        {
+            var response = _service.GetAccount(id);
+            return Ok(response);
+        }
+
+        [Route("List")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.User.List.Response>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult List([FromBody] jewelry.Model.User.List.Request request)
+        {
+            var response = _service.List(request.Search);
+            return response.ToDataSource(request);
         }
 
         [Route("Create")]
@@ -45,6 +66,16 @@ namespace Jewelry.Api.Controllers.User
         public async Task<IActionResult> Create([FromBody] jewelry.Model.User.Create.Request request)
         {
             var response = await _service.Create(request);
+            return Ok(response);
+        }
+
+        [Route("Active")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Active([FromBody] jewelry.Model.User.Active.Request request)
+        {
+            var response = await _service.Active(request);
             return Ok(response);
         }
     }

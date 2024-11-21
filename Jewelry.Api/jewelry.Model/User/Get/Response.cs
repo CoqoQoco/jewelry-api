@@ -8,13 +8,8 @@ namespace jewelry.Model.User.Get
 {
     public class Response
     {
-        public string PrefixNameTh { get; set; }
-        public string FirstNameTh { get; set; }
-        public string LastNameTh { get; set; }
-
-        public string PrefixNameEn { get; set; }
-        public string FirstNameEn { get; set; }
-        public string LastNameEN { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
 
     }
 

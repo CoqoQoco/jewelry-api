@@ -211,9 +211,8 @@ namespace Jewelry.Service.Authentication.Login
                 IsActive = false,
                 IsNew = true,
 
-                PrefixNameTh = request.Firstname,
-                FirstNameTh = request.Firstname,
-                LastNameTh = request.Lastname,
+                FirstName = request.Firstname,
+                LastName = request.Lastname,
 
                 CreateBy = request.Username,
                 CreateDate = DateTime.UtcNow,

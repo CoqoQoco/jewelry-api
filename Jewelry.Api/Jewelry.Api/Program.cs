@@ -1,3 +1,4 @@
+using Base.API.Extensions;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
