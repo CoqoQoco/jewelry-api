@@ -5,6 +5,7 @@ using Jewelry.Api.Extension;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Stock;
 using Kendo.DynamicLinqCore;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -13,6 +14,7 @@ namespace Jewelry.Api.Controllers
 {
     [Route("/[controller]")]
     [ApiController]
+    [Authorize]
     public class CustomerController : ApiControllerBase
     {
         private readonly ILogger<MoldController> _logger;

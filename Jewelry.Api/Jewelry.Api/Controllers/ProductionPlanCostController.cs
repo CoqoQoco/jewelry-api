@@ -9,6 +9,7 @@ using Jewelry.Api.Controllers.Production;
 using Jewelry.Api.Extension;
 using Jewelry.Service.ProductionPlan;
 using Kendo.DynamicLinqCore;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -17,6 +18,7 @@ namespace Jewelry.Api.Controllers
 {
     [Route("/[controller]")]
     [ApiController]
+    [Authorize]
     public class ProductionPlanCostController : ApiControllerBase
     {
         private readonly ILogger<ProductionPlanController> _logger;

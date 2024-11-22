@@ -78,6 +78,15 @@ namespace Jewelry.Api.Controllers.User
             var response = await _service.Active(request);
             return Ok(response);
         }
+        [Route("Inactive")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Inactive([FromBody] jewelry.Model.User.Active.Request request)
+        {
+            var response = await _service.Inactive(request);
+            return Ok(response);
+        }
     }
 }
 

@@ -20,6 +20,7 @@ using Jewelry.Service.Mold;
 using Jewelry.Service.ProductionPlan;
 using Jewelry.Service.Stock;
 using Kendo.DynamicLinqCore;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -28,6 +29,7 @@ namespace Jewelry.Api.Controllers
 {
     [Route("/[controller]")]
     [ApiController]
+    [Authorize]
     public class MoldController : ApiControllerBase
     {
         private readonly ILogger<MoldController> _logger;

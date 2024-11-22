@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Index.HPRtree;
 using NPOI.OpenXmlFormats.Spreadsheet;
+using NPOI.SS.Formula.Functions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -42,22 +43,23 @@ namespace Jewelry.Service.User
                 throw new UnauthorizedAccessException();
             }
 
-            var response =  new jewelry.Model.User.Get.Response()
+            var response = new jewelry.Model.User.Get.Response()
             {
+                Id = user.Id,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
             };
 
             if (user.TbtUserRole.Any())
-            { 
+            {
                 response.Role = from role in user.TbtUserRole
-                                 select new jewelry.Model.User.Get.Role()
-                                 {
-                                     Id = role.RoleNavigation.Id,
-                                     Level = role.RoleNavigation.Level,
-                                     Name = role.RoleNavigation.Name,
-                                     Description = role.RoleNavigation.Description ?? string.Empty,
-                                 };
+                                select new jewelry.Model.User.Get.Role()
+                                {
+                                    Id = role.RoleNavigation.Id,
+                                    Level = role.RoleNavigation.Level,
+                                    Name = role.RoleNavigation.Name,
+                                    Description = role.RoleNavigation.Description ?? string.Empty,
+                                };
             }
 
             return response;
@@ -309,8 +311,8 @@ namespace Jewelry.Service.User
                 if (request.IsNew)
                 {
                     user.IsNew = false;
-                    user.IsActive = true;
                 }
+                user.IsActive = true;
 
                 user.UpdateDate = DateTime.UtcNow;
                 user.UpdateBy = CurrentUsername;
@@ -337,6 +339,47 @@ namespace Jewelry.Service.User
                        CreateBy = CurrentUsername,
                        CreateDate = DateTime.UtcNow,
                    };
+        }
+        #endregion
+        #region --- inactive ---
+        public async Task<string> Inactive(jewelry.Model.User.Active.Request request)
+        {
+            CheckPermissionLevel("edit_user");
+
+            var user = (from item in _jewelryContext.TbtUser
+                        .Include(x => x.TbtUserRole)
+                        where item.Id == request.Id
+                        && item.Username == request.Username
+                        select item).FirstOrDefault();
+
+            if (user == null)
+            {
+                throw new KeyNotFoundException(ErrorMessage.NotFound);
+            }
+            //if (request.IsNew != user.IsNew)
+            //{
+            //    throw new KeyNotFoundException(ErrorMessage.InvalidRequest);
+            //}
+            //if (!user.IsActive)
+            //{
+            //    throw new KeyNotFoundException(ErrorMessage.InvalidRequest);
+            //}
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                user.IsActive = false;
+                user.IsNew = false;
+                user.UpdateDate = DateTime.UtcNow;
+                user.UpdateBy = CurrentUsername;
+
+                _jewelryContext.TbtUser.Update(user);
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
+
+
+            return "success";
         }
         #endregion
     }

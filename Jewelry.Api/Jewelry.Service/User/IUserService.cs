@@ -14,5 +14,6 @@ namespace Jewelry.Service.User
         Task<string> Create(jewelry.Model.User.Create.Request request);
 
         Task<string> Active(jewelry.Model.User.Active.Request request);
+        Task<string> Inactive(jewelry.Model.User.Active.Request request);
     }
 }

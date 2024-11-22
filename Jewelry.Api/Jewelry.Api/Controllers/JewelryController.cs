@@ -4,6 +4,7 @@ using Jewelry.Api.Extension;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
 using Jewelry.Service.User;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -12,6 +13,7 @@ namespace Jewelry.Api.Controllers
 {
     [Route("/[controller]")]
     [ApiController]
+    [Authorize]
     public class JewelryController : ApiControllerBase
     {
         private readonly ILogger<JewelryController> _logger;

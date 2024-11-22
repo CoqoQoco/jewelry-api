@@ -5,6 +5,7 @@ using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
 using Kendo.DynamicLinqCore;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -12,6 +13,7 @@ namespace Jewelry.Api.Controllers.Stock
 {
     [Route("/[controller]")]
     [ApiController]
+    [Authorize]
     public class StockProductController : ApiControllerBase
     {
         private readonly ILogger<MoldController> _logger;

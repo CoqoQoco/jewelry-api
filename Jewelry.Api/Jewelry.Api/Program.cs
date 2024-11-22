@@ -1,10 +1,13 @@
 using Base.API.Extensions;
 using Jewelry.Api.Extension;
+using Jewelry.Data.Context;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
+using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,6 +33,56 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]!)
             )
+        };
+
+        // เพิ่ม Events สำหรับตรวจสอบ user status
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var dbContext = context.HttpContext.RequestServices
+                    .GetRequiredService<JewelryContext>();
+
+                // ดึง user id จาก token claims
+                var userId = int.Parse(context.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                var username = context.Principal.FindFirst(ClaimTypes.Name)?.Value;
+
+                // ตรวจสอบ user status จาก database
+                var user = await dbContext.TbtUser
+                    .FirstOrDefaultAsync(u => u.Id == userId && u.Username == username);
+
+                if (user == null || !user.IsActive || user.IsNew)
+                {
+                    context.Fail("User is inactive or not found");
+                    return;
+                }
+            },
+
+            OnAuthenticationFailed = context =>
+            {
+                if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
+                {
+                    context.Response.Headers.Add("Token-Expired", "true");
+                }
+                return Task.CompletedTask;
+            },
+
+            OnChallenge = context =>
+            {
+                context.HandleResponse(); // ป้องกัน default response
+
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+
+                var response = JsonConvert.SerializeObject(new
+                {
+                    status = 401,
+                    message = "You are not authorized",
+                    error = context.ErrorDescription
+                });
+
+                return context.Response.WriteAsync(response);
+            }
         };
     });
 
@@ -89,6 +142,7 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
+app.UseMiddleware<AuthenticationMiddleware>();
 app.UseExceptionMiddleware();
 
 if (app.Environment.IsDevelopment())

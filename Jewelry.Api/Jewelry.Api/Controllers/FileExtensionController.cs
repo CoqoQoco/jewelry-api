@@ -4,6 +4,7 @@ using Jewelry.Api.Controllers.Production;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Helper;
 using Jewelry.Service.ProductionPlan;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -12,6 +13,7 @@ namespace Jewelry.Api.Controllers
 {
     [Route("/[controller]")]
     [ApiController]
+    [Authorize]
     public class FileExtensionController : ApiControllerBase
     {
         private readonly ILogger<ProductionPlanController> _logger;
