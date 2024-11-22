@@ -45,7 +45,8 @@ namespace Jewelry.Service.Authentication.Login
 
             if (user == null)
             {
-                throw new KeyNotFoundException("ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง");
+                //throw new KeyNotFoundException("ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง");
+                throw new KeyNotFoundException("ไม่พบสิทธิ์การใช้งาน");
             }
 
             var role = user.TbtUserRole.Where(x => x.RoleNavigation.IsActive).Select(x => x.RoleNavigation.Name).ToArray();
@@ -59,10 +60,15 @@ namespace Jewelry.Service.Authentication.Login
 
             if (!VerifyPassword(request.Password, user.Password, user.Salt))
             {
-                throw new KeyNotFoundException("Username/Password ไม่ถูกต้อง");
+                throw new UnauthorizedAccessException("ไม่พบสิทธิ์การใช้งาน");
             }
 
             response.Token = GenerateToken(user.Id.ToString(), user.Username, role);
+
+            user.LastLogin = DateTime.UtcNow;
+
+            _jewelryContext.TbtUser.Update(user);
+            await _jewelryContext.SaveChangesAsync();
 
             return response;
         }

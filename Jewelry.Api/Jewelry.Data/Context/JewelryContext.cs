@@ -1738,6 +1738,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("first_name");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.IsNew).HasColumnName("is_new");
+            entity.Property(e => e.LastLogin).HasColumnName("last_login");
             entity.Property(e => e.LastName)
                 .HasColumnType("character varying")
                 .HasColumnName("last_name");

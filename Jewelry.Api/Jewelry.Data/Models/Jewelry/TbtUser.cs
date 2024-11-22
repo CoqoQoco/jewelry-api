@@ -29,5 +29,7 @@ public partial class TbtUser
 
     public bool IsNew { get; set; }
 
+    public DateTime? LastLogin { get; set; }
+
     public virtual ICollection<TbtUserRole> TbtUserRole { get; set; } = new List<TbtUserRole>();
 }

@@ -5,7 +5,9 @@ using jewelry.Model.ProductionPlan.ProductionPlanStatus.Transfer;
 using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Hosting;
@@ -19,15 +21,14 @@ using System.Transactions;
 
 namespace Jewelry.Service.Production.Plan
 {
-    public class PlanService : IPlanService
+    public class PlanService : BaseService, IPlanService
     {
-        private readonly string _admin = "@ADMIN";
 
         private readonly JewelryContext _jewelryContext;
-
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
-        public PlanService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService)
+        public PlanService(JewelryContext JewelryContext, IHttpContextAccessor httpContextAccessor,
+            IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
@@ -345,7 +346,7 @@ namespace Jewelry.Service.Production.Plan
 
             plan.Status = currentStatus.GetWatingStatus();
             plan.UpdateDate = data.DateNow;
-            plan.UpdateBy = request.TransferBy ?? _admin;
+            plan.UpdateBy = CurrentUsername;
             data.UpdatePlans.Add(plan);
         }
         private TbtProductionPlanStatusHeader CreateNewStatus(
@@ -356,9 +357,9 @@ namespace Jewelry.Service.Production.Plan
             return new TbtProductionPlanStatusHeader
             {
                 CreateDate = dateNow,
-                CreateBy = request.TransferBy ?? _admin,
+                CreateBy = CurrentUsername,
                 UpdateDate = dateNow,
-                UpdateBy = request.TransferBy ?? _admin,
+                UpdateBy = CurrentUsername,
                 IsActive = true,
                 ProductionPlanId = plan.Id,
                 Status = request.TargetStatus
@@ -377,7 +378,7 @@ namespace Jewelry.Service.Production.Plan
                 WoNumber = plan.WoNumber,
                 ProductionPlanId = plan.Id,
                 CreateDate = dateNow,
-                CreateBy = request.TransferBy ?? _admin,
+                CreateBy = CurrentUsername,
                 FormerStatus = request.FormerStatus,
                 TargetStatus = request.TargetStatus
             };
@@ -392,7 +393,7 @@ namespace Jewelry.Service.Production.Plan
                 Running = running,
 
                 CreateDate = dateNow,
-                CreateBy = request.TransferBy ?? _admin,
+                CreateBy = CurrentUsername,
 
                 ProductionPlanId = plan.Id,
                 Wo = plan.Wo,
@@ -423,7 +424,7 @@ namespace Jewelry.Service.Production.Plan
                     IsReceipt = false,
 
                     CreateDate = dateNow,
-                    CreateBy = request.TransferBy ?? _admin,
+                    CreateBy = CurrentUsername,
 
 
                 };

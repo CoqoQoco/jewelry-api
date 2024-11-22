@@ -437,7 +437,6 @@ namespace Jewelry.Service.ProductionPlan
                     {
                         FormerStatus = ProductionPlanStatus.Designed,
                         TargetStatus = ProductionPlanStatus.Casting,
-                        TransferBy = $"ใบผสมทอง : {request.BookNo}- {request.No}/{request.ReceiveBy}",
                     };
 
                     foreach (var item in request.Items)

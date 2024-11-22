@@ -42,11 +42,25 @@ namespace Jewelry.Service.User
                 throw new UnauthorizedAccessException();
             }
 
-            return new jewelry.Model.User.Get.Response()
+            var response =  new jewelry.Model.User.Get.Response()
             {
                 FirstName = user.FirstName,
                 LastName = user.LastName,
             };
+
+            if (user.TbtUserRole.Any())
+            { 
+                response.Role = from role in user.TbtUserRole
+                                 select new jewelry.Model.User.Get.Role()
+                                 {
+                                     Id = role.RoleNavigation.Id,
+                                     Level = role.RoleNavigation.Level,
+                                     Name = role.RoleNavigation.Name,
+                                     Description = role.RoleNavigation.Description ?? string.Empty,
+                                 };
+            }
+
+            return response;
         }
         #endregion
         #region --- get account ---
