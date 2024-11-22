@@ -16,6 +16,7 @@ using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using jewelry.Model.Worker.TrackingWorker;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -71,13 +72,14 @@ namespace Jewelry.Service.ProductionPlan
         Task<TransectionResponse> GetAllTransectionPrice(string wo, int woNumber);
         Task<string> CreatePrice(CreatePriceRequest request);
     }
-    public class ProductionPlanService : IProductionPlanService
+    public class ProductionPlanService : BaseService, IProductionPlanService
     {
-        private readonly string _admin = "@ADMIN";
+        //private readonly string CurrentUsername = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
-        public ProductionPlanService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService)
+        public ProductionPlanService(JewelryContext JewelryContext, IHttpContextAccessor httpContextAccessor,
+            IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
@@ -139,7 +141,7 @@ namespace Jewelry.Service.ProductionPlan
                         Status = ProductionPlanStatus.Designed,
 
                         CreateDate = DateTime.UtcNow,
-                        CreateBy = _admin,
+                        CreateBy = CurrentUsername,
 
                         Type = request.Gold,
                         TypeSize = request.GoldSize
@@ -194,7 +196,7 @@ namespace Jewelry.Service.ProductionPlan
 
                             IsActive = true,
                             CreateDate = DateTime.UtcNow,
-                            CreateBy = _admin,
+                            CreateBy = CurrentUsername,
                         };
                         createMaterials.Add(createMaterial);
                     }
@@ -244,7 +246,7 @@ namespace Jewelry.Service.ProductionPlan
 
                     //    IsActive = true,
                     //    CreateDate = DateTime.UtcNow,
-                    //    CreateBy = _admin,
+                    //    CreateBy = CurrentUsername,
                     //};
                     //_jewelryContext.TbtProductionPlanImage.Add(createImage);
                     //await _jewelryContext.SaveChangesAsync();
@@ -306,7 +308,7 @@ namespace Jewelry.Service.ProductionPlan
 
                         IsActive = true,
                         CreateDate = DateTime.UtcNow,
-                        CreateBy = _admin,
+                        CreateBy = CurrentUsername,
                     };
 
                     createImages.Add(createImage);
@@ -920,7 +922,7 @@ namespace Jewelry.Service.ProductionPlan
 
             plan.Status = request.Status;
             plan.UpdateDate = DateTime.UtcNow;
-            plan.UpdateBy = _admin;
+            plan.UpdateBy = CurrentUsername;
 
             _jewelryContext.TbtProductionPlan.Update(plan);
             await _jewelryContext.SaveChangesAsync();
@@ -976,7 +978,7 @@ namespace Jewelry.Service.ProductionPlan
             plan.Remark = request.Remark ?? plan.Remark;
 
             plan.UpdateDate = DateTime.UtcNow;
-            plan.UpdateBy = _admin;
+            plan.UpdateBy = CurrentUsername;
 
             _jewelryContext.TbtProductionPlan.Update(plan);
             await _jewelryContext.SaveChangesAsync();
@@ -1029,7 +1031,7 @@ namespace Jewelry.Service.ProductionPlan
 
                 IsActive = true,
                 CreateDate = DateTime.UtcNow,
-                CreateBy = _admin,
+                CreateBy = CurrentUsername,
             };
             _jewelryContext.TbtProductionPlanMaterial.Add(createMaterial);
             await _jewelryContext.SaveChangesAsync();
@@ -1074,7 +1076,7 @@ namespace Jewelry.Service.ProductionPlan
             material.IsActive = false;
 
             material.UpdateDate = DateTime.UtcNow;
-            material.UpdateBy = _admin;
+            material.UpdateBy = CurrentUsername;
 
             _jewelryContext.TbtProductionPlanMaterial.Update(material);
             await _jewelryContext.SaveChangesAsync();
@@ -1159,9 +1161,9 @@ namespace Jewelry.Service.ProductionPlan
         //        var newStatus = new TbtProductionPlanStatusHeader()
         //        {
         //            CreateDate = dateNow,
-        //            CreateBy = request.TransferBy ?? _admin,
+        //            CreateBy = request.TransferBy ?? CurrentUsername,
         //            UpdateDate = dateNow,
-        //            UpdateBy = request.TransferBy ?? _admin,
+        //            UpdateBy = request.TransferBy ?? CurrentUsername,
 
         //            IsActive = true,
 
@@ -1179,7 +1181,7 @@ namespace Jewelry.Service.ProductionPlan
         //            ProductionPlanId = targetPlan.Id,
 
         //            CreateDate = dateNow,
-        //            CreateBy = request.TransferBy ?? _admin,
+        //            CreateBy = request.TransferBy ?? CurrentUsername,
 
         //            FormerStatus = request.FormerStatus,
         //            TargetStatus = request.TargetStatus,
@@ -1188,7 +1190,7 @@ namespace Jewelry.Service.ProductionPlan
 
         //        targetPlan.Status = request.TargetStatus;
         //        targetPlan.UpdateDate = dateNow;
-        //        targetPlan.UpdateBy = request.TransferBy ?? _admin;
+        //        targetPlan.UpdateBy = request.TransferBy ?? CurrentUsername;
         //        updatePlans.Add(targetPlan);
 
         //    }
@@ -1331,7 +1333,7 @@ namespace Jewelry.Service.ProductionPlan
 
             plan.Status = request.TargetStatus;
             plan.UpdateDate = data.DateNow;
-            plan.UpdateBy = request.TransferBy ?? _admin;
+            plan.UpdateBy = request.TransferBy ?? CurrentUsername;
             data.UpdatePlans.Add(plan);
         }
         private TbtProductionPlanStatusHeader CreateNewStatus(
@@ -1342,9 +1344,9 @@ namespace Jewelry.Service.ProductionPlan
             return new TbtProductionPlanStatusHeader
             {
                 CreateDate = dateNow,
-                CreateBy = request.TransferBy ?? _admin,
+                CreateBy = request.TransferBy ?? CurrentUsername,
                 UpdateDate = dateNow,
-                UpdateBy = request.TransferBy ?? _admin,
+                UpdateBy = request.TransferBy ?? CurrentUsername,
                 IsActive = true,
                 ProductionPlanId = plan.Id,
                 Status = request.TargetStatus
@@ -1363,7 +1365,7 @@ namespace Jewelry.Service.ProductionPlan
                 WoNumber = plan.WoNumber,
                 ProductionPlanId = plan.Id,
                 CreateDate = dateNow,
-                CreateBy = request.TransferBy ?? _admin,
+                CreateBy = request.TransferBy ?? CurrentUsername,
                 FormerStatus = request.FormerStatus,
                 TargetStatus = request.TargetStatus
             };
@@ -1521,7 +1523,7 @@ namespace Jewelry.Service.ProductionPlan
             header.Remark1 = request.Remark1;
             header.Remark2 = request.Remark2;
             header.UpdateDate = DateTime.UtcNow;
-            header.UpdateBy = _admin;
+            header.UpdateBy = CurrentUsername;
 
             _jewelryContext.TbtProductionPlanStatusHeader.Update(header);
             await _jewelryContext.SaveChangesAsync();
@@ -1713,7 +1715,7 @@ namespace Jewelry.Service.ProductionPlan
             {
                 plan.Status = currentStatus.GetNextStatus();
                 plan.UpdateDate = DateTime.UtcNow;
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
 
                 _jewelryContext.TbtProductionPlan.Update(plan);
                 await _jewelryContext.SaveChangesAsync();
@@ -1781,9 +1783,9 @@ namespace Jewelry.Service.ProductionPlan
                                 IsActive = true,
 
                                 CreateDate = DateTime.UtcNow,
-                                CreateBy = _admin,
+                                CreateBy = CurrentUsername,
                                 UpdateDate = DateTime.UtcNow,
-                                UpdateBy = _admin,
+                                UpdateBy = CurrentUsername,
 
                                 SendName = request.SendName,
                                 SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null,
@@ -1851,9 +1853,9 @@ namespace Jewelry.Service.ProductionPlan
                                 IsActive = true,
 
                                 CreateDate = DateTime.UtcNow,
-                                CreateBy = _admin,
+                                CreateBy = CurrentUsername,
                                 UpdateDate = DateTime.UtcNow,
-                                UpdateBy = _admin,
+                                UpdateBy = CurrentUsername,
 
                                 SendName = request.CheckName,
                                 SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
@@ -1906,9 +1908,9 @@ namespace Jewelry.Service.ProductionPlan
                                 IsActive = true,
 
                                 CreateDate = DateTime.UtcNow,
-                                CreateBy = _admin,
+                                CreateBy = CurrentUsername,
                                 UpdateDate = DateTime.UtcNow,
-                                UpdateBy = _admin,
+                                UpdateBy = CurrentUsername,
 
                                 SendName = request.CheckName,
                                 SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
@@ -1985,9 +1987,9 @@ namespace Jewelry.Service.ProductionPlan
                                 IsActive = true,
 
                                 CreateDate = DateTime.UtcNow,
-                                CreateBy = _admin,
+                                CreateBy = CurrentUsername,
                                 UpdateDate = DateTime.UtcNow,
-                                UpdateBy = _admin,
+                                UpdateBy = CurrentUsername,
 
 
                                 SendName = request.CheckName,
@@ -2012,9 +2014,9 @@ namespace Jewelry.Service.ProductionPlan
                                 IsActive = true,
 
                                 CreateDate = DateTime.UtcNow,
-                                CreateBy = _admin,
+                                CreateBy = CurrentUsername,
                                 UpdateDate = DateTime.UtcNow,
-                                UpdateBy = _admin,
+                                UpdateBy = CurrentUsername,
 
                                 SendName = request.SendName,
                                 SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null,
@@ -2065,7 +2067,7 @@ namespace Jewelry.Service.ProductionPlan
 
                 plan.Status = request.Status;
                 plan.UpdateDate = DateTime.UtcNow;
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
 
                 _jewelryContext.TbtProductionPlan.Update(plan);
                 await _jewelryContext.SaveChangesAsync();
@@ -2147,7 +2149,7 @@ namespace Jewelry.Service.ProductionPlan
                             checkStatus.Remark2 = request.Remark2;
                             checkStatus.WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.TotalWages) : 0;
                             checkStatus.UpdateDate = DateTime.UtcNow;
-                            checkStatus.UpdateBy = _admin;
+                            checkStatus.UpdateBy = CurrentUsername;
 
 
                             _jewelryContext.TbtProductionPlanStatusHeader.Update(checkStatus);
@@ -2214,7 +2216,7 @@ namespace Jewelry.Service.ProductionPlan
                             //checkStatus.WagesTotal = request.TotalWages ?? 0;
 
                             checkStatus.UpdateDate = DateTime.UtcNow;
-                            checkStatus.UpdateBy = _admin;
+                            checkStatus.UpdateBy = CurrentUsername;
 
                             _jewelryContext.TbtProductionPlanStatusHeader.Update(checkStatus);
                             await _jewelryContext.SaveChangesAsync();
@@ -2277,7 +2279,7 @@ namespace Jewelry.Service.ProductionPlan
                             //checkStatus.WagesTotal = request.TotalWages ?? 0;
 
                             checkStatus.UpdateDate = DateTime.UtcNow;
-                            checkStatus.UpdateBy = _admin;
+                            checkStatus.UpdateBy = CurrentUsername;
 
                             _jewelryContext.TbtProductionPlanStatusHeader.Update(checkStatus);
                             await _jewelryContext.SaveChangesAsync();
@@ -2357,7 +2359,7 @@ namespace Jewelry.Service.ProductionPlan
                             //checkStatus.WagesTotal = request.TotalWages ?? 0;
 
                             checkStatus.UpdateDate = DateTime.UtcNow;
-                            checkStatus.UpdateBy = _admin;
+                            checkStatus.UpdateBy = CurrentUsername;
                             _jewelryContext.TbtProductionPlanStatusHeader.Update(checkStatus);
                             await _jewelryContext.SaveChangesAsync();
                         }
@@ -2379,7 +2381,7 @@ namespace Jewelry.Service.ProductionPlan
                 //TODO: 28/09/2024 not update plan status
                 //plan.Status = request.Status;
                 plan.UpdateDate = DateTime.UtcNow;
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
 
                 _jewelryContext.TbtProductionPlan.Update(plan);
                 await _jewelryContext.SaveChangesAsync();
@@ -2430,7 +2432,7 @@ namespace Jewelry.Service.ProductionPlan
 
             statusHeader.IsActive = false;
             statusHeader.UpdateDate = DateTime.UtcNow;
-            statusHeader.UpdateBy = _admin;
+            statusHeader.UpdateBy = CurrentUsername;
 
             _jewelryContext.TbtProductionPlanStatusHeader.Update(statusHeader);
 
@@ -2470,7 +2472,7 @@ namespace Jewelry.Service.ProductionPlan
                 }
             }
 
-            plan.UpdateBy = _admin;
+            plan.UpdateBy = CurrentUsername;
             plan.UpdateDate = DateTime.UtcNow;
 
 
@@ -2695,7 +2697,7 @@ namespace Jewelry.Service.ProductionPlan
 
                         Date = item.Date.HasValue ? item.Date.Value.UtcDateTime : null,
 
-                        CreateBy = _admin,
+                        CreateBy = CurrentUsername,
                         CreateDate = DateTime.UtcNow,
                     };
                     newPrices.Add(newPrice);
@@ -2711,7 +2713,7 @@ namespace Jewelry.Service.ProductionPlan
                 }
 
                 plan.UpdateDate = DateTime.UtcNow;
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
 
                 if (plan.Status == ProductionPlanStatus.WaitPrice)
                 {

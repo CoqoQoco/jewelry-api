@@ -92,6 +92,8 @@ namespace Jewelry.Service.User
                 IsActive = user.IsActive,
                 IsNew = user.IsNew,
 
+                LastLogin = user.LastLogin,
+
                 CreatedDate = user.CreateDate,
                 CreatedBy = user.CreateBy,
                 UpdatedDate = user.UpdateDate,
@@ -236,6 +238,8 @@ namespace Jewelry.Service.User
 
                             IsActive = user.IsActive,
                             IsNew = user.IsNew,
+
+                            LastLogin = user.LastLogin,
 
                             CreatedDate = user.CreateDate,
                             CreatedBy = user.CreateBy,

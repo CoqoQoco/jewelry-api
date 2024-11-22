@@ -17,6 +17,8 @@ namespace jewelry.Model.User.GetAccount
         public bool IsActive { get; set; }
         public bool IsNew { get; set; }
 
+        public DateTime? LastLogin { get; set; }
+
         public DateTime CreatedDate { get; set; }
         public string CreatedBy { get; set; }
         public DateTime? UpdatedDate { get; set; }
