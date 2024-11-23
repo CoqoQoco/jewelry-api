@@ -97,7 +97,7 @@ namespace Jewelry.Api.Controllers.Stock
         {
             try
             {
-                var response = _service.Price(request);
+                var response = await _service.Price(request);
                 return Ok(response);
             }
             catch (HandleException ex)
