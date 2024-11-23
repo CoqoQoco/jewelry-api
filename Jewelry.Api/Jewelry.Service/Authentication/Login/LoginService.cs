@@ -52,11 +52,11 @@ namespace Jewelry.Service.Authentication.Login
             var role = user.TbtUserRole.Where(x => x.RoleNavigation.IsActive).Select(x => x.RoleNavigation.Name).ToArray();
 
             //super user
-            if (user.Username == "CoqoAdmin")
-            {
-                response.Token = GenerateToken(user.Id.ToString(), user.Username, role);
-                return response;
-            }
+            //if (user.Username == "CoqoAdmin")
+            //{
+            //    response.Token = GenerateToken(user.Id.ToString(), user.Username, role);
+            //    return response;
+            //}
 
             if (!VerifyPassword(request.Password, user.Password, user.Salt))
             {
