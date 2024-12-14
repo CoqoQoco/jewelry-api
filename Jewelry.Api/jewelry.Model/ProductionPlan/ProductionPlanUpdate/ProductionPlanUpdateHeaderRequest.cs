@@ -26,5 +26,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanUpdate
         public string? ProductType { get; set; }
         public string ProductDetail { get; set; }
         public string? Remark { get; set; }
+
+        public string? Gold { get; set; }
+        public string? GoldSize { get; set; }
     }
 }

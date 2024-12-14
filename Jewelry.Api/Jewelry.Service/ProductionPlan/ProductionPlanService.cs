@@ -625,8 +625,8 @@ namespace Jewelry.Service.ProductionPlan
                 StatusName = plan.item.StatusNavigation.NameTh,
                 Remark = plan.item.Remark,
 
-                Gold = plan.item.Type,
-                GoldSize = plan.item.TypeSize,
+                Gold = !string.IsNullOrEmpty(plan.item.Type)  ? plan.item.Type.Trim() : string.Empty,
+                GoldSize = !string.IsNullOrEmpty(plan.item.TypeSize) ? plan.item.TypeSize.Trim() : string.Empty,
 
                 TbtProductionPlanStatusHeader = (from item in plan.item.TbtProductionPlanStatusHeader
                                                  select new StatusDetailHeader()
@@ -976,6 +976,9 @@ namespace Jewelry.Service.ProductionPlan
 
             plan.ProductDetail = request.ProductDetail;
             plan.Remark = request.Remark ?? plan.Remark;
+
+            plan.Type = request.Gold;
+            plan.TypeSize = request.GoldSize;
 
             plan.UpdateDate = DateTime.UtcNow;
             plan.UpdateBy = CurrentUsername;
