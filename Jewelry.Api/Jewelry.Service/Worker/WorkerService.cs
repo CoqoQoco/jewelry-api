@@ -214,7 +214,12 @@ namespace Jewelry.Service.Worker
                              JobDate = item.RequestDate,
                              ItemNo = item.ItemNo
 
-                         }).OrderBy(x => x.JobDate).ThenBy(x => x.WoText).ThenByDescending(x => x.Gold).ThenBy(x => x.ItemNo);
+                         }).ToList() // ดึงข้อมูลมาก่อน
+                        .GroupBy(x => x.WoText)
+                        .OrderBy(g => g.Min(x => x.JobDate))
+                        .SelectMany(g => g.OrderBy(x => x.JobDate)
+                        .ThenByDescending(x => x.Gold)
+                        .ThenBy(x => x.ItemNo));
 
             var response = new SearchWorkerWagesResponse()
             {
