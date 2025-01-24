@@ -2541,8 +2541,7 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             //group 2 --> get worker 
-
-            int[] getSatus = new int[] { 50, 60, 80, 90 };
+            int[] getSatus = new int[] { 50, 60, 90 };
             var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                                      .Include(x => x.Header)
                                      .ThenInclude(x => x.ProductionPlan)
@@ -2567,41 +2566,49 @@ namespace Jewelry.Service.ProductionPlan
                                          Qty = item.GoldQtyCheck,
                                          QtyPrice = item.Wages,
 
-                                         QtyWeight = 0,
+                                         QtyWeight = item.GoldWeightCheck,
+                                         QtyWeightPrice = 0,
+
+                                         PriceReference = item.TotalWages,
+                                         Status = item.Header.Status
+                                     });
+
+            //group 3 --> get embed 
+            int[] getEmbedSatus = new int[] { 80 };
+            var transectionEmbed = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                                     .Include(x => x.Header)
+                                     .ThenInclude(x => x.ProductionPlan)
+                                     .ThenInclude(x => x.StatusNavigation)
+
+                                     join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+
+                                     where item.Header.ProductionPlan.Wo == wo
+                                     && item.Header.ProductionPlan.WoNumber == woNumber
+                                     && item.IsActive == true
+                                     && item.Header.IsActive == true
+                                     && getEmbedSatus.Contains(item.Header.Status)
+
+                                     select new TransectionItem()
+                                     {
+                                         Name = status.NameTh,
+                                         NameDescription = $"[{status.NameTh}] {item.Description}",
+                                         NameGroup = TypeofPrice.Embed,
+
+                                         Date = item.RequestDate,
+
+                                         //จำนวนวง
+                                         Qty = item.GoldQtyCheck,
+                                         QtyPrice = item.Wages,
+
+                                         QtyWeight = item.GoldWeightCheck,
                                          QtyWeightPrice = 0,
 
                                          PriceReference = item.TotalWages,
                                      });
-            //var transectionWorker = (from item in _jewelryContext.TbtProductionPlanStatusHeader
-            //                        .Include(x => x.ProductionPlan)
-            //                        .ThenInclude(x => x.StatusNavigation)
 
-            //                         join status in _jewelryContext.TbmProductionPlanStatus on item.Status equals status.Id
+          
 
-            //                         where item.ProductionPlan.Wo == wo
-            //                         && item.ProductionPlan.WoNumber == woNumber
-            //                         && item.IsActive == true
-            //                         && item.IsActive == true
-
-            //                         select new TransectionItem()
-            //                         {
-            //                             Name = status.NameTh,
-            //                             NameDescription = status.NameTh,
-            //                             NameGroup = TypeofPrice.Worker,
-
-            //                             Date = item.CreateDate,
-
-            //                             Qty = 1,
-            //                             Price = item.WagesTotal,
-            //                             //PriceReference = item.Wages,
-            //                         }).ToList();
-
-            if (transectionWorker.Any())
-            {
-                response.Items.AddRange(transectionWorker);
-            }
-
-            //group 3 --> get gem
+            //group 4 --> get gem
             var transectionGem = (from item in _jewelryContext.TbtProductionPlanStatusDetailGem
                                      .Include(x => x.Header)
                                      .ThenInclude(x => x.ProductionPlan)
@@ -2634,9 +2641,78 @@ namespace Jewelry.Service.ProductionPlan
 
                                   }).ToList();
 
+
+            //add worker
+            if (transectionWorker.Any())
+            {
+                if (transectionWorker.Where(x => x.Status == 90).Any())
+                { 
+                    decimal? goldWeight = transectionWorker.Where(x => x.Status == 90).Sum(x => x.QtyWeight);
+                    decimal? gemWeight = transectionGem.Any() ?  transectionGem.Sum(x => x.QtyWeight) : 1;
+                    decimal gemDenominator = 5;
+
+                    var goldCal = MathHelper.RoundDecimal(goldWeight.Value - (MathHelper.SafeDivide(gemWeight.Value, gemDenominator, 2)), 2);
+
+                    var realGold = new TransectionItem()
+                    {
+                        Name = "น้ำหนักคำนวณ",
+                        NameDescription = "Cal Gold Weight",
+                        NameGroup = TypeofPrice.Gold,
+
+                        Date = DateTime.UtcNow,
+
+                        Qty = 0,
+                        QtyPrice = 0,
+
+                        QtyWeight = goldCal,
+                        QtyWeightPrice = 0,
+
+                    };
+                    response.Items.Add(realGold);
+                }
+
+                response.Items.AddRange(transectionWorker);
+            }
+
+            //add embed
+            if (transectionEmbed.Any())
+            {
+
+                response.Items.AddRange(transectionEmbed);
+            }
+
+            //add gem
             if (transectionGem.Any())
             {
                 response.Items.AddRange(transectionGem);
+            }
+
+            //step 5 get etc
+            var transactonEtc = (from item in _jewelryContext.TbtProductionPlanPrice
+                                 where item.Wo == wo
+                                 && item.WoNumber == woNumber
+                                 && item.NameGroup == TypeofPrice.ETC
+                                 select new TransectionItem()
+                                 {
+                                     Name = item.Name,
+                                     NameDescription = item.NameDescription,
+                                     NameGroup = TypeofPrice.ETC,
+
+                                     Date = item.Date,
+
+                                     Qty = item.Qty,
+                                     QtyPrice = item.QtyPrice,
+
+                                     QtyWeight = item.QtyWeight,
+                                     QtyWeightPrice = item.QtyWeightPrice,
+
+                                     PriceReference = item.TotalPrice,
+
+                                 }).ToList();
+
+            if (transactonEtc.Any()) 
+            {
+                response.Items.AddRange(transactonEtc);
             }
 
             return response;

@@ -24,6 +24,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection
         public string Reference2 { get; set; }
         public string Reference3 { get; set; }
 
+
+        public int? Status  { get; set; }
+
         public DateTime? Date { get; set; }
 
         public decimal? Qty { get; set; }
@@ -31,7 +34,6 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection
 
         public decimal? QtyWeight { get; set; }
         public decimal? QtyWeightPrice { get; set; }
-
 
         public decimal? PriceReference { get; set; }
     }

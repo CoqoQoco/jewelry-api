@@ -10,7 +10,9 @@ namespace jewelry.Model.Constant
     {
         public const string Gold = "Gold";
         public const string Worker = "Worker";
+        public const string Embed = "Embed";
         public const string Gem = "Gem";
+        public const string ETC = "ETC";
     }
 }
 
