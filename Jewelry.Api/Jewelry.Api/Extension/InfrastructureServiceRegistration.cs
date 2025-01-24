@@ -7,6 +7,7 @@ using Jewelry.Service.Mold;
 using Jewelry.Service.Production.Plan;
 using Jewelry.Service.ProductionPlan;
 using Jewelry.Service.Receipt.Gem;
+using Jewelry.Service.Receipt.Production;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
@@ -47,7 +48,9 @@ namespace Jewelry.Api.Extension
 
             services.AddScoped<IPlanService, PlanService>();
             services.AddScoped<IProductService, ProductService>();
+
             services.AddScoped<IPlanReceiptService, PlanReceiptService>();
+            services.AddScoped<IReceiptProductionService, ReceiptProductionService>();
 
             services.AddScoped<ILoginService, LoginService>();
 

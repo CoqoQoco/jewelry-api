@@ -1706,8 +1706,10 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.IsComplete).HasColumnName("is_complete");
+            entity.Property(e => e.IsRunning).HasColumnName("is_running");
             entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
             entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.QtyRunning).HasColumnName("qty_running");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
