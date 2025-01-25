@@ -32,5 +32,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanPrice.CreatePrice
         public decimal QtyWeightPrice { get; set; }
 
         public decimal TotalPrice { get; set; }
+
+        public bool IsAdd { get; set; }
     }
 }

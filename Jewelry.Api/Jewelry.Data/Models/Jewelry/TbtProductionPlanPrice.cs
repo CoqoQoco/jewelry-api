@@ -43,5 +43,7 @@ public partial class TbtProductionPlanPrice
 
     public decimal TotalPrice { get; set; }
 
+    public bool IsManualAdd { get; set; }
+
     public virtual TbtProductionPlan Production { get; set; } = null!;
 }

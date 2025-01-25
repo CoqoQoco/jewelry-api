@@ -33,5 +33,9 @@ public partial class TbtStockProductReceiptPlan
 
     public int ProductionPlanId { get; set; }
 
+    public bool IsRunning { get; set; }
+
+    public int QtyRunning { get; set; }
+
     public virtual ICollection<TbtStockProductReceiptItem> TbtStockProductReceiptItem { get; set; } = new List<TbtStockProductReceiptItem>();
 }

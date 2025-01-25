@@ -2647,6 +2647,7 @@ namespace Jewelry.Service.ProductionPlan
             {
                 if (transectionWorker.Where(x => x.Status == 90).Any())
                 { 
+                    decimal? qty = transectionWorker.Where(x => x.Status == 90).Sum(x => x.Qty);
                     decimal? goldWeight = transectionWorker.Where(x => x.Status == 90).Sum(x => x.QtyWeight);
                     decimal? gemWeight = transectionGem.Any() ?  transectionGem.Sum(x => x.QtyWeight) : 1;
                     decimal gemDenominator = 5;
@@ -2655,13 +2656,13 @@ namespace Jewelry.Service.ProductionPlan
 
                     var realGold = new TransectionItem()
                     {
-                        Name = "น้ำหนักคำนวณ",
-                        NameDescription = "Cal Gold Weight",
+                        Name = "น้ำหนักทองรวมหลังหักเพชรพลอย",
+                        NameDescription = "น้ำหนักทองรวมหลังหักเพชรพลอย",
                         NameGroup = TypeofPrice.Gold,
 
                         Date = DateTime.UtcNow,
 
-                        Qty = 0,
+                        Qty = qty,
                         QtyPrice = 0,
 
                         QtyWeight = goldCal,
@@ -2691,12 +2692,12 @@ namespace Jewelry.Service.ProductionPlan
             var transactonEtc = (from item in _jewelryContext.TbtProductionPlanPrice
                                  where item.Wo == wo
                                  && item.WoNumber == woNumber
-                                 && item.NameGroup == TypeofPrice.ETC
+                                 && item.IsManualAdd
                                  select new TransectionItem()
                                  {
                                      Name = item.Name,
                                      NameDescription = item.NameDescription,
-                                     NameGroup = TypeofPrice.ETC,
+                                     NameGroup = item.NameGroup,
 
                                      Date = item.Date,
 
@@ -2707,6 +2708,8 @@ namespace Jewelry.Service.ProductionPlan
                                      QtyWeightPrice = item.QtyWeightPrice,
 
                                      PriceReference = item.TotalPrice,
+
+                                     IsAdd = item.IsManualAdd
 
                                  }).ToList();
 
@@ -2778,6 +2781,10 @@ namespace Jewelry.Service.ProductionPlan
 
                         CreateBy = CurrentUsername,
                         CreateDate = DateTime.UtcNow,
+
+                        IsManualAdd = item.IsAdd
+
+                        
                     };
                     newPrices.Add(newPrice);
                 }

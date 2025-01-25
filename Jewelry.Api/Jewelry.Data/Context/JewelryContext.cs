@@ -18,6 +18,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmCustomerType> TbmCustomerType { get; set; }
 
+    public virtual DbSet<TbmEmbedMethod> TbmEmbedMethod { get; set; }
+
     public virtual DbSet<TbmGem> TbmGem { get; set; }
 
     public virtual DbSet<TbmGemShape> TbmGemShape { get; set; }
@@ -197,6 +199,34 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.NameTh)
                 .HasColumnType("character varying")
                 .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmEmbedMethod>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbm_embed_method_pk");
+
+            entity.ToTable("tbm_embed_method");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.MaxLossPercent).HasColumnName("max_loss_percent");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         modelBuilder.Entity<TbmGem>(entity =>
@@ -1223,6 +1253,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.Date).HasColumnName("date");
+            entity.Property(e => e.IsManualAdd).HasColumnName("is_manual_add");
             entity.Property(e => e.Name)
                 .HasColumnType("character varying")
                 .HasColumnName("name");
@@ -1706,8 +1737,10 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.IsComplete).HasColumnName("is_complete");
+            entity.Property(e => e.IsRunning).HasColumnName("is_running");
             entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
             entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.QtyRunning).HasColumnName("qty_running");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
