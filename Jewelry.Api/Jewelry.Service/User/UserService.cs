@@ -56,9 +56,9 @@ namespace Jewelry.Service.User
                                 select new jewelry.Model.User.Get.Role()
                                 {
                                     Id = role.RoleNavigation.Id,
-                                    Level = role.RoleNavigation.Level,
+                                    //Level = role.RoleNavigation.Level,
                                     Name = role.RoleNavigation.Name,
-                                    Description = role.RoleNavigation.Description ?? string.Empty,
+                                    //Description = role.RoleNavigation.Description ?? string.Empty,
                                 };
             }
 

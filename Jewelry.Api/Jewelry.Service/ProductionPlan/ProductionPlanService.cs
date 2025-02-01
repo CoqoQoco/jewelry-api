@@ -2591,7 +2591,7 @@ namespace Jewelry.Service.ProductionPlan
                                      select new TransectionItem()
                                      {
                                          Name = status.NameTh,
-                                         NameDescription = $"[{status.NameTh}] {item.Description}",
+                                         NameDescription = $"[{status.NameTh}] {item.Description} [{item.GoldQtySend} ชิ้น]",
                                          NameGroup = TypeofPrice.Embed,
 
                                          Date = item.RequestDate,

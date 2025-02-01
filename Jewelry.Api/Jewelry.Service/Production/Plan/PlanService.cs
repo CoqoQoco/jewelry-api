@@ -330,6 +330,7 @@ namespace Jewelry.Service.Production.Plan
 
             var currentStatus = (ProductionPlanStatusEnum)request.TargetStatus;
 
+            //โอนของเข้าคลังสินค้า
             if (request.TargetStatus == ProductionPlanStatus.Completed)
             {
                 //create new stock receipt plan
