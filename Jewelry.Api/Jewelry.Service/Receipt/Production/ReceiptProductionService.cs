@@ -133,5 +133,10 @@ namespace Jewelry.Service.Receipt.Production
             return response;
         }
 
+        public async Task<string> CreateImage(jewelry.Model.Receipt.Production.Image.Create.Request request)
+        {
+
+            return "success";
+        }
     }
 }

@@ -1608,8 +1608,9 @@ namespace Jewelry.Service.ProductionPlan
         {
             _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(header.TbtProductionPlanStatusDetail);
 
-            var removeGems = header.TbtProductionPlanStatusDetailGem
-                .Where(item => string.IsNullOrEmpty(item.OutboundRunning));
+            //ใหลบทุกกรณี
+            var removeGems = header.TbtProductionPlanStatusDetailGem;
+                //.Where(item => string.IsNullOrEmpty(item.OutboundRunning));
 
             if (removeGems.Any())
             {
@@ -1703,7 +1704,11 @@ namespace Jewelry.Service.ProductionPlan
                         GemQty = gem.QTY,
                         GemWeight = gem.Weight,
                         GemName = gem.Name,
-                        GemPrice = gem.Price
+                        GemPrice = gem.Price,
+
+                        OutboundDate = gem.OutboundDate.HasValue ? gem.OutboundDate.Value.UtcDateTime : null,
+                        OutboundRunning = gem.OutboundRunning ?? null,
+                        OutboundName = gem.OutboundName ?? null
                     };
                     addStatusItemGems.Add(newGem);
                 }

@@ -46,6 +46,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
     public class GemItem
     {
         public string? OutboundRunning { get; set; }
+        public string? OutboundName { get; set; }
+        public DateTimeOffset? OutboundDate { get; set; }
+
         public string? ItemNo { get; set; }
         public int? Id { get; set; }
 
