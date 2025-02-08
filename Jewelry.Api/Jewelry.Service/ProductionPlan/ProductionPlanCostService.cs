@@ -689,6 +689,18 @@ namespace Jewelry.Service.ProductionPlan
                         throw new HandleException($"ไม่สามารถบันทึกรายการคืนตัวเรือนซ้ำได้: {duplicates.First()}");
                     }
 
+                    //get all item id
+                    var planIds = request.Items.Select(x => x.Id).ToList();
+                    var productionPlans = (from plan in _jewelryContext.TbtProductionPlan
+                                           where planIds.Contains(plan.Id)
+                                           select plan).ToList();
+
+                    var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
+                    {
+                        FormerStatus = ProductionPlanStatus.Designed,
+                        TargetStatus = ProductionPlanStatus.Casting,
+                    };
+
                     foreach (var item in request.Items)
                     {
                         //if (string.IsNullOrEmpty(item.ProductionPlanId))
@@ -706,6 +718,29 @@ namespace Jewelry.Service.ProductionPlan
                             CreateBy = _admin,
                         };
                         createItems.Add(createItem);
+
+                        // set auto status paln when plan is design
+                        var getPlan = productionPlans.Where(x => x.Id == item.Id).FirstOrDefault();
+                        if (getPlan == null)
+                        {
+                            throw new HandleException($"{ErrorMessage.NotFound} --> ไม่พบแผนผลิต");
+                        }
+
+                        if (getPlan.Status == ProductionPlanStatus.Designed)
+                        {
+                            var createheaderPlan = new jewelry.Model.Production.Plan.Transfer.RequestItem()
+                            {
+                                Id = item.Id,
+                                Wo = getPlan.Wo,
+                                WoNumber = getPlan.WoNumber
+                            };
+                            requestTransfer.Plans.Add(createheaderPlan);
+                        }
+                    }
+
+                    if (requestTransfer.Plans != null && requestTransfer.Plans.Count > 0)
+                    {
+                        var result = await _planService.Transfer(requestTransfer);
                     }
                 }
 
