@@ -343,6 +343,9 @@ namespace Jewelry.Service.ProductionPlan
                          join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
                          from cj in customerJoin.DefaultIfEmpty()
 
+                         join mold in _jewelryContext.TbtProductMold on item.Mold equals mold.Code into moldJoin
+                         from m in moldJoin.DefaultIfEmpty()
+
                          where item.IsActive == true
                          let currentStatus = item.TbtProductionPlanStatusHeader.Where(x => x.IsActive == true && x.Status == item.Status).FirstOrDefault()
                          select new ProductionPlanTrackingResponse()
@@ -353,6 +356,8 @@ namespace Jewelry.Service.ProductionPlan
                              WoText = item.WoText,
 
                              Mold = item.Mold,
+                             MoldSub = m != null && !string.IsNullOrEmpty(m.ImageDraft1) ? $"{item.Mold}-Sub" : string.Empty,
+
                              Status = item.Status,
                              StatusName = item.StatusNavigation.NameTh,
 
@@ -360,7 +365,7 @@ namespace Jewelry.Service.ProductionPlan
                              ProductQty = item.ProductQty,
 
                              CustomerNumber = item.CustomerNumber,
-                             CustomerName = cj != null ? cj.NameTh : null,
+                             CustomerName = cj != null && !string.IsNullOrEmpty(cj.NameTh) ? cj.NameTh : null,
 
                              CustomerType = item.CustomerType,
                              CustomerTypeName = item.CustomerTypeNavigation.NameTh,
@@ -573,10 +578,13 @@ namespace Jewelry.Service.ProductionPlan
                         join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
                         from cj in customerJoin.DefaultIfEmpty()
 
+                        join mold in _jewelryContext.TbtProductMold on item.Mold equals mold.Code into moldJoin
+                        from m in moldJoin.DefaultIfEmpty()
+
                         where item.IsActive == true
                         && item.Id == id
                         //&& item.TbtProductionPlanStatusDetail.Any(x => x.IsActive == true)
-                        select new { item, cj }).SingleOrDefault();
+                        select new { item, cj, m }).SingleOrDefault();
 
             var listWork = (from item in _jewelryContext.TbmWorker
                             select item);
@@ -603,6 +611,7 @@ namespace Jewelry.Service.ProductionPlan
 
                 RequestDate = plan.item.RequestDate,
                 Mold = plan.item.Mold,
+                MoldSub = plan.m != null && !string.IsNullOrEmpty(plan.m.ImageDraft1) ? $"{plan.item.Mold}-Sub" : string.Empty,
 
                 ProductRunning = plan.item.ProductRunning,
                 ProductName = plan.item.ProductName,

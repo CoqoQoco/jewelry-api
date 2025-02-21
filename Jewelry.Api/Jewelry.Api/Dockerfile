@@ -1,12 +1,24 @@
 # See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+# เปลี่ยนเป็น root user ชั่วคราวเพื่อสร้างโฟลเดอร์และตั้งค่าสิทธิ์
+USER root
+# สร้างโฟลเดอร์สำหรับเก็บรูปภาพและกำหนดสิทธิ์
+#RUN mkdir -p /app/Images/Mold && \
+    #chown -R app:app /app/Images && \
+    #chmod -R 755 /app/Images
+
+USER root
+RUN mkdir -p /app/Images/Mold && \
+    chmod -R 777 /app/Images && \
+    chown -R app:app /app/Images
+
+
+# กลับไปใช้ app user
 USER app
 WORKDIR /app
 EXPOSE 7000
 EXPOSE 7000
-
 
 # This stage is used to build the service project
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
@@ -31,4 +43,24 @@ RUN dotnet publish "./Jewelry.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publis
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+
+# สร้างโฟลเดอร์สำหรับเก็บรูปภาพและกำหนดสิทธิ์
+#RUN mkdir -p /app/Images/Mold && \
+    #chmod -R 777 /app/Images
+
+
+## เพิ่มขั้นตอนตรวจสอบและรักษาสิทธิ์โฟลเดอร์
+#USER root
+#RUN mkdir -p /app/Images/Mold && \
+    #chown -R app:app /app/Images && \
+    #chmod -R 755 /app/Images
+
+# เพิ่มขั้นตอนตรวจสอบและรักษาสิทธิ์โฟลเดอร์
+USER root
+RUN mkdir -p /app/Images/Mold && \
+    chmod -R 777 /app/Images && \
+    chown -R app:app /app/Images
+
+
+USER app
 ENTRYPOINT ["dotnet", "Jewelry.Api.dll"]

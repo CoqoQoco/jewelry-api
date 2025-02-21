@@ -2,6 +2,8 @@
 using jewelry.Model.Mold;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using NPOI.SS.Formula.Functions;
 using System;
@@ -19,12 +21,14 @@ namespace Jewelry.Service.Stock
         Task<string> UpdateMold(UpdateMoldRequest request);
         IQueryable<TbtProductMold> SearchMold(SearchMold request);
     }
-    public class MoldService : IMoldService
+    public class MoldService : BaseService, IMoldService
     {
-        private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
-        public MoldService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
+
+        public MoldService(JewelryContext JewelryContext,
+             IHostEnvironment HostingEnvironment,
+             IHttpContextAccessor httpContextAccessor) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
@@ -52,7 +56,7 @@ namespace Jewelry.Service.Stock
                     MoldBy = request.MoldBy,
 
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     IsActive = true,
                     Image = $"{request.Code.ToUpper().Trim()}-Mold.png",
                 };
@@ -92,44 +96,41 @@ namespace Jewelry.Service.Stock
             var mold = (from item in _jewelryContext.TbtProductMold
                         where item.Code == request.Code.ToUpper()
                         select item).SingleOrDefault();
-
             if (mold == null)
             {
                 throw new HandleException($"ไม่พบข้อมูลเเม่พิมพ์รหัส {request.Code.ToUpper()} กรุณาลองอีกครั้ง");
             }
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                if (request.Images != null)
+                if (request.ImagesMain != null)
                 {
-                    //string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
                     string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold", $"{request.Code.ToUpper().Trim()}-Mold.png");
-                    if (File.Exists(imagePath))
-                    {
-                        File.Delete(imagePath);
-                    }
-
+                    // ไม่ต้องตรวจสอบหรือลบไฟล์เดิม FileMode.Create จะทับไฟล์เดิมโดยอัตโนมัติ
                     using (Stream fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write))
                     {
-                        request.Images.CopyTo(fileStream);
-                        fileStream.Close();
+                        await request.ImagesMain.CopyToAsync(fileStream);
                     }
                 }
-
+                if (request.ImagesSub != null)
+                {
+                    string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold", $"{request.Code.ToUpper().Trim()}-Sub-Mold.png");
+                    // ไม่ต้องตรวจสอบหรือลบไฟล์เดิม FileMode.Create จะทับไฟล์เดิมโดยอัตโนมัติ
+                    using (Stream fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write))
+                    {
+                        await request.ImagesSub.CopyToAsync(fileStream);
+                    }
+                    mold.ImageDraft1 = $"{request.Code.ToUpper().Trim()}-Sub-Mold.png";
+                }
                 mold.Category = request.Category;
                 mold.CategoryCode = request.CategoryCode;
                 mold.Description = request.Description;
-
                 mold.MoldBy = request.MoldBy;
-
                 mold.UpdateDate = DateTime.UtcNow;
-                mold.UpdateBy = _admin;
-
+                mold.UpdateBy = CurrentUsername;
                 _jewelryContext.TbtProductMold.Update(mold);
                 await _jewelryContext.SaveChangesAsync();
-
                 scope.Complete();
             }
-
             return "success";
         }
         public IQueryable<TbtProductMold> SearchMold(SearchMold request)

@@ -20,6 +20,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
 
         public DateTime? RequestDate { get; set; }
         public string? Mold { get; set; }
+        public string MoldSub { get; set; }
 
         public string? ProductRunning { get; set; }
         public string? ProductName { get; set; }

@@ -16,7 +16,9 @@ using jewelry.Model.Mold.PlanResin;
 using jewelry.Model.Mold.PlanStore;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
@@ -45,14 +47,16 @@ namespace Jewelry.Service.Mold
         Task<string> PlanStore(PlanStoreRequest request);
         Task<string> PlanRemodel(PlanRemodelRequest request);
     }
-    public class MoldPlanService : IMoldPlanService
+    public class MoldPlanService : BaseService, IMoldPlanService
     {
-        private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
 
-        public MoldPlanService(JewelryContext jewelryContext, IHostEnvironment hostingEnvironment, IRunningNumber runningNumberService)
+        public MoldPlanService(JewelryContext jewelryContext, 
+            IHostEnvironment hostingEnvironment, 
+            IRunningNumber runningNumberService, 
+            IHttpContextAccessor httpContextAccessor) : base(jewelryContext , httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _hostingEnvironment = hostingEnvironment;
@@ -301,9 +305,9 @@ namespace Jewelry.Service.Mold
                     var gem = new TbtProductMoldPlanGem()
                     {
                         PlanId = plan.Id,
-                        CreateBy = _admin,
+                        CreateBy = CurrentUsername,
                         CreateDate = DateTime.UtcNow,
-                        UpdateBy = _admin,
+                        UpdateBy = CurrentUsername,
                         UpdateDate = DateTime.UtcNow,
 
                         Size = item.Size,
@@ -346,7 +350,7 @@ namespace Jewelry.Service.Mold
                 throw new HandleException("เเม่พิมพ์ถูกหลอมหรืออยู่ในการจัดเก็บเเล้ว ไม่สามารถดำเนินการได้");
             }
 
-            plan.UpdateBy = _admin;
+            plan.UpdateBy = CurrentUsername;
             plan.UpdateDate = DateTime.UtcNow;
             plan.Status = MoldPlanStatus.Melting;
 
@@ -380,9 +384,9 @@ namespace Jewelry.Service.Mold
                 var running = await _runningNumberService.GenerateRunningNumberForGold("MOLD");
                 var plan = new TbtProductMoldPlan()
                 {
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
-                    UpdateBy = _admin,
+                    UpdateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
 
                     Running = running,
@@ -402,9 +406,9 @@ namespace Jewelry.Service.Mold
                     Remark = request.Remark,
                     QtySend = request.QtySend,
                     QtyReceive = request.QtyReceive,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
-                    UpdateBy = _admin,
+                    UpdateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
                     PlanId = plan.Id,
 
@@ -468,9 +472,9 @@ namespace Jewelry.Service.Mold
                         var gem = new TbtProductMoldPlanGem()
                         {
                             PlanId = plan.Id,
-                            CreateBy = _admin,
+                            CreateBy = CurrentUsername,
                             CreateDate = DateTime.UtcNow,
-                            UpdateBy = _admin,
+                            UpdateBy = CurrentUsername,
                             UpdateDate = DateTime.UtcNow,
 
                             Size = item.Size,
@@ -532,7 +536,7 @@ namespace Jewelry.Service.Mold
             #region *** create ***
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
                 plan.UpdateDate = DateTime.UtcNow;
                 plan.Status = MoldPlanStatus.Resin;
                 plan.NextStatus = MoldPlanStatus.CastingSilver;
@@ -551,9 +555,9 @@ namespace Jewelry.Service.Mold
                     ResinBy = request.ResinBy,
                     Remark = request.Remark,
 
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
-                    UpdateBy = _admin,
+                    UpdateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
                 };
 
@@ -644,7 +648,7 @@ namespace Jewelry.Service.Mold
             #region *** create ***
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
                 plan.UpdateDate = DateTime.UtcNow;
                 plan.Status = MoldPlanStatus.CastingSilver;
                 plan.NextStatus = MoldPlanStatus.Casting;
@@ -663,9 +667,9 @@ namespace Jewelry.Service.Mold
                     CastBy = request.CastBy,
                     Remark = request.Remark,
 
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
-                    UpdateBy = _admin,
+                    UpdateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
                 };
 
@@ -756,7 +760,7 @@ namespace Jewelry.Service.Mold
             #region *** create ***
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
                 plan.UpdateDate = DateTime.UtcNow;
                 plan.Status = MoldPlanStatus.Casting;
                 plan.NextStatus = MoldPlanStatus.Cuttig;
@@ -775,9 +779,9 @@ namespace Jewelry.Service.Mold
                     CastBy = request.CastBy,
                     Remark = request.Remark,
 
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
-                    UpdateBy = _admin,
+                    UpdateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
                 };
 
@@ -884,7 +888,7 @@ namespace Jewelry.Service.Mold
             #region *** create ***
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
                 plan.UpdateDate = DateTime.UtcNow;
                 plan.Status = MoldPlanStatus.Cuttig;
                 plan.NextStatus = MoldPlanStatus.Store;
@@ -904,9 +908,9 @@ namespace Jewelry.Service.Mold
                     CuttingBy = request.CuttingBy,
                     Remark = request.Remark,
 
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
-                    UpdateBy = _admin,
+                    UpdateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
                 };
 
@@ -965,7 +969,7 @@ namespace Jewelry.Service.Mold
                     MoldBy = string.Empty,
 
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
 
                     IsActive = false,
                     Image = string.Empty,
@@ -1028,7 +1032,7 @@ namespace Jewelry.Service.Mold
             #region *** create ***
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                plan.UpdateBy = _admin;
+                plan.UpdateBy = CurrentUsername;
                 plan.UpdateDate = DateTime.UtcNow;
                 plan.Status = MoldPlanStatus.Store;
                 plan.NextStatus = MoldPlanStatus.Success;
@@ -1050,9 +1054,9 @@ namespace Jewelry.Service.Mold
 
                     Location = request.Location,
 
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
-                    UpdateBy = _admin,
+                    UpdateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
                 };
 
@@ -1094,7 +1098,7 @@ namespace Jewelry.Service.Mold
                 mold.Description = request.Remark;
                 mold.MoldBy = request.WorkerBy;
                 mold.UpdateDate = DateTime.UtcNow;
-                mold.UpdateBy = _admin;
+                mold.UpdateBy = CurrentUsername;
                 mold.IsActive = true;
                 mold.Image = store.ImageUrl ?? string.Empty;
                 mold.PlanId = plan.Id;
@@ -1139,7 +1143,7 @@ namespace Jewelry.Service.Mold
                     ReModelMold = request.Remodel,
                     IsActive = true,
 
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
                 };
 

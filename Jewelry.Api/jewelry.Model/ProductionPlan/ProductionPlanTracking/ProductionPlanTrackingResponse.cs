@@ -19,7 +19,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
         public string? UpdateBy { get; set; }
 
         public DateTime RequestDate { get; set; }
-        public string Mold { get; set; } 
+
+        public string Mold { get; set; }
+        public string MoldSub { get; set; }
 
         public string? ProductRunning { get; set; }
         public string ProductName { get; set; } 

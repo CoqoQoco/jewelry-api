@@ -14,6 +14,8 @@ namespace jewelry.Model.Mold
         public string Category { get; set; }
         public string CategoryCode { get; set; }
         public string? MoldBy { get; set; }
-        public IFormFile? Images { get; set; }
+
+        public IFormFile? ImagesMain { get; set; }
+        public IFormFile? ImagesSub { get; set; }
     }
 }
