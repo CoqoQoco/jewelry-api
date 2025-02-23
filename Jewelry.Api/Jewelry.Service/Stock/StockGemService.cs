@@ -47,7 +47,11 @@ namespace Jewelry.Service.Stock
                              Id = item.Id,
                              Name = $"{item.Code}-{item.GroupName}-{item.Shape}-{item.Size}-{item.Grade}",
                              Code = item.Code,
-                             Price = item.Price
+
+                             Price = item.Price,
+                             PriceQty = item.PriceQty,
+                             Unit = item.Unit,
+
                          }).ToList();
 
             if (!string.IsNullOrEmpty(request.Text))
