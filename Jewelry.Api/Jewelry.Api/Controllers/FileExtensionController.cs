@@ -100,6 +100,24 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("GetStockProductImage")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult? GetImageBase64String(string imageName)
+        {
+            try
+            {
+                var response = _service.GetStockProductImageBase64String(imageName);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
 
         [Route("GetImage")]
         [HttpGet]

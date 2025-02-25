@@ -11,6 +11,7 @@ using Jewelry.Service.Receipt.Production;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
+using Jewelry.Service.Stock.ProductImage;
 using Jewelry.Service.User;
 using Jewelry.Service.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IMoldPlanService, MoldPlanService>();
             services.AddScoped<IStockMoldService, StockMoldService>();
             services.AddScoped<IReceiptAndIssueStockGemService, ReceiptAndIssueStockGemService>();
+            services.AddScoped<IProductImageService, ProductImageService>();
 
             services.AddScoped<IPlanService, PlanService>();
             services.AddScoped<IProductService, ProductService>();

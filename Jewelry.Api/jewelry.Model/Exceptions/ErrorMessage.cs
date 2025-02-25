@@ -11,6 +11,7 @@ namespace jewelry.Model.Exceptions
     {
         public static string PermissionFail = "ขออภัย คุณไม่มีสิทธิ์ที่จะดำเนินการรายการนี้";
         public static string NotFound = "ไม่พบข้อมูล";
+        public static string AlreadyExist = "มีข้อมูลนี้อยู่เเล้ว";
 
         public static string InvalidRequest = "ข้อมูลที่ส่งมาไม่ถูกต้อง";
 

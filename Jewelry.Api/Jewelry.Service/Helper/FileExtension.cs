@@ -20,6 +20,8 @@ namespace Jewelry.Service.Helper
 
         string GetPlanMoldDesignImageBase64String(string imageName);
         string GetPlanMoldResinImageBase64String(string imageName);
+
+        string GetStockProductImageBase64String(string imageName);
     }
     public class FileExtension : IFileExtension
     {
@@ -110,6 +112,25 @@ namespace Jewelry.Service.Helper
         public string GetPlanMoldResinImageBase64String(string imageName)
         {
             string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanResin");
+            //string folderPath = Path.Combine("Images", "/OrderPlan");
+            string imagePath = Path.Combine(folderPath, imageName);
+
+            if (System.IO.File.Exists(imagePath))
+            {
+                byte[] imageBytes = System.IO.File.ReadAllBytes(imagePath);
+
+                // แปลง byte array เป็น Base64 string
+                return Convert.ToBase64String(imageBytes);
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public string GetStockProductImageBase64String(string imageName)
+        {
+            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Stock/Product");
             //string folderPath = Path.Combine("Images", "/OrderPlan");
             string imagePath = Path.Combine(folderPath, imageName);
 

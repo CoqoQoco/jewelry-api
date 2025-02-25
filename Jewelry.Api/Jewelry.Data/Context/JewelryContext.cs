@@ -92,6 +92,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockProduct> TbtStockProduct { get; set; }
 
+    public virtual DbSet<TbtStockProductImage> TbtStockProductImage { get; set; }
+
     public virtual DbSet<TbtStockProductReceiptItem> TbtStockProductReceiptItem { get; set; }
 
     public virtual DbSet<TbtStockProductReceiptPlan> TbtStockProductReceiptPlan { get; set; }
@@ -1679,6 +1681,39 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.ProductionPlanId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_stock_product_plan_fk");
+        });
+
+        modelBuilder.Entity<TbtStockProductImage>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_product_image_pk");
+
+            entity.ToTable("tbt_stock_product_image");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('tbt_stock_product_image_column1_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValueSql("true")
+                .HasColumnName("is_active");
+            entity.Property(e => e.Name)
+                .HasColumnType("character varying")
+                .HasColumnName("name");
+            entity.Property(e => e.NamePath)
+                .HasColumnType("character varying")
+                .HasColumnName("name_path");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.Year).HasColumnName("year");
         });
 
         modelBuilder.Entity<TbtStockProductReceiptItem>(entity =>

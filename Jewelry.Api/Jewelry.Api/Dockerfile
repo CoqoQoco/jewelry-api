@@ -9,10 +9,11 @@ USER root
     #chmod -R 755 /app/Images
 
 USER root
+
 RUN mkdir -p /app/Images/Mold && \
+    mkdir -p /app/Images/Stock/Product && \
     chmod -R 777 /app/Images && \
     chown -R app:app /app/Images
-
 
 # กลับไปใช้ app user
 USER app
@@ -44,21 +45,11 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-# สร้างโฟลเดอร์สำหรับเก็บรูปภาพและกำหนดสิทธิ์
-#RUN mkdir -p /app/Images/Mold && \
-    #chmod -R 777 /app/Images
-
-
-## เพิ่มขั้นตอนตรวจสอบและรักษาสิทธิ์โฟลเดอร์
-#USER root
-#RUN mkdir -p /app/Images/Mold && \
-    #chown -R app:app /app/Images && \
-    #chmod -R 755 /app/Images
-
 # เพิ่มขั้นตอนตรวจสอบและรักษาสิทธิ์โฟลเดอร์
 USER root
 RUN mkdir -p /app/Images/Mold && \
-    chmod -R 777 /app/Images && \
+    mkdir -p /app/Images/Stock/Product && \  
+    chmod -R 777  /app/Images && \
     chown -R app:app /app/Images
 
 
