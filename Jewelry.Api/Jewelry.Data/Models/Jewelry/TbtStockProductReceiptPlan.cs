@@ -37,5 +37,7 @@ public partial class TbtStockProductReceiptPlan
 
     public int QtyRunning { get; set; }
 
+    public string? JsonDraft { get; set; }
+
     public virtual ICollection<TbtStockProductReceiptItem> TbtStockProductReceiptItem { get; set; } = new List<TbtStockProductReceiptItem>();
 }
