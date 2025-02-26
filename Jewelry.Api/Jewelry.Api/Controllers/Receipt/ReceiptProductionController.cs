@@ -67,5 +67,26 @@ namespace Jewelry.Api.Controllers.Receipt
             }
         }
 
+
+        [Route("CreateDraft")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CreateDraft(jewelry.Model.Receipt.Production.Draft.Create.Request request)
+        {
+            try
+            {
+
+
+                var response = await _receiptProduction.CreateDraft(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
     }
 }

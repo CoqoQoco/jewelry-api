@@ -123,7 +123,8 @@ namespace Jewelry.Service.Receipt.Production
 
             if (!string.IsNullOrEmpty(query.item.JsonDraft))
             {
-                //get draft
+                var draft = query.item.GetStocksFromJsonDraft();
+                response.Stocks.AddRange(draft);
             }
             else
             {
@@ -176,14 +177,38 @@ namespace Jewelry.Service.Receipt.Production
                         ImagePath = string.Empty,
 
                         Remark = string.Empty,
-                        IsReceipt = false
+                        IsReceipt = false,
+
+                        Materials = new List<jewelry.Model.Receipt.Production.PlanGet.Material>()
                     });
                     running++;
                 }
             }
+
             return response;
         }
 
+        public async Task<string> CreateDraft(jewelry.Model.Receipt.Production.Draft.Create.Request request)
+        {
+
+            var receiptPlan = (from item in _jewelryContext.TbtStockProductReceiptPlan
+                               where item.Running == request.ReceiptNumber
+                               select item).FirstOrDefault();
+
+            if (receiptPlan == null)
+            {
+                throw new KeyNotFoundException($"{ErrorMessage.NotFound} --> receipt no: {request.ReceiptNumber}");
+            }
+
+            receiptPlan.JsonDraft = request.MapToTbtStockProductReceiptPlanJson();
+            receiptPlan.UpdateBy = CurrentUsername;
+            receiptPlan.UpdateDate = DateTime.UtcNow;
+
+            _jewelryContext.TbtStockProductReceiptPlan.Update(receiptPlan);
+            await _jewelryContext.SaveChangesAsync();
+
+            return "success";
+        }
 
     }
 }
