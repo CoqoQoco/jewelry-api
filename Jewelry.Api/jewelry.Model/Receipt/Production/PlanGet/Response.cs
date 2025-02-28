@@ -48,6 +48,8 @@ namespace jewelry.Model.Receipt.Production.PlanGet
         public bool IsRunning { get; set; }
         public int QtyRunning { get; set; }
 
+        public IEnumerable<Gem> Gems { get; set; }
+
         public List<ReceiptStock> Stocks { get; set; }
     }
     public class ReceiptStock
@@ -78,13 +80,29 @@ namespace jewelry.Model.Receipt.Production.PlanGet
     public class Material
     {
         public string? Type { get; set; }
-        public string? SubType { get; set; }
-        public string? Description { get; set; }
+        public string? TypeName { get; set; }
+        public string? TypeCode { get; set; }
+        public string? TypeBarcode { get; set; }
 
         public decimal? Qty { get; set; }
+        public string? QtyUnit { get; set; }
         public decimal? Weight { get; set; }
+        public string? WeightUnit { get; set; }
 
         public string? Size { get; set; }
         public decimal? Price { get; set; }
+    }
+
+    public class Gem
+    {
+        public string GemCode { get; set; } 
+        public decimal? GemQty { get; set; }
+        public decimal? GemWeight { get; set; }
+        public string? GemName { get; set; }
+        public decimal? GemPrice { get; set; }
+        public string? Remark { get; set; }
+        public string? OutboundRunning { get; set; }
+        public string? OutboundName { get; set; }
+        public DateTime? OutboundDate { get; set; }
     }
 }

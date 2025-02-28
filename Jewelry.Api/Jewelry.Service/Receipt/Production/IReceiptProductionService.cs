@@ -11,6 +11,8 @@ namespace Jewelry.Service.Receipt.Production
         IQueryable<jewelry.Model.Receipt.Production.PlanList.Response> ListPlan(jewelry.Model.Receipt.Production.PlanList.Search request);
         Task<jewelry.Model.Receipt.Production.PlanGet.Response> GetPlan(jewelry.Model.Receipt.Production.PlanGet.Request request);
 
-        Task<string> CreateDraft(jewelry.Model.Receipt.Production.Draft.Create.Request request);
+        Task<jewelry.Model.Receipt.Production.Confirm.Response> Confirm(jewelry.Model.Receipt.Production.Confirm.Request request);
+
+        Task<string> Darft(jewelry.Model.Receipt.Production.Draft.Create.Request request);
     }
 }

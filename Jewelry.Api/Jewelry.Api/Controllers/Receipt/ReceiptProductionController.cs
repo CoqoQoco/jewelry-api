@@ -68,18 +68,40 @@ namespace Jewelry.Api.Controllers.Receipt
         }
 
 
-        [Route("CreateDraft")]
+
+        [Route("Confirm")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Receipt.Production.Confirm.Response))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public async Task<IActionResult> CreateDraft(jewelry.Model.Receipt.Production.Draft.Create.Request request)
+        public async Task<IActionResult> Confirm(jewelry.Model.Receipt.Production.Confirm.Request request)
         {
             try
             {
 
 
-                var response = await _receiptProduction.CreateDraft(request);
+                var response = await _receiptProduction.Confirm(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
+        [Route("Darft")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Darft(jewelry.Model.Receipt.Production.Draft.Create.Request request)
+        {
+            try
+            {
+
+
+                var response = await _receiptProduction.Darft(request);
                 return Ok(response);
             }
             catch (HandleException ex)

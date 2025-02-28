@@ -28,5 +28,7 @@ namespace jewelry.Model.Exceptions
         public static string PickReturned = "รายการนี้ได้ทำการคืนเเล้ว";
 
         public static string StatusAlready = "สร้างข้อมูลซ้ำไม่ได้";
+
+        public static string StockAlreadyReceipt = "รายการนี้ได้ทำการรับเเล้ว";
     }
 }

@@ -5,10 +5,6 @@ namespace Jewelry.Data.Models.Jewelry;
 
 public partial class TbtStockProduct
 {
-    public string Running { get; set; } = null!;
-
-    public int ProductionPlanId { get; set; }
-
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;
@@ -17,11 +13,69 @@ public partial class TbtStockProduct
 
     public string? UpdateBy { get; set; }
 
-    public string? ReceiptNumber { get; set; }
+    public string ReceiptNumber { get; set; } = null!;
 
     public string? Location { get; set; }
 
-    public bool IsReceipt { get; set; }
+    /// <summary>
+    /// เลขใบจ่าย-รับงาน
+    /// </summary>
+    public string Wo { get; set; } = null!;
 
-    public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
+    /// <summary>
+    /// ลำดับใบจ่าย-รับงาน
+    /// </summary>
+    public int WoNumber { get; set; }
+
+    public string? Status { get; set; }
+
+    public string ProductNameEn { get; set; } = null!;
+
+    public string ProductNameTh { get; set; } = null!;
+
+    public decimal Qty { get; set; }
+
+    public decimal ProductPrice { get; set; }
+
+    public DateTime ReceiptDate { get; set; }
+
+    public string StockNumber { get; set; } = null!;
+
+    /// <summary>
+    /// รหัสประเภทสินค้า
+    /// </summary>
+    public string ProductType { get; set; } = null!;
+
+    public string? Size { get; set; }
+
+    public string ReceiptType { get; set; } = null!;
+
+    public string? Remark { get; set; }
+
+    public string? ImageName { get; set; }
+
+    public string? ImagePath { get; set; }
+
+    public string? Mold { get; set; }
+
+    public DateTime ProductionDate { get; set; }
+
+    /// <summary>
+    /// ประเภทสินค้า
+    /// </summary>
+    public string? ProductTypeName { get; set; }
+
+    /// <summary>
+    /// Gold/Silver
+    /// </summary>
+    public string? ProductionType { get; set; }
+
+    /// <summary>
+    /// 10 K, 18K ....
+    /// </summary>
+    public string? ProductionTypeSize { get; set; }
+
+    public string ProductNumber { get; set; } = null!;
+
+    public virtual ICollection<TbtStockProductMaterial> TbtStockProductMaterial { get; set; } = new List<TbtStockProductMaterial>();
 }
