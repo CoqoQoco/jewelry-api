@@ -12,6 +12,7 @@ namespace Jewelry.Service.Receipt.Production
         Task<jewelry.Model.Receipt.Production.PlanGet.Response> GetPlan(jewelry.Model.Receipt.Production.PlanGet.Request request);
 
         Task<jewelry.Model.Receipt.Production.Confirm.Response> Confirm(jewelry.Model.Receipt.Production.Confirm.Request request);
+        IQueryable<jewelry.Model.Receipt.Production.History.List.Response> ListHistory(jewelry.Model.Receipt.Production.History.List.Search request);
 
         Task<string> Darft(jewelry.Model.Receipt.Production.Draft.Create.Request request);
     }

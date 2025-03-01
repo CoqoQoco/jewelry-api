@@ -89,6 +89,24 @@ namespace Jewelry.Api.Controllers.Receipt
             }
         }
 
+        [Route("ListHistory")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Receipt.Production.History.List.Response>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListHistory([FromBody] jewelry.Model.Receipt.Production.History.List.Request request)
+        {
+            try
+            {
+                var response = _receiptProduction.ListHistory(request.Search);
+                return response.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
 
         [Route("Darft")]
         [HttpPost]

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NetTopologySuite.Index.HPRtree;
+using NetTopologySuite.Triangulate.QuadEdge;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -435,6 +436,103 @@ namespace Jewelry.Service.Receipt.Production
             await _jewelryContext.SaveChangesAsync();
 
             return "success";
+        }
+
+
+        public IQueryable<jewelry.Model.Receipt.Production.History.List.Response> ListHistory(jewelry.Model.Receipt.Production.History.List.Search request)
+        {
+            var query = (from stock in _jewelryContext.TbtStockProduct
+
+                         where stock.CreateDate >= request.ReceiptDateStart.StartOfDayUtc()
+                         && stock.CreateDate <= request.ReceiptDateEnd.StartOfDayUtc()
+
+                         select new jewelry.Model.Receipt.Production.History.List.Response()
+                         {
+
+                             StockNumber = stock.StockNumber,
+                             Status = stock.Status,
+
+                             ReceiptNumber = stock.ReceiptNumber,
+                             ReceiptDate = stock.ReceiptDate,
+                             ReceiptType = stock.ReceiptType,
+
+                             Mold = stock.Mold,
+
+                             Qty = stock.Qty,
+                             ProductPrice = stock.ProductPrice,
+
+                             ProductNumber = stock.ProductNumber,
+                             ProductNameTh = stock.ProductNameTh,
+                             ProductNameEn = stock.ProductNameEn,
+
+                             ProductType = stock.ProductType,
+                             ProductTypeName = stock.ProductTypeName,
+
+                             ImageName = stock.ImageName,
+                             ImagePath = stock.ImagePath,
+
+                             Wo = stock.Wo,
+                             WoNumber = stock.WoNumber,
+                             WoText = $"{stock.Wo}{stock.WoNumber.ToString()}",
+
+                             ProductionDate = stock.CreateDate,
+                             ProductionType = stock.ProductionType,
+                             ProductionTypeSize = stock.ProductionTypeSize,
+
+                             Size = stock.Size,
+                             Location = stock.Location,
+                             Remark = stock.Remark,
+
+                             CreateBy = stock.CreateBy,
+                             CreateDate = stock.CreateDate,
+                         });
+
+         
+            if (request.ReceiptType != null && request.ReceiptType.Any())
+            {
+                var receiptTypeArray = request.ReceiptType.Select(x => x).ToArray();
+                query = query.Where(x => receiptTypeArray.Contains(x.ProductType));
+            }
+
+
+            if (!string.IsNullOrEmpty(request.StockNumber))
+            { 
+                query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
+            }
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.Mold.Contains(request.Mold));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+            }
+            if (!string.IsNullOrEmpty(request.ProductNameTh))
+            {
+                query = query.Where(x => x.ProductNameTh.Contains(request.ProductNameTh));
+            }
+            if (!string.IsNullOrEmpty(request.ProductNameEn))
+            {
+                query = query.Where(x => x.ProductNameEn.Contains(request.ProductNameEn));
+            }
+
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                query = query.Where(x => x.WoText.Contains(request.WoText));
+            }
+            if (!string.IsNullOrEmpty(request.Size))
+            {
+                query = query.Where(x => x.Size.Contains(request.Size));
+            }
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                var productTypeArray = request.ProductType.Select(x => x).ToArray();
+                query = query.Where(x => productTypeArray.Contains(x.ProductType));
+            }
+
+            return query;
+
         }
 
     }

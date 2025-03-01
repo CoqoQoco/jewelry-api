@@ -698,6 +698,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                                      TbtProductionPlanStatusGem = (from gem in item.TbtProductionPlanStatusDetailGem
                                                                                    let gemStock = stockGem.Where(x => x.Code == gem.GemCode).FirstOrDefault()
+                                                                                   //let gemPrice = stockGem.Where(x => x.Code == gem.GemCode).FirstOrDefault()
                                                                                    select new StatusDetailGem()
                                                                                    {
                                                                                        ProductionPlanId = gem.ProductionPlanId,
@@ -708,7 +709,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        Code = gem.GemCode,
                                                                                        Name = gem.GemName,
                                                                                        QTY = gem.GemQty,
-                                                                                       Price = gem.GemPrice,
+                                                                                       Price = gem.GemPrice.HasValue ? gem.GemPrice : (gemStock.UnitCode == "Q" ? gemStock.PriceQty : gemStock.Price),
                                                                                        Weight = gem.GemWeight,
 
                                                                                        Unit = gemStock != null ? gemStock.Unit : "",
