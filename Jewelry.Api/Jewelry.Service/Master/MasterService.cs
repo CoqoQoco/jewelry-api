@@ -230,6 +230,7 @@ namespace Jewelry.Service.Master
                                     NameEn = item.NameEn,
                                     NameTh = item.NameTh,
                                     Code = item.Code,
+                                    Prefix = item.ProductCode,
                                     Description = $"{item.Code}: {item.NameTh}"
                                 });
 
@@ -371,6 +372,7 @@ namespace Jewelry.Service.Master
 
                 productType.NameEn = request.NameEn;
                 productType.NameTh = request.NameTh;
+                productType.ProductCode = !string.IsNullOrEmpty(request.Prefix) ? request.Prefix.ToUpper() : productType.ProductCode;
 
                 _jewelryContext.TbmProductType.Update(productType);
                 await _jewelryContext.SaveChangesAsync();
@@ -546,6 +548,8 @@ namespace Jewelry.Service.Master
                     CreateDate = DateTime.UtcNow,
                     CreateBy = _admin,
                     IsActive = true,
+
+                    ProductCode = !string.IsNullOrEmpty(request.Prefix) ? request.Prefix.ToUpper() : "DK"
                 };
 
                 _jewelryContext.TbmProductType.Add(newProductType);

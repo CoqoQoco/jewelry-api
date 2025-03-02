@@ -77,9 +77,9 @@ namespace Jewelry.Service.Receipt.Production
                 Qty = confirm.Qty,
                 ProductPrice = confirm.Price,
 
-                ProductNumber = confirm.ProductNumber,
-                ProductNameTh = confirm.ProductNameTH,
-                ProductNameEn = confirm.ProductNameEN,
+                ProductNumber = confirm.ProductNumber.ToUpper(),
+                ProductNameTh = confirm.ProductNameTH.ToUpper(),
+                ProductNameEn = confirm.ProductNameEN.ToUpper(),
 
                 ProductType = plan.ProductType,
                 ProductTypeName = plan.ProductTypeNavigation.NameTh,

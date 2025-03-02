@@ -281,6 +281,22 @@ namespace Jewelry.Service.Receipt.Production
                 throw new KeyNotFoundException($"{ErrorMessage.NotFound} --> draft");
             }
 
+            var cheackProductNumber = request.Stocks.Select(x => x.ProductNumber).ToArray();
+
+            var duplicateStock = (from item in _jewelryContext.TbtStockProduct
+                                  where cheackProductNumber.Contains(item.ProductNumber)
+                                  select item);
+
+            if (duplicateStock.Any())
+            {
+                // รวมรหัสสินค้าทั้งหมดเป็นข้อความเดียวโดยคั่นด้วยเครื่องหมาย comma
+                var duplicateProductNumbers = string.Join(", ", duplicateStock.Select(x => x.ProductNumber));
+
+                // โยน exception พร้อมข้อความที่รวมรายการรหัสสินค้าที่ซ้ำกัน
+                throw new HandleException($"{ErrorMessage.AlreadyExist} --> รหัสสินค้า: {duplicateProductNumbers}");
+            }
+
+
             var newStocks = new List<TbtStockProduct>();
             var newStocksMaterial = new List<TbtStockProductMaterial>();
 
