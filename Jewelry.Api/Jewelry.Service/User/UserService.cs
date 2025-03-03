@@ -5,9 +5,12 @@ using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Tokens;
 using NetTopologySuite.Index.HPRtree;
 using NPOI.OpenXmlFormats.Spreadsheet;
 using NPOI.SS.Formula.Functions;
+using NPOI.SS.Formula.PTG;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,9 +24,17 @@ namespace Jewelry.Service.User
     public class UserService : BaseService, IUserService
     {
         private readonly JewelryContext _jewelryContext;
-        public UserService(JewelryContext JewelryContext, IHttpContextAccessor httpContextAccessor) : base(JewelryContext, httpContextAccessor)
+        private IHostEnvironment _hostingEnvironment;
+        private IFileExtension _fileService;
+
+        public UserService(JewelryContext JewelryContext,
+            IHostEnvironment hostingEnvironment,
+            IFileExtension fileService,
+            IHttpContextAccessor httpContextAccessor) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
+            _hostingEnvironment = hostingEnvironment;
+            _fileService = fileService;
         }
 
         #region --- get profile ---
@@ -38,6 +49,10 @@ namespace Jewelry.Service.User
                         && item.IsNew == false
                         select item).FirstOrDefault();
 
+            var masterUser = (from item in _jewelryContext.TbmUserRole
+                              where item.IsActive
+                              select item);
+
             if (user == null)
             {
                 throw new UnauthorizedAccessException();
@@ -46,8 +61,20 @@ namespace Jewelry.Service.User
             var response = new jewelry.Model.User.Get.Response()
             {
                 Id = user.Id,
+                Username = user.Username,
+
                 FirstName = user.FirstName,
                 LastName = user.LastName,
+
+                IsActive = user.IsActive,
+                IsNew = user.IsNew,
+
+                LastLogin = user.LastLogin,
+
+                CreatedDate = user.CreateDate,
+                CreatedBy = user.CreateBy,
+                UpdatedDate = user.UpdateDate,
+                UpdatedBy = user.UpdateBy,
             };
 
             if (user.TbtUserRole.Any())
@@ -56,10 +83,25 @@ namespace Jewelry.Service.User
                                 select new jewelry.Model.User.Get.Role()
                                 {
                                     Id = role.RoleNavigation.Id,
-                                    //Level = role.RoleNavigation.Level,
                                     Name = role.RoleNavigation.Name,
-                                    //Description = role.RoleNavigation.Description ?? string.Empty,
+                                    Description = role.RoleNavigation.Description ?? string.Empty,
                                 };
+            }
+
+            if (masterUser.Any())
+            {
+                response.MasterRoles = (from role in masterUser
+                                        select new jewelry.Model.User.Get.MasterRole()
+                                        {
+                                            Id = role.Id,
+                                            Name = role.Name,
+                                            Description = role.Description ?? string.Empty,
+                                        });
+            }
+
+            if (!string.IsNullOrEmpty(user.ImageUrl))
+            {
+                response.Image = _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
             }
 
             return response;
@@ -124,8 +166,77 @@ namespace Jewelry.Service.User
                                         });
             }
 
+            if (!string.IsNullOrEmpty(user.ImageUrl))
+            {
+                response.Image = _fileService.GetImageBase64String("Images/User/Profile", user.ImageUrl);
+            }
+
             return response;
         }
+        #endregion
+
+        #region --- update ---
+        public async Task<string> UpdateAccount(jewelry.Model.User.UpdateAccount.Request request)
+        {
+
+            var user = (from item in _jewelryContext.TbtUser
+                        where item.Id == request.Id
+                        select item).FirstOrDefault();
+
+            if (user == null)
+            {
+                throw new KeyNotFoundException(ErrorMessage.NotFound);
+            }
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+
+                if (!string.IsNullOrEmpty(request.ImageAction) && request.ImageAction == "update")
+                {
+                    var namePath = $"{user.Username}-{user.Id}.png";
+                    try
+                    {
+                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/User/Profile");
+                        if (!Directory.Exists(imagePath))
+                        {
+                            Directory.CreateDirectory(imagePath);
+                        }
+
+                        string imagePathWithFileName = Path.Combine(imagePath, $"{namePath}");
+
+                        //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
+                        using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                        {
+                            request.Image.CopyTo(fileStream);
+                            fileStream.Close();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        //_logger.LogError($"ไม่สามารถบันทึกรูปภาพได้: {ex.Message}", ex);
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                    }
+
+                    user.ImageUrl = namePath;
+                }
+
+                if (!string.IsNullOrEmpty(request.ImageAction) && request.ImageAction == "delete") 
+                {
+                    user.ImageUrl = string.Empty;
+                }
+
+
+                user.UpdateBy = CurrentUsername;
+                user.UpdateDate = DateTime.UtcNow;
+                _jewelryContext.TbtUser.Update(user);
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
+
+            return "success";
+        }
+
         #endregion
         #region --- create user ---
         public async Task<string> Create(jewelry.Model.User.Create.Request request)
@@ -204,6 +315,8 @@ namespace Jewelry.Service.User
 
                 FirstName = request.FirstName,
                 LastName = request.LastName,
+
+                ImageUrl = string.Empty,
 
                 CreateBy = CurrentUsername,
                 CreateDate = DateTime.UtcNow,

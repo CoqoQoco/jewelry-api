@@ -24,6 +24,8 @@ namespace jewelry.Model.User.GetAccount
         public DateTime? UpdatedDate { get; set; }
         public string? UpdatedBy { get; set; }
 
+        public string? Image { get; set; }
+
         public IEnumerable<Role>? Roles { get; set; }
         public IEnumerable<MasterRole>? MasterRoles { get; set; }
     }

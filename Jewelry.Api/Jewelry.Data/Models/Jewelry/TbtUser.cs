@@ -31,5 +31,7 @@ public partial class TbtUser
 
     public DateTime? LastLogin { get; set; }
 
+    public string? ImageUrl { get; set; }
+
     public virtual ICollection<TbtUserRole> TbtUserRole { get; set; } = new List<TbtUserRole>();
 }

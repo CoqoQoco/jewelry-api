@@ -48,6 +48,16 @@ namespace Jewelry.Api.Controllers.User
             return Ok(response);
         }
 
+        [Route("UpdateAccount")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UpdateAccount([FromForm] jewelry.Model.User.UpdateAccount.Request request)
+        {
+            var response = await _service.UpdateAccount(request);
+            return Ok(response);
+        }
+
         [Route("List")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.User.List.Response>))]

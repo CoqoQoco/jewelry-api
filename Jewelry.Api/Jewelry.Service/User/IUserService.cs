@@ -10,6 +10,8 @@ namespace Jewelry.Service.User
     {
         jewelry.Model.User.Get.Response Get();
         jewelry.Model.User.GetAccount.Response GetAccount(int id);
+        Task<string> UpdateAccount(jewelry.Model.User.UpdateAccount.Request request);
+
         IQueryable<jewelry.Model.User.List.Response> List(jewelry.Model.User.List.Search request);
         Task<string> Create(jewelry.Model.User.Create.Request request);
 

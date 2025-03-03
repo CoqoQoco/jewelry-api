@@ -1914,6 +1914,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.FirstName)
                 .HasColumnType("character varying")
                 .HasColumnName("first_name");
+            entity.Property(e => e.ImageUrl)
+                .HasMaxLength(255)
+                .HasColumnName("image_url");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.IsNew).HasColumnName("is_new");
             entity.Property(e => e.LastLogin).HasColumnName("last_login");
