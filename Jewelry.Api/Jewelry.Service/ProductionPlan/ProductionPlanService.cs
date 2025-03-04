@@ -375,7 +375,7 @@ namespace Jewelry.Service.ProductionPlan
                              RequestDate = item.RequestDate,
                              LastUpdateStatus = currentStatus != null
                                                 ? currentStatus.UpdateDate
-                                                : item.CreateDate,
+                                                : item.UpdateDate,
                              IsOverPlan = item.RequestDate < DateTime.UtcNow && !succesStatus.Contains(item.Status), // ประเมินราคา
 
                              ProductType = item.ProductType,
