@@ -22,6 +22,7 @@ namespace jewelry.Model.Stock.Gem.Search
         public string[]? Size { get; set; }
         public string[]? Shape { get; set; }
         public string[]? Grade { get; set; }
+        public string[]? TypeCheck { get; set; }
 
         public string? Text { get; set; }
     }

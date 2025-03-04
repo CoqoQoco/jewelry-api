@@ -5,6 +5,7 @@ using jewelry.Model.Stock.Gem.PriceEdit;
 using jewelry.Model.Stock.Gem.Search;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NetTopologySuite.Index.HPRtree;
 using NPOI.HSSF.Record;
@@ -73,31 +74,8 @@ namespace Jewelry.Service.Stock
         public IQueryable<SearchGemResponse> SearchGemData(SearchGem request)
         {
             var query = (from item in _jewelryContext.TbtStockGem
-                         select new SearchGemResponse()
-                         {
-                             Id = item.Id,
-                             Name = $"{item.Code}-{item.Shape}-{item.Size}-{item.Grade}",
-                             Code = item.Code,
-                             GroupName = item.GroupName,
-
-                             Size = item.Size,
-                             Shape = item.Shape,
-                             Grade = item.Grade,
-
-                             Quantity = item.Quantity,
-                             QuantityOnProcess = item.QuantityOnProcess,
-                             QuantityWeight = item.QuantityWeight,
-                             QuantityWeightOnProcess = item.QuantityWeightOnProcess,
-
-                             Price = item.Price,
-                             PriceQty = item.PriceQty,
-                             Unit = item.Unit,
-                             UnitCode = item.UnitCode,
-
-                             Remark1 = item.Remark1,
-                             Remark2 = item.Remark2,
-                         });
-
+                         select item).AsNoTracking();
+           
             if (request.Id.HasValue)
             {
                 query = (from item in query
@@ -135,7 +113,58 @@ namespace Jewelry.Service.Stock
                          select item);
             }
 
-            return query.AsQueryable();
+            if (request.TypeCheck != null && request.TypeCheck.Length > 0)
+            {
+                var typeCheckLower = request.TypeCheck.Select(tc => tc.ToLower()).ToArray();
+
+                if (typeCheckLower.Contains("qty-remain"))
+                {
+                    query = query.Where(item => item.Quantity > 0);
+                }
+
+                if (typeCheckLower.Contains("qty-process-remain"))
+                {
+                    query = query.Where(item => item.QuantityOnProcess > 0);
+                }
+
+                if (typeCheckLower.Contains("qty-weight-remain"))
+                {
+                    query = query.Where(item => item.QuantityWeight > 0);
+                }
+
+                if (typeCheckLower.Contains("qty-weight-process-remain"))
+                {
+                    query = query.Where(item => item.QuantityWeightOnProcess > 0);
+                }
+            }
+
+            var response = (from item in query
+                            select new SearchGemResponse()
+                            {
+                                Id = item.Id,
+                                Name = $"{item.Code}-{item.Shape}-{item.Size}-{item.Grade}",
+                                Code = item.Code,
+                                GroupName = item.GroupName,
+
+                                Size = item.Size,
+                                Shape = item.Shape,
+                                Grade = item.Grade,
+
+                                Quantity = item.Quantity,
+                                QuantityOnProcess = item.QuantityOnProcess,
+                                QuantityWeight = item.QuantityWeight,
+                                QuantityWeightOnProcess = item.QuantityWeightOnProcess,
+
+                                Price = item.Price,
+                                PriceQty = item.PriceQty,
+                                Unit = item.Unit,
+                                UnitCode = item.UnitCode,
+
+                                Remark1 = item.Remark1,
+                                Remark2 = item.Remark2,
+                            });
+
+            return response;
         }
         public IQueryable<OptionResponse> GroupGemData(OptionRequest request)
         {
