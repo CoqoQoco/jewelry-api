@@ -168,7 +168,7 @@ namespace Jewelry.Service.User
 
             if (!string.IsNullOrEmpty(user.ImageUrl))
             {
-                response.Image = _fileService.GetImageBase64String("Images/User/Profile", user.ImageUrl);
+                response.Image = _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
             }
 
             return response;
