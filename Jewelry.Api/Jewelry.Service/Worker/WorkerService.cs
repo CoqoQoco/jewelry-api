@@ -8,7 +8,9 @@ using jewelry.Model.Worker.Update;
 using jewelry.Model.Worker.WorkerWages;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NPOI.OpenXmlFormats.Dml;
@@ -32,12 +34,13 @@ namespace Jewelry.Service.Worker
         ReportWorkerSummeryResponse SummeryReport(ReportWorkerWages request);
         IQueryable<TrackingWorkerResponse> TrackingWorker(TrackingWorker request);
     }
-    public class WorkerService : IWorkerService
+    public class WorkerService : BaseService, IWorkerService
     {
-        private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
-        public WorkerService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
+        public WorkerService(JewelryContext JewelryContext, 
+            IHttpContextAccessor httpContextAccessor, 
+            IHostEnvironment HostingEnvironment) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
@@ -78,9 +81,9 @@ namespace Jewelry.Service.Worker
                 TypeId = request.Type,
                 IsActive = true,
 
-                CreateBy = _admin,
+                CreateBy = CurrentUsername,
                 CreateDate = DateTime.UtcNow,
-                UpdateBy = _admin,
+                UpdateBy = CurrentUsername,
                 UpdateDate = DateTime.UtcNow,
             };
 
@@ -104,7 +107,7 @@ namespace Jewelry.Service.Worker
             dub.NameTh = request.NameTh;
             dub.TypeId = request.Type;
             dub.UpdateDate = DateTime.UtcNow;
-            dub.UpdateBy = _admin;
+            dub.UpdateBy = CurrentUsername;
 
             _jewelryContext.TbmWorker.Update(dub);
             await _jewelryContext.SaveChangesAsync();
