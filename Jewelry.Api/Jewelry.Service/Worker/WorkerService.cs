@@ -171,7 +171,7 @@ namespace Jewelry.Service.Worker
                 }
             }
 
-            return query.OrderByDescending(x => x.UpdateDate);
+            return query;
         }
         public SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request)
         {
