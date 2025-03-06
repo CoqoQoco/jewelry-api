@@ -1,9 +1,14 @@
-﻿using jewelry.Model.Customer;
+﻿using ICSharpCode.SharpZipLib.Zip;
+using jewelry.Model.Customer;
 using jewelry.Model.Exceptions;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using NetTopologySuite.Index.HPRtree;
 using NPOI.XWPF.UserModel;
 using System;
 using System.Collections.Generic;
@@ -19,12 +24,13 @@ namespace Jewelry.Service.Customer
         IQueryable<SearchCustomerResponse> SearchCustomer(SearchCustomer request);
         Task<string> CreateCustomer(CreateCustomerRequest request);
     }
-    public class CustomerService : ICustomerService
+    public class CustomerService : BaseService, ICustomerService
     {
-        private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
-        public CustomerService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
+        public CustomerService(JewelryContext JewelryContext, 
+            IHostEnvironment HostingEnvironment,
+            IHttpContextAccessor httpContextAccessor) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
@@ -37,71 +43,72 @@ namespace Jewelry.Service.Customer
         }
         public IQueryable<SearchCustomerResponse> Search(SearchCustomer request)
         {
-            var CustomerPlan = (from item in _jewelryContext.TbmCustomer.Include(x => x.TypeCodeNavigation)
-                                    //join plan in _jewelryContext.TbtProductionPlan on item.Code.ToUpper() equals plan.CustomerType.ToUpper() into joined
-                                    //from j in joined.DefaultIfEmpty()
-                                join plan in _jewelryContext.TbtProductionPlan on item.Code.ToUpper() equals plan.CustomerNumber.ToUpper() into planJoined
-                                from pj in planJoined.DefaultIfEmpty()
-                                where item.Code.Contains(request.Text.ToUpper())
-                                select new CustomerPlan() { customer = item, Plan = pj });
+            // 1. สร้าง query พื้นฐานพร้อม Include ที่จำเป็น
+            var query = _jewelryContext.TbmCustomer
+                .Include(x => x.TypeCodeNavigation)
+                .AsQueryable();
 
-            var customers = CustomerPlan.ToList();
+            // 2. กรองตามเงื่อนไขการค้นหาถ้ามี
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                var searchText = request.Text.Trim();
+                var searchTextUpper = searchText.ToUpper();
 
-            var response = (from item in CustomerPlan
-                            group item by new
-                            {
-                                Code = item.customer.Code,
-                            } into header
-                            select new SearchCustomerResponse()
-                            {
-                                Code = header.Key.Code,
-                                NameTh = header.First().customer.NameTh,
-                                NameEn = header.First().customer.NameEn,
+                query = query.Where(item =>
+                    item.Code.Contains(searchTextUpper) ||
+                    (item.NameEn != null && item.NameEn.Contains(searchText)) ||
+                    (item.NameTh != null && item.NameTh.Contains(searchText)) ||
+                    (item.Email != null && item.Email.Contains(searchText)) ||
+                    (item.ContactName != null && item.ContactName.Contains(searchText))
+                );
+            }
 
-                                Address = header.First().customer.Address,
-                                Telephone1 = header.First().customer.Telephone1,
-                                Telephone2 = header.First().customer.Telephone2,
-                                ContactName = header.First().customer.ContactName,
-                                Email = header.First().customer.Email,
-                                Remark = header.First().customer.Remark,
+            // 3. ทำ LEFT JOIN กับตาราง TbtProductionPlan แบบปรับปรุง
+            var result = query.GroupJoin(
+                _jewelryContext.TbtProductionPlan,
+                customer => customer.Code.ToUpper(),
+                plan => plan.CustomerNumber.ToUpper(),
+                (customer, plans) => new SearchCustomerResponse
+                {
+                    Code = customer.Code,
+                    NameTh = customer.NameTh,
+                    NameEn = customer.NameEn,
+                    Address = customer.Address,
+                    Telephone1 = customer.Telephone1,
+                    Telephone2 = customer.Telephone2,
+                    ContactName = customer.ContactName,
+                    Email = customer.Email,
+                    Remark = customer.Remark,
+                    TypeCode = customer.TypeCode,
+                    TypeName = customer.TypeCodeNavigation.NameTh,
+                    ProductionPlanCount = plans.Count()
+                });
 
-                                TypeCode = header.First().customer.TypeCode,
-                                TypeName = header.First().customer.TypeCodeNavigation.NameTh,
-                                OrderCount = header.Any(x => x.Plan != null) ? header.Select(x => x.Plan.Id).Count() : 0,
-                            });
-
-            //try
-            //{
-            //    var responses = response.ToList();
-            //}
-            //catch (Exception ex)
-            //{ 
-            //   throw new Exception(ex.Message, ex);
-            //}
-            return response.OrderBy(x => x.Code);
+            return result;
         }
+
         public IQueryable<SearchCustomerResponse> SearchCustomer(SearchCustomer request)
         {
             var response = (from item in _jewelryContext.TbmCustomer.Include(x => x.TypeCodeNavigation)
-                                where item.Code.Contains(request.Text.ToUpper())
-                                select new SearchCustomerResponse()
-                                {
-                                    Code = item.Code,
-                                    NameTh = item.NameTh,
-                                    NameEn = item.NameEn,
+                            where item.Code.Contains(request.Text.ToUpper())
+                            select new SearchCustomerResponse()
+                            {
+                                Code = item.Code,
+                                NameTh = item.NameTh,
+                                NameEn = item.NameEn,
 
-                                    Address = item.Address,
-                                    Telephone1 = item.Telephone1,
-                                    Telephone2 = item.Telephone2,
-                                    ContactName = item.ContactName,
-                                    Email = item.Email,
-                                    Remark = item.Remark,
+                                Address = item.Address,
+                                Telephone1 = item.Telephone1,
+                                Telephone2 = item.Telephone2,
+                                ContactName = item.ContactName,
+                                Email = item.Email,
+                                Remark = item.Remark,
 
-                                    TypeCode = item.TypeCode,
-                                    TypeName = item.TypeCodeNavigation.NameTh,
-                                });
+                                TypeCode = item.TypeCode,
+                                TypeName = item.TypeCodeNavigation.NameTh,
+                            });
 
-            return response.OrderBy(x => x.Code);
+            return response;
         }
         public async Task<string> CreateCustomer(CreateCustomerRequest request)
         {
@@ -131,7 +138,7 @@ namespace Jewelry.Service.Customer
                 Remark = request.Remark,
 
                 CreateDate = DateTime.UtcNow,
-                CreateBy = _admin
+                CreateBy = CurrentUsername
             };
 
             _jewelryContext.TbmCustomer.Add(add);

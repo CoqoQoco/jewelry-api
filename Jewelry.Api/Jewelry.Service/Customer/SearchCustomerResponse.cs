@@ -29,7 +29,8 @@ namespace Jewelry.Service.Customer
 
         public string? Remark { get; set; }
 
-        public int OrderCount { get; set; }
+
+        public int ProductionPlanCount { get; set; } = 0;
     }
 
   

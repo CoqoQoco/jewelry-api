@@ -14,7 +14,6 @@ namespace Jewelry.Service.Customer
     }
     public class SearchCustomer
     {
-        //[StringLength(30, MinimumLength = 4, ErrorMessage = "Maximum 30 characters")]
         public string? Text { get; set; }
     }
 }
