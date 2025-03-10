@@ -44,6 +44,8 @@ namespace Jewelry.Service.Receipt.Production
                          .Include(o => o.CustomerTypeNavigation)
                          on item.ProductionPlanId equals plan.Id
 
+                         where item.IsComplete == false
+
                          //.Include(x => x.ProductionPlan)
                          //.Include(o => o.ProductionPlan.ProductTypeNavigation)
                          //.Include(o => o.ProductionPlan.CustomerTypeNavigation)
@@ -332,8 +334,9 @@ namespace Jewelry.Service.Receipt.Production
                     {
                         newProductResponse.Materials = newProductMaterial.MapResponseNewStockMaterialProduction();
                     }
-                    response.Stocks.Add(newProductResponse);
                 }
+
+                response.Stocks.Add(newProductResponse);
 
                 match.IsReceipt = true;
                 match.UpdateBy = CurrentUsername;
@@ -460,7 +463,7 @@ namespace Jewelry.Service.Receipt.Production
             var query = (from stock in _jewelryContext.TbtStockProduct
 
                          where stock.CreateDate >= request.ReceiptDateStart.StartOfDayUtc()
-                         && stock.CreateDate <= request.ReceiptDateEnd.StartOfDayUtc()
+                         && stock.CreateDate <= request.ReceiptDateEnd.EndOfDayUtc()
 
                          select new jewelry.Model.Receipt.Production.History.List.Response()
                          {
@@ -503,7 +506,7 @@ namespace Jewelry.Service.Receipt.Production
                              CreateDate = stock.CreateDate,
                          });
 
-         
+
             if (request.ReceiptType != null && request.ReceiptType.Any())
             {
                 var receiptTypeArray = request.ReceiptType.Select(x => x).ToArray();
@@ -512,7 +515,7 @@ namespace Jewelry.Service.Receipt.Production
 
 
             if (!string.IsNullOrEmpty(request.StockNumber))
-            { 
+            {
                 query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
             }
             if (!string.IsNullOrEmpty(request.Mold))

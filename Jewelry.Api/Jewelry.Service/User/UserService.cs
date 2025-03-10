@@ -85,6 +85,7 @@ namespace Jewelry.Service.User
                                     Id = role.RoleNavigation.Id,
                                     Name = role.RoleNavigation.Name,
                                     Description = role.RoleNavigation.Description ?? string.Empty,
+                                    Level = role.RoleNavigation.Level,
                                 };
             }
 

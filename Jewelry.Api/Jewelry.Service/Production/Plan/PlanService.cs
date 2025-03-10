@@ -124,6 +124,7 @@ namespace Jewelry.Service.Production.Plan
             return query;
         }
         #endregion
+
         #region --- list transfer transection ---
         public IQueryable<jewelry.Model.Production.Plan.TransferList.Response> TransferList(jewelry.Model.Production.Plan.TransferList.RequestSearch request)
         {
@@ -209,6 +210,7 @@ namespace Jewelry.Service.Production.Plan
             return query;
         }
         #endregion
+
         #region --- Transfer Plan ---
         public async Task<jewelry.Model.Production.Plan.Transfer.Response> Transfer(jewelry.Model.Production.Plan.Transfer.Request request)
         {
@@ -492,6 +494,20 @@ namespace Jewelry.Service.Production.Plan
             public List<TbtStockProductReceiptItem> newStockReceiptItem { get; } = new();
 
             public bool HasAnyValidPlans => NewStatuses.Any();
+        }
+        #endregion
+
+        #region --- restore plan ---
+        public async Task<string> Restore(jewelry.Model.Production.Plan.Restore.Request request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductionPlan
+                        where item.Wo == request.Wo
+                        && item.WoNumber == request.WoNumber
+                        && item.Id == request.Id
+                        select item).FirstOrDefault();
+
+
+            return "success";
         }
         #endregion
     }
