@@ -23,6 +23,12 @@ namespace jewelry.Model.User.List
         public string CreatedBy { get; set; }
         public DateTime? UpdatedDate { get; set; }
         public string? UpdatedBy { get; set; }
+        public string? Image { get; set; }
+
+        public string RoleName { get; set; }
+        public string RoleDescription { get; set; }
 
     }
+
+   
 }

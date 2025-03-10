@@ -80,6 +80,7 @@ namespace Jewelry.Service.User
             if (user.TbtUserRole.Any())
             {
                 response.Role = from role in user.TbtUserRole
+
                                 select new jewelry.Model.User.Get.Role()
                                 {
                                     Id = role.RoleNavigation.Id,
@@ -221,7 +222,7 @@ namespace Jewelry.Service.User
                     user.ImageUrl = namePath;
                 }
 
-                if (!string.IsNullOrEmpty(request.ImageAction) && request.ImageAction == "delete") 
+                if (!string.IsNullOrEmpty(request.ImageAction) && request.ImageAction == "delete")
                 {
                     user.ImageUrl = string.Empty;
                 }
@@ -341,27 +342,10 @@ namespace Jewelry.Service.User
         #region --- list ---
         public IQueryable<jewelry.Model.User.List.Response> List(jewelry.Model.User.List.Search request)
         {
-            var query = from user in _jewelryContext.TbtUser
-                            //.Include(x => x.TbtUserRole)
-                            //.ThenInclude(x => x.RoleNavigation)
-                        select new jewelry.Model.User.List.Response()
-                        {
-                            Id = user.Id,
-                            Username = user.Username,
-
-                            FirstName = user.FirstName,
-                            LastName = user.LastName,
-
-                            IsActive = user.IsActive,
-                            IsNew = user.IsNew,
-
-                            LastLogin = user.LastLogin,
-
-                            CreatedDate = user.CreateDate,
-                            CreatedBy = user.CreateBy,
-                            UpdatedDate = user.UpdateDate,
-                            UpdatedBy = user.UpdateBy,
-                        };
+            var query = (from user in _jewelryContext.TbtUser
+                            .Include(x => x.TbtUserRole)
+                            .ThenInclude(x => x.RoleNavigation)
+                         select user);
 
             if (request.Id.HasValue)
             {
@@ -380,7 +364,38 @@ namespace Jewelry.Service.User
                 query = query.Where(x => x.IsNew == request.IsNew);
             }
 
-            return query;
+
+            var response = (from user in query
+                            select new jewelry.Model.User.List.Response()
+                            {
+                                Id = user.Id,
+                                Username = user.Username,
+
+                                FirstName = user.FirstName,
+                                LastName = user.LastName,
+
+                                IsActive = user.IsActive,
+                                IsNew = user.IsNew,
+
+                                LastLogin = user.LastLogin,
+
+                                CreatedDate = user.CreateDate,
+                                CreatedBy = user.CreateBy,
+                                UpdatedDate = user.UpdateDate,
+                                UpdatedBy = user.UpdateBy,
+
+                                Image = user.ImageUrl,
+                                RoleName = user.TbtUserRole.Any()
+                                            ? user.TbtUserRole.OrderByDescending(x => x.RoleNavigation.Level).FirstOrDefault().RoleNavigation.Name
+                                            : string.Empty,
+                                RoleDescription = user.TbtUserRole.Any()
+                                                    ? user.TbtUserRole.OrderByDescending(x => x.RoleNavigation.Level).FirstOrDefault().RoleNavigation.Description
+                                                    : string.Empty,
+
+                            });
+
+
+            return response;
         }
         #endregion
         #region --- active ---
