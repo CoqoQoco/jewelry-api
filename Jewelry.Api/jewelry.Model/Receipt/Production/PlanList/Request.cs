@@ -14,6 +14,18 @@ namespace jewelry.Model.Receipt.Production.PlanList
 
     public class Search
     {
-        public string? WO { get; set; }
+        public DateTimeOffset ReceiptDateStart { get; set; }
+        public DateTimeOffset ReceiptDateEnd { get; set; }
+
+        public string? ReceiptNumber { get; set; }
+        public string? WoText { get; set; }
+        public string? Mold { get; set; }
+
+
+        public string? ProductNumber { get; set; }
+        public string[]? ProductType { get; set; }
+
+        public string[]? GoldType { get; set; }
+        public string[]? GoldSize { get; set; }
     }
 }

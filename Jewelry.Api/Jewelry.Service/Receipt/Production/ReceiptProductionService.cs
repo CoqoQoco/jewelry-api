@@ -45,47 +45,76 @@ namespace Jewelry.Service.Receipt.Production
                          on item.ProductionPlanId equals plan.Id
 
                          where item.IsComplete == false
+                         && item.CreateDate >= request.ReceiptDateStart.StartOfDayUtc()
+                         && item.CreateDate <= request.ReceiptDateEnd.EndOfDayUtc()
+                         select new { item, plan });
 
-                         //.Include(x => x.ProductionPlan)
-                         //.Include(o => o.ProductionPlan.ProductTypeNavigation)
-                         //.Include(o => o.ProductionPlan.CustomerTypeNavigation)
-
-                         select new jewelry.Model.Receipt.Production.PlanList.Response()
-                         {
-                             Id = plan.Id,
-                             Wo = plan.Wo,
-                             WoNumber = plan.WoNumber,
-                             WoText = plan.WoText,
-
-                             ReceiptNumber = item.Running,
-                             ReceiptDate = item.CreateDate,
-
-                             IsCompleted = item.IsComplete,
-                             IsRunning = item.IsRunning,
-                             QtyRunning = item.QtyRunning,
-
-                             ProductNumber = plan.ProductNumber,
-                             ProductTypeName = plan.ProductTypeNavigation.NameTh,
-                             ProductType = plan.ProductType,
-                             ProductQty = plan.ProductQty,
-
-                             Mold = plan.Mold,
-                             Gold = plan.Type,
-                             GoldSize = plan.TypeSize,
-
-                             ReceiptStocks = item.TbtStockProductReceiptItem.Select(x => new jewelry.Model.Receipt.Production.PlanList.ReceiptStock()
-                             {
-                                 StockNumber = x.StockReceiptNumber,
-                                 IsReceipt = x.IsReceipt
-                             })
-                         });
-
-            if (!string.IsNullOrEmpty(request.WO))
+            if (!string.IsNullOrEmpty(request.ReceiptNumber))
             {
-                query = query.Where(x => x.WoText.Contains(request.WO));
+                query = query.Where(x => x.item.Running.Contains(request.ReceiptNumber.ToUpper()));
+            }
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                query = query.Where(x => x.item.WoText.Contains(request.WoText.ToUpper()));
+            }
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.plan.Mold.Contains(request.Mold.ToUpper()));
             }
 
-            return query;
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.plan.ProductNumber.Contains(request.ProductNumber.ToUpper()));
+            }
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                var productTypeArray = request.ProductType.Select(x => x).ToArray();
+                query = query.Where(x => productTypeArray.Contains(x.plan.ProductType));
+            }
+
+            if (request.GoldType != null && request.GoldType.Any())
+            {
+                var goldTypeArray = request.GoldType.Select(x => x).ToArray();
+                query = query.Where(x => goldTypeArray.Contains(x.plan.Type));
+            }
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                var goldSizeArray = request.GoldSize.Select(x => x).ToArray();
+                query = query.Where(x => goldSizeArray.Contains(x.plan.TypeSize));
+            }
+
+            var response = (from receip in query
+                            select new jewelry.Model.Receipt.Production.PlanList.Response()
+                            {
+                                Id = receip.plan.Id,
+                                Wo = receip.plan.Wo,
+                                WoNumber = receip.plan.WoNumber,
+                                WoText = receip.plan.WoText,
+
+                                ReceiptNumber = receip.item.Running,
+                                ReceiptDate = receip.item.CreateDate,
+
+                                IsCompleted = receip.item.IsComplete,
+                                IsRunning = receip.item.IsRunning,
+                                QtyRunning = receip.item.QtyRunning,
+
+                                ProductNumber = receip.plan.ProductNumber,
+                                ProductTypeName = receip.plan.ProductTypeNavigation.NameTh,
+                                ProductType = receip.plan.ProductType,
+                                ProductQty = receip.plan.ProductQty,
+
+                                Mold = receip.plan.Mold,
+                                Gold = receip.plan.Type,
+                                GoldSize = receip.plan.TypeSize,
+
+                                ReceiptStocks = receip.item.TbtStockProductReceiptItem.Select(x => new jewelry.Model.Receipt.Production.PlanList.ReceiptStock()
+                                {
+                                    StockNumber = x.StockReceiptNumber,
+                                    IsReceipt = x.IsReceipt
+                                })
+                            });
+
+            return response;
 
         }
         public async Task<jewelry.Model.Receipt.Production.PlanGet.Response> GetPlan(jewelry.Model.Receipt.Production.PlanGet.Request request)
