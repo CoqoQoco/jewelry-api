@@ -1,4 +1,5 @@
 ﻿using Jewelry.Data.Context;
+using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace Jewelry.Service.Stock.Product
 {
@@ -27,83 +29,107 @@ namespace Jewelry.Service.Stock.Product
             _runningNumberService = runningNumberService;
         }
 
-        public IQueryable<jewelry.Model.Stock.Product.List.Response> List(jewelry.Model.Stock.Product.List.RequestSearch request)
+        public IQueryable<jewelry.Model.Stock.Product.List.Response> List(jewelry.Model.Stock.Product.List.Search request)
         {
+            var stock = (from item in _jewelryContext.TbtStockProduct
+                         .Include(x => x.TbtStockProductMaterial)
+                         where item.Status == "Available"
+                         select item);
 
-            throw new NotImplementedException();
-            //var query = (from item in _jewelryContext.TbtStockProduct
-            //             //.Include(x => x.ProductionPlan)
-            //             //.Include(o => o.ProductionPlan.ProductTypeNavigation)
-            //             //.Include(o => o.ProductionPlan.CustomerTypeNavigation)
-            //             //.Include(x => x.ReceiptNumberNavigation)
-            //             select new jewelry.Model.Stock.Product.List.Response()
-            //             {
-            //                 Id = item.ProductionPlan.Id,
-            //                 Wo = item.ProductionPlan.Wo,
-            //                 WoNumber = item.ProductionPlan.WoNumber,
-            //                 WoText = item.ProductionPlan.WoText,
+            if (request.ReceiptType != null && request.ReceiptType.Any())
+            {
+                var stockTypeArray = request.ReceiptType.Select(x => x).ToArray();
+                stock = stock.Where(x => stockTypeArray.Contains(x.ProductionType));
+            }
+            if (!string.IsNullOrEmpty(request.StockNumber))
+            {
+                stock = stock.Where(x => x.StockNumber.Contains(request.StockNumber));
+            }
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                stock = stock.Where(x => x.Mold.Contains(request.Mold));
+            }
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                var productTypeArray = request.ProductType.Select(x => x).ToArray();
+                stock = stock.Where(x => productTypeArray.Contains(x.ProductType));
+            }
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                stock = stock.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+            }
+            if (!string.IsNullOrEmpty(request.ProductNameTh))
+            {
+                stock = stock.Where(x => x.ProductNameTh.Contains(request.ProductNameTh));
+            }
+            if (!string.IsNullOrEmpty(request.ProductNameEn))
+            {
+                stock = stock.Where(x => x.ProductNameEn.Contains(request.ProductNameEn));
+            }
+            if (!string.IsNullOrEmpty(request.Size))
+            {
+                stock = stock.Where(x => x.Size.Contains(request.Size));
+            }
 
-            //                 ReceiptNumber = item.ReceiptNumber,
-            //                 //ReceiptDate = item.ReceiptNumberNavigation.CreateDate,
-            //                 StockNumber = item.Running,
+            var response = from item in stock
+                           select new jewelry.Model.Stock.Product.List.Response()
+                           {
+                               StockNumber = item.StockNumber,
+                               Status = item.Status,
 
-            //                 ProductNumber = item.ProductionPlan.ProductNumber,
-            //                 ProductTypeName = item.ProductionPlan.ProductTypeNavigation.NameTh,
-            //                 ProductType = item.ProductionPlan.ProductType,
-            //                 ProductQty = item.ProductionPlan.ProductQty,
+                               ReceiptNumber = item.ReceiptNumber,
+                               ReceiptDate = item.ReceiptDate,
+                               ReceiptType = item.ProductionType,
 
-            //                 Mold = item.ProductionPlan.Mold,
-            //                 Gold = item.ProductionPlan.Type,
-            //                 GoldSize = item.ProductionPlan.TypeSize,
-            //             });
+                               Mold = item.Mold,
 
-            //if (request.RecieptStart.HasValue)
-            //{
-            //    query = query.Where(x => x.ReceiptDate >= request.RecieptStart.Value.StartOfDayUtc());
-            //}
-            //if (request.ReceiptEnd.HasValue)
-            //{
-            //    query = query.Where(x => x.ReceiptDate >= request.ReceiptEnd.Value.EndOfDayUtc());
-            //}
+                               Qty = item.Qty,
+                               ProductPrice = item.ProductPrice,
 
-            //if (!string.IsNullOrEmpty(request.ReceiptNumber))
-            //{
-            //    query = query.Where(x => x.ReceiptNumber.Contains(request.ReceiptNumber));
-            //}
-            //if (!string.IsNullOrEmpty(request.StockNumber))
-            //{
-            //    query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
-            //}
+                               ProductNumber = item.ProductNumber,
+                               ProductNameTh = item.ProductNameTh,
+                               ProductNameEn = item.ProductNameEn,
 
+                               ProductType = item.ProductType,
+                               ProductTypeName = item.ProductTypeName,
 
-            //if (!string.IsNullOrEmpty(request.WoText))
-            //{
-            //    query = query.Where(x => x.WoText.Contains(request.WoText));
-            //}
-            //if (!string.IsNullOrEmpty(request.Mold))
-            //{
-            //    query = query.Where(x => x.Mold.Contains(request.Mold));
-            //}
+                               ImageName = item.ImageName,
+                               ImagePath = item.ImagePath,
 
-            //if (!string.IsNullOrEmpty(request.ProductNumber))
-            //{
-            //    query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
-            //}
-            //if (request.ProductType != null && request.ProductType.Any())
-            //{
-            //    query = query.Where(x => request.ProductType.Contains(x.ProductType));
-            //}
+                               Wo = item.Wo,
+                               WoNumber = item.WoNumber,
+                               WoText = $"{item.Wo}{item.WoNumber.ToString()}",
 
-            //if (request.Gold != null && request.Gold.Any())
-            //{
-            //    query = query.Where(x => request.Gold.Contains(x.Gold));
-            //}
-            //if (request.GoldSize != null && request.GoldSize.Any())
-            //{
-            //    query = query.Where(x => request.GoldSize.Contains(x.GoldSize));
-            //}
+                               ProductionDate = item.CreateDate,
+                               ProductionType = item.ProductionType,
+                               ProductionTypeSize = item.ProductionTypeSize,
 
-            //return query;
+                               Size = item.Size,
+                               Location = item.Location,
+                               Remark = item.Remark,
+
+                               CreateBy = item.CreateBy,
+                               CreateDate = item.CreateDate,
+
+                               Materials = item.TbtStockProductMaterial.Any() ?
+                                            (from material in item.TbtStockProductMaterial
+                                             select new jewelry.Model.Stock.Product.List.Material()
+                                             {
+                                                Type = material.Type,
+                                                TypeName = material.TypeName,
+                                                TypeCode = material.TypeCode,
+                                                TypeBarcode = material.TypeBarcode,
+                                                Qty = material.Qty,
+                                                QtyUnit = material.QtyUnit,
+                                                Weight = material.Weight,
+                                                WeightUnit = material.WeightUnit,
+                                                Size = material.Size,
+                                                Price = material.Price
+                                             }).ToList() 
+                                             : new List<jewelry.Model.Stock.Product.List.Material>()
+                           };
+
+            return response;
         }
     }
 }

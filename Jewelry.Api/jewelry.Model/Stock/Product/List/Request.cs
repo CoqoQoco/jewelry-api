@@ -9,24 +9,23 @@ namespace jewelry.Model.Stock.Product.List
 {
     public class Request : DataSourceRequest
     {
-      public RequestSearch Search { get; set;  }
+      public Search Search { get; set;  }
     }
 
-    public class RequestSearch
+    public class Search
     {
-        public DateTimeOffset? RecieptStart { get; set; }
-        public DateTimeOffset? ReceiptEnd { get; set; }
+        public string[]? ReceiptType { get; set; }
 
-        public string? ReceiptNumber { get; set; }
         public string? StockNumber { get; set; }
-
         public string? Mold { get; set; }
-        public string? WoText { get; set; }
 
         public string? ProductNumber { get; set; }
-        public string[]? ProductType { get; set; }
+        public string? ProductNameEn { get; set; }
+        public string? ProductNameTh { get; set; }
 
-        public string[]? Gold { get; set; }
-        public string[]? GoldSize { get; set; }
+        //public string? WoText { get; set; }
+        public string[]? ProductType { get; set; }
+        public string? Size { get; set; }
+
     }
 }

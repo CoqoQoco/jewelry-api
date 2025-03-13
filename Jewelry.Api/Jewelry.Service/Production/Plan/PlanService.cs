@@ -247,6 +247,7 @@ namespace Jewelry.Service.Production.Plan
         {
             var plans = await _jewelryContext.TbtProductionPlan
                 .Include(x => x.TbtProductionPlanStatusHeader)
+                .Include(x => x.ProductTypeNavigation)
                 .Where(item => planIds.Contains(item.Id))
                 .ToListAsync();
 
@@ -394,17 +395,18 @@ namespace Jewelry.Service.Production.Plan
             return new TbtStockProductReceiptPlan
             {
                 Running = running,
+                Type = "production",
 
                 CreateDate = dateNow,
                 CreateBy = CurrentUsername,
 
-                ProductionPlanId = plan.Id,
                 Wo = plan.Wo,
                 WoNumber = plan.WoNumber,
                 WoText = plan.WoText,
 
                 Qty = plan.ProductQty,
                 IsComplete = false,
+                IsRunning = false,
             };
         }
 
@@ -420,15 +422,24 @@ namespace Jewelry.Service.Production.Plan
                 var item = new TbtStockProductReceiptItem
                 {
                     Running = running,
+                    Type = "production",
+
                     Wo = plan.Wo,
                     WoNumber = plan.WoNumber,
+                    WoText = plan.WoText,
 
-                    StockReceiptNumber = await _runningNumberService.GenerateRunningNumberForGold("STR"),
+                    Mold = plan.Mold,
+                    StockReceiptNumber = await _runningNumberService.GenerateRunningNumberForGold("RPR"),
                     IsReceipt = false,
 
                     CreateDate = dateNow,
                     CreateBy = CurrentUsername,
 
+                    ProductionType = plan.Type,
+                    ProductionTypeSize = plan.TypeSize,
+
+                    ProductType = plan.ProductType,
+                    ProductTypeName = plan.ProductTypeNavigation.NameTh
 
                 };
 

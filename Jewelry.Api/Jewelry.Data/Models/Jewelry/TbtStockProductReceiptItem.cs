@@ -22,12 +22,44 @@ public partial class TbtStockProductReceiptItem
     /// <summary>
     /// เลขใบจ่าย-รับงาน
     /// </summary>
-    public string Wo { get; set; } = null!;
+    public string? Wo { get; set; }
 
     /// <summary>
     /// ลำดับใบจ่าย-รับงาน
     /// </summary>
-    public int WoNumber { get; set; }
+    public int? WoNumber { get; set; }
 
-    public virtual TbtStockProductReceiptPlan TbtStockProductReceiptPlan { get; set; } = null!;
+    public string Type { get; set; } = null!;
+
+    public string? Po { get; set; }
+
+    public string? WoText { get; set; }
+
+    public string? StockNumber { get; set; }
+
+    /// <summary>
+    /// รหัสประเภทสินค้า
+    /// </summary>
+    public string? ProductType { get; set; }
+
+    /// <summary>
+    /// ประเภทสินค้า
+    /// </summary>
+    public string? ProductTypeName { get; set; }
+
+    /// <summary>
+    /// Gold/Silver
+    /// </summary>
+    public string? ProductionType { get; set; }
+
+    /// <summary>
+    /// 10 K, 18K ....
+    /// </summary>
+    public string? ProductionTypeSize { get; set; }
+
+    public string? Mold { get; set; }
+
+    public DateTime? ReceiptDate { get; set; }
+
+    public virtual TbtStockProductReceiptPlan RunningNavigation { get; set; } = null!;
 }

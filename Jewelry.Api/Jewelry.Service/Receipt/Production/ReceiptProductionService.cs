@@ -42,7 +42,7 @@ namespace Jewelry.Service.Receipt.Production
                          join plan in _jewelryContext.TbtProductionPlan
                          .Include(o => o.ProductTypeNavigation)
                          .Include(o => o.CustomerTypeNavigation)
-                         on item.ProductionPlanId equals plan.Id
+                         on item.WoText equals plan.WoText
 
                          where item.IsComplete == false
                          && item.CreateDate >= request.ReceiptDateStart.StartOfDayUtc()
@@ -128,7 +128,7 @@ namespace Jewelry.Service.Receipt.Production
                          .Include(o => o.TbtProductionPlanPrice)
                          .Include(o => o.TbtProductionPlanStatusHeader)
                          .ThenInclude(t => t.TbtProductionPlanStatusDetailGem)
-                         on item.ProductionPlanId equals plan.Id
+                         on item.WoText equals plan.WoText
 
                          //join _gem in _jewelryContext.TbtProductionPlanStatusDetailGem
                          //on plan.Id equals _gem.ProductionPlanId into joinedGem
@@ -269,7 +269,6 @@ namespace Jewelry.Service.Receipt.Production
 
             return response;
         }
-
         public async Task<jewelry.Model.Receipt.Production.Confirm.Response> Confirm(jewelry.Model.Receipt.Production.Confirm.Request request)
         {
             var response = new jewelry.Model.Receipt.Production.Confirm.Response()
@@ -286,7 +285,7 @@ namespace Jewelry.Service.Receipt.Production
                          .Include(o => o.TbtProductionPlanPrice)
                          .Include(o => o.TbtProductionPlanStatusHeader)
                          .ThenInclude(t => t.TbtProductionPlanStatusDetailGem)
-                         on receipt.ProductionPlanId equals plan.Id
+                         on receipt.WoText equals plan.WoText
 
                          where receipt.Running == request.ReceiptNumber
                          select new { receipt, plan }).FirstOrDefault();
@@ -370,6 +369,8 @@ namespace Jewelry.Service.Receipt.Production
                 match.IsReceipt = true;
                 match.UpdateBy = CurrentUsername;
                 match.UpdateDate = DateTime.UtcNow;
+                match.ReceiptDate = DateTime.UtcNow;
+                match.StockNumber = _stockRunning;
                 updateReceiptItem.Add(match);
 
                 foreach (var draft in drafts)
@@ -463,7 +464,6 @@ namespace Jewelry.Service.Receipt.Production
             return response;
 
         }
-
         public async Task<string> Darft(jewelry.Model.Receipt.Production.Draft.Create.Request request)
         {
 
@@ -485,26 +485,58 @@ namespace Jewelry.Service.Receipt.Production
 
             return "success";
         }
-
-
         public IQueryable<jewelry.Model.Receipt.Production.History.List.Response> ListHistory(jewelry.Model.Receipt.Production.History.List.Search request)
         {
-            var query = (from stock in _jewelryContext.TbtStockProduct
+            var receipt = (from item in _jewelryContext.TbtStockProductReceiptItem
+                           where item.IsReceipt == true
+                           && item.ReceiptDate >= request.ReceiptDateStart.StartOfDayUtc()
+                           && item.ReceiptDate <= request.ReceiptDateEnd.EndOfDayUtc()
+                           select item);
 
-                         where stock.CreateDate >= request.ReceiptDateStart.StartOfDayUtc()
-                         && stock.CreateDate <= request.ReceiptDateEnd.EndOfDayUtc()
+            if (request.ReceiptType != null && request.ReceiptType.Any())
+            {
+                var receiptTypeArray = request.ReceiptType.Select(x => x).ToArray();
+                receipt = receipt.Where(x => receiptTypeArray.Contains(x.Type));
+            }
+            if (!string.IsNullOrEmpty(request.StockNumber))
+            {
+                receipt = receipt.Where(x => x.StockNumber.Contains(request.StockNumber));
+            }
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                receipt = receipt.Where(x => x.Mold.Contains(request.Mold));
+            }
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                receipt = receipt.Where(x => x.WoText.Contains(request.WoText));
+            }
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                var productTypeArray = request.ProductType.Select(x => x).ToArray();
+                receipt = receipt.Where(x => productTypeArray.Contains(x.ProductType));
+            }
 
+            if (receipt.Any() == false)
+            {
+                return Enumerable.Empty<jewelry.Model.Receipt.Production.History.List.Response>().AsQueryable();
+            }
+
+            var query = (from item in receipt
+
+                         join stock in _jewelryContext.TbtStockProduct
+                         on item.StockNumber equals stock.StockNumber
+                       
                          select new jewelry.Model.Receipt.Production.History.List.Response()
                          {
 
                              StockNumber = stock.StockNumber,
                              Status = stock.Status,
 
-                             ReceiptNumber = stock.ReceiptNumber,
+                             ReceiptNumber = item.StockReceiptNumber,
                              ReceiptDate = stock.ReceiptDate,
-                             ReceiptType = stock.ReceiptType,
+                             ReceiptType = item.Type,
 
-                             Mold = stock.Mold,
+                             Mold = item.Mold,
 
                              Qty = stock.Qty,
                              ProductPrice = stock.ProductPrice,
@@ -514,43 +546,26 @@ namespace Jewelry.Service.Receipt.Production
                              ProductNameEn = stock.ProductNameEn,
 
                              ProductType = stock.ProductType,
-                             ProductTypeName = stock.ProductTypeName,
+                             ProductTypeName = item.ProductTypeName,
 
                              ImageName = stock.ImageName,
                              ImagePath = stock.ImagePath,
 
-                             Wo = stock.Wo,
-                             WoNumber = stock.WoNumber,
-                             WoText = $"{stock.Wo}{stock.WoNumber.ToString()}",
+                             Wo = item.Wo,
+                             WoNumber = item.WoNumber,
+                             WoText = $"{item.Wo}{item.WoNumber.ToString()}",
 
-                             ProductionDate = stock.CreateDate,
-                             ProductionType = stock.ProductionType,
-                             ProductionTypeSize = stock.ProductionTypeSize,
+                             ProductionDate = item.CreateDate,
+                             ProductionType = item.ProductionType,
+                             ProductionTypeSize = item.ProductionTypeSize,
 
                              Size = stock.Size,
                              Location = stock.Location,
                              Remark = stock.Remark,
 
-                             CreateBy = stock.CreateBy,
-                             CreateDate = stock.CreateDate,
+                             CreateBy = item.CreateBy,
+                             CreateDate = item.CreateDate,
                          });
-
-
-            if (request.ReceiptType != null && request.ReceiptType.Any())
-            {
-                var receiptTypeArray = request.ReceiptType.Select(x => x).ToArray();
-                query = query.Where(x => receiptTypeArray.Contains(x.ProductType));
-            }
-
-
-            if (!string.IsNullOrEmpty(request.StockNumber))
-            {
-                query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
-            }
-            if (!string.IsNullOrEmpty(request.Mold))
-            {
-                query = query.Where(x => x.Mold.Contains(request.Mold));
-            }
 
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
@@ -564,19 +579,9 @@ namespace Jewelry.Service.Receipt.Production
             {
                 query = query.Where(x => x.ProductNameEn.Contains(request.ProductNameEn));
             }
-
-            if (!string.IsNullOrEmpty(request.WoText))
-            {
-                query = query.Where(x => x.WoText.Contains(request.WoText));
-            }
             if (!string.IsNullOrEmpty(request.Size))
             {
                 query = query.Where(x => x.Size.Contains(request.Size));
-            }
-            if (request.ProductType != null && request.ProductType.Any())
-            {
-                var productTypeArray = request.ProductType.Select(x => x).ToArray();
-                query = query.Where(x => productTypeArray.Contains(x.ProductType));
             }
 
             return query;

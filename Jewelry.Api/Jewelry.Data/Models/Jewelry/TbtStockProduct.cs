@@ -20,12 +20,12 @@ public partial class TbtStockProduct
     /// <summary>
     /// เลขใบจ่าย-รับงาน
     /// </summary>
-    public string Wo { get; set; } = null!;
+    public string? Wo { get; set; }
 
     /// <summary>
     /// ลำดับใบจ่าย-รับงาน
     /// </summary>
-    public int WoNumber { get; set; }
+    public int? WoNumber { get; set; }
 
     public string? Status { get; set; }
 
@@ -76,6 +76,8 @@ public partial class TbtStockProduct
     public string? ProductionTypeSize { get; set; }
 
     public string ProductNumber { get; set; } = null!;
+
+    public string? PoNumber { get; set; }
 
     public virtual ICollection<TbtStockProductMaterial> TbtStockProductMaterial { get; set; } = new List<TbtStockProductMaterial>();
 }

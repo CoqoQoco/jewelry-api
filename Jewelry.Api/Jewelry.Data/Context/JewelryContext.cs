@@ -1682,6 +1682,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Mold)
                 .HasColumnType("character varying")
                 .HasColumnName("mold");
+            entity.Property(e => e.PoNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("po_number");
             entity.Property(e => e.ProductNameEn)
                 .HasColumnType("character varying")
                 .HasColumnName("product_name_en");
@@ -1837,9 +1840,39 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.IsReceipt).HasColumnName("is_receipt");
+            entity.Property(e => e.Mold)
+                .HasColumnType("character varying")
+                .HasColumnName("mold");
+            entity.Property(e => e.Po)
+                .HasColumnType("character varying")
+                .HasColumnName("po");
+            entity.Property(e => e.ProductType)
+                .HasComment("รหัสประเภทสินค้า")
+                .HasColumnType("character varying")
+                .HasColumnName("product_type");
+            entity.Property(e => e.ProductTypeName)
+                .HasComment("ประเภทสินค้า")
+                .HasColumnType("character varying")
+                .HasColumnName("product_type_name");
+            entity.Property(e => e.ProductionType)
+                .HasComment("Gold/Silver")
+                .HasColumnType("character varying")
+                .HasColumnName("production_type");
+            entity.Property(e => e.ProductionTypeSize)
+                .HasComment("10 K, 18K ....")
+                .HasColumnType("character varying")
+                .HasColumnName("production_type_size");
+            entity.Property(e => e.ReceiptDate).HasColumnName("receipt_date");
             entity.Property(e => e.Running)
                 .HasColumnType("character varying")
                 .HasColumnName("running");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.Type)
+                .HasDefaultValueSql("'production'::character varying")
+                .HasColumnType("character varying")
+                .HasColumnName("type");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
@@ -1851,29 +1884,25 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.WoNumber)
                 .HasComment("ลำดับใบจ่าย-รับงาน")
                 .HasColumnName("wo_number");
+            entity.Property(e => e.WoText)
+                .HasColumnType("character varying")
+                .HasColumnName("wo_text");
 
-            entity.HasOne(d => d.TbtStockProductReceiptPlan).WithMany(p => p.TbtStockProductReceiptItem)
-                .HasForeignKey(d => new { d.Running, d.Wo, d.WoNumber })
+            entity.HasOne(d => d.RunningNavigation).WithMany(p => p.TbtStockProductReceiptItem)
+                .HasForeignKey(d => d.Running)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_stock_product_receipt_item_fk");
         });
 
         modelBuilder.Entity<TbtStockProductReceiptPlan>(entity =>
         {
-            entity.HasKey(e => new { e.Running, e.Wo, e.WoNumber }).HasName("tbt_stock_product_receipt_plan_pk");
+            entity.HasKey(e => e.Running).HasName("tbt_stock_product_receipt_plan_pk");
 
             entity.ToTable("tbt_stock_product_receipt_plan");
 
             entity.Property(e => e.Running)
                 .HasColumnType("character varying")
                 .HasColumnName("running");
-            entity.Property(e => e.Wo)
-                .HasComment("เลขใบจ่าย-รับงาน")
-                .HasColumnType("character varying")
-                .HasColumnName("wo");
-            entity.Property(e => e.WoNumber)
-                .HasComment("ลำดับใบจ่าย-รับงาน")
-                .HasColumnName("wo_number");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
@@ -1883,13 +1912,26 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.JsonDraft)
                 .HasColumnType("json")
                 .HasColumnName("json_draft");
-            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.PoNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("po_number");
             entity.Property(e => e.Qty).HasColumnName("qty");
             entity.Property(e => e.QtyRunning).HasColumnName("qty_running");
+            entity.Property(e => e.Type)
+                .HasDefaultValueSql("'production'::character varying")
+                .HasColumnType("character varying")
+                .HasColumnName("type");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.Wo)
+                .HasComment("เลขใบจ่าย-รับงาน")
+                .HasColumnType("character varying")
+                .HasColumnName("wo");
+            entity.Property(e => e.WoNumber)
+                .HasComment("ลำดับใบจ่าย-รับงาน")
+                .HasColumnName("wo_number");
             entity.Property(e => e.WoText)
                 .HasColumnType("character varying")
                 .HasColumnName("wo_text");

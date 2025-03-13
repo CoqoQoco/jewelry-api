@@ -30,9 +30,9 @@ namespace jewelry.Model.Receipt.Production.Confirm
         public string ProductType { get; set; }
         public decimal ProductPrice { get; set; }
 
-        public string Wo { get; set; }
-        public int WoNumber { get; set; }
-        public string WoText { get; set; }
+        public string? Wo { get; set; }
+        public int? WoNumber { get; set; }
+        public string? WoText { get; set; }
 
         public string? ProductionType { get; set; }
         public string? ProductionTypeSize { get; set; }
@@ -57,6 +57,7 @@ namespace jewelry.Model.Receipt.Production.Confirm
 
         public List<Material> Materials { get; set; } = new List<Material>();
     }
+
     public class Material
     {
         public string Type { get; set; }

@@ -20,24 +20,26 @@ public partial class TbtStockProductReceiptPlan
     /// <summary>
     /// เลขใบจ่าย-รับงาน
     /// </summary>
-    public string Wo { get; set; } = null!;
+    public string? Wo { get; set; }
 
     /// <summary>
     /// ลำดับใบจ่าย-รับงาน
     /// </summary>
-    public int WoNumber { get; set; }
+    public int? WoNumber { get; set; }
 
-    public string WoText { get; set; } = null!;
+    public string? WoText { get; set; }
 
     public int? Qty { get; set; }
-
-    public int ProductionPlanId { get; set; }
 
     public bool IsRunning { get; set; }
 
     public int QtyRunning { get; set; }
 
     public string? JsonDraft { get; set; }
+
+    public string Type { get; set; } = null!;
+
+    public string? PoNumber { get; set; }
 
     public virtual ICollection<TbtStockProductReceiptItem> TbtStockProductReceiptItem { get; set; } = new List<TbtStockProductReceiptItem>();
 }

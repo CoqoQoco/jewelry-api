@@ -8,6 +8,6 @@ namespace Jewelry.Service.Stock.Product
 {
     public interface IProductService
     {
-        IQueryable<jewelry.Model.Stock.Product.List.Response> List(jewelry.Model.Stock.Product.List.RequestSearch request);
+        IQueryable<jewelry.Model.Stock.Product.List.Response> List(jewelry.Model.Stock.Product.List.Search request);
     }
 }

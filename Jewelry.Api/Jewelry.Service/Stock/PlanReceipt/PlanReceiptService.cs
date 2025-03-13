@@ -34,7 +34,7 @@ namespace Jewelry.Service.Stock.PlanReceipt
                          join plan in _jewelryContext.TbtProductionPlan
                          .Include(o => o.ProductTypeNavigation)
                          .Include(o => o.CustomerTypeNavigation)
-                         on item.ProductionPlanId equals plan.Id
+                         on item.WoText equals plan.WoText
                          //.Include(x => x.ProductionPlan)
                          //.Include(o => o.ProductionPlan.ProductTypeNavigation)
                          //.Include(o => o.ProductionPlan.CustomerTypeNavigation)
