@@ -239,7 +239,7 @@ namespace Jewelry.Service.Receipt.Production
                     response.Stocks.Add(new jewelry.Model.Receipt.Production.PlanGet.ReceiptStock()
                     {
                         StockReceiptNumber = receipt.StockReceiptNumber,
-                        StockNumber = string.Empty,
+                        StockNumber = null,
 
                         ProductNumber = $"{response.ProductNumber}-{running.ToString()}",
                         ProductNameTH = query.plan.ProductName,
@@ -248,14 +248,14 @@ namespace Jewelry.Service.Receipt.Production
                         Qty = 1,
                         Price = pricePerUnit, // ใช้ราคาต่อชิ้นที่คำนวณไว้
 
-                        Size = string.Empty,
-                        Location = string.Empty,
+                        Size = null,
+                        Location = null,
 
-                        ImageName = string.Empty,
+                        ImageName = null,
                         ImageYear = null,
-                        ImagePath = string.Empty,
+                        ImagePath = null,
 
-                        Remark = string.Empty,
+                        Remark = null,
                         IsReceipt = false,
 
                         MoldDesign = query.plan.Mold,

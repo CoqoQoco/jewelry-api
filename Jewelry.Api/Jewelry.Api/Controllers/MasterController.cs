@@ -165,6 +165,28 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("MasterDiamondGrade")]
+        [HttpGet]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<MasterModel>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult MasterDiamondGrade()
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var response = _service.MasterDiamondGrade();
+
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
 
         // ------ post to get master
         [Route("SearchMaster")]

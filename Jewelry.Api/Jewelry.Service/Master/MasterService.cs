@@ -22,6 +22,7 @@ namespace Jewelry.Service.Master
         IQueryable<MasterModel> MasterGemShape();
         IQueryable<MasterModel> MasterProductType();
         IQueryable<MasterModel> MasterCustomerType();
+        IQueryable<MasterModel> MasterDiamondGrade();
 
 
         IQueryable<MasterModel> SearchMaster(SearchMasterModel request);
@@ -35,8 +36,8 @@ namespace Jewelry.Service.Master
     {
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
-        public MasterService(JewelryContext JewelryContext, 
-            IHttpContextAccessor httpContextAccessor, 
+        public MasterService(JewelryContext JewelryContext,
+            IHttpContextAccessor httpContextAccessor,
             IHostEnvironment HostingEnvironment) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
@@ -131,6 +132,21 @@ namespace Jewelry.Service.Master
                                 NameTh = item.NameTh,
                                 Code = item.Code,
                                 Description = $"{item.Code}: {item.NameTh}"
+                            });
+
+            return response.OrderBy(x => x.Code);
+        }
+        public IQueryable<MasterModel> MasterDiamondGrade()
+        {
+            var response = (from item in _jewelryContext.TbmDiamondGrade
+                            where item.IsActive == true
+                            select new MasterModel()
+                            {
+                                Id = item.Id,
+                                NameEn = item.NameEn,
+                                NameTh = item.NameTh,
+                                Code = item.Code,
+                                Description = $"{item.Code}"
                             });
 
             return response.OrderBy(x => x.Code);
@@ -292,9 +308,31 @@ namespace Jewelry.Service.Master
                                 where item.GoldSizeCode.Contains(request.GoldSizeCode)
                                 select item);
                 }
+            }
+
+            else if (request.Type.ToUpper() == "DIAMOND-GRADE")
+            {
+                var response = (from item in _jewelryContext.TbmDiamondGrade
+                                where item.IsActive == true
+                                select new MasterModel()
+                                {
+                                    Id = item.Id,
+                                    NameEn = item.NameEn,
+                                    NameTh = item.NameTh,
+                                    Code = item.Code,
+                                    Description = $"{item.NameEn}"
+                                });
+
+                if (!string.IsNullOrEmpty(request.Text))
+                {
+                    response = (from item in response
+                                where item.Code.Contains(request.Text.ToUpper())
+                                || item.NameTh.Contains(request.Text.ToUpper())
+                                || item.NameEn.Contains(request.Text.ToUpper())
+                                select item);
+                }
 
                 return response;
-                //return response.OrderBy(x => x.Code);
             }
 
             throw new HandleException("Type is required.");
@@ -380,6 +418,29 @@ namespace Jewelry.Service.Master
                 _jewelryContext.TbmProductType.Update(productType);
                 await _jewelryContext.SaveChangesAsync();
             }
+
+            if (request.Type.ToUpper() == "DIAMOND-GRADE")
+            {
+                var grade = (from item in _jewelryContext.TbmDiamondGrade
+                             where item.Id == request.Id
+                             && item.Code == request.Code.ToUpper()
+                             select item).SingleOrDefault();
+
+                if (grade == null)
+                {
+                    throw new HandleException($"ไม่พบข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                grade.NameEn = request.NameEn;
+                grade.NameTh = request.NameTh;
+
+                grade.UpdateBy = CurrentUsername;
+                grade.UpdateDate = DateTime.UtcNow;
+
+                _jewelryContext.TbmDiamondGrade.Update(grade);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
 
             return "success";
         }
