@@ -2,6 +2,8 @@
 using jewelry.Model.Master;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using System;
@@ -29,12 +31,13 @@ namespace Jewelry.Service.Master
         Task<string> CreateMasterModel(CreateMasterModelRequest request);
     }
 
-    public class MasterService : IMasterService
+    public class MasterService : BaseService, IMasterService
     {
-        private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
-        public MasterService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
+        public MasterService(JewelryContext JewelryContext, 
+            IHttpContextAccessor httpContextAccessor, 
+            IHostEnvironment HostingEnvironment) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
@@ -471,7 +474,7 @@ namespace Jewelry.Service.Master
                     NameEn = request.NameEn,
                     NameTh = request.NameTh,
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     IsActive = true,
                 };
 
@@ -496,7 +499,7 @@ namespace Jewelry.Service.Master
                     NameEn = request.NameEn,
                     NameTh = request.NameTh,
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     IsActive = true,
                 };
 
@@ -521,7 +524,7 @@ namespace Jewelry.Service.Master
                     NameEn = request.NameEn,
                     NameTh = request.NameTh,
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     IsActive = true,
                 };
 
@@ -546,7 +549,7 @@ namespace Jewelry.Service.Master
                     NameEn = request.NameEn,
                     NameTh = request.NameTh,
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     IsActive = true,
 
                     ProductCode = !string.IsNullOrEmpty(request.Prefix) ? request.Prefix.ToUpper() : "DK"
@@ -581,9 +584,9 @@ namespace Jewelry.Service.Master
                     NameEn = request.NameEn,
                     NameTh = request.NameTh,
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
-                    UpdateBy = _admin,
+                    UpdateBy = CurrentUsername,
                     IsActive = true,
                     Remark = request.Description,
                     GoldCode = request.GoldCode,
@@ -591,6 +594,37 @@ namespace Jewelry.Service.Master
                 };
 
                 _jewelryContext.TbmZill.Add(newZill);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            else if (request.Type.ToUpper() == "DIAMOND-GRADE")
+            {
+                var zill = (from item in _jewelryContext.TbmDiamondGrade
+                            where item.Code == request.Code.ToUpper()
+                            select item).SingleOrDefault();
+
+                if (zill != null)
+                {
+                    throw new HandleException($"มีข้อมูลรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+                }
+
+                var newZill = new TbmDiamondGrade()
+                {
+                    Code = request.Code.ToUpper(),
+                    NameEn = request.NameEn,
+                    NameTh = request.NameTh,
+
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = CurrentUsername,
+
+                    UpdateBy = CurrentUsername,
+                    UpdateDate = DateTime.UtcNow,
+
+                    IsActive = true,
+
+                };
+
+                _jewelryContext.TbmDiamondGrade.Add(newZill);
                 await _jewelryContext.SaveChangesAsync();
             }
 

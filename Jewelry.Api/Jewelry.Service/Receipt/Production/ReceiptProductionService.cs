@@ -158,6 +158,8 @@ namespace Jewelry.Service.Receipt.Production
                 QtyRunning = query.item.QtyRunning,
 
                 ProductNumber = query.plan.ProductNumber,
+                ProductName = query.plan.ProductName,
+
                 ProductTypeName = query.plan.ProductTypeNavigation.NameTh,
                 ProductType = query.plan.ProductType,
                 ProductQty = query.plan.ProductQty,
@@ -194,6 +196,8 @@ namespace Jewelry.Service.Receipt.Production
                 }
             }
 
+
+            //have draft
             if (!string.IsNullOrEmpty(query.item.JsonDraft))
             {
                 var draft = query.item.GetStocksFromJsonDraft();
@@ -238,8 +242,8 @@ namespace Jewelry.Service.Receipt.Production
                         StockNumber = string.Empty,
 
                         ProductNumber = $"{response.ProductNumber}-{running.ToString()}",
-                        ProductNameTH = string.Empty,
-                        ProductNameEN = string.Empty,
+                        ProductNameTH = query.plan.ProductName,
+                        ProductNameEN = query.plan.ProductName,
 
                         Qty = 1,
                         Price = pricePerUnit, // ใช้ราคาต่อชิ้นที่คำนวณไว้
@@ -253,6 +257,8 @@ namespace Jewelry.Service.Receipt.Production
 
                         Remark = string.Empty,
                         IsReceipt = false,
+
+                        MoldDesign = query.plan.Mold,
 
                         Materials = new List<jewelry.Model.Receipt.Production.PlanGet.Material>()
                     });
@@ -371,6 +377,10 @@ namespace Jewelry.Service.Receipt.Production
                 match.UpdateDate = DateTime.UtcNow;
                 match.ReceiptDate = DateTime.UtcNow;
                 match.StockNumber = _stockRunning;
+
+                match.Mold = query.plan.Mold;
+                match.MoldDesign = stock.MoldDesign;
+
                 updateReceiptItem.Add(match);
 
                 foreach (var draft in drafts)
@@ -395,6 +405,7 @@ namespace Jewelry.Service.Receipt.Production
                         draft.Remark = newProduct.Remark;
                         draft.IsReceipt = true;
 
+                        draft.MoldDesign = newProduct.MoldDesign;
                         draft.Materials = new List<jewelry.Model.Receipt.Production.PlanGet.Material>();
 
                         //map  draft.Materials by newStocksMaterial
@@ -537,6 +548,7 @@ namespace Jewelry.Service.Receipt.Production
                              ReceiptType = item.Type,
 
                              Mold = item.Mold,
+                             MoldDesign = item.MoldDesign,
 
                              Qty = stock.Qty,
                              ProductPrice = stock.ProductPrice,

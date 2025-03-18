@@ -61,5 +61,7 @@ public partial class TbtStockProductReceiptItem
 
     public DateTime? ReceiptDate { get; set; }
 
+    public string? MoldDesign { get; set; }
+
     public virtual TbtStockProductReceiptPlan RunningNavigation { get; set; } = null!;
 }

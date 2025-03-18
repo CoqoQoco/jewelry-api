@@ -79,5 +79,7 @@ public partial class TbtStockProduct
 
     public string? PoNumber { get; set; }
 
+    public string? MoldDesign { get; set; }
+
     public virtual ICollection<TbtStockProductMaterial> TbtStockProductMaterial { get; set; } = new List<TbtStockProductMaterial>();
 }

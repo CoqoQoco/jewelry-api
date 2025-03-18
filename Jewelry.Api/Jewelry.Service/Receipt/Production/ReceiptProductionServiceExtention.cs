@@ -73,6 +73,7 @@ namespace Jewelry.Service.Receipt.Production
                 ReceiptType = "production",
 
                 Mold = plan.Mold,
+                MoldDesign = confirm.MoldDesign,
 
                 Qty = confirm.Qty,
                 ProductPrice = confirm.Price,
@@ -118,6 +119,7 @@ namespace Jewelry.Service.Receipt.Production
                 ReceiptType = stock.ReceiptType,
 
                 Mold = stock.Mold,
+                MoldDesign = stock.MoldDesign,
 
                 Qty = stock.Qty,
                 ProductPrice = stock.ProductPrice,

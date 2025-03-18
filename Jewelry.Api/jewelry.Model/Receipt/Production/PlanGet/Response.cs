@@ -62,6 +62,8 @@ namespace jewelry.Model.Receipt.Production.PlanGet
         public string? ProductNameTH { get; set; }
         public string? ProductNameEN { get; set; }
 
+        public string? MoldDesign { get; set; }
+
         public decimal? Qty { get; set; }
         public decimal? Price { get; set; }
 

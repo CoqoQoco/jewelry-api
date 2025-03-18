@@ -29,7 +29,10 @@ namespace jewelry.Model.Receipt.Production.History.List
         public string? ProductionType { get; set; }
         public string? ProductionTypeSize { get; set; }
         public DateTime ProductionDate { get; set; }
+
         public string? Mold { get; set; }
+        public string? MoldDesign { get; set; }
+
 
         public string? ImageName { get; set; }
         public string? ImagePath { get; set; }

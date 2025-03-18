@@ -20,6 +20,9 @@ namespace jewelry.Model.Receipt.Production.Confirm
         public string StockReceiptNumber { get; set; }
 
         public string ProductNumber { get; set; }
+        public string MoldDesign { get; set; }
+
+
         public string ProductNameTH { get; set; }
         public string ProductNameEN { get; set; }
 
