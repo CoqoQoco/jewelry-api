@@ -547,7 +547,7 @@ namespace Jewelry.Service.Receipt.Production
                              ReceiptDate = stock.ReceiptDate,
                              ReceiptType = item.Type,
 
-                             Mold = item.Mold,
+                             Mold = item.MoldDesign ?? item.Mold,
                              MoldDesign = item.MoldDesign,
 
                              Qty = stock.Qty,

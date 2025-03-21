@@ -51,9 +51,10 @@ namespace Jewelry.Service.Base
             // กำหนด permission map
             var permissionMap = new Dictionary<string, string[]>
             {
-                ["new_user"] = new[] { "Admin", "Dev"},
+                ["new_user"] = new[] { "Admin", "Dev" },
                 ["edit_user"] = new[] { "Admin", "Dev" },
                 ["delete_user"] = new[] { "Admin", "Dev" },
+                ["update_stock"] = new[] { "Dev" },
             };
 
             // ตรวจสอบว่ามี topic นั้นใน map หรือไม่
