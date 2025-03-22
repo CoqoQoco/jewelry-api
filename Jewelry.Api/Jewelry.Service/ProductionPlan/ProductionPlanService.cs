@@ -709,7 +709,9 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        Code = gem.GemCode,
                                                                                        Name = gem.GemName,
                                                                                        QTY = gem.GemQty,
-                                                                                       Price = gem.GemPrice.HasValue ? gem.GemPrice : (gemStock.UnitCode == "Q" ? gemStock.PriceQty : gemStock.Price),
+                                                                                       Price = gem.GemPrice.HasValue && gem.GemPrice.Value > 0 
+                                                                                                                      ? gem.GemPrice 
+                                                                                                                      : (gemStock.UnitCode == "Q" ? gemStock.PriceQty : gemStock.Price),
                                                                                        Weight = gem.GemWeight,
 
                                                                                        Unit = gemStock != null ? gemStock.Unit : "",
