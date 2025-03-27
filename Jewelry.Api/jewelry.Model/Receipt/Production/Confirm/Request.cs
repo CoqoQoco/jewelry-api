@@ -30,6 +30,7 @@ namespace jewelry.Model.Receipt.Production.Confirm
         public decimal Price { get; set; }
 
         public string? Size { get; set; }
+        public string? StudEarring { get; set; }
         public string? Location { get; set; }
 
         public string? ImageName { get; set; }

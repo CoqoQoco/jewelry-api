@@ -81,5 +81,10 @@ public partial class TbtStockProduct
 
     public string? MoldDesign { get; set; }
 
+    /// <summary>
+    /// แป้นต่างหู
+    /// </summary>
+    public string? StudEarring { get; set; }
+
     public virtual ICollection<TbtStockProductMaterial> TbtStockProductMaterial { get; set; } = new List<TbtStockProductMaterial>();
 }

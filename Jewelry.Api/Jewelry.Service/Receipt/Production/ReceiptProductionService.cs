@@ -207,22 +207,22 @@ namespace Jewelry.Service.Receipt.Production
             {
                 // คำนวณราคาต้นทุนและราคาต่อชิ้น
                 decimal totalCost = 0;
-                decimal pricePerUnit = 0;
+                decimal pricePerUnit = 0.00m;
 
-                if (query.plan.TbtProductionPlanPrice != null && query.plan.TbtProductionPlanPrice.Any())
-                {
-                    totalCost = query.plan.TbtProductionPlanPrice.Sum(x => x.TotalPrice);
+                //if (query.plan.TbtProductionPlanPrice != null && query.plan.TbtProductionPlanPrice.Any())
+                //{
+                //    totalCost = query.plan.TbtProductionPlanPrice.Sum(x => x.TotalPrice);
 
-                    // ตรวจสอบว่าจำนวนสินค้ามากกว่า 0 ก่อนหารเพื่อป้องกัน DivideByZeroException
-                    if (response.ProductQty > 0 && totalCost > 0)
-                    {
-                        pricePerUnit = decimal.Round(totalCost / response.ProductQty, 2, MidpointRounding.AwayFromZero);
-                    }
-                    else
-                    {
-                        pricePerUnit = 0.00m;
-                    }
-                }
+                //    // ตรวจสอบว่าจำนวนสินค้ามากกว่า 0 ก่อนหารเพื่อป้องกัน DivideByZeroException
+                //    if (response.ProductQty > 0 && totalCost > 0)
+                //    {
+                //        pricePerUnit = decimal.Round(totalCost / response.ProductQty, 2, MidpointRounding.AwayFromZero);
+                //    }
+                //    else
+                //    {
+                //        pricePerUnit = 0.00m;
+                //    }
+                //}
 
                 //new draft
                 var receiptStock = (from item in query.item.TbtStockProductReceiptItem
@@ -249,6 +249,7 @@ namespace Jewelry.Service.Receipt.Production
                         Price = pricePerUnit, // ใช้ราคาต่อชิ้นที่คำนวณไว้
 
                         Size = null,
+                        StudEarring = null,
                         Location = null,
 
                         ImageName = null,
@@ -352,7 +353,9 @@ namespace Jewelry.Service.Receipt.Production
                     throw new HandleException($"{ErrorMessage.StockAlreadyReceipt} --> {stock.StockReceiptNumber}");
                 }
 
-                var _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProduct(query.plan.ProductTypeNavigation.ProductCode);
+                var prefix = query.plan.Type == "Silver" ? productType.SilverCode : productType.ProductCode;
+
+                var _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
 
                 var newProduct = match.MapNewStockProduction(query.receipt, query.plan, stock, _stockRunning, CurrentUsername);
                 var newProductResponse = newProduct.MapResponseNewStockProduction();
@@ -397,6 +400,7 @@ namespace Jewelry.Service.Receipt.Production
                         draft.Price = newProduct.ProductPrice;
 
                         draft.Size = newProduct.Size;
+                        draft.StudEarring = newProduct.StudEarring;
                         draft.Location = newProduct.Location;
 
                         draft.ImageName = newProduct.ImageName;
@@ -536,7 +540,7 @@ namespace Jewelry.Service.Receipt.Production
 
                          join stock in _jewelryContext.TbtStockProduct
                          on item.StockNumber equals stock.StockNumber
-                       
+
                          select new jewelry.Model.Receipt.Production.History.List.Response()
                          {
 

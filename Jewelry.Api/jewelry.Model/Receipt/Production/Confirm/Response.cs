@@ -48,6 +48,7 @@ namespace jewelry.Model.Receipt.Production.Confirm
 
         public string? Location { get; set; }
         public string? Size { get; set; }
+        public string? StudEarring { get; set; }
 
         public string? Remark { get; set; }
 

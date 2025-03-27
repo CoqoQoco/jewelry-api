@@ -14,7 +14,8 @@ namespace Jewelry.Service.Helper
     {
         Task<string> GenerateRunningNumber(string key);
         Task<string> GenerateRunningNumberForGold(string key);
-        Task<string> GenerateRunningNumberForStockProduct(string key);
+        //Task<string> GenerateRunningNumberForStockProduct(string key);
+        Task<string> GenerateRunningNumberForStockProductHash(string key);
     }
     public class RunningNumber : IRunningNumber
     {
@@ -70,6 +71,33 @@ namespace Jewelry.Service.Helper
             var jobRunning = await Next(name);
             name = $"{name}-{jobRunning.ToString("000")}";
             return name;
+        }
+
+        public async Task<string> GenerateRunningNumberForStockProductHash(string key)
+        {
+            // แปลงปีเดือน (2403 → 6I3)
+            int yearMonth = int.Parse(DateTime.UtcNow.ToString("yyMM"));
+            string encodedMonth = ToBase36(yearMonth);
+
+            var keyWithEncodedMonth = $"{key}-{encodedMonth}"; // ใช้ในฐานข้อมูลเพื่อรีเซ็ตเลข
+
+            // Running number ที่รีเซ็ตทุกเดือน
+            var monthlyRunning = await Next(keyWithEncodedMonth);
+
+            // แสดงค่า Base36 ใน response
+            return $"{key}-{encodedMonth}-{monthlyRunning:000}"; // return แบบที่ไม่สามารถเดาได้ง่าย
+        }
+
+        private string ToBase36(int number)
+        {
+            const string chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            string result = "";
+            while (number > 0)
+            {
+                result = chars[number % 36] + result;
+                number /= 36;
+            }
+            return result.PadLeft(3, '0'); // ให้เป็น 3 ตัวอักษรเสมอ
         }
     }
 }

@@ -42,7 +42,7 @@ namespace Jewelry.Api.Controllers.Stock
         {
             try
             {
-                var response =  _service.List(request.Search);
+                var response = _service.List(request.Search);
                 return response.ToDataSource(request);
 
             }
@@ -87,6 +87,24 @@ namespace Jewelry.Api.Controllers.Stock
             catch (HandleException ex)
             {
                 return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
+        [Route("ListName")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.ListName.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult ListName([FromBody] jewelry.Model.Stock.Product.ListName.Request request)
+        {
+            try
+            {
+                var response = _service.ListName(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
     }

@@ -96,6 +96,7 @@ namespace Jewelry.Service.Receipt.Production
                 ProductionTypeSize = plan.TypeSize,
 
                 Size = confirm.Size,
+                StudEarring = confirm.StudEarring,
                 Location = confirm.Location,
                 Remark = confirm.Remark,
 
@@ -142,6 +143,7 @@ namespace Jewelry.Service.Receipt.Production
                 ProductionTypeSize = stock.ProductionTypeSize,
 
                 Size = stock.Size,
+                StudEarring = stock.StudEarring,
                 Location = stock.Location,
                 Remark = stock.Remark,
 

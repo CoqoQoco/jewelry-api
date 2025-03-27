@@ -21,6 +21,8 @@ public partial class TbmProductType
 
     public string ProductCode { get; set; } = null!;
 
+    public string SilverCode { get; set; } = null!;
+
     public virtual ICollection<TbtProductMoldPlanDesign> TbtProductMoldPlanDesign { get; set; } = new List<TbtProductMoldPlanDesign>();
 
     public virtual ICollection<TbtProductionPlan> TbtProductionPlan { get; set; } = new List<TbtProductionPlan>();

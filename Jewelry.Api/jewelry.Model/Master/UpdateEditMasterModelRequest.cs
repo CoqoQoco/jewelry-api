@@ -16,5 +16,6 @@ namespace jewelry.Model.Master
         public string? Description { get; set; }
 
         public string? Prefix { get; set; }
+        public string? Prefix2 { get; set; }
     }
 }

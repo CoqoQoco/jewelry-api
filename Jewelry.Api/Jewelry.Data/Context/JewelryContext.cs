@@ -411,6 +411,10 @@ public partial class JewelryContext : DbContext
                 .HasDefaultValueSql("'DK'::character varying")
                 .HasColumnType("character varying")
                 .HasColumnName("product_code");
+            entity.Property(e => e.SilverCode)
+                .HasDefaultValueSql("'DK'::character varying")
+                .HasColumnType("character varying")
+                .HasColumnName("silver_code");
         });
 
         modelBuilder.Entity<TbmProductionPlanStatus>(entity =>
@@ -1763,6 +1767,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Status)
                 .HasColumnType("character varying")
                 .HasColumnName("status");
+            entity.Property(e => e.StudEarring)
+                .HasComment("แป้นต่างหู")
+                .HasColumnType("character varying")
+                .HasColumnName("stud_earring");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");

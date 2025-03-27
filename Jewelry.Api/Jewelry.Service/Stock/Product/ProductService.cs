@@ -172,7 +172,7 @@ namespace Jewelry.Service.Stock.Product
                 stock.Size = request.Size;
                 stock.Location = request.Location;
 
-                stock.UpdateDate = DateTime.UtcNow; 
+                stock.UpdateDate = DateTime.UtcNow;
                 stock.UpdateBy = CurrentUsername;
 
 
@@ -222,5 +222,37 @@ namespace Jewelry.Service.Stock.Product
 
             return "success";
         }
+
+        public IQueryable<jewelry.Model.Stock.Product.ListName.Response> ListName(jewelry.Model.Stock.Product.ListName.Request request)
+        {
+            if (request.Mode == "TH")
+            {
+                var response = (
+                    from item in _jewelryContext.TbtStockProduct
+                    where item.ProductNameTh.Contains(request.Text)
+                    select new jewelry.Model.Stock.Product.ListName.Response()
+                    {
+                        Text = item.ProductNameTh
+                    }).Distinct();
+
+                return response;
+            }
+
+            if (request.Mode == "EN")
+            {
+                var response = (
+                    from item in _jewelryContext.TbtStockProduct
+                    where item.ProductNameEn.Contains(request.Text)
+                    select new jewelry.Model.Stock.Product.ListName.Response()
+                    {
+                        Text = item.ProductNameEn
+                    }).Distinct();
+
+                return response;
+            }
+
+            throw new HandleException("Mode is Required");
+        }
+
     }
 }

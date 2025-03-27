@@ -116,7 +116,10 @@ namespace Jewelry.Service.Master
                                 NameEn = item.NameEn,
                                 NameTh = item.NameTh,
                                 Code = item.Code,
-                                Description = $"{item.Code}: {item.NameTh}"
+                                Description = $"{item.Code}: {item.NameTh}",
+
+                                Prefix = item.ProductCode,
+                                Prefix2 = item.SilverCode
                             });
 
             return response.OrderBy(x => x.Code);
@@ -131,7 +134,7 @@ namespace Jewelry.Service.Master
                                 NameEn = item.NameEn,
                                 NameTh = item.NameTh,
                                 Code = item.Code,
-                                Description = $"{item.Code}: {item.NameTh}"
+                                Description = $"{item.Code}: {item.NameTh}",
                             });
 
             return response.OrderBy(x => x.Code);
@@ -250,6 +253,7 @@ namespace Jewelry.Service.Master
                                     NameTh = item.NameTh,
                                     Code = item.Code,
                                     Prefix = item.ProductCode,
+                                    Prefix2 = item.SilverCode,
                                     Description = $"{item.Code}: {item.NameTh}"
                                 });
 
@@ -413,7 +417,9 @@ namespace Jewelry.Service.Master
 
                 productType.NameEn = request.NameEn;
                 productType.NameTh = request.NameTh;
+
                 productType.ProductCode = !string.IsNullOrEmpty(request.Prefix) ? request.Prefix.ToUpper() : productType.ProductCode;
+                productType.SilverCode = !string.IsNullOrEmpty(request.Prefix2) ? request.Prefix2.ToUpper() : productType.SilverCode;
 
                 _jewelryContext.TbmProductType.Update(productType);
                 await _jewelryContext.SaveChangesAsync();
@@ -613,7 +619,8 @@ namespace Jewelry.Service.Master
                     CreateBy = CurrentUsername,
                     IsActive = true,
 
-                    ProductCode = !string.IsNullOrEmpty(request.Prefix) ? request.Prefix.ToUpper() : "DK"
+                    ProductCode = !string.IsNullOrEmpty(request.Prefix) ? request.Prefix.ToUpper() : "DK",
+                    SilverCode = !string.IsNullOrEmpty(request.Prefix2) ? request.Prefix2.ToUpper() : "DK"
                 };
 
                 _jewelryContext.TbmProductType.Add(newProductType);
