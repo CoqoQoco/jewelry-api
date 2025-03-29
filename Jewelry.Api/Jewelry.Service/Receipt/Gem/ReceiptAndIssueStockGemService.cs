@@ -11,7 +11,9 @@ using jewelry.Model.Receipt.Gem.Scan;
 using jewelry.Model.Receipt.Gem.Update;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Identity.Client;
@@ -42,14 +44,17 @@ namespace Jewelry.Service.Receipt.Gem
         Task<string> PickOffGem(PickOffRequest request);
         Task<PickReturnResponse> PickReturnGem(PickReturnRequest request);
     }
-    public class ReceiptAndIssueStockGemService : IReceiptAndIssueStockGemService
+    public class ReceiptAndIssueStockGemService : BaseService, IReceiptAndIssueStockGemService
     {
-        private readonly string _admin = "@ADMIN";
+        //private readonly string _admin = "@ADMIN";
         private readonly bool _valPass = true;
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
-        public ReceiptAndIssueStockGemService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService)
+        public ReceiptAndIssueStockGemService(JewelryContext JewelryContext, 
+            IHostEnvironment HostingEnvironment, 
+            IHttpContextAccessor httpContextAccessor, 
+            IRunningNumber runningNumberService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
@@ -78,7 +83,7 @@ namespace Jewelry.Service.Receipt.Gem
                 GradeCode = request.GradeCode,
 
                 CreateDate = DateTime.UtcNow,
-                CreateBy = _admin,
+                CreateBy = CurrentUsername,
 
                 Remark1 = request.Remark.Trim(),
 
@@ -113,7 +118,7 @@ namespace Jewelry.Service.Receipt.Gem
             gem.Remark1 = request.Remark;
 
             gem.UpdateDate = DateTime.UtcNow;
-            gem.UpdateBy = _admin;
+            gem.UpdateBy = CurrentUsername;
 
             _jewelryContext.TbtStockGem.Update(gem);
             await _jewelryContext.SaveChangesAsync();
@@ -187,6 +192,9 @@ namespace Jewelry.Service.Receipt.Gem
                          select new ListResponse()
                          {
                              RequestDate = tran.RequestDate,
+                             ReturnDate = tran.ReturnDate,
+                             IsOverPick = tran.ReturnDate < DateTime.UtcNow,
+
                              Running = tran.Running,
                              RefRunning1 = tran.RefRunning,
                              RefRunning2 = tran.Ref2Running,
@@ -323,6 +331,31 @@ namespace Jewelry.Service.Receipt.Gem
                          select item);
             }
 
+            if (!string.IsNullOrEmpty(request.Operator))
+            {
+                query = query.Where(item => item.OperatorBy.Contains(request.Operator));
+            }
+
+            if (!string.IsNullOrEmpty(request.CreateBy))
+            {
+                query = query.Where(item => item.CreateBy.Contains(request.CreateBy));
+            }
+
+            if (request.Status != null && request.Status.Any())
+            {
+                query = query.Where(item => request.Status.Contains(item.Status));
+            }
+
+            if (request.ReturnDateStart.HasValue)
+            {
+                query = query.Where(item => item.ReturnDate >= request.ReturnDateStart.Value.StartOfDayUtc());
+            }
+
+            if (request.ReturnDateEnd.HasValue)
+            {
+                query = query.Where(item => item.ReturnDate <= request.ReturnDateEnd.Value.EndOfDayUtc());
+            }
+
             return query;
         }
         public async Task<string> InboundGem(InboundRequest request)
@@ -372,7 +405,7 @@ namespace Jewelry.Service.Receipt.Gem
                     gemData.QuantityWeight += gem.ReceiveQtyWeight;
 
                     gemData.UpdateDate = DateTime.UtcNow;
-                    gemData.UpdateBy = _admin;
+                    gemData.UpdateBy = CurrentUsername;
                     UpdateGems.Add(gemData);
 
                     var newInbound = new TbtStockGemTransection()
@@ -398,7 +431,7 @@ namespace Jewelry.Service.Receipt.Gem
                         Stastus = "completed",
 
                         RequestDate = request.RequestDate.UtcDateTime,
-                        CreateBy = _admin,
+                        CreateBy = CurrentUsername,
                         CreateDate = DateTime.UtcNow,
                     };
                     newInbounds.Add(newInbound);
@@ -484,7 +517,7 @@ namespace Jewelry.Service.Receipt.Gem
                     gemData.QuantityWeight -= gem.IssueQtyWeight;
 
                     gemData.UpdateDate = DateTime.UtcNow;
-                    gemData.UpdateBy = _admin;
+                    gemData.UpdateBy = CurrentUsername;
                     UpdateGems.Add(gemData);
 
                     var newInbound = new TbtStockGemTransection()
@@ -507,7 +540,7 @@ namespace Jewelry.Service.Receipt.Gem
                         Stastus = "completed",
 
                         RequestDate = request.RequestDate.UtcDateTime,
-                        CreateBy = _admin,
+                        CreateBy = CurrentUsername,
                         CreateDate = DateTime.UtcNow,
 
                         ProductionPlanWo = gem.WO,
@@ -555,6 +588,16 @@ namespace Jewelry.Service.Receipt.Gem
             if (!string.IsNullOrEmpty(request.Running))
             {
                 query = query.Where(item => item.Running.Contains(request.Running));
+            }
+
+            if (!string.IsNullOrEmpty(request.Operator))
+            {
+                query = query.Where(item => item.OperatorBy.Contains(request.Operator));
+            }
+
+            if (!string.IsNullOrEmpty(request.CreateBy))
+            {
+                query = query.Where(item => item.CreateBy.Contains(request.CreateBy));
             }
 
             if (request.Type != null && request.Type.Any())
@@ -656,7 +699,7 @@ namespace Jewelry.Service.Receipt.Gem
 
             return response.AsQueryable();
         }
-
+       
         public IQueryable<PicklistResponse> OldPicklist(PicklistFilter request)
         {
 
@@ -840,7 +883,7 @@ namespace Jewelry.Service.Receipt.Gem
                     gemData.QuantityWeightOnProcess += gem.IssueQtyWeight;
 
                     gemData.UpdateDate = DateTime.UtcNow;
-                    gemData.UpdateBy = _admin;
+                    gemData.UpdateBy = CurrentUsername;
                     UpdateGems.Add(gemData);
 
                     var newInbound = new TbtStockGemTransection()
@@ -865,7 +908,7 @@ namespace Jewelry.Service.Receipt.Gem
                         RequestDate = request.RequestDate.UtcDateTime,
                         ReturnDate = request.ReturnDate.UtcDateTime,
 
-                        CreateBy = _admin,
+                        CreateBy = CurrentUsername,
                         CreateDate = DateTime.UtcNow,
 
                         OperatorBy = request.OperatorBy,
@@ -1047,7 +1090,7 @@ namespace Jewelry.Service.Receipt.Gem
                                 Stastus = "completed",
 
                                 RequestDate = request.RequestDate.UtcDateTime,
-                                CreateBy = _admin,
+                                CreateBy = CurrentUsername,
                                 CreateDate = DateTime.UtcNow,
 
                                 Ref2Running = request.PickOffRunning,
@@ -1097,7 +1140,7 @@ namespace Jewelry.Service.Receipt.Gem
 
                             Stastus = "completed",
                             RequestDate = request.RequestDate.UtcDateTime,
-                            CreateBy = _admin,
+                            CreateBy = CurrentUsername,
                             CreateDate = DateTime.UtcNow,
 
                             OperatorBy = request.OperatorBy,
@@ -1115,7 +1158,7 @@ namespace Jewelry.Service.Receipt.Gem
 
                         gemsPickOff.Stastus = "completed";
                         gemsPickOff.UpdateDate = DateTime.UtcNow;
-                        gemsPickOff.UpdateBy = _admin;
+                        gemsPickOff.UpdateBy = CurrentUsername;
 
 
                         updateTransection.Add(gemsPickOff);
@@ -1123,7 +1166,7 @@ namespace Jewelry.Service.Receipt.Gem
                     }
 
                     gemData.UpdateDate = DateTime.UtcNow;
-                    gemData.UpdateBy = _admin;
+                    gemData.UpdateBy = CurrentUsername;
                     updateGems.Add(gemData);
                 }
 
@@ -1155,9 +1198,9 @@ namespace Jewelry.Service.Receipt.Gem
                                 Remark1 = request.Remark,
 
                                 CreateDate = DateTime.UtcNow,
-                                CreateBy = _admin,
+                                CreateBy = CurrentUsername,
                                 UpdateDate = DateTime.UtcNow,
-                                UpdateBy = _admin,
+                                UpdateBy = CurrentUsername,
 
                                 WagesTotal = 0,
                             };
@@ -1171,7 +1214,7 @@ namespace Jewelry.Service.Receipt.Gem
                         {
                             headerId = planGemPick.Id;
                             planGemPick.UpdateDate = DateTime.UtcNow;
-                            planGemPick.UpdateBy = _admin;
+                            planGemPick.UpdateBy = CurrentUsername;
                         }
 
                         foreach (var gem in group)
@@ -1203,7 +1246,7 @@ namespace Jewelry.Service.Receipt.Gem
                             {
                                 matchPlanGroup.Status = ProductionPlanStatus.Gems;
                                 matchPlanGroup.UpdateDate = DateTime.UtcNow;
-                                matchPlanGroup.UpdateBy = _admin;
+                                matchPlanGroup.UpdateBy = CurrentUsername;
                                 updatePlan.Add(matchPlanGroup);
                             }
                         }
@@ -1284,7 +1327,7 @@ namespace Jewelry.Service.Receipt.Gem
                         {
                             item.RefRunning = runningNoPickReturn;
 
-                            item.UpdateBy = _admin;
+                            item.UpdateBy = CurrentUsername;
                             item.UpdateDate = DateTime.UtcNow;
                         }
                     }

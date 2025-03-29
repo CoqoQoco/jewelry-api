@@ -21,6 +21,8 @@ namespace jewelry.Model.Receipt.Gem.List
         public string Status { get; set; }
 
         public DateTime RequestDate { get; set; }
+        public DateTime? ReturnDate { get; set; }
+        public bool IsOverPick { get; set; }
         public string Running { get; set; }
         public string? RefRunning1 { get; set; }
         public string? RefRunning2 { get; set; }

@@ -16,6 +16,10 @@ namespace jewelry.Model.Receipt.Gem.List
     {
         public DateTimeOffset? RequestDateStart { get; set; }
         public DateTimeOffset? RequestDateEnd { get; set; }
+
+        public DateTimeOffset? ReturnDateStart { get; set; }
+        public DateTimeOffset? ReturnDateEnd { get; set; }
+
         public string? Code { get; set; }
         public string[]? GroupName { get; set; }
         
@@ -28,12 +32,15 @@ namespace jewelry.Model.Receipt.Gem.List
         public string[]? Shape { get; set; }
         public string[]? Grade { get; set; }
 
-        public string? Status { get; set; }
+        public string[]? Status { get; set; }
 
         public string? WO { get; set; }
 
         public string? Running { get; set; }
         public string? RefRunning1 { get; set; }
         public string? RefRunning2 { get; set; }
+
+        public string? Operator { get; set; }
+        public string? CreateBy { get; set; }
     }
 }

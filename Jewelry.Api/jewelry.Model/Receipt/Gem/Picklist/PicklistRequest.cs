@@ -26,5 +26,8 @@ namespace jewelry.Model.Receipt.Gem.Picklist
         public DateTimeOffset? ReturnDateEnd { get; set; }
 
         public string? GetRunning { get; set; }
+
+        public string? Operator { get; set; }
+        public string? CreateBy { get; set; }
     }
 }

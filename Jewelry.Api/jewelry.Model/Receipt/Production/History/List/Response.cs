@@ -43,6 +43,8 @@ namespace jewelry.Model.Receipt.Production.History.List
         public string? Location { get; set; }
         public string? Size { get; set; }
 
+        public string? StudEarring { get; set; }
+
         public string? Remark { get; set; }
 
         public DateTime CreateDate { get; set; }

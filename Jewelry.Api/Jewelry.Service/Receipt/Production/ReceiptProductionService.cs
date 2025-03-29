@@ -579,6 +579,8 @@ namespace Jewelry.Service.Receipt.Production
                              Location = stock.Location,
                              Remark = stock.Remark,
 
+                             StudEarring = stock.StudEarring,
+
                              CreateBy = item.CreateBy,
                              CreateDate = item.CreateDate,
                          });
