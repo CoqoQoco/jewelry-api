@@ -193,7 +193,7 @@ namespace Jewelry.Service.Receipt.Gem
                          {
                              RequestDate = tran.RequestDate,
                              ReturnDate = tran.ReturnDate,
-                             IsOverPick = tran.ReturnDate < DateTime.UtcNow,
+                             IsOverPick = tran.ReturnDate.HasValue ? tran.ReturnDate.Value < DateTime.UtcNow : false,
 
                              Running = tran.Running,
                              RefRunning1 = tran.RefRunning,
