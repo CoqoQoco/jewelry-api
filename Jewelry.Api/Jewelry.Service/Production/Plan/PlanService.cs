@@ -3,6 +3,7 @@ using jewelry.Model.Exceptions;
 using jewelry.Model.Production.Plan.Transfer;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus.Transfer;
 using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
+using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
@@ -11,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Hosting;
+using NetTopologySuite.Index.HPRtree;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -18,6 +20,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
+using static NPOI.HSSF.Util.HSSFColor;
 
 namespace Jewelry.Service.Production.Plan
 {
@@ -217,17 +220,13 @@ namespace Jewelry.Service.Production.Plan
             ValidateRequest(request);
 
             var plans = await GetProductionPlans(request.Plans.Select(x => x.Id).ToArray());
-            var response = new jewelry.Model.Production.Plan.Transfer.Response { Message = "success" };
+            var plansCost = await GetProductionPlanCost(request.Plans.Select(x => $"{x.Wo}-{x.WoNumber}").ToArray());
 
-            var transferData = await PrepareTransferData(request, plans);
+            var response = new jewelry.Model.Production.Plan.Transfer.Response { Message = "success" };
+            var transferData = await PrepareTransferData(request, plans, plansCost);
 
             if (transferData.HasAnyValidPlans)
             {
-                //if (!string.IsNullOrEmpty(transferData.ReceiptRunning))
-                //{
-
-                //}
-
                 await ProcessTransfer(transferData);
             }
 
@@ -248,6 +247,7 @@ namespace Jewelry.Service.Production.Plan
             var plans = await _jewelryContext.TbtProductionPlan
                 .Include(x => x.TbtProductionPlanStatusHeader)
                 .Include(x => x.ProductTypeNavigation)
+                .Include(x => x.TbtProductionPlanMaterial)
                 .Where(item => planIds.Contains(item.Id))
                 .ToListAsync();
 
@@ -257,8 +257,72 @@ namespace Jewelry.Service.Production.Plan
             }
 
             return plans;
+        } 
+        private async Task<List<GoldCostItemResponse>> GetProductionPlanCost(string[] planNumbers)
+        {
+            var query = (from item in _jewelryContext.TbtProductionPlanCostGoldItem
+                         .Include(x => x.TbtProductionPlanCostGold)
+                         where item.TbtProductionPlanCostGold.IsActive == true
+                         select new GoldCostItemResponse()
+                         {
+                             No = item.No,
+                             BookNo = item.BookNo,
+                             AssignDate = item.TbtProductionPlanCostGold.AssignDate,
+
+                             GoldCode = item.TbtProductionPlanCostGold.GoldNavigation.Code,
+                             GoldName = item.TbtProductionPlanCostGold.GoldNavigation.NameTh,
+                             GoldSizeCode = item.TbtProductionPlanCostGold.GoldSizeNavigation.Code,
+                             GoldSizeName = item.TbtProductionPlanCostGold.GoldSizeNavigation.NameTh,
+                             GoldReceipt = item.TbtProductionPlanCostGold.GoldReceipt,
+
+                             Zill = item.TbtProductionPlanCostGold.Zill,
+                             ZillQty = item.TbtProductionPlanCostGold.ZillQty,
+
+                             MeltDate = item.TbtProductionPlanCostGold.MeltDate,
+                             MeltWeight = item.TbtProductionPlanCostGold.MeltWeight,
+                             ReturnMeltWeight = item.TbtProductionPlanCostGold.ReturnMeltWeight,
+                             ReturnMeltScrapWeight = item.TbtProductionPlanCostGold.ReturnMeltScrapWeight,
+                             MeltWeightLoss = item.TbtProductionPlanCostGold.MeltWeightLoss,
+                             MeltWeightOver = item.TbtProductionPlanCostGold.MeltWeightOver,
+
+                             CastDate = item.TbtProductionPlanCostGold.CastDate,
+                             CastWeight = item.TbtProductionPlanCostGold.CastWeight,
+                             GemWeight = item.TbtProductionPlanCostGold.GemWeight,
+                             ReturnCastWeight = item.TbtProductionPlanCostGold.ReturnCastWeight,
+                             ReturnCastMoldWeight = item.TbtProductionPlanCostGold.ReturnCastMoldWeight,
+                             ReturnCastBodyBrokenWeight = item.TbtProductionPlanCostGold.ReturnCastBodyBrokenedWeight,
+                             ReturnCastBodyWeightTotal = item.TbtProductionPlanCostGold.ReturnCastBodyWeightTotal,
+                             ReturnCastScrapWeight = item.TbtProductionPlanCostGold.ReturnCastScrapWeight,
+                             ReturnCastPowderWeight = item.TbtProductionPlanCostGold.ReturnCastPowderWeight,
+                             CastWeightLoss = item.TbtProductionPlanCostGold.CastWeightLoss,
+                             CastWeightOver = item.TbtProductionPlanCostGold.CastWeightOver,
+
+                             Cost = item.TbtProductionPlanCostGold.Cost,
+
+                             AssignBy = item.TbtProductionPlanCostGold.AssignBy,
+                             ReceiveBy = item.TbtProductionPlanCostGold.ReceiveBy,
+                             RunningNumber = item.TbtProductionPlanCostGold.RunningNumber,
+                             Remark1 = item.TbtProductionPlanCostGold.Remark,
+
+                             ProductionPlanId = item.ProductionPlanId,
+                             ReturnWeight = item.ReturnWeight,
+                             ReturnQTY = item.ReturnQty.HasValue ? item.ReturnQty.Value : 0,
+                             Remark2 = item.Remark,
+                         });
+
+            query = query.Where(x => planNumbers.Contains(x.ProductionPlanId));
+
+            if (!planNumbers.Any())
+            {
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            return await query.ToListAsync();
         }
-        private async Task<TransferData> PrepareTransferData(jewelry.Model.Production.Plan.Transfer.Request request, List<TbtProductionPlan> plans)
+
+        private async Task<TransferData> PrepareTransferData(jewelry.Model.Production.Plan.Transfer.Request request, 
+            List<TbtProductionPlan> plans, 
+            List<GoldCostItemResponse> plansGoldCostItem)
         {
             var data = new TransferData
             {
@@ -279,7 +343,8 @@ namespace Jewelry.Service.Production.Plan
                 if (validationResult.IsValid)
                 {
                     var targetPlan = plans.First(x => x.Id == planRequest.Id);
-                    await AddValidPlanData(data, targetPlan, request, receiptRunning);
+                    var targetPlansGoldCostItem = plansGoldCostItem.Where(x => x.ProductionPlanId == $"{targetPlan.Wo}-{targetPlan.WoNumber}").ToList();
+                    await AddValidPlanData(data, targetPlan, targetPlansGoldCostItem, request, receiptRunning);
                 }
                 else
                 {
@@ -321,12 +386,17 @@ namespace Jewelry.Service.Production.Plan
         }
         private async Task AddValidPlanData(TransferData data,
             TbtProductionPlan plan,
+            List<GoldCostItemResponse> plansGoldCostItem,
             jewelry.Model.Production.Plan.Transfer.Request request,
             string receiptRunning)
         {
 
             var newStatus = CreateNewStatus(plan, request, data.DateNow);
             data.NewStatuses.Add(newStatus);
+
+            //new status detial
+            var newStatusDetail = await CreateNewStatusDetial(plan, plansGoldCostItem, request, data.DateNow);
+            data.NewStatusDetail.AddRange(newStatusDetail);
 
             var transferStatus = CreateTransferStatus(plan, request, data.TransferRunning, data.DateNow);
             data.TransferStatuses.Add(transferStatus);
@@ -364,11 +434,86 @@ namespace Jewelry.Service.Production.Plan
                 CreateBy = CurrentUsername,
                 UpdateDate = dateNow,
                 UpdateBy = CurrentUsername,
+
                 IsActive = true,
                 ProductionPlanId = plan.Id,
                 Status = request.TargetStatus
             };
         }
+
+        private async  Task<List<TbtProductionPlanStatusDetail>> CreateNewStatusDetial(
+            TbtProductionPlan plan,
+            List<GoldCostItemResponse> plansGoldCostItem,
+            jewelry.Model.Production.Plan.Transfer.Request request,
+            DateTime dateNow)
+        {
+            var NewStatusDetail = new List<TbtProductionPlanStatusDetail>();
+
+            if (plansGoldCostItem.Any())
+            {
+                foreach (var item in plansGoldCostItem)
+                {
+                    var detail = new TbtProductionPlanStatusDetail
+                    {
+                        //HeaderId = headerId,
+                        ProductionPlanId = plan.Id,
+                        ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{plan.Id}-{request.TargetStatus}"),
+                        IsActive = true,
+                        RequestDate = dateNow,
+
+                        Gold = item.GoldCode,
+
+                        GoldQtySend = item.ReturnQTY,
+                        GoldWeightSend = item.ReturnWeight,
+
+                        GoldQtyCheck = null,
+                        GoldWeightCheck = null,
+
+                        Worker = null,
+                        WorkerSub = null,
+                        Description = null,
+                        Wages = 0,
+                        TotalWages = 0
+                    };
+                    NewStatusDetail.Add(detail);
+                }
+            }
+            else
+            {
+                if (plan.TbtProductionPlanMaterial.Any())
+                {
+                    foreach (var item in plan.TbtProductionPlanMaterial)
+                    {
+                        var detail = new TbtProductionPlanStatusDetail
+                        {
+                            //HeaderId = headerId,
+                            ProductionPlanId = plan.Id,
+                            ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{plan.Id}-{request.TargetStatus}"),
+                            IsActive = true,
+                            RequestDate = dateNow,
+                            Gold = item.Gold,
+
+                            GoldQtySend = item.GoldQty,
+                            GoldWeightSend = null,
+
+                            GoldQtyCheck = null,
+                            GoldWeightCheck = null,
+
+                            Worker = null,
+                            WorkerSub = null,
+                            Description = null,
+                            Wages = 0,
+                            TotalWages = 0
+                        };
+                        NewStatusDetail.Add(detail);
+                    }
+                }
+            }
+
+
+            return NewStatusDetail;
+        }
+
         private TbtProductionPlanTransferStatus CreateTransferStatus(
             TbtProductionPlan plan,
             jewelry.Model.Production.Plan.Transfer.Request request,
@@ -387,6 +532,7 @@ namespace Jewelry.Service.Production.Plan
                 TargetStatus = request.TargetStatus
             };
         }
+
         private async Task<TbtStockProductReceiptPlan> CreateNewStockReceiptPlan(TbtProductionPlan plan,
             jewelry.Model.Production.Plan.Transfer.Request request,
             string running,
@@ -448,6 +594,7 @@ namespace Jewelry.Service.Production.Plan
 
             return NewStockReceiptItem;
         }
+
         private async Task ProcessTransfer(TransferData data)
         {
             using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
@@ -463,6 +610,18 @@ namespace Jewelry.Service.Production.Plan
                     var match = data.NewStatuses.First(x => x.ProductionPlanId == transfer.ProductionPlanId);
                     transfer.TargetStatusId = match.Id;
                 }
+            }
+
+            // บันทึก status detail
+            if (data.NewStatusDetail.Any())
+            {
+                foreach (var item in data.NewStatusDetail)
+                {
+                    item.HeaderId = data.NewStatuses.First(x => x.ProductionPlanId == item.ProductionPlanId).Id;
+                }
+
+                await _jewelryContext.TbtProductionPlanStatusDetail.AddRangeAsync(data.NewStatusDetail);
+                await _jewelryContext.SaveChangesAsync();
             }
 
             if (data.TransferStatuses.Any())
@@ -490,12 +649,18 @@ namespace Jewelry.Service.Production.Plan
 
             scope.Complete();
         }
+
         private class TransferData
         {
             public DateTime DateNow { get; set; }
             public string TransferRunning { get; set; }
             public string ReceiptRunning { get; set; }
+
+
             public List<TbtProductionPlanStatusHeader> NewStatuses { get; } = new();
+            public List<TbtProductionPlanStatusDetail> NewStatusDetail { get; } = new();
+
+
             public List<TbtProductionPlanTransferStatus> TransferStatuses { get; } = new();
             public List<TbtProductionPlan> UpdatePlans { get; } = new();
             public List<TransferResponseItem> Errors { get; } = new();

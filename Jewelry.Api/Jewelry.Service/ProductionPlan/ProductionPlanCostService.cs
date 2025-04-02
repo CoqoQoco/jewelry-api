@@ -7,8 +7,10 @@ using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Production.Plan;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NPOI.OpenXmlFormats.Spreadsheet;
@@ -33,16 +35,18 @@ namespace Jewelry.Service.ProductionPlan
 
         IQueryable<GoldCostItemResponse> ListGoldCostItem(GoldCostItemSearch request);
     }
-    public class ProductionPlanCostService : IProductionPlanCostService
+    public class ProductionPlanCostService : BaseService, IProductionPlanCostService
     {
-        private readonly string _admin = "@ADMIN";
+        //private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
         private readonly IPlanService _planService;
-        public ProductionPlanCostService(JewelryContext JewelryContext, 
-            IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService, 
-            IPlanService planService)
+        public ProductionPlanCostService(JewelryContext JewelryContext,
+            IHostEnvironment HostingEnvironment,
+            IHttpContextAccessor httpContextAccessor,
+            IRunningNumber runningNumberService,
+            IPlanService planService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
@@ -361,6 +365,11 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             var running = await _runningNumberService.GenerateRunningNumberForGold("CAST");
+            var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
+            {
+                FormerStatus = ProductionPlanStatus.Designed,
+                TargetStatus = ProductionPlanStatus.Casting,
+            };
 
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
@@ -401,7 +410,7 @@ namespace Jewelry.Service.ProductionPlan
                     CastWeightOver = request.CastWeightOver,
 
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = _admin,
+                    CreateBy = CurrentUsername,
 
                     RunningNumber = running,
                     Cost = request.Cost,
@@ -433,11 +442,11 @@ namespace Jewelry.Service.ProductionPlan
                                            where planIds.Contains(plan.Id)
                                            select plan).ToList();
 
-                    var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
-                    {
-                        FormerStatus = ProductionPlanStatus.Designed,
-                        TargetStatus = ProductionPlanStatus.Casting,
-                    };
+                    //var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
+                    //{
+                    //    FormerStatus = ProductionPlanStatus.Designed,
+                    //    TargetStatus = ProductionPlanStatus.Casting,
+                    //};
 
                     foreach (var item in request.Items)
                     {
@@ -452,7 +461,7 @@ namespace Jewelry.Service.ProductionPlan
 
 
                             CreateDate = DateTime.UtcNow,
-                            CreateBy = _admin,
+                            CreateBy = CurrentUsername,
                         };
                         createItems.Add(createItem);
 
@@ -596,10 +605,6 @@ namespace Jewelry.Service.ProductionPlan
                         #endregion
                     }
 
-                    if (requestTransfer.Plans != null && requestTransfer.Plans.Count > 0)
-                    { 
-                        var result = await _planService.Transfer(requestTransfer);
-                    }
                 }
                 if (createItems.Any())
                 {
@@ -610,6 +615,11 @@ namespace Jewelry.Service.ProductionPlan
                 //throw new HandleException($"ไม่สามารถบันทึกรายการคืนตัวเรือนซ้ำได้");
                 await _jewelryContext.SaveChangesAsync();
                 scope.Complete();
+            }
+
+            if (requestTransfer.Plans != null && requestTransfer.Plans.Count > 0)
+            {
+                var result = await _planService.Transfer(requestTransfer);
             }
 
             return "success";
@@ -625,6 +635,11 @@ namespace Jewelry.Service.ProductionPlan
             {
                 throw new HandleException($"ไม่พบข้อมูลใบเบิกผสมทอง เลขที่:{request.No} เล่มที่:{request.BookNo} โปรดตรวจสอบความถูกต้องอีกครั้ง");
             }
+            var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
+            {
+                FormerStatus = ProductionPlanStatus.Designed,
+                TargetStatus = ProductionPlanStatus.Casting,
+            };
 
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
@@ -664,7 +679,7 @@ namespace Jewelry.Service.ProductionPlan
                 data.CastWeightOver = request.CastWeightOver;
 
                 data.UpdateDate = DateTime.UtcNow;
-                data.UpdateBy = _admin;
+                data.UpdateBy = CurrentUsername;
 
                 data.Cost = request.Cost;
 
@@ -695,11 +710,11 @@ namespace Jewelry.Service.ProductionPlan
                                            where planIds.Contains(plan.Id)
                                            select plan).ToList();
 
-                    var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
-                    {
-                        FormerStatus = ProductionPlanStatus.Designed,
-                        TargetStatus = ProductionPlanStatus.Casting,
-                    };
+                    //var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
+                    //{
+                    //    FormerStatus = ProductionPlanStatus.Designed,
+                    //    TargetStatus = ProductionPlanStatus.Casting,
+                    //};
 
                     foreach (var item in request.Items)
                     {
@@ -715,7 +730,7 @@ namespace Jewelry.Service.ProductionPlan
                             Remark = item.Remark,
 
                             CreateDate = DateTime.UtcNow,
-                            CreateBy = _admin,
+                            CreateBy = CurrentUsername,
                         };
                         createItems.Add(createItem);
 
@@ -737,11 +752,6 @@ namespace Jewelry.Service.ProductionPlan
                             requestTransfer.Plans.Add(createheaderPlan);
                         }
                     }
-
-                    if (requestTransfer.Plans != null && requestTransfer.Plans.Count > 0)
-                    {
-                        var result = await _planService.Transfer(requestTransfer);
-                    }
                 }
 
                 if (createItems.Any())
@@ -752,6 +762,11 @@ namespace Jewelry.Service.ProductionPlan
                 await _jewelryContext.SaveChangesAsync();
 
                 scope.Complete();
+            }
+
+            if (requestTransfer.Plans != null && requestTransfer.Plans.Count > 0)
+            {
+                var result = await _planService.Transfer(requestTransfer);
             }
 
             return "success";

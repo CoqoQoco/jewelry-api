@@ -18,6 +18,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Jewelry.Service.Production.Plan;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -27,6 +28,7 @@ using NetTopologySuite.Index.HPRtree;
 using NetTopologySuite.Noding;
 using Newtonsoft.Json;
 using NPOI.HPSF;
+using NPOI.SS.Formula.Functions;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -78,12 +80,16 @@ namespace Jewelry.Service.ProductionPlan
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
+        private readonly IPlanService _planService;
         public ProductionPlanService(JewelryContext JewelryContext, IHttpContextAccessor httpContextAccessor,
-            IHostEnvironment HostingEnvironment, IRunningNumber runningNumberService) : base(JewelryContext, httpContextAccessor)
+            IHostEnvironment HostingEnvironment,
+            IPlanService planService,
+            IRunningNumber runningNumberService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
             _runningNumberService = runningNumberService;
+            _planService = planService;
         }
 
         #region ----- Production Plan -----
@@ -110,7 +116,11 @@ namespace Jewelry.Service.ProductionPlan
                 }
 
                 var running = await _runningNumberService.GenerateRunningNumber("PLAN");
-
+                var requestTransfer = new jewelry.Model.Production.Plan.Transfer.Request()
+                {
+                    FormerStatus = ProductionPlanStatus.Designed,
+                    TargetStatus = ProductionPlanStatus.Casting,
+                };
 
                 using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
                 {
@@ -251,8 +261,25 @@ namespace Jewelry.Service.ProductionPlan
                     //_jewelryContext.TbtProductionPlanImage.Add(createImage);
                     //await _jewelryContext.SaveChangesAsync();
 
+                    if (request.IsModifyPlan)
+                    {
+                        var createheaderPlan = new jewelry.Model.Production.Plan.Transfer.RequestItem()
+                        {
+                            Id = createPlan.Id,
+                            Wo = createPlan.Wo,
+                            WoNumber = createPlan.WoNumber
+                        };
+                        requestTransfer.Plans.Add(createheaderPlan);
+                    }
+
                     scope.Complete();
                 }
+
+                if (requestTransfer.Plans != null && requestTransfer.Plans.Count > 0)
+                {
+                    var result = await _planService.Transfer(requestTransfer);
+                }
+
                 return new ProductionPlanCreateResponse();
             }
             catch (HandleException ex)

@@ -33,6 +33,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
         public string? Gold { get; set; }
         public string? GoldSize { get; set; }
 
+        public bool IsModifyPlan { get; set; } = false;
 
         public string Material { get; set; }
 

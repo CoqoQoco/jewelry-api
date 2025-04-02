@@ -312,6 +312,8 @@ namespace Jewelry.Service.Master
                                 where item.GoldSizeCode.Contains(request.GoldSizeCode)
                                 select item);
                 }
+
+                return response;
             }
 
             else if (request.Type.ToUpper() == "DIAMOND-GRADE")
