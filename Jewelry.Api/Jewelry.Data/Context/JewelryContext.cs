@@ -1475,6 +1475,12 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("wo");
             entity.Property(e => e.WoNumber).HasColumnName("wo_number");
+            entity.Property(e => e.WorkerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("worker_code");
+            entity.Property(e => e.WorkerName)
+                .HasColumnType("character varying")
+                .HasColumnName("worker_name");
 
             entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanTransferStatus)
                 .HasForeignKey(d => d.ProductionPlanId)

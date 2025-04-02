@@ -29,5 +29,9 @@ public partial class TbtProductionPlanTransferStatus
 
     public int TargetStatusId { get; set; }
 
+    public string? WorkerCode { get; set; }
+
+    public string? WorkerName { get; set; }
+
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 }

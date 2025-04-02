@@ -158,6 +158,8 @@ namespace Jewelry.Service.Production.Plan
 
                              Gold = item.ProductionPlan.Type,
                              GoldSize = item.ProductionPlan.TypeSize,
+
+                             //WorkerCode = item.
                          });
 
             if (request.Start.HasValue)
@@ -532,7 +534,10 @@ namespace Jewelry.Service.Production.Plan
                 CreateDate = dateNow,
                 CreateBy = CurrentUsername,
                 FormerStatus = request.FormerStatus,
-                TargetStatus = request.TargetStatus
+                TargetStatus = request.TargetStatus,
+
+                WorkerCode = request.WorkerCode,
+                WorkerName = request.WorkerName
             };
         }
 

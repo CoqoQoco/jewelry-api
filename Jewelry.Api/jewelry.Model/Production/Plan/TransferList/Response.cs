@@ -13,6 +13,9 @@ namespace jewelry.Model.Production.Plan.TransferList
         public int FormerStatus { get; set; }
         public int TargetStatus { get; set; }
 
+        public string? WorkerName { get; set; }
+        public string? WorkerCode { get; set; }
+
         public int Id { get; set; }
         public string Wo { get; set; }
         public int WoNumber { get; set; }
