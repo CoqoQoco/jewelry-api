@@ -85,7 +85,7 @@ namespace Jewelry.Service.Production.Plan
                              TotalWages = item.TotalWages,
                              WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
 
-                             ReceiveDate = item.Header.SendDate,
+                             ReceiveDate = item.Header.UpdateDate,
                              ReceiveWorkDate = item.RequestDate,
                          });
 
@@ -432,8 +432,11 @@ namespace Jewelry.Service.Production.Plan
             {
                 CreateDate = dateNow,
                 CreateBy = CurrentUsername,
-                UpdateDate = dateNow,
-                UpdateBy = CurrentUsername,
+                //UpdateDate = dateNow,
+                //UpdateBy = CurrentUsername,
+
+                WorkerName = request.WorkerName,
+                WorkerCode = request.WorkerCode,
 
                 IsActive = true,
                 ProductionPlanId = plan.Id,

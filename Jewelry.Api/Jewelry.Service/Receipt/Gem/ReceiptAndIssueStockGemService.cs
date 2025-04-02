@@ -1192,8 +1192,8 @@ namespace Jewelry.Service.Receipt.Gem
                                 Status = ProductionPlanStatus.Gems,
                                 IsActive = true,
 
-                                SendDate = request.RequestDate.UtcDateTime,
-                                CheckDate = request.RequestDate.UtcDateTime,
+                                //SendDate = request.RequestDate.UtcDateTime,
+                                //CheckDate = request.RequestDate.UtcDateTime,
 
                                 Remark1 = request.Remark,
 

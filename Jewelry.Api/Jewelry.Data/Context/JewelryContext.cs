@@ -1413,10 +1413,6 @@ public partial class JewelryContext : DbContext
             entity.ToTable("tbt_production_plan_status_header");
 
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.CheckDate).HasColumnName("check_date");
-            entity.Property(e => e.CheckName)
-                .HasColumnType("character varying")
-                .HasColumnName("check_name");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
@@ -1429,16 +1425,18 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Remark2)
                 .HasColumnType("character varying")
                 .HasColumnName("remark_2");
-            entity.Property(e => e.SendDate).HasColumnName("send_date");
-            entity.Property(e => e.SendName)
-                .HasColumnType("character varying")
-                .HasColumnName("send_name");
             entity.Property(e => e.Status).HasColumnName("status");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
             entity.Property(e => e.WagesTotal).HasColumnName("wages_total");
+            entity.Property(e => e.WorkerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("worker_code");
+            entity.Property(e => e.WorkerName)
+                .HasColumnType("character varying")
+                .HasColumnName("worker_name");
 
             entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanStatusHeader)
                 .HasForeignKey(d => d.ProductionPlanId)

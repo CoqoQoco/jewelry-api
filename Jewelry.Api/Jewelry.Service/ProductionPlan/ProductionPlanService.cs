@@ -677,10 +677,12 @@ namespace Jewelry.Service.ProductionPlan
 
                                                      Status = item.Status,
 
-                                                     SendDate = item.SendDate,
-                                                     SendName = item.SendName,
-                                                     CheckDate = item.CheckDate,
-                                                     CheckName = item.CheckName,
+                                                     WorkerCode = item.WorkerCode,
+                                                     WorkerName = item.WorkerName,
+                                                     //SendDate = item.SendDate,
+                                                     //SendName = item.SendName,
+                                                     //CheckDate = item.CheckDate,
+                                                     //CheckName = item.CheckName,
 
                                                      IsActive = item.IsActive,
                                                      Remark1 = item.Remark1,
@@ -871,8 +873,8 @@ namespace Jewelry.Service.ProductionPlan
 
                          where item.IsActive == true
                          && item.Header.IsActive == true
-                         && item.Header.SendDate >= request.Start.StartOfDayUtc()
-                         && item.Header.SendDate <= request.End.EndOfDayUtc()
+                         && item.Header.CreateDate >= request.Start.StartOfDayUtc()
+                         && item.Header.CreateDate <= request.End.EndOfDayUtc()
 
                          select new ProductionPlanStatusListResponse()
                          {
@@ -908,7 +910,7 @@ namespace Jewelry.Service.ProductionPlan
                              TotalWages = item.TotalWages,
                              WagesStatus = item.Wages.HasValue && item.Wages.Value > 0 ? 100 : 10,
 
-                             ReceiveDate = item.Header.SendDate,
+                             ReceiveDate = item.Header.UpdateDate,
                              JobDate = item.RequestDate,
                          });
 
@@ -1558,10 +1560,8 @@ namespace Jewelry.Service.ProductionPlan
         }
         private async Task UpdateStatusHeaderCommonFields(TbtProductionPlanStatusHeader header, ProductionPlanStatusUpdateRequest request)
         {
-            header.SendName = request.SendName;
-            header.SendDate = request.SendDate?.UtcDateTime;
-            header.CheckName = request.CheckName;
-            header.CheckDate = request.CheckDate?.UtcDateTime;
+            header.WorkerName = request.WorkerName;
+            header.WorkerCode = request.WorkerCode;
             header.Remark1 = request.Remark1;
             header.Remark2 = request.Remark2;
             header.UpdateDate = DateTime.UtcNow;
@@ -1834,10 +1834,10 @@ namespace Jewelry.Service.ProductionPlan
                                 UpdateDate = DateTime.UtcNow,
                                 UpdateBy = CurrentUsername,
 
-                                SendName = request.SendName,
-                                SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null,
-                                CheckName = request.CheckName,
-                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                                //SendName = request.SendName,
+                                //SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null,
+                                //CheckName = request.CheckName,
+                                //CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
@@ -1904,10 +1904,10 @@ namespace Jewelry.Service.ProductionPlan
                                 UpdateDate = DateTime.UtcNow,
                                 UpdateBy = CurrentUsername,
 
-                                SendName = request.CheckName,
-                                SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
-                                CheckName = request.CheckName,
-                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                                //SendName = request.CheckName,
+                                //SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                                //CheckName = request.CheckName,
+                                //CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
@@ -1959,10 +1959,10 @@ namespace Jewelry.Service.ProductionPlan
                                 UpdateDate = DateTime.UtcNow,
                                 UpdateBy = CurrentUsername,
 
-                                SendName = request.CheckName,
-                                SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
-                                CheckName = request.CheckName,
-                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                                //SendName = request.CheckName,
+                                //SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                                //CheckName = request.CheckName,
+                                //CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
@@ -2039,10 +2039,10 @@ namespace Jewelry.Service.ProductionPlan
                                 UpdateBy = CurrentUsername,
 
 
-                                SendName = request.CheckName,
-                                SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
-                                CheckName = request.CheckName,
-                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                                //SendName = request.CheckName,
+                                //SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                                //CheckName = request.CheckName,
+                                //CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
@@ -2065,10 +2065,10 @@ namespace Jewelry.Service.ProductionPlan
                                 UpdateDate = DateTime.UtcNow,
                                 UpdateBy = CurrentUsername,
 
-                                SendName = request.SendName,
-                                SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null,
-                                CheckName = request.CheckName,
-                                CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
+                                //SendName = request.SendName,
+                                //SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null,
+                                //CheckName = request.CheckName,
+                                //CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null,
 
                                 Remark1 = request.Remark1,
                                 Remark2 = request.Remark2,
@@ -2188,10 +2188,10 @@ namespace Jewelry.Service.ProductionPlan
                             await _jewelryContext.SaveChangesAsync();
 
 
-                            checkStatus.SendName = request.SendName;
-                            checkStatus.SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null;
-                            checkStatus.CheckName = request.CheckName;
-                            checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
+                            //checkStatus.SendName = request.SendName;
+                            //checkStatus.SendDate = request.SendDate.HasValue ? request.SendDate.Value.UtcDateTime : null;
+                            //checkStatus.CheckName = request.CheckName;
+                            //checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
                             checkStatus.Remark1 = request.Remark1;
                             checkStatus.Remark2 = request.Remark2;
                             checkStatus.WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.TotalWages) : 0;
@@ -2253,10 +2253,10 @@ namespace Jewelry.Service.ProductionPlan
                             _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(checkStatus.TbtProductionPlanStatusDetail);
                             await _jewelryContext.SaveChangesAsync();
 
-                            checkStatus.SendName = request.CheckName;
-                            checkStatus.SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
-                            checkStatus.CheckName = request.CheckName;
-                            checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
+                            //checkStatus.SendName = request.CheckName;
+                            //checkStatus.SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
+                            //checkStatus.CheckName = request.CheckName;
+                            //checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
 
                             checkStatus.Remark1 = request.Remark1;
                             checkStatus.Remark2 = request.Remark2;
@@ -2316,10 +2316,10 @@ namespace Jewelry.Service.ProductionPlan
                             await _jewelryContext.SaveChangesAsync();
 
 
-                            checkStatus.SendName = request.CheckName;
-                            checkStatus.SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
-                            checkStatus.CheckName = request.CheckName;
-                            checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
+                            //checkStatus.SendName = request.CheckName;
+                            //checkStatus.SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
+                            //checkStatus.CheckName = request.CheckName;
+                            //checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
 
                             checkStatus.Remark1 = request.Remark1;
                             checkStatus.Remark2 = request.Remark2;
@@ -2396,10 +2396,10 @@ namespace Jewelry.Service.ProductionPlan
                     case 85: //CVD
                     case 95: // ประเมินราคา
                         {
-                            checkStatus.SendName = request.CheckName;
-                            checkStatus.SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
-                            checkStatus.CheckName = request.CheckName;
-                            checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
+                            //checkStatus.SendName = request.CheckName;
+                            //checkStatus.SendDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
+                            //checkStatus.CheckName = request.CheckName;
+                            //checkStatus.CheckDate = request.CheckDate.HasValue ? request.CheckDate.Value.UtcDateTime : null;
 
                             checkStatus.Remark1 = request.Remark1;
                             checkStatus.Remark2 = request.Remark2;

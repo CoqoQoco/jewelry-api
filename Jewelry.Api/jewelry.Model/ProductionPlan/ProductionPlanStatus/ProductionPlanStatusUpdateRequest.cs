@@ -15,10 +15,13 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
         public int HeaderId { get; set; }
         public int Status { get; set; }
 
-        public string? SendName { get; set; }
-        public DateTimeOffset? SendDate { get; set; }
-        public string? CheckName { get; set; }
-        public DateTimeOffset? CheckDate { get; set; }
+        public string? WorkerCode { get; set; }
+        public string? WorkerName { get; set; }
+
+        //public string? SendName { get; set; }
+        //public DateTimeOffset? SendDate { get; set; }
+        //public string? CheckName { get; set; }
+        //public DateTimeOffset? CheckDate { get; set; }
 
         public List<GoldItem>? Golds { get; set; }
         public List<GemItem>? Gems { get; set; }

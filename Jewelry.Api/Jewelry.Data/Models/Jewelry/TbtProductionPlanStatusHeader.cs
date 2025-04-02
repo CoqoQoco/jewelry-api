@@ -19,14 +19,6 @@ public partial class TbtProductionPlanStatusHeader
 
     public int Status { get; set; }
 
-    public string? SendName { get; set; }
-
-    public DateTime? SendDate { get; set; }
-
-    public string? CheckName { get; set; }
-
-    public DateTime? CheckDate { get; set; }
-
     public string? Remark1 { get; set; }
 
     public string? Remark2 { get; set; }
@@ -34,6 +26,10 @@ public partial class TbtProductionPlanStatusHeader
     public bool IsActive { get; set; }
 
     public decimal? WagesTotal { get; set; }
+
+    public string? WorkerCode { get; set; }
+
+    public string? WorkerName { get; set; }
 
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 
