@@ -203,6 +203,7 @@ namespace Jewelry.Service.Worker
                              StatusDescription = status.Description,
 
                              Gold = item.Gold,
+                             GoldSize = item.Header.ProductionPlan.TypeSize,
 
                              GoldQtySend = item.GoldQtySend,
                              GoldWeightSend = item.GoldWeightSend,
