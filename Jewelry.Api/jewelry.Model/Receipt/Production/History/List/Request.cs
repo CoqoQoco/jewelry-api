@@ -14,8 +14,8 @@ namespace jewelry.Model.Receipt.Production.History.List
 
     public class Search
     {
-        public DateTimeOffset ReceiptDateStart { get; set; }
-        public DateTimeOffset ReceiptDateEnd { get; set; }
+        public DateTimeOffset? ReceiptDateStart { get; set; }
+        public DateTimeOffset? ReceiptDateEnd { get; set; }
         public string[]? ReceiptType { get; set; }
 
         public string? StockNumber { get; set; }

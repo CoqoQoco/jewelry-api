@@ -45,9 +45,19 @@ namespace Jewelry.Service.Receipt.Production
                          on item.WoText equals plan.WoText
 
                          where item.IsComplete == false
-                         && item.CreateDate >= request.ReceiptDateStart.StartOfDayUtc()
-                         && item.CreateDate <= request.ReceiptDateEnd.EndOfDayUtc()
+                         //&& item.CreateDate >= request.ReceiptDateStart.StartOfDayUtc()
+                         //&& item.CreateDate <= request.ReceiptDateEnd.EndOfDayUtc()
                          select new { item, plan });
+
+            if(request.ReceiptDateStart.HasValue)
+            {
+                query = query.Where(x => x.item.CreateDate >= request.ReceiptDateStart.Value.StartOfDayUtc());
+            }
+            if (request.ReceiptDateEnd.HasValue)
+            {
+                query = query.Where(x => x.item.CreateDate >= request.ReceiptDateEnd.Value.EndOfDayUtc());
+            }
+
 
             if (!string.IsNullOrEmpty(request.ReceiptNumber))
             {
@@ -504,9 +514,18 @@ namespace Jewelry.Service.Receipt.Production
         {
             var receipt = (from item in _jewelryContext.TbtStockProductReceiptItem
                            where item.IsReceipt == true
-                           && item.ReceiptDate >= request.ReceiptDateStart.StartOfDayUtc()
-                           && item.ReceiptDate <= request.ReceiptDateEnd.EndOfDayUtc()
+                           //&& item.ReceiptDate >= request.ReceiptDateStart.StartOfDayUtc()
+                           //&& item.ReceiptDate <= request.ReceiptDateEnd.EndOfDayUtc()
                            select item);
+
+            if (request.ReceiptDateStart.HasValue)
+            {
+                receipt = receipt.Where(x => x.ReceiptDate >= request.ReceiptDateStart.Value.StartOfDayUtc());
+            }
+            if (request.ReceiptDateEnd.HasValue)
+            {
+                receipt = receipt.Where(x => x.ReceiptDate <= request.ReceiptDateEnd.Value.EndOfDayUtc());
+            }
 
             if (request.ReceiptType != null && request.ReceiptType.Any())
             {

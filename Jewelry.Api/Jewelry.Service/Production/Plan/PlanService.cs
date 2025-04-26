@@ -434,8 +434,8 @@ namespace Jewelry.Service.Production.Plan
             {
                 CreateDate = dateNow,
                 CreateBy = CurrentUsername,
-                //UpdateDate = dateNow,
-                //UpdateBy = CurrentUsername,
+                UpdateDate = dateNow,
+                UpdateBy = CurrentUsername,
 
                 WorkerName = request.WorkerName,
                 WorkerCode = request.WorkerCode,
