@@ -49,15 +49,21 @@ namespace Jewelry.Service.Receipt.Production
                          //&& item.CreateDate <= request.ReceiptDateEnd.EndOfDayUtc()
                          select new { item, plan });
 
-            if(request.ReceiptDateStart.HasValue)
+            //var testtttt = query.ToList();
+
+            if (request.ReceiptDateStart.HasValue)
             {
                 query = query.Where(x => x.item.CreateDate >= request.ReceiptDateStart.Value.StartOfDayUtc());
             }
+
+            //var testtt = query.ToList();
+
             if (request.ReceiptDateEnd.HasValue)
             {
-                query = query.Where(x => x.item.CreateDate >= request.ReceiptDateEnd.Value.EndOfDayUtc());
+                query = query.Where(x => x.item.CreateDate <= request.ReceiptDateEnd.Value.EndOfDayUtc());
             }
 
+            //var testttt = query.ToList();
 
             if (!string.IsNullOrEmpty(request.ReceiptNumber))
             {
@@ -124,6 +130,7 @@ namespace Jewelry.Service.Receipt.Production
                                 })
                             });
 
+            
             return response;
 
         }
@@ -438,6 +445,7 @@ namespace Jewelry.Service.Receipt.Production
                                     Weight = _newStocksMaterial.Weight,
 
                                     Size = _newStocksMaterial.Size,
+                                    Region = _newStocksMaterial.Region,
                                     Price = _newStocksMaterial.Price
                                 });
                             }

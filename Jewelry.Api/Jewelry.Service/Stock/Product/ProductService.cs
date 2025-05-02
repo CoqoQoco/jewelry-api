@@ -133,6 +133,7 @@ namespace Jewelry.Service.Stock.Product
                                                  Weight = material.Weight,
                                                  WeightUnit = material.WeightUnit,
                                                  Size = material.Size,
+                                                 Region = material.Region,
                                                  Price = material.Price
                                              }).ToList()
                                              : new List<jewelry.Model.Stock.Product.List.Material>()
@@ -201,6 +202,7 @@ namespace Jewelry.Service.Stock.Product
                             WeightUnit = item.WeightUnit,
 
                             Size = item.Size,
+                            Region = item.Region,
                             Price = item.Price,
 
                             CreateBy = CurrentUsername,

@@ -57,6 +57,7 @@ namespace jewelry.Model.Receipt.Production.Draft.Create
         public string? WeightUnit { get; set; }
 
         public string? Size { get; set; }
+        public string? Region { get; set; }
         public decimal? Price { get; set; }
     }
 }

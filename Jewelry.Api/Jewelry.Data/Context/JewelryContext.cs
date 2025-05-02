@@ -1842,6 +1842,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.QtyUnit)
                 .HasColumnType("character varying")
                 .HasColumnName("qty_unit");
+            entity.Property(e => e.Region)
+                .HasColumnType("character varying")
+                .HasColumnName("region");
             entity.Property(e => e.Size)
                 .HasColumnType("character varying")
                 .HasColumnName("size");

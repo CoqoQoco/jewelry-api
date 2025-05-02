@@ -37,5 +37,7 @@ public partial class TbtStockProductMaterial
 
     public string? WeightUnit { get; set; }
 
+    public string? Region { get; set; }
+
     public virtual TbtStockProduct StockNumberNavigation { get; set; } = null!;
 }

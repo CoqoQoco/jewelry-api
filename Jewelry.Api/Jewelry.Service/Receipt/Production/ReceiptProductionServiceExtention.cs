@@ -179,6 +179,7 @@ namespace Jewelry.Service.Receipt.Production
                     WeightUnit = item.WeightUnit,
 
                     Size = item.Size,
+                    Region = item.Region,
                     Price = item.Price,
 
                     CreateBy = operatorBy,
@@ -208,6 +209,7 @@ namespace Jewelry.Service.Receipt.Production
                     WeightUnit = stock.WeightUnit,
 
                     Size = stock.Size,
+                    Region = stock.Region,
                     Price = stock.Price,
                 });
             }
