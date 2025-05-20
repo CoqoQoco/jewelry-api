@@ -2780,7 +2780,7 @@ namespace Jewelry.Service.ProductionPlan
             }
             if (plan.Status == ProductionPlanStatus.Completed)
             {
-                var checkPermission = GetPermissionLevel("edit_user");
+                var checkPermission = GetPermissionLevel("update_plan");
 
                 if (!checkPermission)
                 {
