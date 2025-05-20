@@ -1,6 +1,7 @@
 ﻿using Jewelry.Data.Context;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
+using Microsoft.EntityFrameworkCore.Update.Internal;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -55,6 +56,7 @@ namespace Jewelry.Service.Base
                 ["edit_user"] = new[] { "Admin", "Dev" },
                 ["delete_user"] = new[] { "Admin", "Dev" },
                 ["update_stock"] = new[] { "Dev" },
+                ["update_plan"] = new[] { "UpdatePlan"}
             };
 
             // ตรวจสอบว่ามี topic นั้นใน map หรือไม่
@@ -70,5 +72,41 @@ namespace Jewelry.Service.Base
                 throw new UnauthorizedAccessException($"คุณไม่มีสิทธิ์เข้าถึง: {topic}");
             }
         }
+        protected bool GetPermissionLevel(string topic)
+        {
+            // ถ้าไม่มี user roles ให้ throw unauthorized ทันที
+            if (!CurrentUserRoles.Any())
+            {
+                throw new UnauthorizedAccessException("ไม่พบข้อมูลสิทธิ์การใช้งาน");
+            }
+
+            // กำหนด permission map
+            var permissionMap = new Dictionary<string, string[]>
+            {
+                ["new_user"] = new[] { "Admin", "Dev" },
+                ["edit_user"] = new[] { "Admin", "Dev" },
+                ["delete_user"] = new[] { "Admin", "Dev" },
+                ["update_stock"] = new[] { "Dev" },
+                ["update_plan"] = new[] { "UpdatePlan" }
+            };
+
+            // ตรวจสอบว่ามี topic นั้นใน map หรือไม่
+            if (!permissionMap.ContainsKey(topic))
+            {
+                throw new KeyNotFoundException($"ไม่พบการกำหนดสิทธิ์สำหรับ {topic}");
+            }
+
+            // ตรวจสอบสิทธิ์
+            var allowedRoles = permissionMap[topic];
+            if (!allowedRoles.Any(role => CurrentUserRoles.Contains(role)))
+            {
+                throw new UnauthorizedAccessException($"คุณไม่มีสิทธิ์เข้าถึง: {topic}");
+            }
+
+            return true;
+        }
+
+
+
     }
 }

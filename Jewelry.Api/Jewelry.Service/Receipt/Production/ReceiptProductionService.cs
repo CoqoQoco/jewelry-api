@@ -9,8 +9,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NetTopologySuite.Index.HPRtree;
 using NetTopologySuite.Triangulate.QuadEdge;
+using NPOI.OpenXmlFormats.Dml;
+using NPOI.Util;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Reflection.Metadata.Ecma335;
@@ -130,7 +133,7 @@ namespace Jewelry.Service.Receipt.Production
                                 })
                             });
 
-            
+
             return response;
 
         }
@@ -633,5 +636,717 @@ namespace Jewelry.Service.Receipt.Production
 
         }
 
+
+        public async Task<string> ImportProduct()
+        {
+            var oldProduct = (from item in _jewelryContext.StockFromConvert
+                              where item.Typejob != "convert"
+                              select item).Take(10).ToList();
+
+            var actualProduct = (from item in _jewelryContext.TbtStockProduct
+                                 select item).ToList();
+
+            var masterProductType = (from item in _jewelryContext.TbmProductType
+                                     select item).ToList();
+
+            var masterGold = (from item in _jewelryContext.TbmGold
+                              select item).ToList();
+
+            var masterGoldSize = (from item in _jewelryContext.TbmGoldSize
+                                  select item).ToList();
+
+
+            if (!oldProduct.Any())
+            {
+                return "No Data";
+            }
+
+            var _receiptRunning = await _runningNumberService.GenerateRunningNumber("REP");
+
+            var addProducts = new List<TbtStockProduct>();
+            var addProductsMaterial = new List<TbtStockProductMaterial>();
+            int add = 0;
+
+            foreach (var item in oldProduct)
+            {
+                var match = actualProduct.Where(x => x.ProductCode == item.Noproduct).FirstOrDefault();
+                if (match != null)
+                {
+                    continue;
+                }
+
+                string prefix = "DK";
+                var _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
+
+                add++;
+
+                var newProduct = new TbtStockProduct
+                {
+                    StockNumber = _stockRunning,
+                    Status = StockProductStatus.Available,
+
+                    ReceiptNumber = _receiptRunning,
+                    ReceiptDate = DateTime.UtcNow,
+                    ReceiptType = "convert",
+
+                    Mold = item.NoCode,
+                    MoldDesign = item.NoCode,
+
+                    Qty = item.Quantity.HasValue ? item.Quantity.Value : 1,
+
+                    ProductPrice = item.Pricesale.HasValue ? item.Pricesale.Value : 0,
+                    ProductCost = string.IsNullOrEmpty(item.Pricecost) ? 0 : decimal.Parse(item.Pricecost),
+
+                    ProductCode = item.Noproduct,
+                    ProductNumber = item.Codeproduct,
+                    ProductNameTh = item.Productname ?? "DK",
+                    ProductNameEn = item.Productname ?? "DK",
+
+                    ImageName = item.NoCode,
+                    ImagePath = $"{item.NoCode}.png",
+
+                    //Wo = plan.Wo,
+                    //WoNumber = plan.WoNumber,
+
+                    Size = item.Ringsize,
+                    Remark = item.Remark,
+
+                    CreateBy = CurrentUsername,
+                    CreateDate = DateTime.UtcNow
+                };
+
+                //check product type
+                if (!string.IsNullOrEmpty(item.Typep))
+                {
+                    var productType = GetProductType(masterProductType, item.Typep);
+                    newProduct.ProductType = productType.Code;
+                    newProduct.ProductTypeName = productType.NameTh;
+                }
+
+                //get production date
+                newProduct.ProductionDate = GetProductionDate(item.Dateproduct);
+
+                //get production type
+                newProduct.ProductionType = ProducttionType(masterGold, item.Typeg);
+
+                //get production type size
+                newProduct.ProductionTypeSize = ProducttionTypeSize(masterGoldSize, item.Productname);
+
+                //get wo
+                newProduct.WoOrigin = item.Jobno;
+                newProduct.Wo = GetWO(item.Jobno);
+                newProduct.WoNumber = GetWONumber(item.Jobno);
+
+                //add product
+                addProducts.Add(newProduct);
+
+                //gold
+                if (!string.IsNullOrEmpty(item.Typeg))
+                {
+                    var check = item.Typeg.ToUpper().Trim();
+                    var newMaterial = GetMaterial(_stockRunning, check, item.Typeg, item.Typed1, item.Qtyg, item.Wg, item.Unit1, item.Priceg, null);
+
+                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                    {
+                        addProductsMaterial.Add(newMaterial);
+                    }
+                }
+
+
+                //check typD
+                if (!string.IsNullOrEmpty(item.Typed))
+                {
+                    var check = item.Typed.ToUpper().Trim();
+                    var newMaterial = GetMaterial(_stockRunning, check, item.Typed, item.Typed1, item.Qtyd, item.Wd, item.Unit2, item.Priced, null);
+
+                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                    {
+                        addProductsMaterial.Add(newMaterial);
+                    }
+                }
+
+                //check typeR
+                if (!string.IsNullOrEmpty(item.Typer))
+                {
+                    var check = item.Typer.ToUpper().Trim();
+                    var newMaterial = GetMaterial(_stockRunning, check, item.Typer, item.Typed1, item.Qtyr, item.Wr, item.Unit3, item.Pricer, item.Sizer);
+
+                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                    {
+                        addProductsMaterial.Add(newMaterial);
+                    }
+
+                }
+
+                //check typeS
+                if (!string.IsNullOrEmpty(item.TypeS))
+                {
+                    var check = item.TypeS.ToUpper().Trim();
+                    var newMaterial = GetMaterial(_stockRunning, check, item.TypeS, item.Typed1, item.Qtys, item.Ws, item.Unit4, item.Prices, item.Sizes);
+
+                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                    {
+                        addProductsMaterial.Add(newMaterial);
+                    }
+
+                }
+
+                //check typeE
+                if (!string.IsNullOrEmpty(item.Typee))
+                {
+                    var check = item.Typee.ToUpper().Trim();
+                    var newMaterial = GetMaterial(_stockRunning, check, item.Typee, item.Typed1, item.Qtye, item.We, item.Unit5, item.Pricee, item.Sizee);
+
+                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                    {
+                        addProductsMaterial.Add(newMaterial);
+                    }
+
+                }
+
+                //check typeM
+                if (!string.IsNullOrEmpty(item.Typem))
+                {
+                    var check = item.Typem.ToUpper().Trim();
+                    var newMaterial = GetMaterial(_stockRunning, check, item.Typem, item.Typed1, item.Qtym, item.Wm, item.Unit6, item.Pricem, item.Sizem);
+
+                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                    {
+                        addProductsMaterial.Add(newMaterial);
+                    }
+
+                }
+
+                item.Typejob = "convert";
+            }
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                if (addProducts.Any())
+                {
+                    _jewelryContext.TbtStockProduct.AddRange(addProducts);
+                    await _jewelryContext.SaveChangesAsync();
+                }
+
+                if (addProductsMaterial.Any())
+                {
+                    _jewelryContext.TbtStockProductMaterial.AddRange(addProductsMaterial);
+                    //await _jewelryContext.SaveChangesAsync();
+                }
+
+                if (oldProduct.Any())
+                {
+                    _jewelryContext.StockFromConvert.UpdateRange(oldProduct);
+                }
+
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
+
+            return $"success {add} item";
+        }
+        private TbmProductType GetProductType(List<TbmProductType> master, string check)
+        {
+            if (string.IsNullOrEmpty(check))
+            {
+                // ถ้าไม่มีข้อมูลประเภทสินค้า ให้ใช้ค่าเริ่มต้น (DK)
+                return master.FirstOrDefault(x => x.Code == "DK") ?? master.FirstOrDefault();
+            }
+
+            var checkText = check.ToUpper().Trim();
+
+            // ตรวจสอบแต่ละประเภทตามลำดับความสำคัญ
+            if (checkText.Contains("RING"))
+            {
+                return master.FirstOrDefault(x => x.Code == "R");
+            }
+            else if (checkText.Contains("PENDANT"))
+            {
+                return master.FirstOrDefault(x => x.Code == "P");
+            }
+            else if (checkText.Contains("EARRING") || checkText.Contains("LOCK") || checkText.Contains("STDU") || checkText.Contains("STUD"))
+            {
+                if (checkText.Contains("STUD") || checkText.Contains("STUD"))
+                {
+                    return master.FirstOrDefault(x => x.Code == "ES");
+                }
+                else if (checkText.Contains("HOOK"))
+                {
+                    return master.FirstOrDefault(x => x.Code == "EH");
+                }
+                else if (checkText.Contains("LOCK"))
+                {
+                    return master.FirstOrDefault(x => x.Code == "EL");
+                }
+                else
+                {
+                    return master.FirstOrDefault(x => x.Code == "E");
+                }
+            }
+            else if (checkText.Contains("BRACELET"))
+            {
+                return master.FirstOrDefault(x => x.Code == "B");
+            }
+            else if (checkText.Contains("NECKLACE"))
+            {
+                return master.FirstOrDefault(x => x.Code == "N");
+            }
+            else if (checkText.Contains("BANGLE"))
+            {
+                return master.FirstOrDefault(x => x.Code == "G");
+            }
+            else if (checkText.Contains("BROOCH"))
+            {
+                return master.FirstOrDefault(x => x.Code == "T");
+            }
+            else if (checkText.Contains("BUTTON"))
+            {
+                return master.FirstOrDefault(x => x.Code == "V");
+            }
+            else if (checkText.Contains("CHAIN"))
+            {
+                return master.FirstOrDefault(x => x.Code == "CH");
+            }
+
+            // หากยังไม่พบ ให้ใช้ค่าเริ่มต้น
+            return master.FirstOrDefault(x => x.Code == "DK") ?? master.FirstOrDefault();
+        }
+        private DateTime GetProductionDate(string productionDateCode)
+        {
+            try
+            {
+                // ถ้าเป็นค่าว่างหรือ null ให้ใช้วันที่ปัจจุบัน
+                if (string.IsNullOrEmpty(productionDateCode) || productionDateCode.ToUpper() == "[NULL]")
+                {
+                    return DateTime.UtcNow;
+                }
+
+                // ทำความสะอาดข้อมูล ตัดอักขระพิเศษหรือช่องว่างออก
+                productionDateCode = productionDateCode.Trim();
+
+                // ตรวจสอบว่าเป็นตัวเลขจำนวน 8 หลักหรือไม่
+                if (productionDateCode.Length != 8 || !int.TryParse(productionDateCode, out _))
+                {
+                    return DateTime.UtcNow;
+                }
+
+                // แยกปี เดือน วัน
+                int yearThai = int.Parse(productionDateCode.Substring(0, 4));  // พ.ศ.
+                int month = int.Parse(productionDateCode.Substring(4, 2));      // เดือน
+                int day = int.Parse(productionDateCode.Substring(6, 2));        // วัน
+
+                // แปลงปี พ.ศ. เป็น ค.ศ.
+                int yearGregorian = yearThai - 543;
+
+                // ตรวจสอบความถูกต้องของวันที่
+                if (month < 1 || month > 12 || day < 1 || day > 31 || yearGregorian < 1900 || yearGregorian > 2100)
+                {
+                    return DateTime.UtcNow;
+                }
+
+                // สร้าง DateTime ในเขตเวลาท้องถิ่น (ประเทศไทย - GMT+7)
+                var localTime = new DateTime(yearGregorian, month, day, 0, 0, 0, DateTimeKind.Local);
+
+                // แปลงเป็น UTC
+                return localTime.ToUniversalTime();
+            }
+            catch (Exception)
+            {
+                // กรณีเกิดข้อผิดพลาดในการแปลงค่า ให้ใช้วันที่ปัจจุบัน
+                return DateTime.UtcNow;
+            }
+        }
+        private string ProducttionType(List<TbmGold> master, string check)
+        {
+            if (string.IsNullOrEmpty(check))
+            {
+                // ถ้าไม่มีข้อมูลประเภทสินค้า ให้ใช้ค่าเริ่มต้น (DK)
+                return master.FirstOrDefault(x => x.Code == "WG").NameEn;
+            }
+
+            var checkText = check.ToUpper().Trim();
+
+            if (checkText.Contains("PG"))
+            {
+                return master.FirstOrDefault(x => x.Code == "PG").NameEn;
+            }
+            else if (checkText.Contains("YG"))
+            {
+                return master.FirstOrDefault(x => x.Code == "YG").NameEn;
+            }
+            else if (checkText.Contains("SI"))
+            {
+                return master.FirstOrDefault(x => x.Code == "SV").NameEn;
+            }
+            else
+            {
+                return master.FirstOrDefault(x => x.Code == "WG").NameEn;
+            }
+        }
+        private string ProducttionTypeSize(List<TbmGoldSize> master, string check)
+        {
+            if (string.IsNullOrEmpty(check))
+            {
+                // ถ้าไม่มีข้อมูลประเภทสินค้า ให้ใช้ค่าเริ่มต้น (DK)
+                return master.FirstOrDefault(x => x.Code == "100").NameEn;
+            }
+
+            var checkText = check.ToUpper().Trim();
+
+            if (checkText.Contains("14K"))
+            {
+                return master.FirstOrDefault(x => x.Code == "5").NameEn;
+            }
+            else if (checkText.Contains("18K"))
+            {
+                return master.FirstOrDefault(x => x.Code == "7").NameEn;
+            }
+            else if (checkText.Contains("22K"))
+            {
+                return master.FirstOrDefault(x => x.Code == "8").NameEn;
+            }
+            else if (checkText.Contains("10K"))
+            {
+                return master.FirstOrDefault(x => x.Code == "4").NameEn;
+            }
+            else if (checkText.Contains("9K"))
+            {
+                return master.FirstOrDefault(x => x.Code == "3").NameEn;
+            }
+            else if (checkText.Contains("SIL"))
+            {
+                return master.FirstOrDefault(x => x.Code == "9").NameEn;
+            }
+            else
+            {
+                return master.FirstOrDefault(x => x.Code == "100").NameEn;
+            }
+        }
+        private string? GetWO(string check)
+        {
+            if (string.IsNullOrEmpty(check))
+            {
+                return null;
+            }
+            if (check.StartsWith("NO."))
+            {
+                check = check.Substring(3).Trim();
+            }
+            if (check.Contains("NO."))
+            {
+                // หาตำแหน่งเริ่มต้นของ "NO."
+                int startPos = check.IndexOf("NO.");
+                // ตัด "NO." ออกและคืนค่าข้อความที่เหลือ
+                check = check.Substring(startPos + 3).Trim();
+            }
+
+            // ตรวจสอบกรณีที่มีทั้ง "-" และ "/"
+            bool hasDash = check.Contains("-");
+            bool hasSlash = check.Contains("/");
+
+            if (hasSlash && hasDash)
+            {
+                // กรณีมีทั้ง "-" และ "/" ให้ตัดตาม "/" เท่านั้น
+                string[] parts = check.Split('/');
+                return parts.Length > 0 ? parts[0].Trim() : check;
+            }
+            else if (hasSlash)
+            {
+                // กรณีมีแค่ "/"
+                string[] parts = check.Split('/');
+                return parts.Length > 0 ? parts[0].Trim() : check;
+            }
+            else if (hasDash)
+            {
+                // กรณีมีแค่ "-"
+                string[] parts = check.Split('-');
+                return parts.Length > 0 ? parts[0].Trim() : check;
+            }
+
+            // กรณีไม่พบเครื่องหมายใ
+            return check;
+        }
+        private int? GetWONumber(string check)
+        {
+            if (string.IsNullOrEmpty(check))
+            {
+                return null;
+            }
+
+            // ตัดช่องว่างหน้า-หลังออก
+            check = check.Trim();
+
+            // ถ้าข้อความขึ้นต้นด้วย "NO." ให้ตัดออก
+            if (check.StartsWith("NO."))
+            {
+                check = check.Substring(3).Trim();
+            }
+
+            // ถ้าพบคำว่า "NO." ในตำแหน่งอื่น
+            if (check.Contains("NO."))
+            {
+                // หาตำแหน่งเริ่มต้นของ "NO."
+                int startPos = check.IndexOf("NO.");
+                // ตัด "NO." ออกและคืนค่าข้อความที่เหลือ
+                check = check.Substring(startPos + 3).Trim();
+            }
+
+            // ตรวจสอบกรณีที่มีทั้ง "-" และ "/"
+            bool hasDash = check.Contains("-");
+            bool hasSlash = check.Contains("/");
+
+            string secondPart = null;
+
+            if (hasSlash && hasDash)
+            {
+                // กรณีมีทั้ง "-" และ "/" ให้ตัดตาม "/" เท่านั้น
+                string[] parts = check.Split('/');
+                if (parts.Length >= 2)
+                {
+                    secondPart = parts[1].Trim();
+                }
+            }
+            else if (hasSlash)
+            {
+                // กรณีมีแค่ "/"
+                string[] parts = check.Split('/');
+                if (parts.Length >= 2)
+                {
+                    secondPart = parts[1].Trim();
+                }
+            }
+            else if (hasDash)
+            {
+                // กรณีมีแค่ "-"
+                string[] parts = check.Split('-');
+                if (parts.Length >= 2)
+                {
+                    secondPart = parts[1].Trim();
+                }
+            }
+
+            // ถ้าไม่มีตำแหน่งที่ 2 หรือไม่พบเครื่องหมายใดๆ
+            if (secondPart == null)
+            {
+                return null;
+            }
+
+            // พยายามแปลงเป็น int
+            if (int.TryParse(secondPart, out int result))
+            {
+                return result;
+            }
+
+            return null;
+        }
+
+        private TbtStockProductMaterial? GetMaterial(string running, string check, string type, string typeCode, int? qty, int? weight, string weghtUnit, int? price, string size)
+        {
+            var newMaterial = new TbtStockProductMaterial();
+
+            newMaterial.StockNumber = running;
+            newMaterial.CreateDate = DateTime.UtcNow;
+            newMaterial.CreateBy = CurrentUsername;
+
+            newMaterial.TypeOrigin = string.IsNullOrEmpty(type) || string.IsNullOrWhiteSpace(type) || type == "[NULL]" || type == " " ? null : type;
+            newMaterial.Type = "Gem";
+            newMaterial.TypeCode = typeCode;
+
+            newMaterial.Qty = qty.HasValue ? qty.Value : 0;
+            //QtyUnit = item.Unit2,
+
+            newMaterial.Weight = weight.HasValue ? weight.Value : 0;
+            newMaterial.WeightUnit = weghtUnit;
+            newMaterial.Price = price.HasValue ? price.Value : 0;
+
+            if (check.Contains("DIA") || check == "D")
+            {
+                newMaterial.Type = "Diamond";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.Type}{newMaterial.Weight} {newMaterial.WeightUnit} {newMaterial.TypeCode}";
+            }
+
+            if (check.Contains("CZ"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Cubic Zirconia";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("RU"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Ruby";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("SAP"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Sapphire";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+            if (check.Contains("PINK SAP"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Pink Sapphire";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+            if (check.Contains("PINK SAP"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Yellow Sapphire";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+            if (check.Contains("FANCY SAP"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Fancy Sapphire";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+            if (check.Contains("YELLOW SAP"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Yellow Sapphire";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+            if (check.Contains("WHITE SAP"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "White Sapphire";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("AME"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Amethyst";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("EME") || check == "E")
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Emerald";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("BLUE TO") || check.Contains("BT"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Blue Topaz";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+            if (check.Contains("GREEN TO"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Green Topaz";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+
+            if (check.Contains("CIT") || check.Contains("CL"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Citrine";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("TANZ"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Tanzanite";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("MIX"))
+            {
+                newMaterial.Type = "GEM";
+                newMaterial.TypeCode = "Mix Stone";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("AQU"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Aquamarine";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("LEMON"))
+            {
+                newMaterial.Type = "GEM";
+                newMaterial.TypeCode = "Lemon Quart";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+            if (check.Contains("ROSE QU"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Rose Quart";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+            if (check.Contains("WHITE QU"))
+            {
+                newMaterial.Type = "GEM";
+                newMaterial.TypeCode = "White Quart";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("TSA"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Tsavolite";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("GAR"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "Garnet";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("WHITE PEA"))
+            {
+                newMaterial.Type = "Gem";
+                newMaterial.TypeCode = "WHITE Pearl";
+                newMaterial.TypeBarcode = $"{newMaterial.Qty}{newMaterial.TypeCode}{newMaterial.Weight} {newMaterial.WeightUnit}";
+            }
+
+            if (check.Contains("GOLD"))
+            {
+                newMaterial.Type = "Gold";
+                newMaterial.TypeCode = check.Contains("WHITE") ? "WG" : "YG";
+                newMaterial.TypeBarcode = $"{newMaterial.Weight} {newMaterial.WeightUnit} {newMaterial.Type} {newMaterial.Size ?? null}";
+            }
+
+            return newMaterial;
+        }
+
+
+        private bool CheckTypeOrigin(string check)
+        {
+            var response = false;
+
+            if (!string.IsNullOrEmpty(check))
+            {
+                response = true;
+            }
+            if (!string.IsNullOrWhiteSpace(check))
+            {
+                response = true;
+            }
+
+            if (check == " ")
+            {
+                response = false;
+            }
+            if (check == "[NULL]")
+            {
+                response = false;
+            }
+
+            return response;
+        }
     }
 }

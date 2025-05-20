@@ -39,5 +39,7 @@ public partial class TbtStockProductMaterial
 
     public string? Region { get; set; }
 
+    public string? TypeOrigin { get; set; }
+
     public virtual TbtStockProduct StockNumberNavigation { get; set; } = null!;
 }

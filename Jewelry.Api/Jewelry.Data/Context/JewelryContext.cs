@@ -12,6 +12,8 @@ public partial class JewelryContext : DbContext
     {
     }
 
+    public virtual DbSet<StockFromConvert> StockFromConvert { get; set; }
+
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
 
     public virtual DbSet<TbmCustomer> TbmCustomer { get; set; }
@@ -109,6 +111,174 @@ public partial class JewelryContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("pg_catalog", "adminpack");
+
+        modelBuilder.Entity<StockFromConvert>(entity =>
+        {
+            entity.HasKey(e => e.Recgen).HasName("stock_from_convert_pk");
+
+            entity.ToTable("stock_from_convert");
+
+            entity.Property(e => e.Recgen)
+                .ValueGeneratedNever()
+                .HasColumnName("recgen");
+            entity.Property(e => e.Codeproduct)
+                .HasMaxLength(255)
+                .HasColumnName("codeproduct");
+            entity.Property(e => e.Dateadd)
+                .HasMaxLength(255)
+                .HasColumnName("dateadd");
+            entity.Property(e => e.Dateproduct)
+                .HasMaxLength(255)
+                .HasColumnName("dateproduct");
+            entity.Property(e => e.Descthai)
+                .HasMaxLength(255)
+                .HasColumnName("descthai");
+            entity.Property(e => e.Issueno)
+                .HasMaxLength(255)
+                .HasColumnName("issueno");
+            entity.Property(e => e.Jobno)
+                .HasMaxLength(255)
+                .HasColumnName("jobno");
+            entity.Property(e => e.NoCode)
+                .HasMaxLength(255)
+                .HasColumnName("no_code");
+            entity.Property(e => e.Noproduct)
+                .HasMaxLength(255)
+                .HasColumnName("noproduct");
+            entity.Property(e => e.OriginD)
+                .HasMaxLength(255)
+                .HasColumnName("origin_d");
+            entity.Property(e => e.OriginD1)
+                .HasMaxLength(255)
+                .HasColumnName("origin_d1");
+            entity.Property(e => e.Partno)
+                .HasMaxLength(255)
+                .HasColumnName("partno");
+            entity.Property(e => e.Partnoold)
+                .HasMaxLength(255)
+                .HasColumnName("partnoold");
+            entity.Property(e => e.Pricecost)
+                .HasMaxLength(255)
+                .HasColumnName("pricecost");
+            entity.Property(e => e.Priced).HasColumnName("priced");
+            entity.Property(e => e.Priced1).HasColumnName("priced1");
+            entity.Property(e => e.Pricee).HasColumnName("pricee");
+            entity.Property(e => e.Priceg).HasColumnName("priceg");
+            entity.Property(e => e.Pricem).HasColumnName("pricem");
+            entity.Property(e => e.Pricer).HasColumnName("pricer");
+            entity.Property(e => e.Prices).HasColumnName("prices");
+            entity.Property(e => e.Pricesale).HasColumnName("pricesale");
+            entity.Property(e => e.Priceus).HasColumnName("priceus");
+            entity.Property(e => e.Productname)
+                .HasMaxLength(255)
+                .HasColumnName("productname");
+            entity.Property(e => e.Qtyd).HasColumnName("qtyd");
+            entity.Property(e => e.Qtyd1).HasColumnName("qtyd1");
+            entity.Property(e => e.Qtye).HasColumnName("qtye");
+            entity.Property(e => e.Qtyg).HasColumnName("qtyg");
+            entity.Property(e => e.Qtym).HasColumnName("qtym");
+            entity.Property(e => e.Qtyr).HasColumnName("qtyr");
+            entity.Property(e => e.Qtys).HasColumnName("qtys");
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.Remark)
+                .HasMaxLength(255)
+                .HasColumnName("remark");
+            entity.Property(e => e.Ringsize)
+                .HasMaxLength(255)
+                .HasColumnName("ringsize");
+            entity.Property(e => e.Sizee)
+                .HasMaxLength(255)
+                .HasColumnName("sizee");
+            entity.Property(e => e.Sizem)
+                .HasMaxLength(255)
+                .HasColumnName("sizem");
+            entity.Property(e => e.Sizer)
+                .HasMaxLength(255)
+                .HasColumnName("sizer");
+            entity.Property(e => e.Sizes)
+                .HasMaxLength(255)
+                .HasColumnName("sizes");
+            entity.Property(e => e.StatusP)
+                .HasMaxLength(255)
+                .HasColumnName("status_p");
+            entity.Property(e => e.Stockid)
+                .HasMaxLength(255)
+                .HasColumnName("stockid");
+            entity.Property(e => e.TypeS).HasMaxLength(255);
+            entity.Property(e => e.Typed)
+                .HasMaxLength(255)
+                .HasColumnName("typed");
+            entity.Property(e => e.Typed1)
+                .HasMaxLength(255)
+                .HasColumnName("typed1");
+            entity.Property(e => e.Typedesc)
+                .HasMaxLength(255)
+                .HasColumnName("typedesc");
+            entity.Property(e => e.Typee)
+                .HasMaxLength(255)
+                .HasColumnName("typee");
+            entity.Property(e => e.Typeg)
+                .HasMaxLength(255)
+                .HasColumnName("typeg");
+            entity.Property(e => e.Typejob)
+                .HasMaxLength(255)
+                .HasColumnName("typejob");
+            entity.Property(e => e.Typem)
+                .HasMaxLength(255)
+                .HasColumnName("typem");
+            entity.Property(e => e.Typep)
+                .HasMaxLength(255)
+                .HasColumnName("typep");
+            entity.Property(e => e.Typer)
+                .HasMaxLength(255)
+                .HasColumnName("typer");
+            entity.Property(e => e.Typesil)
+                .HasMaxLength(255)
+                .HasColumnName("typesil");
+            entity.Property(e => e.Unit)
+                .HasMaxLength(255)
+                .HasColumnName("unit");
+            entity.Property(e => e.Unit1)
+                .HasMaxLength(255)
+                .HasColumnName("unit1");
+            entity.Property(e => e.Unit2)
+                .HasMaxLength(255)
+                .HasColumnName("unit2");
+            entity.Property(e => e.Unit3)
+                .HasMaxLength(255)
+                .HasColumnName("unit3");
+            entity.Property(e => e.Unit4)
+                .HasMaxLength(255)
+                .HasColumnName("unit4");
+            entity.Property(e => e.Unit5)
+                .HasMaxLength(255)
+                .HasColumnName("unit5");
+            entity.Property(e => e.Unit6)
+                .HasMaxLength(255)
+                .HasColumnName("unit6");
+            entity.Property(e => e.Unitd1)
+                .HasMaxLength(255)
+                .HasColumnName("unitd1");
+            entity.Property(e => e.Unitsil)
+                .HasMaxLength(255)
+                .HasColumnName("unitsil");
+            entity.Property(e => e.Username)
+                .HasMaxLength(255)
+                .HasColumnName("username");
+            entity.Property(e => e.Wd).HasColumnName("wd");
+            entity.Property(e => e.Wd1).HasColumnName("wd1");
+            entity.Property(e => e.We).HasColumnName("we");
+            entity.Property(e => e.Wg).HasColumnName("wg");
+            entity.Property(e => e.Whno)
+                .HasMaxLength(255)
+                .HasColumnName("whno");
+            entity.Property(e => e.Wm).HasColumnName("wm");
+            entity.Property(e => e.Wr).HasColumnName("wr");
+            entity.Property(e => e.Ws).HasColumnName("ws");
+            entity.Property(e => e.Wsil)
+                .HasMaxLength(255)
+                .HasColumnName("wsil");
+        });
 
         modelBuilder.Entity<TbmAccount>(entity =>
         {
@@ -1727,6 +1897,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.PoNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("po_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
+            entity.Property(e => e.ProductCost).HasColumnName("product_cost");
             entity.Property(e => e.ProductNameEn)
                 .HasColumnType("character varying")
                 .HasColumnName("product_name_en");
@@ -1786,6 +1960,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.WoNumber)
                 .HasComment("ลำดับใบจ่าย-รับงาน")
                 .HasColumnName("wo_number");
+            entity.Property(e => e.WoOrigin)
+                .HasColumnType("character varying")
+                .HasColumnName("wo_origin");
         });
 
         modelBuilder.Entity<TbtStockProductImage>(entity =>
@@ -1860,6 +2037,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.TypeName)
                 .HasColumnType("character varying")
                 .HasColumnName("type_name");
+            entity.Property(e => e.TypeOrigin)
+                .HasColumnType("character varying")
+                .HasColumnName("type_origin");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");

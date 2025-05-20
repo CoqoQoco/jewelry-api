@@ -2780,7 +2780,12 @@ namespace Jewelry.Service.ProductionPlan
             }
             if (plan.Status == ProductionPlanStatus.Completed)
             {
-                throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+                var checkPermission = GetPermissionLevel("edit_user");
+
+                if (!checkPermission)
+                {
+                    throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+                }
             }
             if (plan.Status == ProductionPlanStatus.Melted)
             {

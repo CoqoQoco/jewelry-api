@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace jewelry.Model.Stock.Product.List
+namespace jewelry.Model.Stock.Product.Get
 {
     public class Response
     {
@@ -65,6 +65,8 @@ namespace jewelry.Model.Stock.Product.List
         public string? Region { get; set; }
         public decimal? Price { get; set; }
 
-      
+        public string TextGold => $"{TypeCode} {Weight} {WeightUnit}";
+        public string TextGem => $"{Qty}{TypeCode} {Weight} {WeightUnit}";
+        public string TextDiamond => $"{Qty}{Type} {Weight} {WeightUnit} {TypeCode}";
     }
 }

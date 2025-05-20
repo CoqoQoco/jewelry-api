@@ -86,5 +86,11 @@ public partial class TbtStockProduct
     /// </summary>
     public string? StudEarring { get; set; }
 
+    public decimal? ProductCost { get; set; }
+
+    public string? ProductCode { get; set; }
+
+    public string? WoOrigin { get; set; }
+
     public virtual ICollection<TbtStockProductMaterial> TbtStockProductMaterial { get; set; } = new List<TbtStockProductMaterial>();
 }

@@ -12,6 +12,7 @@ using NPOI.SS.Formula.Atp;
 using NPOI.Util;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -141,6 +142,81 @@ namespace Jewelry.Service.Stock.Product
 
             return response;
         }
+        public jewelry.Model.Stock.Product.Get.Response Get(jewelry.Model.Stock.Product.Get.Request request)
+        {
+            if (string.IsNullOrEmpty(request.StockNumber) && string.IsNullOrEmpty(request.ProductNumber))
+            { 
+                throw new HandleException("StockNumber or ProductNumber is Required");
+            }
+
+            var query = (from item in _jewelryContext.TbtStockProduct
+                        .Include(x => x.TbtStockProductMaterial)
+                         where item.Status == "Available"
+                         select item);
+
+            if (!string.IsNullOrEmpty(request.StockNumber))
+            {
+                query = query.Where(x => x.StockNumber == request.StockNumber);
+            }
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber == request.ProductNumber);
+            }
+
+            if (!query.Any())
+            { 
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            var stock = query.FirstOrDefault();
+            var response = new jewelry.Model.Stock.Product.Get.Response()
+            {
+                StockNumber = stock.StockNumber,
+                ReceiptNumber = stock.ReceiptNumber,
+                ReceiptType = stock.ProductionType,
+                ReceiptDate = stock.ReceiptDate,
+                ProductNumber = stock.ProductNumber,
+                ProductNameTh = stock.ProductNameTh,
+                ProductNameEn = stock.ProductNameEn,
+                ProductType = stock.ProductType,
+                ProductTypeName = stock.ProductTypeName,
+                ProductPrice = stock.ProductPrice,
+                Wo = stock.Wo,
+                WoNumber = stock.WoNumber,
+                WoText = $"{stock.Wo}{stock.WoNumber.ToString()}",
+                ProductionDate = stock.CreateDate,
+                ProductionTypeSize = stock.ProductionTypeSize,
+                Mold = stock.MoldDesign ?? stock.Mold,
+                ImageName = stock.ImageName,
+                ImagePath = stock.ImagePath,
+                Qty = stock.Qty,
+                Location = stock.Location,
+                Size = stock.Size,
+                Remark = stock.Remark,
+                CreateBy = stock.CreateBy,
+                CreateDate = stock.CreateDate,
+                UpdateBy = stock.UpdateBy,
+                UpdateDate = stock.UpdateDate,
+                Materials = (from material in stock.TbtStockProductMaterial
+                             select new jewelry.Model.Stock.Product.Get.Material()
+                             {
+                                 Type = material.Type,
+                                 TypeName = material.TypeName,
+                                 TypeCode = material.TypeCode,
+                                 TypeBarcode = material.TypeBarcode,
+                                 Qty = material.Qty,
+                                 QtyUnit = material.QtyUnit,
+                                 Weight = material.Weight,
+                                 WeightUnit = material.WeightUnit,
+                                 Size = material.Size,
+                                 Region = material.Region,
+                                 Price = material.Price
+                             }).ToList()
+            };
+
+            return response;
+        }
+        
 
         public async Task<string> Update(jewelry.Model.Stock.Product.Update.Request request)
         {

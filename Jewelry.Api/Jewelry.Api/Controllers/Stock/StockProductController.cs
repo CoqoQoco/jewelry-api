@@ -53,6 +53,26 @@ namespace Jewelry.Api.Controllers.Stock
         }
 
 
+        [Route("Get")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.Get.Response>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Get([FromBody] jewelry.Model.Stock.Product.Get.Request request)
+        {
+            try
+            {
+                var response = _service.Get(request);
+                return Ok(response);
+
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
         [Route("Update")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]

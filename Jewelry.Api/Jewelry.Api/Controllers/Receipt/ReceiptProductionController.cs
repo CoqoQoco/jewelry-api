@@ -128,5 +128,26 @@ namespace Jewelry.Api.Controllers.Receipt
             }
         }
 
+
+        [Route("Import")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Import()
+        {
+            try
+            {
+
+
+                var response = await _receiptProduction.ImportProduct();
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
     }
 }
