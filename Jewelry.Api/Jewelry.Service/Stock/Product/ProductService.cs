@@ -3,6 +3,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Jewelry.Service.ProductionPlan;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -30,13 +31,16 @@ namespace Jewelry.Service.Stock.Product
 
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
+        private readonly IProductionPlanService _productionPlanService;
         public ProductService(JewelryContext JewelryContext, IHttpContextAccessor httpContextAccessor,
             IHostEnvironment HostingEnvironment,
+            IProductionPlanService ProductionPlanService,
             IRunningNumber runningNumberService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
             _runningNumberService = runningNumberService;
+            _productionPlanService = ProductionPlanService;
         }
 
         public IQueryable<jewelry.Model.Stock.Product.List.Response> List(jewelry.Model.Stock.Product.List.Search request)
@@ -142,7 +146,7 @@ namespace Jewelry.Service.Stock.Product
 
             return response;
         }
-        public jewelry.Model.Stock.Product.Get.Response Get(jewelry.Model.Stock.Product.Get.Request request)
+        public async Task<jewelry.Model.Stock.Product.Get.Response> Get(jewelry.Model.Stock.Product.Get.Request request)
         {
             if (string.IsNullOrEmpty(request.StockNumber) && string.IsNullOrEmpty(request.ProductNumber))
             { 
@@ -213,6 +217,40 @@ namespace Jewelry.Service.Stock.Product
                                  Price = material.Price
                              }).ToList()
             };
+
+
+            if (!string.IsNullOrEmpty(response.Wo) && response.WoNumber.HasValue)
+            {
+
+                var plan = (from item in _jewelryContext.TbtProductionPlan
+                             .Include(x => x.TbtProductionPlanPrice)
+                             where item.Wo == response.Wo
+                             && item.WoNumber == response.WoNumber.Value
+                             select item).FirstOrDefault();
+            
+
+                if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
+                { 
+                    response.PriceTransactions = plan.TbtProductionPlanPrice.Select(x => new jewelry.Model.Stock.Product.Get.PriceTransaction()
+                    {
+                        No = x.No,
+                        Name = x.Name,
+                        NameDescription = x.NameDescription,
+                        NameGroup = x.NameGroup,
+
+                        Date = x.Date,
+
+                        Qty = x.Qty,
+                        QtyPrice = x.QtyPrice,
+                        QtyWeight = x.QtyWeight,
+                        QtyWeightPrice = x.QtyWeightPrice,
+
+                        TotalPrice = x.TotalPrice,
+                    }).ToList();
+
+                    response.PlanQty = plan.ProductQty;
+                }
+            }
 
             return response;
         }

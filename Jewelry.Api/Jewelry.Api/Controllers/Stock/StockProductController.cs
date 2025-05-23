@@ -62,7 +62,7 @@ namespace Jewelry.Api.Controllers.Stock
         {
             try
             {
-                var response = _service.Get(request);
+                var response = await _service.Get(request);
                 return Ok(response);
 
             }
