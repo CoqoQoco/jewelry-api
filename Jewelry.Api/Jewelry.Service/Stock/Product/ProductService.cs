@@ -231,6 +231,8 @@ namespace Jewelry.Service.Stock.Product
 
                 if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
                 { 
+                    response.PlanQty = plan.ProductQty;
+
                     response.PriceTransactions = plan.TbtProductionPlanPrice.Select(x => new jewelry.Model.Stock.Product.Get.PriceTransaction()
                     {
                         No = x.No,
@@ -240,15 +242,14 @@ namespace Jewelry.Service.Stock.Product
 
                         Date = x.Date,
 
-                        Qty = x.Qty,
-                        QtyPrice = x.QtyPrice,
-                        QtyWeight = x.QtyWeight,
-                        QtyWeightPrice = x.QtyWeightPrice,
+                        Qty = x.Qty / plan.ProductQty,
+                        QtyPrice = x.QtyPrice / plan.ProductQty,
+                        QtyWeight = x.QtyWeight / plan.ProductQty,
+                        QtyWeightPrice = x.QtyWeightPrice / plan.ProductQty,
 
-                        TotalPrice = x.TotalPrice,
+                        TotalPrice = x.TotalPrice / plan.ProductQty,
                     }).ToList();
 
-                    response.PlanQty = plan.ProductQty;
                 }
             }
 
