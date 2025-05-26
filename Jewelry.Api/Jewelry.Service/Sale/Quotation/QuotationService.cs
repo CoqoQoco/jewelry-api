@@ -39,7 +39,7 @@ namespace Jewelry.Service.Sale.Quotation
             }
            
             var quotation = (from item in _jewelryContext.TbtSaleQuotation
-                             where  request.Number == request.Number.ToUpper()
+                             where item.Number == request.Number.ToUpper()
                              select item).FirstOrDefault();
 
             if (quotation == null)
@@ -58,7 +58,7 @@ namespace Jewelry.Service.Sale.Quotation
                     CurrencyRate = request.CurrencyRate,
 
                     MarkUp = request.MarkUp,
-                    Discount = request.Dicount,
+                    Discount = request.Discount,
 
                     Remark = request.Remark,
                     Data = request.Data,
@@ -66,6 +66,7 @@ namespace Jewelry.Service.Sale.Quotation
                     CreateDate = DateTime.UtcNow,
                     CreateBy = CurrentUsername,
 
+                    Freight = request.Freight,
                     Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow
                 };
 
@@ -84,12 +85,17 @@ namespace Jewelry.Service.Sale.Quotation
             quotation.CurrencyRate = request.CurrencyRate;
 
             quotation.MarkUp = request.MarkUp;
-            quotation.Discount = request.Dicount;
+            quotation.Discount = request.Discount;
 
             quotation.Remark = request.Remark;
+            quotation.Freight = request.Freight;
 
             quotation.Data = request.Data;
             quotation.Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow;
+
+
+            _jewelryContext.TbtSaleQuotation.Update(quotation);
+            await _jewelryContext.SaveChangesAsync();
 
             return "success";
         }
@@ -122,11 +128,12 @@ namespace Jewelry.Service.Sale.Quotation
                 Currency = quotation.Currency,
                 CurrencyRate = quotation.CurrencyRate ?? 0 ,
                 MarkUp = quotation.MarkUp ?? 0,
-                Dicount = quotation.Discount ?? 0,
+                Discount = quotation.Discount ?? 0,
 
                 Remark = quotation.Remark,
                 Data = quotation.Data,
 
+                Freight = quotation.Freight.HasValue ? quotation.Freight.Value : null,
                 Date = quotation.Date.HasValue ? quotation.Date.Value : null
             };
         }

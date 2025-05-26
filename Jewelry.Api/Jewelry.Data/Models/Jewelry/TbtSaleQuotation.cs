@@ -38,4 +38,6 @@ public partial class TbtSaleQuotation
     public string? Remark { get; set; }
 
     public string? CustomerAddress { get; set; }
+
+    public decimal? Freight { get; set; }
 }

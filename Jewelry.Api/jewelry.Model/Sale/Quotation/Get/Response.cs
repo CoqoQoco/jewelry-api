@@ -20,11 +20,12 @@ namespace jewelry.Model.Sale.Quotation.Get
         public decimal CurrencyRate { get; set; }
 
         public decimal MarkUp { get; set; }
-        public decimal Dicount { get; set; }
+        public decimal Discount { get; set; }
 
         public string Remark { get; set; }
         public string Data { get; set; }
 
+        public decimal? Freight { get; set; }
         public DateTimeOffset? Date { get; set; }
     }
 }

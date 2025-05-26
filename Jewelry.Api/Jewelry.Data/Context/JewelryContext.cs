@@ -1734,6 +1734,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("data");
             entity.Property(e => e.Date).HasColumnName("date");
             entity.Property(e => e.Discount).HasColumnName("discount");
+            entity.Property(e => e.Freight).HasColumnName("freight");
             entity.Property(e => e.MarkUp).HasColumnName("mark_up");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
