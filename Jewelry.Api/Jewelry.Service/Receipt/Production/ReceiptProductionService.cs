@@ -703,7 +703,7 @@ namespace Jewelry.Service.Receipt.Production
                     ProductNameEn = item.Productname ?? "DK",
 
                     ImageName = item.NoCode,
-                    ImagePath = $"{item.NoCode}.jpeg",
+                    ImagePath = $"{item.NoCode}.jpg",
 
                     //Wo = plan.Wo,
                     //WoNumber = plan.WoNumber,
