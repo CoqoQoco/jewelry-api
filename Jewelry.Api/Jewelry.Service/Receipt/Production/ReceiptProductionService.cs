@@ -641,7 +641,7 @@ namespace Jewelry.Service.Receipt.Production
         {
             var oldProduct = (from item in _jewelryContext.StockFromConvert
                               where item.Typejob != "convert"
-                              select item).Take(10).ToList();
+                              select item).Take(10000).ToList();
 
             var actualProduct = (from item in _jewelryContext.TbtStockProduct
                                  select item).ToList();
