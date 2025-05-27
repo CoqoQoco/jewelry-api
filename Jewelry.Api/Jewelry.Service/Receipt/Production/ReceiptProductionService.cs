@@ -669,10 +669,14 @@ namespace Jewelry.Service.Receipt.Production
 
             foreach (var item in oldProduct)
             {
-                var match = actualProduct.Where(x => x.ProductCode == item.Noproduct).FirstOrDefault();
-
                 item.Typejob = "convert";
 
+                if (string.IsNullOrEmpty(item.NoCode))
+                {
+                    continue;
+                }
+
+                var match = actualProduct.Where(x => x.ProductCode == item.Noproduct).FirstOrDefault();
                 if (match != null)
                 {
                     continue;
