@@ -641,7 +641,7 @@ namespace Jewelry.Service.Receipt.Production
         {
             var oldProduct = (from item in _jewelryContext.StockFromConvert
                               where item.Typejob != "convert"
-                              select item).Take(10000).ToList();
+                              select item).Take(1000).ToList();
 
             var actualProduct = (from item in _jewelryContext.TbtStockProduct
                                  select item).ToList();
@@ -670,6 +670,9 @@ namespace Jewelry.Service.Receipt.Production
             foreach (var item in oldProduct)
             {
                 var match = actualProduct.Where(x => x.ProductCode == item.Noproduct).FirstOrDefault();
+
+                item.Typejob = "convert";
+
                 if (match != null)
                 {
                     continue;
@@ -851,7 +854,7 @@ namespace Jewelry.Service.Receipt.Production
             if (string.IsNullOrEmpty(check))
             {
                 // ถ้าไม่มีข้อมูลประเภทสินค้า ให้ใช้ค่าเริ่มต้น (DK)
-                return master.FirstOrDefault(x => x.Code == "DK") ?? master.FirstOrDefault();
+                return master.FirstOrDefault(x => x.Code == "N/A") ?? master.FirstOrDefault();
             }
 
             var checkText = check.ToUpper().Trim();
@@ -910,7 +913,7 @@ namespace Jewelry.Service.Receipt.Production
             }
 
             // หากยังไม่พบ ให้ใช้ค่าเริ่มต้น
-            return master.FirstOrDefault(x => x.Code == "DK") ?? master.FirstOrDefault();
+            return master.FirstOrDefault(x => x.Code == "N/A") ?? master.FirstOrDefault();
         }
         private DateTime GetProductionDate(string productionDateCode)
         {
