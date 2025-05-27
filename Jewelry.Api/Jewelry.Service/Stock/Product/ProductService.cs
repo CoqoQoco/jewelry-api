@@ -256,12 +256,12 @@ namespace Jewelry.Service.Stock.Product
 
                         Date = x.Date,
 
-                        Qty = x.Qty / plan.ProductQty,
-                        QtyPrice = x.QtyPrice / plan.ProductQty,
-                        QtyWeight = x.QtyWeight / plan.ProductQty,
-                        QtyWeightPrice = x.QtyWeightPrice / plan.ProductQty,
+                        Qty = Math.Round(x.Qty / plan.ProductQty, 2),
+                        QtyPrice = Math.Round(x.QtyPrice / plan.ProductQty, 2),
+                        QtyWeight = Math.Round(x.QtyWeight / plan.ProductQty, 2),
+                        QtyWeightPrice = Math.Round(x.QtyWeightPrice / plan.ProductQty, 2),
 
-                        TotalPrice = x.TotalPrice / plan.ProductQty,
+                        TotalPrice = Math.Round(x.TotalPrice / plan.ProductQty, 2),
                     }).ToList();
 
                 }
