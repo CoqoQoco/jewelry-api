@@ -257,9 +257,9 @@ namespace Jewelry.Service.Stock.Product
                         Date = x.Date,
 
                         Qty = Math.Round(x.Qty / plan.ProductQty, 2),
-                        QtyPrice = nameGroupMatch.Contains(x.NameGroup) ? x.QtyPrice : Math.Round(x.QtyPrice / plan.ProductQty, 2),
+                        QtyPrice = Math.Round(x.QtyPrice, 2),
                         QtyWeight = Math.Round(x.QtyWeight / plan.ProductQty, 2),
-                        QtyWeightPrice = nameGroupMatch.Contains(x.NameGroup) ? x.QtyWeightPrice : Math.Round(x.QtyWeightPrice / plan.ProductQty, 2),
+                        QtyWeightPrice = Math.Round(x.QtyWeightPrice, 2),
 
                         //TotalPrice = Math.Round(x.TotalPrice / plan.ProductQty, 2),
                     }).ToList();
