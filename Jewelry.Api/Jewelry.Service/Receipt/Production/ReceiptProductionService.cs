@@ -639,9 +639,19 @@ namespace Jewelry.Service.Receipt.Production
 
         public async Task<string> ImportProduct()
         {
-            var oldProduct = (from item in _jewelryContext.StockFromConvert
-                              where item.Typejob != "convert"
-                              select item).Take(1000).ToList();
+            //var oldProduct = (from item in _jewelryContext.StockFromConvert
+            //                  where item.Typejob != "convert"
+            //                  select item).Take(1000).ToList();
+
+            var oldProduct = (from sfc in _jewelryContext.StockFromConvert
+                              join sp in _jewelryContext.TbtStockProduct
+                              on sfc.NoCode equals sp.ProductCode into joined
+                              from sp in joined.DefaultIfEmpty()
+                              where sp == null
+                              select sfc).Take(1000).ToList();
+
+
+
 
             var actualProduct = (from item in _jewelryContext.TbtStockProduct
                                  select item).ToList();
