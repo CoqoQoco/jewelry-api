@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -81,12 +82,14 @@ namespace jewelry.Model.Stock.Product.Get
         public string NameDescription { get; set; }
         public string NameGroup { get; set; }
         public DateTimeOffset? Date { get; set; }
+
         public decimal Qty { get; set; }
         public decimal QtyPrice { get; set; }
         public decimal QtyWeight { get; set; }
         public decimal QtyWeightPrice { get; set; }
-        public decimal TotalPrice { get; set; }
+        public decimal TotalPrice => Math.Round((Qty * QtyPrice) + (QtyWeight * QtyWeightPrice), 2);
 
-        
+
+
     }
 }
