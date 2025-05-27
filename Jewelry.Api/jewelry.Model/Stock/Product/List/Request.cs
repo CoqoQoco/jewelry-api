@@ -17,6 +17,7 @@ namespace jewelry.Model.Stock.Product.List
         public string[]? ReceiptType { get; set; }
 
         public string? StockNumber { get; set; }
+        public string? StockNumberOrigin { get; set; }
         public string? Mold { get; set; }
 
         public string? ProductNumber { get; set; }

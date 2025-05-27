@@ -59,6 +59,10 @@ namespace Jewelry.Service.Stock.Product
             {
                 stock = stock.Where(x => x.StockNumber.Contains(request.StockNumber));
             }
+            if (!string.IsNullOrEmpty(request.StockNumberOrigin))
+            {
+                stock = stock.Where(x => x.ProductCode.Contains(request.StockNumberOrigin));
+            }
             if (!string.IsNullOrEmpty(request.Mold))
             {
                 stock = stock.Where(x => x.MoldDesign.Contains(request.Mold));
@@ -89,6 +93,7 @@ namespace Jewelry.Service.Stock.Product
                            select new jewelry.Model.Stock.Product.List.Response()
                            {
                                StockNumber = item.StockNumber,
+                               StockNumberOrigin = item.ProductCode,
                                Status = item.Status,
 
                                ReceiptNumber = item.ReceiptNumber,
@@ -148,9 +153,11 @@ namespace Jewelry.Service.Stock.Product
         }
         public async Task<jewelry.Model.Stock.Product.Get.Response> Get(jewelry.Model.Stock.Product.Get.Request request)
         {
-            if (string.IsNullOrEmpty(request.StockNumber) && string.IsNullOrEmpty(request.ProductNumber))
-            { 
-                throw new HandleException("StockNumber or ProductNumber is Required");
+            if (string.IsNullOrEmpty(request.StockNumber) 
+                && string.IsNullOrEmpty(request.ProductNumber) 
+                && string.IsNullOrEmpty(request.StockNumberOrigin))
+            {
+                throw new HandleException("StockNumber or ProductNumber or StockNumberOrigin is Required");
             }
 
             var query = (from item in _jewelryContext.TbtStockProduct
@@ -162,13 +169,17 @@ namespace Jewelry.Service.Stock.Product
             {
                 query = query.Where(x => x.StockNumber == request.StockNumber);
             }
+            if (!string.IsNullOrEmpty(request.StockNumberOrigin))
+            {
+                query = query.Where(x => x.ProductCode == request.StockNumberOrigin);
+            }
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
                 query = query.Where(x => x.ProductNumber == request.ProductNumber);
             }
 
             if (!query.Any())
-            { 
+            {
                 throw new HandleException(ErrorMessage.NotFound);
             }
 
@@ -176,9 +187,12 @@ namespace Jewelry.Service.Stock.Product
             var response = new jewelry.Model.Stock.Product.Get.Response()
             {
                 StockNumber = stock.StockNumber,
+                StockNumberOrigin = stock.ProductCode ?? stock.StockNumber,
+
                 ReceiptNumber = stock.ReceiptNumber,
                 ReceiptType = stock.ProductionType,
                 ReceiptDate = stock.ReceiptDate,
+
                 ProductNumber = stock.ProductNumber,
                 ProductNameTh = stock.ProductNameTh,
                 ProductNameEn = stock.ProductNameEn,
@@ -224,13 +238,13 @@ namespace Jewelry.Service.Stock.Product
 
                 var plan = (from item in _jewelryContext.TbtProductionPlan
                              .Include(x => x.TbtProductionPlanPrice)
-                             where item.Wo == response.Wo
-                             && item.WoNumber == response.WoNumber.Value
-                             select item).FirstOrDefault();
-            
+                            where item.Wo == response.Wo
+                            && item.WoNumber == response.WoNumber.Value
+                            select item).FirstOrDefault();
+
 
                 if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
-                { 
+                {
                     response.PlanQty = plan.ProductQty;
 
                     response.PriceTransactions = plan.TbtProductionPlanPrice.Select(x => new jewelry.Model.Stock.Product.Get.PriceTransaction()
@@ -255,7 +269,7 @@ namespace Jewelry.Service.Stock.Product
 
             return response;
         }
-        
+
 
         public async Task<string> Update(jewelry.Model.Stock.Product.Update.Request request)
         {

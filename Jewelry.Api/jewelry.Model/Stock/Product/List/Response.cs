@@ -9,6 +9,8 @@ namespace jewelry.Model.Stock.Product.List
     public class Response
     {
         public string StockNumber { get; set; }
+        public string? StockNumberOrigin { get; set; }
+
         public string ReceiptNumber { get; set; }
         public string ReceiptType { get; set; }
         public DateTime ReceiptDate { get; set; }

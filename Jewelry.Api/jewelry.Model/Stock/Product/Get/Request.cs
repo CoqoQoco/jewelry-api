@@ -9,6 +9,7 @@ namespace jewelry.Model.Stock.Product.Get
     public class Request
     {
         public string? StockNumber { get; set; }
+        public string? StockNumberOrigin { get; set; }
         public string? ProductNumber { get; set; }
     }
 }
