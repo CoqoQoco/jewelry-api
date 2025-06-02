@@ -107,7 +107,7 @@ namespace Jewelry.Service.Sale.Quotation
                 throw new HandleException("Quotation Number is Required.");
             }
             var quotation = (from item in _jewelryContext.TbtSaleQuotation
-                             where request.Number == request.Number.ToUpper()
+                             where item.Number == request.Number.ToUpper()
                              select item).FirstOrDefault();
 
             if (quotation == null)

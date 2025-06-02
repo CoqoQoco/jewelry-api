@@ -35,7 +35,7 @@ namespace Jewelry.Service.Stock.ProductImage
         {
             var year = DateTime.UtcNow.Year;
             var name = request.Name.ToUpper();
-            var namePath = $"{name}-{year}.png";
+            var namePath = $"{name}.png";
 
             var image = (from item in _jewelryContext.TbtStockProductImage
                          where item.Name == name 
