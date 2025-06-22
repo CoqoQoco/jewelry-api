@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
+using Kendo.DynamicLinqCore;
 
 namespace Jewelry.Api.Controllers.Production
 {
@@ -80,6 +81,24 @@ namespace Jewelry.Api.Controllers.Production
             catch (HandleException ex)
             {
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("List")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(IQueryable<jewelry.Model.Production.PlanBOM.List.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListBOM([FromBody] jewelry.Model.Production.PlanBOM.List.Request request)
+        {
+            try
+            {
+                var bomList = _IProductionBomService.ListBom(request.Search ?? new jewelry.Model.Production.PlanBOM.List.Criteria());
+                return bomList.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
     }

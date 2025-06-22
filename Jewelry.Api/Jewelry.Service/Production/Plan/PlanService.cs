@@ -417,6 +417,7 @@ namespace Jewelry.Service.Production.Plan
                 data.newStockReceiptItem.AddRange(newStockReceiptItem);
 
                 plan.IsReceipt = true;
+                plan.CompletedDate = data.DateNow;
                 data.ReceiptRunning = receiptRunning;
             }
 

@@ -1146,6 +1146,9 @@ public partial class JewelryContext : DbContext
             entity.ToTable("tbt_production_plan");
 
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CompletedDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("completed_date");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");

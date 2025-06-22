@@ -4,6 +4,7 @@ using jewelry.Model.Mold.PlanList;
 using jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection;
 using jewelry.Model.Receipt.Production.PlanGet;
 using Jewelry.Data.Context;
+using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
@@ -279,6 +280,114 @@ namespace Jewelry.Service.Production.PlanBOM
             {
                 throw new HandleException(ex.Message);
             }
+        }
+
+
+        public IQueryable<jewelry.Model.Production.PlanBOM.List.Response> ListBom(jewelry.Model.Production.PlanBOM.List.Criteria request)
+        {
+            var goldSpecificName = "น้ำหนักทองรวมหลังหักเพชรพลอย";
+
+            var bomQuery = from bom in _jewelryContext.TbtProductionPlanPrice
+                            .Include(x => x.Production)
+                            .ThenInclude(x => x.TbtProductionPlanStatusHeader)
+                            .Include(x => x.Production.CustomerTypeNavigation)
+                            .Include(x => x.Production.ProductTypeNavigation)
+                           where bom.Production.IsActive == true
+                           && bom.Production.Status == ProductionPlanStatus.Completed
+                           && bom.Production.CompletedDate >= request.Start.StartOfDayUtc()
+                           && bom.Production.CompletedDate <= request.End.EndOfDayUtc()
+                           //&& ((bom.NameGroup == "Gold" && bom.Name == goldSpecificName) || (bom.NameGroup == "Gem"))
+                           && (bom.NameGroup == "Gold"  || bom.NameGroup == "Gem")
+                           select bom;
+
+            // Apply text filters
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                bomQuery = bomQuery.Where(x => x.Name.Contains(request.Text) 
+                    || x.NameDescription.Contains(request.Text)
+                    || x.Production.ProductNumber.Contains(request.Text));
+            }
+
+            if (!string.IsNullOrEmpty(request.WoText))
+            {
+                bomQuery = bomQuery.Where(x => x.Production.WoText.Contains(request.WoText));
+            }
+
+
+            // Apply customer filters
+            if (request.CustomerType != null && request.CustomerType.Length > 0)
+            {
+                bomQuery = bomQuery.Where(x => request.CustomerType.Contains(x.Production.CustomerType));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                bomQuery = bomQuery.Where(x => x.Production.CustomerTypeNavigation.Code.Contains(request.CustomerCode));
+            }
+
+            // Apply gold filters
+            if (request.Gold != null && request.Gold.Length > 0)
+            {
+                bomQuery = bomQuery.Where(x => request.Gold.Contains(x.Production.Type));
+            }
+
+            if (request.GoldSize != null && request.GoldSize.Length > 0)
+            {
+                bomQuery = bomQuery.Where(x => request.GoldSize.Contains(x.Production.TypeSize));
+            }
+
+            // Apply mold filter
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                bomQuery = bomQuery.Where(x => x.Production.Mold.Contains(request.Mold));
+            }
+
+            // Apply product filters
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                bomQuery = bomQuery.Where(x => x.Production.ProductNumber.Contains(request.ProductNumber));
+            }
+
+            if (request.ProductType != null && request.ProductType.Length > 0)
+            {
+                bomQuery = bomQuery.Where(x => request.ProductType.Contains(x.Production.ProductType));
+            }
+
+            bomQuery = bomQuery.Where(x => (x.NameGroup == "Gold" && x.Name.Contains("ทอง") || x.NameGroup == "Gem"));
+
+            return bomQuery.Select(b => new jewelry.Model.Production.PlanBOM.List.Response
+            {
+                Name = b.Name,
+                NameDescription = b.NameDescription,
+                NameGroup = b.NameGroup,
+                
+                Date = b.Production.CompletedDate,
+                
+                Qty = b.Qty,
+                QtyPrice = b.QtyPrice,
+                
+                QtyWeight = b.QtyWeight,
+                QtyWeightPrice = b.QtyWeightPrice,
+
+                // Enhanced fields
+                ProductionPlanId = b.Production.Id,
+                Wo = b.Production.Wo,
+                WoNumber = b.Production.WoNumber,
+                WoText = b.Production.WoText,
+
+                CompletedDate = b.Production.CompletedDate,
+                ProductNumber = b.Production.ProductNumber,
+
+                CustomerCode = b.Production.CustomerTypeNavigation != null ? b.Production.CustomerTypeNavigation.Code : string.Empty,
+                CustomerName = b.Production.CustomerTypeNavigation != null ? b.Production.CustomerTypeNavigation.NameTh : string.Empty,
+
+                Gold = b.Production.Type,
+                GoldSize = b.Production.TypeSize,
+
+                Mold = b.Production.Mold,
+                ProductType = b.Production.ProductTypeNavigation.NameTh,
+
+            });
         }
     }
 }

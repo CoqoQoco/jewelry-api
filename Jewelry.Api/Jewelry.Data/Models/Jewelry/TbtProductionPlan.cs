@@ -67,6 +67,8 @@ public partial class TbtProductionPlan
 
     public bool IsReceipt { get; set; }
 
+    public DateTime? CompletedDate { get; set; }
+
     public virtual TbmCustomerType CustomerTypeNavigation { get; set; } = null!;
 
     public virtual TbmProductType ProductTypeNavigation { get; set; } = null!;
