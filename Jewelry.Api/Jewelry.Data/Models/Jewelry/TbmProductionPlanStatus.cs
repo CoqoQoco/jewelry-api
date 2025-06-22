@@ -13,6 +13,8 @@ public partial class TbmProductionPlanStatus
 
     public string? Description { get; set; }
 
+    public string? Reference { get; set; }
+
     public virtual ICollection<TbtProductionPlan> TbtProductionPlan { get; set; } = new List<TbtProductionPlan>();
 
     public virtual ICollection<TbtProductionPlanStatusHeader> TbtProductionPlanStatusHeader { get; set; } = new List<TbtProductionPlanStatusHeader>();

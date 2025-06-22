@@ -66,6 +66,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlan> TbtProductionPlan { get; set; }
 
+    public virtual DbSet<TbtProductionPlanBom> TbtProductionPlanBom { get; set; }
+
     public virtual DbSet<TbtProductionPlanCostGold> TbtProductionPlanCostGold { get; set; }
 
     public virtual DbSet<TbtProductionPlanCostGoldItem> TbtProductionPlanCostGoldItem { get; set; }
@@ -607,6 +609,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.NameTh)
                 .HasColumnType("character varying")
                 .HasColumnName("name_th");
+            entity.Property(e => e.Reference)
+                .HasColumnType("character varying")
+                .HasColumnName("reference");
         });
 
         modelBuilder.Entity<TbmUserRole>(entity =>
@@ -1221,6 +1226,65 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.Status)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_production_status_fk");
+        });
+
+        modelBuilder.Entity<TbtProductionPlanBom>(entity =>
+        {
+            entity.HasKey(e => new { e.Running, e.Wo, e.WoNumber, e.No }).HasName("tbt_production_plan_bom_pk");
+
+            entity.ToTable("tbt_production_plan_bom");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.Wo)
+                .HasColumnType("character varying")
+                .HasColumnName("wo");
+            entity.Property(e => e.WoNumber).HasColumnName("wo_number");
+            entity.Property(e => e.No)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("no");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.Date).HasColumnName("date");
+            entity.Property(e => e.DisplayName)
+                .HasColumnType("character varying")
+                .HasColumnName("display_name");
+            entity.Property(e => e.MatchCode)
+                .HasColumnType("character varying")
+                .HasColumnName("match_code");
+            entity.Property(e => e.MatchName)
+                .HasColumnType("character varying")
+                .HasColumnName("match_name");
+            entity.Property(e => e.OriginCode)
+                .HasColumnType("character varying")
+                .HasColumnName("origin_code");
+            entity.Property(e => e.OriginName)
+                .HasColumnType("character varying")
+                .HasColumnName("origin_name");
+            entity.Property(e => e.Price).HasColumnName("price");
+            entity.Property(e => e.ProductionId).HasColumnName("production_id");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.Type)
+                .HasColumnType("character varying")
+                .HasColumnName("type");
+            entity.Property(e => e.Unit)
+                .HasColumnType("character varying")
+                .HasColumnName("unit");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.WoText)
+                .HasColumnType("character varying")
+                .HasColumnName("wo_text");
+
+            entity.HasOne(d => d.Production).WithMany(p => p.TbtProductionPlanBom)
+                .HasForeignKey(d => d.ProductionId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_production_plan_bom_fk");
         });
 
         modelBuilder.Entity<TbtProductionPlanCostGold>(entity =>

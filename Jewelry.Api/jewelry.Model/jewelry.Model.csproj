@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Production\PlanBOM\Get\" />
     <Folder Include="Production\Plan\Create\" />
     <Folder Include="Production\Plan\Update\" />
   </ItemGroup>

@@ -362,8 +362,8 @@ namespace Jewelry.Service.ProductionPlan
                          //.Include(x => x.TbtProductionPlanImage)
                          //.Include(x => x.TbtProductionPlanMaterial)
                          .Include(x => x.StatusNavigation)
-                         .Include(x => x.TbtProductionPlanStatusHeader
-                         .Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
+                         .Include(x => x.TbtProductionPlanStatusHeader.Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
+                         .Include(x => x.TbtProductionPlanPrice)
                          .Include(o => o.ProductTypeNavigation)
                          .Include(o => o.CustomerTypeNavigation)
 
@@ -375,6 +375,8 @@ namespace Jewelry.Service.ProductionPlan
 
                          where item.IsActive == true
                          let currentStatus = item.TbtProductionPlanStatusHeader.Where(x => x.IsActive == true && x.Status == item.Status).FirstOrDefault()
+                         //let hasPrice = item.TbtProductionPlanTransferStatus.Any(x => x.TargetStatus == ProductionPlanStatus.Price)
+
                          select new ProductionPlanTrackingResponse()
                          {
                              Id = item.Id,
@@ -386,7 +388,7 @@ namespace Jewelry.Service.ProductionPlan
                              MoldSub = m != null && !string.IsNullOrEmpty(m.ImageDraft1) ? $"{item.Mold}-Sub" : string.Empty,
 
                              Status = item.Status,
-                             StatusName = item.StatusNavigation.NameTh,
+                             StatusName = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false ? item.StatusNavigation.Reference : item.StatusNavigation.NameTh,
 
                              ProductNumber = item.ProductNumber,
                              ProductQty = item.ProductQty,
@@ -403,7 +405,9 @@ namespace Jewelry.Service.ProductionPlan
                              LastUpdateStatus = currentStatus != null
                                                 ? currentStatus.UpdateDate
                                                 : item.UpdateDate,
+
                              IsOverPlan = item.RequestDate < DateTime.UtcNow && !succesStatus.Contains(item.Status), // ประเมินราคา
+                             IsSuccessWithoutCost = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false, 
 
                              ProductType = item.ProductType,
                              ProductTypeName = item.ProductTypeNavigation.NameTh,
@@ -658,7 +662,10 @@ namespace Jewelry.Service.ProductionPlan
 
                 IsActive = plan.item.IsActive,
                 Status = plan.item.Status,
-                StatusName = plan.item.StatusNavigation.NameTh,
+                StatusName = plan.item.Status == ProductionPlanStatus.Completed 
+                                                 && plan.item.TbtProductionPlanPrice.Any() == false 
+                                                 ? plan.item.StatusNavigation.Reference 
+                                                 : plan.item.StatusNavigation.NameTh,
                 Remark = plan.item.Remark,
 
                 Gold = !string.IsNullOrEmpty(plan.item.Type)  ? plan.item.Type.Trim() : string.Empty,
@@ -2660,10 +2667,6 @@ namespace Jewelry.Service.ProductionPlan
 
                                       //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
                                   join gem in _jewelryContext.TbtStockGem on item.GemCode equals gem.Code
-
-                                  where item.Header.ProductionPlan.Wo == wo
-
-
                                   where item.Header.ProductionPlan.Wo == wo
                                   && item.Header.ProductionPlan.WoNumber == woNumber
                                   && item.IsActive == true
@@ -2863,6 +2866,7 @@ namespace Jewelry.Service.ProductionPlan
 
             return "success";
         }
+      
 
         #endregion
 

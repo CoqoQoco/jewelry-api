@@ -47,6 +47,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanTracking
         public string? GoldSize { get; set; }
 
         public bool IsOverPlan { get; set; }
+        public bool IsSuccessWithoutCost { get; set; }
+
+
         public DateTime? LastUpdateStatus { get; set; }
     }
 }

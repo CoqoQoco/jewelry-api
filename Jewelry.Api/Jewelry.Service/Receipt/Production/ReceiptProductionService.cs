@@ -218,7 +218,7 @@ namespace Jewelry.Service.Receipt.Production
 
 
             //have draft
-            if (!string.IsNullOrEmpty(query.item.JsonDraft))
+            if (!string.IsNullOrEmpty(query.item.JsonDraft) && query.item.JsonDraft != "{}")
             {
                 var draft = query.item.GetStocksFromJsonDraft();
                 response.Stocks.AddRange(draft);
@@ -252,6 +252,56 @@ namespace Jewelry.Service.Receipt.Production
                 {
                     throw new KeyNotFoundException($"{ErrorMessage.NotFound} --> receipt stocks");
                 }
+                var materials = new List<jewelry.Model.Receipt.Production.PlanGet.Material>();
+                if (query.plan != null && query.plan.TbtProductionPlanPrice != null && query.plan.TbtProductionPlanPrice.Any())
+                {
+                    var masterGoldSize = (from item in _jewelryContext.TbmGoldSize
+                                          select item).ToList();
+
+                    var masterGold = (from item in _jewelryContext.TbmGold
+                                      select item).ToList();
+
+                    var masterGem = (from item in _jewelryContext.TbmGem
+                                     select item).ToList();
+
+                    var transactions = query.plan.TbtProductionPlanPrice;
+                    var planQty = query.plan.ProductQty;
+                    foreach (var transaction in transactions)
+                    {
+                        var material = new jewelry.Model.Receipt.Production.PlanGet.Material
+                        {
+                            Type = transaction.NameGroup,
+                            TypeName = transaction.Name,
+                            TypeNameDescription = transaction.NameDescription,
+                            TypeBarcode = null,
+
+                            Qty = Math.Round(transaction.Qty / planQty, 2),
+                            QtyPrice = Math.Round(transaction.QtyPrice, 2),
+                            QtyWeight = Math.Round(transaction.QtyWeight / planQty, 2),
+                            QtyWeightPrice = Math.Round(transaction.QtyWeightPrice, 2),
+
+                            IsOrigin = true
+                        };
+
+                        if (material.Type == "Gem")
+                        {
+                            var matchGems = masterGem.FirstOrDefault(x => x.NameEn.Contains(material.TypeName));
+                            if (matchGems == null)
+                            {
+                                matchGems = masterGem.FirstOrDefault(x => material.TypeName.Contains(x.NameEn));
+                            }
+
+                            if (matchGems != null)
+                            {
+                                material.TypeCode = matchGems.Code;
+                                material.TypeCodeName = matchGems.NameEn;
+                            }
+                        }
+                        materials.Add(material);
+                    }
+
+                }
+
 
                 int running = 1;
                 foreach (var receipt in receiptStock)
@@ -281,8 +331,9 @@ namespace Jewelry.Service.Receipt.Production
 
                         MoldDesign = query.plan.Mold,
 
-                        Materials = new List<jewelry.Model.Receipt.Production.PlanGet.Material>()
+                        Materials = materials
                     });
+
                     running++;
                 }
 
@@ -444,12 +495,12 @@ namespace Jewelry.Service.Receipt.Production
                                     TypeCode = _newStocksMaterial.TypeCode,
                                     TypeBarcode = _newStocksMaterial.TypeBarcode,
 
-                                    Qty = _newStocksMaterial.Qty,
-                                    Weight = _newStocksMaterial.Weight,
+                                    //Qty = _newStocksMaterial.Qty,
+                                    //Weight = _newStocksMaterial.Weight,
 
-                                    Size = _newStocksMaterial.Size,
+                                    //Size = _newStocksMaterial.Size,
                                     Region = _newStocksMaterial.Region,
-                                    Price = _newStocksMaterial.Price
+                                    //Price = _newStocksMaterial.Price
                                 });
                             }
                         }
@@ -635,7 +686,6 @@ namespace Jewelry.Service.Receipt.Production
             return query;
 
         }
-
 
         public async Task<string> ImportProduct()
         {

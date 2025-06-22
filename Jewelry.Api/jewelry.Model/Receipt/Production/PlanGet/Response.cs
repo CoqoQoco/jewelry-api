@@ -82,19 +82,26 @@ namespace jewelry.Model.Receipt.Production.PlanGet
     }
     public class Material
     {
+
         public string? Type { get; set; }
         public string? TypeName { get; set; }
+        public string? TypeNameDescription { get; set; }
+
         public string? TypeCode { get; set; }
+        public string? TypeCodeName { get; set; }
         public string? TypeBarcode { get; set; }
 
-        public decimal? Qty { get; set; }
+        public decimal Qty { get; set; }
         public string? QtyUnit { get; set; }
-        public decimal? Weight { get; set; }
-        public string? WeightUnit { get; set; }
+        public decimal QtyPrice { get; set; }
 
-        public string? Size { get; set; }
+        public decimal QtyWeight { get; set; }
+        public string? QtyWeightUnit { get; set; }
+        public decimal QtyWeightPrice { get; set; }
+
+        //public string? Size { get; set; }
         public string? Region { get; set; }
-        public decimal? Price { get; set; }
+        public bool IsOrigin { get; set; } = false;
     }
 
     public class Gem
