@@ -3,6 +3,7 @@ using jewelry.Model.Exceptions;
 using jewelry.Model.Production.Plan.Transfer;
 using jewelry.Model.ProductionPlan.ProductionPlanStatus.Transfer;
 using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
+using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -13,6 +14,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Hosting;
 using NetTopologySuite.Index.HPRtree;
+using NPOI.OpenXmlFormats;
+using NPOI.OpenXmlFormats.Dml;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -259,7 +262,7 @@ namespace Jewelry.Service.Production.Plan
             }
 
             return plans;
-        } 
+        }
         private async Task<List<GoldCostItemResponse>> GetProductionPlanCost(string[] planNumbers)
         {
             var query = (from item in _jewelryContext.TbtProductionPlanCostGoldItem
@@ -322,8 +325,8 @@ namespace Jewelry.Service.Production.Plan
             return await query.ToListAsync();
         }
 
-        private async Task<TransferData> PrepareTransferData(jewelry.Model.Production.Plan.Transfer.Request request, 
-            List<TbtProductionPlan> plans, 
+        private async Task<TransferData> PrepareTransferData(jewelry.Model.Production.Plan.Transfer.Request request,
+            List<TbtProductionPlan> plans,
             List<GoldCostItemResponse> plansGoldCostItem)
         {
             var data = new TransferData
@@ -447,7 +450,7 @@ namespace Jewelry.Service.Production.Plan
             };
         }
 
-        private async  Task<List<TbtProductionPlanStatusDetail>> CreateNewStatusDetial(
+        private async Task<List<TbtProductionPlanStatusDetail>> CreateNewStatusDetial(
             TbtProductionPlan plan,
             List<GoldCostItemResponse> plansGoldCostItem,
             jewelry.Model.Production.Plan.Transfer.Request request,
@@ -693,6 +696,332 @@ namespace Jewelry.Service.Production.Plan
 
 
             return "success";
+        }
+        #endregion
+
+        #region --- daily report ---
+        public async Task<jewelry.Model.Production.Plan.DailyPlan.Response> GetDailyReport(jewelry.Model.Production.Plan.DailyPlan.Criteria request)
+        {
+            var utcNow = DateTime.UtcNow;
+            var yesterdayStart = utcNow.Date.AddDays(-1);
+            var yesterdayEnd = utcNow.Date.AddMilliseconds(-1);
+
+            // Define disabled status
+            var disableStatus = new int[]
+            {
+                ProductionPlanStatus.Melted,
+                ProductionPlanStatus.WaitCVD,
+                ProductionPlanStatus.CVD,
+            };
+
+            // Get active status templates
+            var activeStatus = await (from item in _jewelryContext.TbmProductionPlanStatus
+                                where !disableStatus.Contains(item.Id)
+                                select new jewelry.Model.Production.Plan.DailyPlan.ReortItem()
+                                {
+                                    Status = item.Id,
+                                    StatusNameEN = item.NameEn,
+                                    StatusNameTH = item.NameTh,
+                                    Description = item.Description,
+                                    Reference = item.Reference,
+                                    Count = 0
+                                }).ToListAsync();
+
+            var successStatus = new List<int> 
+            {   
+                ProductionPlanStatus.Completed,
+                ProductionPlanStatus.Melted,
+                ProductionPlanStatus.WaitCVD,
+                ProductionPlanStatus.CVD,
+                //ProductionPlanStatus.Price 
+            };
+
+            // Main query for production plans
+            var baseQuery = from item in _jewelryContext.TbtProductionPlan
+                           .Include(x => x.StatusNavigation)
+                           .Include(x => x.TbtProductionPlanStatusHeader.Where(o => o.IsActive == true).OrderByDescending(x => x.UpdateDate))
+                           .Include(x => x.TbtProductionPlanPrice)
+                           .Include(o => o.ProductTypeNavigation)
+                           .Include(o => o.CustomerTypeNavigation)
+                           //.Include(o => o.TypeNavigation)
+                           //.Include(o => o.TypeSizeNavigation)
+
+                           join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
+                           from cj in customerJoin.DefaultIfEmpty()
+
+                           join mold in _jewelryContext.TbtProductMold on item.Mold equals mold.Code into moldJoin
+                           from m in moldJoin.DefaultIfEmpty()
+
+                           where item.IsActive == true
+                           let currentStatus = item.TbtProductionPlanStatusHeader.Where(x => x.IsActive == true && x.Status == item.Status).FirstOrDefault()
+
+                           select new
+                           {
+                               Id = item.Id,
+                               Wo = item.Wo,
+                               WoNumber = item.WoNumber,
+                               WoText = item.WoText,
+                               CreateDate = item.CreateDate,
+                               CreateBy = item.CreateBy,
+                               UpdateDate = item.UpdateDate,
+                               UpdateBy = item.UpdateBy,
+                               RequestDate = item.RequestDate,
+
+                               Mold = item.Mold,
+                               MoldSub = m != null && !string.IsNullOrEmpty(m.ImageDraft1) ? $"{item.Mold}-Sub" : string.Empty,
+
+                               Status = item.Status,
+                               StatusName = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false ? item.StatusNavigation.Reference : item.StatusNavigation.NameTh,
+
+                               ProductRunning = item.ProductRunning,
+                               ProductNumber = item.ProductNumber,
+                               ProductName = item.ProductName,
+                               ProductDetail = item.ProductDetail,
+                               ProductQty = item.ProductQty,
+                               ProductQtyUnit = item.ProductQtyUnit,
+                               //ProductWeight = item.ProductWeight,
+
+                               CustomerNumber = item.CustomerNumber,
+                               CustomerName = cj != null && !string.IsNullOrEmpty(cj.NameTh) ? cj.NameTh : null,
+
+                               CustomerType = item.CustomerType,
+                               CustomerTypeName = item.CustomerTypeNavigation.NameTh,
+
+                               LastUpdateStatus = currentStatus != null ? currentStatus.UpdateDate : item.UpdateDate,
+
+                               IsOverPlan = item.RequestDate < utcNow && !successStatus.Contains(item.Status),
+                               IsSuccessWithoutCost = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false,
+
+                               ProductType = item.ProductType,
+                               ProductTypeName = item.ProductTypeNavigation.NameTh,
+
+                               Gold = item.Type,
+                               //GoldName = item.TypeNavigation.NameTh,
+                               GoldSize = item.TypeSize,
+                               //GoldSizeName = item.TypeSizeNavigation.NameTh,
+
+                               IsActive = item.IsActive,
+                               Remark = item.Remark
+                           };
+
+            // Apply filters
+            var query = baseQuery;
+
+            if (request.Start.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.Start.Value.StartOfDayUtc());
+            }
+            if (request.End.HasValue)
+            {
+                query = query.Where(x => x.CreateDate <= request.End.Value.EndOfDayUtc());
+            }
+
+            if (request.SendStart.HasValue)
+            {
+                query = query.Where(x => x.LastUpdateStatus >= request.SendStart.Value.StartOfDayUtc());
+            }
+            if (request.SendEnd.HasValue)
+            {
+                query = query.Where(x => x.LastUpdateStatus <= request.SendEnd.Value.EndOfDayUtc());
+            }
+
+            if (request.IsOverPlan.HasValue && request.IsOverPlan == 1)
+            {
+                query = query.Where(x => x.IsOverPlan == true);
+            }
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                var searchText = request.Text.ToUpper();
+                query = query.Where(x => x.Wo.Contains(searchText)
+                                    || x.WoText.Contains(request.Text)
+                                    || x.Mold.Contains(request.Text)
+                                    || x.ProductNumber.Contains(request.Text)
+                                    || x.CustomerNumber.Contains(request.Text));
+            }
+
+            if (request.Status != null && request.Status.Any())
+            {
+                query = query.Where(x => request.Status.Contains(x.Status));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                query = query.Where(x => x.CustomerNumber.Contains(request.CustomerCode));
+            }
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Gold));
+            }
+
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => request.GoldSize.Contains(x.GoldSize));
+            }
+
+            if (request.CustomerType != null && request.CustomerType.Any())
+            {
+                query = query.Where(x => request.CustomerType.Contains(x.CustomerType));
+            }
+
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.Mold.Contains(request.Mold));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+            }
+
+            // Execute query
+            var queryResult = await query.ToListAsync();
+
+            // Calculate status counts efficiently
+            var statusCounts = queryResult.GroupBy(x => x.Status).ToDictionary(g => g.Key, g => g.Count());
+            
+            // Special handling for completed status (only count those without price)
+            var completedWithoutPriceCount = queryResult.Count(x => x.Status == ProductionPlanStatus.Completed && x.IsSuccessWithoutCost);
+
+            // Update status counts
+            foreach (var status in activeStatus)
+            {
+                if (status.Status == ProductionPlanStatus.Completed)
+                {
+                    status.Count = completedWithoutPriceCount;
+                    status.StatusNameTH = status.Reference;
+                }
+                else
+                {
+                    status.Count = statusCounts.GetValueOrDefault(status.Status, 0);
+                }
+            }
+
+            // Get recent activity (last 10 updated items)
+            var recentActivity = queryResult
+                .OrderByDescending(x => x.LastUpdateStatus)
+                .Take(10)
+                .Select(x => new jewelry.Model.Production.Plan.DailyPlan.RecentItem
+                {
+                    Id = x.Id,
+                    Wo = x.Wo,
+                    WoNumber = x.WoNumber,
+                    WoText = x.WoText,
+                    CreateDate = x.CreateDate,
+                    CreateBy = x.CreateBy ?? "",
+                    UpdateDate = x.UpdateDate,
+                    UpdateBy = x.UpdateBy,
+                    RequestDate = x.RequestDate,
+                    Mold = x.Mold,
+                    MoldSub = x.MoldSub,
+                    ProductRunning = x.ProductRunning,
+                    ProductName = x.ProductName ?? "",
+                    ProductType = x.ProductType.ToString(),
+                    ProductTypeName = x.ProductTypeName ?? "",
+                    ProductNumber = x.ProductNumber,
+                    ProductDetail = x.ProductDetail ?? "",
+                    ProductQty = x.ProductQty,
+                    ProductQtyUnit = x.ProductQtyUnit ?? "",
+                    CustomerNumber = x.CustomerNumber,
+                    CustomerName = x.CustomerName ?? "",
+                    CustomerType = x.CustomerType,
+                    CustomerTypeName = x.CustomerTypeName ?? "",
+                    IsActive = x.IsActive,
+                    Status = x.Status,
+                    StatusName = x.StatusName ?? "",
+                    Remark = x.Remark,
+                    Gold = x.Gold,
+                    GoldSize = x.GoldSize
+                }).ToList();
+
+            // Calculate dashboard metrics
+            var planCountProcess = queryResult.Count(x => !successStatus.Contains(x.Status));
+            var planCountOverdue = queryResult.Count(x => x.IsOverPlan && !successStatus.Contains(x.Status));
+            var planCountTotal = queryResult.Count;
+            
+            var planCountCompletedYesterday = await _jewelryContext.TbtProductionPlan
+                .Where(x => x.IsActive == true 
+                       && x.Status == ProductionPlanStatus.Completed 
+                       && x.CompletedDate >= yesterdayStart 
+                       && x.CompletedDate <= yesterdayEnd)
+                .CountAsync();
+
+            var completedToday = await _jewelryContext.TbtProductionPlan
+                .Where(x => x.IsActive == true 
+                       && x.Status == ProductionPlanStatus.Completed 
+                       && x.CompletedDate >= utcNow.Date 
+                       && x.CompletedDate < utcNow.Date.AddDays(1))
+                .CountAsync();
+
+            var pendingApproval = queryResult.Count(x => x.Status == ProductionPlanStatus.Price);
+
+            // Calculate status trends
+            var statusTrends = activeStatus.Select(status => new jewelry.Model.Production.Plan.DailyPlan.StatusTrend
+            {
+                Status = status.Status,
+                StatusName = status.StatusNameTH ?? "",
+                Count = status.Count,
+                Percentage = planCountTotal > 0 ? Math.Round((decimal)status.Count * 100 / planCountTotal, 2) : 0,
+                TrendDirection = "stable" // Could be enhanced with historical data comparison
+            }).ToList();
+
+            // Product type summary
+            var productTypeSummary = queryResult
+                .GroupBy(x => new { x.ProductType, x.ProductTypeName })
+                .Select(g => new jewelry.Model.Production.Plan.DailyPlan.ProductTypeSummary
+                {
+                    ProductType = g.Key.ProductType,
+                    ProductTypeName = g.Key.ProductTypeName ?? "",
+                    Count = g.Count(),
+                    TotalQty = g.Sum(x => x.ProductQty),
+                    //TotalWeight = g.Sum(x => x.ProductWeight)
+                })
+                .OrderByDescending(x => x.Count)
+                .ToList();
+
+            // Customer type summary
+            var customerTypeSummary = queryResult
+                .GroupBy(x => new { x.CustomerType, x.CustomerTypeName })
+                .Select(g => new jewelry.Model.Production.Plan.DailyPlan.CustomerTypeSummary
+                {
+                    CustomerType = g.Key.CustomerType ?? "",
+                    CustomerTypeName = g.Key.CustomerTypeName ?? "",
+                    Count = g.Count(),
+                    TotalQty = g.Sum(x => x.ProductQty)
+                })
+                .OrderByDescending(x => x.Count)
+                .ToList();
+
+            var percentageCompleted = planCountTotal > 0 
+                ? Math.Round((decimal)queryResult.Count(x => successStatus.Contains(x.Status)) * 100 / planCountTotal, 2) 
+                : 0;
+
+            return new jewelry.Model.Production.Plan.DailyPlan.Response()
+            {
+                Report = activeStatus.OrderBy(x => x.Status).ToList(),
+                RecentActivity = recentActivity,
+                PlanCountProcess = planCountProcess,
+                PlanCountCompletedOnYesterday = planCountCompletedYesterday,
+                PlanCountOverdue = planCountOverdue,
+                PlanCountTotal = planCountTotal,
+                Summary = new jewelry.Model.Production.Plan.DailyPlan.DashboardSummary
+                {
+                    TotalActiveProjects = planCountTotal,
+                    CompletedToday = completedToday,
+                    OverduePlans = planCountOverdue,
+                    PendingApproval = pendingApproval,
+                    PercentageCompleted = percentageCompleted,
+                    StatusTrends = statusTrends.OrderBy(x => x.Status).ToList(),
+                    ProductTypeSummary = productTypeSummary,
+                    CustomerTypeSummary = customerTypeSummary
+                }
+            };
         }
         #endregion
     }

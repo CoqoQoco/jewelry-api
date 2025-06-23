@@ -13,7 +13,7 @@ namespace Jewelry.Api.Controllers.Production
 {
     [Route("Production/[controller]")]
     [ApiController]
-    [Authorize]
+    //[Authorize]
     public class PlanController : ApiControllerBase
     {
         private readonly ILogger<PlanController> _logger;
@@ -76,6 +76,24 @@ namespace Jewelry.Api.Controllers.Production
             try
             {
                 var response = await _planService.Transfer(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("DailyPlan")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Production.Plan.DailyPlan.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetDailyRemainByStatus([FromBody] jewelry.Model.Production.Plan.DailyPlan.Request request)
+        {
+            try
+            {
+                var response = await _planService.GetDailyReport(request.Search);
                 return Ok(response);
             }
             catch (HandleException ex)
