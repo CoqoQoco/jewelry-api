@@ -716,19 +716,19 @@ namespace Jewelry.Service.Production.Plan
 
             // Get active status templates
             var activeStatus = await (from item in _jewelryContext.TbmProductionPlanStatus
-                                where !disableStatus.Contains(item.Id)
-                                select new jewelry.Model.Production.Plan.DailyPlan.ReortItem()
-                                {
-                                    Status = item.Id,
-                                    StatusNameEN = item.NameEn,
-                                    StatusNameTH = item.NameTh,
-                                    Description = item.Description,
-                                    Reference = item.Reference,
-                                    Count = 0
-                                }).ToListAsync();
+                                      where !disableStatus.Contains(item.Id)
+                                      select new jewelry.Model.Production.Plan.DailyPlan.ReortItem()
+                                      {
+                                          Status = item.Id,
+                                          StatusNameEN = item.NameEn,
+                                          StatusNameTH = item.NameTh,
+                                          Description = item.Description,
+                                          Reference = item.Reference,
+                                          Count = 0
+                                      }).ToListAsync();
 
-            var successStatus = new List<int> 
-            {   
+            var successStatus = new List<int>
+            {
                 ProductionPlanStatus.Completed,
                 ProductionPlanStatus.Melted,
                 ProductionPlanStatus.WaitCVD,
@@ -743,66 +743,66 @@ namespace Jewelry.Service.Production.Plan
                            .Include(x => x.TbtProductionPlanPrice)
                            .Include(o => o.ProductTypeNavigation)
                            .Include(o => o.CustomerTypeNavigation)
-                           //.Include(o => o.TypeNavigation)
-                           //.Include(o => o.TypeSizeNavigation)
+                                //.Include(o => o.TypeNavigation)
+                                //.Include(o => o.TypeSizeNavigation)
 
-                           join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
-                           from cj in customerJoin.DefaultIfEmpty()
+                            join customer in _jewelryContext.TbmCustomer on item.CustomerNumber equals customer.Code into customerJoin
+                            from cj in customerJoin.DefaultIfEmpty()
 
-                           join mold in _jewelryContext.TbtProductMold on item.Mold equals mold.Code into moldJoin
-                           from m in moldJoin.DefaultIfEmpty()
+                            join mold in _jewelryContext.TbtProductMold on item.Mold equals mold.Code into moldJoin
+                            from m in moldJoin.DefaultIfEmpty()
 
-                           where item.IsActive == true
-                           let currentStatus = item.TbtProductionPlanStatusHeader.Where(x => x.IsActive == true && x.Status == item.Status).FirstOrDefault()
+                            where item.IsActive == true
+                            let currentStatus = item.TbtProductionPlanStatusHeader.Where(x => x.IsActive == true && x.Status == item.Status).FirstOrDefault()
 
-                           select new
-                           {
-                               Id = item.Id,
-                               Wo = item.Wo,
-                               WoNumber = item.WoNumber,
-                               WoText = item.WoText,
-                               CreateDate = item.CreateDate,
-                               CreateBy = item.CreateBy,
-                               UpdateDate = item.UpdateDate,
-                               UpdateBy = item.UpdateBy,
-                               RequestDate = item.RequestDate,
+                            select new
+                            {
+                                Id = item.Id,
+                                Wo = item.Wo,
+                                WoNumber = item.WoNumber,
+                                WoText = item.WoText,
+                                CreateDate = item.CreateDate,
+                                CreateBy = item.CreateBy,
+                                UpdateDate = item.UpdateDate,
+                                UpdateBy = item.UpdateBy,
+                                RequestDate = item.RequestDate,
 
-                               Mold = item.Mold,
-                               MoldSub = m != null && !string.IsNullOrEmpty(m.ImageDraft1) ? $"{item.Mold}-Sub" : string.Empty,
+                                Mold = item.Mold,
+                                MoldSub = m != null && !string.IsNullOrEmpty(m.ImageDraft1) ? $"{item.Mold}-Sub" : string.Empty,
 
-                               Status = item.Status,
-                               StatusName = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false ? item.StatusNavigation.Reference : item.StatusNavigation.NameTh,
+                                Status = item.Status,
+                                StatusName = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false ? item.StatusNavigation.Reference : item.StatusNavigation.NameTh,
 
-                               ProductRunning = item.ProductRunning,
-                               ProductNumber = item.ProductNumber,
-                               ProductName = item.ProductName,
-                               ProductDetail = item.ProductDetail,
-                               ProductQty = item.ProductQty,
-                               ProductQtyUnit = item.ProductQtyUnit,
-                               //ProductWeight = item.ProductWeight,
+                                ProductRunning = item.ProductRunning,
+                                ProductNumber = item.ProductNumber,
+                                ProductName = item.ProductName,
+                                ProductDetail = item.ProductDetail,
+                                ProductQty = item.ProductQty,
+                                ProductQtyUnit = item.ProductQtyUnit,
+                                //ProductWeight = item.ProductWeight,
 
-                               CustomerNumber = item.CustomerNumber,
-                               CustomerName = cj != null && !string.IsNullOrEmpty(cj.NameTh) ? cj.NameTh : null,
+                                CustomerNumber = item.CustomerNumber,
+                                CustomerName = cj != null && !string.IsNullOrEmpty(cj.NameTh) ? cj.NameTh : null,
 
-                               CustomerType = item.CustomerType,
-                               CustomerTypeName = item.CustomerTypeNavigation.NameTh,
+                                CustomerType = item.CustomerType,
+                                CustomerTypeName = item.CustomerTypeNavigation.NameTh,
 
-                               LastUpdateStatus = currentStatus != null ? currentStatus.UpdateDate : item.UpdateDate,
+                                LastUpdateStatus = currentStatus != null ? currentStatus.UpdateDate : item.UpdateDate,
 
-                               IsOverPlan = item.RequestDate < utcNow && !successStatus.Contains(item.Status),
-                               IsSuccessWithoutCost = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false,
+                                IsOverPlan = item.RequestDate < utcNow && !successStatus.Contains(item.Status),
+                                IsSuccessWithoutCost = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false,
 
-                               ProductType = item.ProductType,
-                               ProductTypeName = item.ProductTypeNavigation.NameTh,
+                                ProductType = item.ProductType,
+                                ProductTypeName = item.ProductTypeNavigation.NameTh,
 
-                               Gold = item.Type,
-                               //GoldName = item.TypeNavigation.NameTh,
-                               GoldSize = item.TypeSize,
-                               //GoldSizeName = item.TypeSizeNavigation.NameTh,
+                                Gold = item.Type,
+                                //GoldName = item.TypeNavigation.NameTh,
+                                GoldSize = item.TypeSize,
+                                //GoldSizeName = item.TypeSizeNavigation.NameTh,
 
-                               IsActive = item.IsActive,
-                               Remark = item.Remark
-                           };
+                                IsActive = item.IsActive,
+                                Remark = item.Remark
+                            };
 
             // Apply filters
             var query = baseQuery;
@@ -880,14 +880,41 @@ namespace Jewelry.Service.Production.Plan
                 query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
             }
 
-            // Execute query
-            var queryResult = await query.ToListAsync();
+            //ก่อน filter ทั้งหมด
+
+            var planCountCompletedYesterday = await _jewelryContext.TbtProductionPlan
+                .Where(x => x.IsActive == true
+                       && x.Status == ProductionPlanStatus.Completed
+                       && x.CompletedDate >= yesterdayStart
+                       && x.CompletedDate <= yesterdayEnd)
+                .CountAsync();
+
+            var completedToday = await _jewelryContext.TbtProductionPlan
+                .Where(x => x.IsActive == true
+                       && x.Status == ProductionPlanStatus.Completed
+                       && x.CompletedDate >= utcNow.Date
+                       && x.CompletedDate < utcNow.Date.AddDays(1))
+                .CountAsync();
+
+            var removeStatus = new List<int>
+            {
+                //ProductionPlanStatus.Completed,
+                ProductionPlanStatus.Melted,
+                ProductionPlanStatus.WaitCVD,
+                ProductionPlanStatus.CVD,
+                //ProductionPlanStatus.Price 
+            };
+            //remove seccoss 100%, melted, wait cvd, cvd
+            query = query.Where(x => !removeStatus.Contains(x.Status));
+            query = query.Where(x => !(x.Status == ProductionPlanStatus.Completed && !x.IsSuccessWithoutCost));
+
+            var tettt = query.ToList();
 
             // Calculate status counts efficiently
-            var statusCounts = queryResult.GroupBy(x => x.Status).ToDictionary(g => g.Key, g => g.Count());
-            
+            var statusCounts = query.GroupBy(x => x.Status).ToDictionary(g => g.Key, g => g.Count());
+
             // Special handling for completed status (only count those without price)
-            var completedWithoutPriceCount = queryResult.Count(x => x.Status == ProductionPlanStatus.Completed && x.IsSuccessWithoutCost);
+            var completedWithoutPriceCount = query.Count(x => x.Status == ProductionPlanStatus.Completed && x.IsSuccessWithoutCost);
 
             // Update status counts
             foreach (var status in activeStatus)
@@ -904,7 +931,7 @@ namespace Jewelry.Service.Production.Plan
             }
 
             // Get recent activity (last 10 updated items)
-            var recentActivity = queryResult
+            var recentActivity = query
                 .OrderByDescending(x => x.LastUpdateStatus)
                 .Take(10)
                 .Select(x => new jewelry.Model.Production.Plan.DailyPlan.RecentItem
@@ -941,25 +968,15 @@ namespace Jewelry.Service.Production.Plan
                 }).ToList();
 
             // Calculate dashboard metrics
-            var planCountProcess = queryResult.Count(x => !successStatus.Contains(x.Status));
-            var planCountOverdue = queryResult.Count(x => x.IsOverPlan && !successStatus.Contains(x.Status));
-            var planCountTotal = queryResult.Count;
-            
-            var planCountCompletedYesterday = await _jewelryContext.TbtProductionPlan
-                .Where(x => x.IsActive == true 
-                       && x.Status == ProductionPlanStatus.Completed 
-                       && x.CompletedDate >= yesterdayStart 
-                       && x.CompletedDate <= yesterdayEnd)
-                .CountAsync();
+            var planCountProcess = query.Count(x => !successStatus.Contains(x.Status));
+            var planCountOverdue = query.Count(x => x.IsOverPlan && !successStatus.Contains(x.Status));
+            var planCountTotal = query.Count();
 
-            var completedToday = await _jewelryContext.TbtProductionPlan
-                .Where(x => x.IsActive == true 
-                       && x.Status == ProductionPlanStatus.Completed 
-                       && x.CompletedDate >= utcNow.Date 
-                       && x.CompletedDate < utcNow.Date.AddDays(1))
-                .CountAsync();
+            var percentageCompleted = planCountTotal > 0
+                                        ? Math.Round((decimal)query.Count(x => x.Status == ProductionPlanStatus.Completed) * 100 / planCountTotal, 2)
+                                        : 0;
 
-            var pendingApproval = queryResult.Count(x => x.Status == ProductionPlanStatus.Price);
+            var pendingApproval = query.Count(x => x.Status == ProductionPlanStatus.Designed);
 
             // Calculate status trends
             var statusTrends = activeStatus.Select(status => new jewelry.Model.Production.Plan.DailyPlan.StatusTrend
@@ -972,7 +989,7 @@ namespace Jewelry.Service.Production.Plan
             }).ToList();
 
             // Product type summary
-            var productTypeSummary = queryResult
+            var productTypeSummary = query
                 .GroupBy(x => new { x.ProductType, x.ProductTypeName })
                 .Select(g => new jewelry.Model.Production.Plan.DailyPlan.ProductTypeSummary
                 {
@@ -986,7 +1003,7 @@ namespace Jewelry.Service.Production.Plan
                 .ToList();
 
             // Customer type summary
-            var customerTypeSummary = queryResult
+            var customerTypeSummary = query
                 .GroupBy(x => new { x.CustomerType, x.CustomerTypeName })
                 .Select(g => new jewelry.Model.Production.Plan.DailyPlan.CustomerTypeSummary
                 {
@@ -997,10 +1014,6 @@ namespace Jewelry.Service.Production.Plan
                 })
                 .OrderByDescending(x => x.Count)
                 .ToList();
-
-            var percentageCompleted = planCountTotal > 0 
-                ? Math.Round((decimal)queryResult.Count(x => successStatus.Contains(x.Status)) * 100 / planCountTotal, 2) 
-                : 0;
 
             return new jewelry.Model.Production.Plan.DailyPlan.Response()
             {
