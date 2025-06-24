@@ -787,7 +787,7 @@ namespace Jewelry.Service.Production.Plan
                                 CustomerType = item.CustomerType,
                                 CustomerTypeName = item.CustomerTypeNavigation.NameTh,
 
-                                LastUpdateStatus = currentStatus != null ? currentStatus.UpdateDate : item.UpdateDate,
+                                LastUpdateStatus = currentStatus != null ? currentStatus.UpdateDate : (item.UpdateDate ?? item.CreateDate),
 
                                 IsOverPlan = item.RequestDate < utcNow && !successStatus.Contains(item.Status),
                                 IsSuccessWithoutCost = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false,
@@ -932,6 +932,7 @@ namespace Jewelry.Service.Production.Plan
 
             // Get recent activity (last 10 updated items)
             var recentActivity = query
+                .Where(x => x.LastUpdateStatus.HasValue)
                 .OrderByDescending(x => x.LastUpdateStatus)
                 .Take(10)
                 .Select(x => new jewelry.Model.Production.Plan.DailyPlan.RecentItem
