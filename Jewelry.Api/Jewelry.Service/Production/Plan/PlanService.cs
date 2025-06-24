@@ -908,7 +908,7 @@ namespace Jewelry.Service.Production.Plan
             query = query.Where(x => !removeStatus.Contains(x.Status));
             query = query.Where(x => !(x.Status == ProductionPlanStatus.Completed && !x.IsSuccessWithoutCost));
 
-            var tettt = query.ToList();
+            //var tettt = query.ToList();
 
             // Calculate status counts efficiently
             var statusCounts = query.GroupBy(x => x.Status).ToDictionary(g => g.Key, g => g.Count());
