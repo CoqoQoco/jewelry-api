@@ -649,7 +649,7 @@ namespace Jewelry.Service.Stock
                              PreviousPrice = price.PreviousPrice,
                              NewPrice = price.NewPrice,
                              ChangeAmount = price.NewPrice - price.PreviousPrice,
-                             ChangePercentage = ((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100,
+                             ChangePercentage = price.PreviousPrice > 0 ? ((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100 : 0,
                              ChangeDate = price.CreateDate,
                              ChangeBy = price.CreateBy
                          })
