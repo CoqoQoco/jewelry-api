@@ -550,7 +550,7 @@ namespace Jewelry.Service.Stock
                              Grade = gem.Grade,
                              PreviousPrice = price.PreviousPrice,
                              NewPrice = price.NewPrice,
-                             ChangePercentage = ((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100,
+                             ChangePercentage = price.PreviousPrice > 0 ? ((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100 : 0,
                              ChangeDate = price.CreateDate,
                              ChangeType = price.NewPrice > price.PreviousPrice ? "INCREASE" : "DECREASE"
                          })
