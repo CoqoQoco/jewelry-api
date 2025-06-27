@@ -33,7 +33,9 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public string Grade { get; set; } = string.Empty;
         public int Count { get; set; }
         public decimal TotalQuantity { get; set; }
+        public decimal TotalOnProcessQuantity { get; set; }
         public decimal TotalQuantityWeight { get; set; }
+        public decimal TotalOnProcessQuantityWeight { get; set; }
         public decimal TotalValue { get; set; }
         public decimal AveragePrice { get; set; }
     }

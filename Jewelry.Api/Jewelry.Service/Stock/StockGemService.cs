@@ -82,7 +82,7 @@ namespace Jewelry.Service.Stock
         {
             var query = (from item in _jewelryContext.TbtStockGem
                          select item).AsNoTracking();
-           
+
             if (request.Id.HasValue)
             {
                 query = (from item in query
@@ -453,22 +453,27 @@ namespace Jewelry.Service.Stock
         {
             var query = BuildStockQuery(request);
 
-            return await query
-                .GroupBy(x => new { x.GroupName, x.Shape, x.Grade })
-                .Select(g => new GemCategoryBreakdown
-                {
-                    GroupName = g.Key.GroupName,
-                    Shape = g.Key.Shape,
-                    Grade = g.Key.Grade,
-                    Count = g.Count(),
-                    TotalQuantity = g.Sum(x => x.Quantity),
-                    TotalQuantityWeight = g.Sum(x => x.QuantityWeight),
-                    TotalValue = g.Sum(x => x.Quantity * x.Price),
-                    AveragePrice = g.Average(x => x.Price)
-                })
-                .OrderByDescending(x => x.TotalValue)
-                .Take(20)
-                .ToListAsync();
+            var group = query.GroupBy(x => new { x.GroupName })
+                             .Select(g => new GemCategoryBreakdown
+                             {
+                                 GroupName = g.Key.GroupName,
+                                 //Shape = g.Key.Shape,
+                                 //Grade = g.Key.Grade,
+                                 Count = g.Count(),
+                                 TotalQuantity = g.Sum(x => x.Quantity),
+                                 TotalOnProcessQuantity = g.Sum(x => x.QuantityOnProcess),
+                                 TotalQuantityWeight = g.Sum(x => x.QuantityWeight),
+                                 TotalOnProcessQuantityWeight = g.Sum(x => x.QuantityWeightOnProcess),
+                                 TotalValue = g.Sum(x => x.UnitCode == "Q" ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price)),
+                                 AveragePrice = g.Average(x => x.Price)
+                             })
+                             .OrderByDescending(x => x.GroupName);
+
+            return await group.Where(x => x.TotalQuantity > 0 
+                                       || x.TotalQuantityWeight > 0 
+                                       || x.TotalOnProcessQuantity > 0 
+                                       || x.TotalOnProcessQuantityWeight > 0)
+                              .ToListAsync();
         }
 
         private async Task<List<TransactionTrend>> GetTransactionTrends(DateTime startDate, DateTime endDate, DashboardRequest request)
@@ -508,25 +513,25 @@ namespace Jewelry.Service.Stock
                 .Where(x => x.CreateDate >= startDate && x.CreateDate < endDate);
 
             return await (from trans in transactionQuery
-                         join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                         where (string.IsNullOrEmpty(request.GroupName) || gem.GroupName == request.GroupName) &&
-                               (string.IsNullOrEmpty(request.Shape) || gem.Shape == request.Shape) &&
-                               (string.IsNullOrEmpty(request.Grade) || gem.Grade == request.Grade)
-                         group new { trans, gem } by new { gem.Code, gem.GroupName, gem.Shape, gem.Grade, gem.Size } into g
-                         select new TopGemMovement
-                         {
-                             Code = g.Key.Code,
-                             GroupName = g.Key.GroupName,
-                             Shape = g.Key.Shape,
-                             Grade = g.Key.Grade,
-                             Size = g.Key.Size,
-                             TransactionCount = g.Count(),
-                             TotalQuantityMoved = g.Sum(x => x.trans.Qty),
-                             TotalQuantityWeightMoved = g.Sum(x => x.trans.QtyWeight),
-                             CurrentQuantity = g.Max(x => x.gem.Quantity),
-                             CurrentQuantityWeight = g.Max(x => x.gem.QuantityWeight),
-                             CurrentPrice = g.Max(x => x.gem.Price)
-                         })
+                          join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                          where (string.IsNullOrEmpty(request.GroupName) || gem.GroupName == request.GroupName) &&
+                                (string.IsNullOrEmpty(request.Shape) || gem.Shape == request.Shape) &&
+                                (string.IsNullOrEmpty(request.Grade) || gem.Grade == request.Grade)
+                          group new { trans, gem } by new { gem.Code, gem.GroupName, gem.Shape, gem.Grade, gem.Size } into g
+                          select new TopGemMovement
+                          {
+                              Code = g.Key.Code,
+                              GroupName = g.Key.GroupName,
+                              Shape = g.Key.Shape,
+                              Grade = g.Key.Grade,
+                              Size = g.Key.Size,
+                              TransactionCount = g.Count(),
+                              TotalQuantityMoved = g.Sum(x => x.trans.Qty),
+                              TotalQuantityWeightMoved = g.Sum(x => x.trans.QtyWeight),
+                              CurrentQuantity = g.Max(x => x.gem.Quantity),
+                              CurrentQuantityWeight = g.Max(x => x.gem.QuantityWeight),
+                              CurrentPrice = g.Max(x => x.gem.Price)
+                          })
                 .OrderByDescending(x => x.TransactionCount)
                 .Take(10)
                 .ToListAsync();
@@ -538,22 +543,22 @@ namespace Jewelry.Service.Stock
                 .Where(x => x.CreateDate >= startDate && x.CreateDate < endDate);
 
             return await (from price in priceChangeQuery
-                         join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
-                         where (string.IsNullOrEmpty(request.GroupName) || gem.GroupName == request.GroupName) &&
-                               (string.IsNullOrEmpty(request.Shape) || gem.Shape == request.Shape) &&
-                               (string.IsNullOrEmpty(request.Grade) || gem.Grade == request.Grade)
-                         select new PriceChangeAlert
-                         {
-                             Code = price.Code,
-                             GroupName = gem.GroupName,
-                             Shape = gem.Shape,
-                             Grade = gem.Grade,
-                             PreviousPrice = price.PreviousPrice,
-                             NewPrice = price.NewPrice,
-                             ChangePercentage = price.PreviousPrice > 0 ? ((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100 : 0,
-                             ChangeDate = price.CreateDate,
-                             ChangeType = price.NewPrice > price.PreviousPrice ? "INCREASE" : "DECREASE"
-                         })
+                          join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
+                          where (string.IsNullOrEmpty(request.GroupName) || gem.GroupName == request.GroupName) &&
+                                (string.IsNullOrEmpty(request.Shape) || gem.Shape == request.Shape) &&
+                                (string.IsNullOrEmpty(request.Grade) || gem.Grade == request.Grade)
+                          select new PriceChangeAlert
+                          {
+                              Code = price.Code,
+                              GroupName = gem.GroupName,
+                              Shape = gem.Shape,
+                              Grade = gem.Grade,
+                              PreviousPrice = price.PreviousPrice,
+                              NewPrice = price.NewPrice,
+                              ChangePercentage = price.PreviousPrice > 0 ? ((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100 : 0,
+                              ChangeDate = price.CreateDate,
+                              ChangeType = price.NewPrice > price.PreviousPrice ? "INCREASE" : "DECREASE"
+                          })
                 .Where(x => Math.Abs(x.ChangePercentage) > 5) // Only show changes > 5%
                 .OrderByDescending(x => Math.Abs(x.ChangePercentage))
                 .Take(10)
@@ -566,10 +571,10 @@ namespace Jewelry.Service.Stock
 
             if (!string.IsNullOrEmpty(request.GroupName))
                 query = query.Where(x => x.GroupName == request.GroupName);
-            
+
             if (!string.IsNullOrEmpty(request.Shape))
                 query = query.Where(x => x.Shape == request.Shape);
-            
+
             if (!string.IsNullOrEmpty(request.Grade))
                 query = query.Where(x => x.Grade == request.Grade);
 
@@ -614,24 +619,24 @@ namespace Jewelry.Service.Stock
         private async Task<List<TodayTransaction>> GetTodayTransactions(DateTime today, DateTime tomorrow, DashboardRequest request)
         {
             return await (from trans in _jewelryContext.TbtStockGemTransection
-                         join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                         where trans.CreateDate >= today && trans.CreateDate < tomorrow
-                         select new TodayTransaction
-                         {
-                             Running = trans.Running,
-                             Code = trans.Code,
-                             GroupName = gem.GroupName,
-                             Shape = gem.Shape,
-                             Grade = gem.Grade,
-                             Type = trans.Type,
-                             TypeName = trans.Type == 1 ? "IN" : trans.Type == 2 ? "OUT" : "OTHER",
-                             Qty = trans.Qty,
-                             QtyWeight = trans.QtyWeight,
-                             JobOrPo = trans.JobOrPo,
-                             Status = trans.Stastus,
-                             CreateDate = trans.CreateDate,
-                             CreateBy = trans.CreateBy
-                         })
+                          join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                          where trans.CreateDate >= today && trans.CreateDate < tomorrow
+                          select new TodayTransaction
+                          {
+                              Running = trans.Running,
+                              Code = trans.Code,
+                              GroupName = gem.GroupName,
+                              Shape = gem.Shape,
+                              Grade = gem.Grade,
+                              Type = trans.Type,
+                              TypeName = trans.Type == 1 ? "IN" : trans.Type == 2 ? "OUT" : "OTHER",
+                              Qty = trans.Qty,
+                              QtyWeight = trans.QtyWeight,
+                              JobOrPo = trans.JobOrPo,
+                              Status = trans.Stastus,
+                              CreateDate = trans.CreateDate,
+                              CreateBy = trans.CreateBy
+                          })
                 .OrderByDescending(x => x.CreateDate)
                 .Take(50)
                 .ToListAsync();
@@ -640,19 +645,19 @@ namespace Jewelry.Service.Stock
         private async Task<List<TodayPriceChange>> GetTodayPriceChanges(DateTime today, DateTime tomorrow, DashboardRequest request)
         {
             return await (from price in _jewelryContext.TbtStockGemTransectionPrice
-                         join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
-                         where price.CreateDate >= today && price.CreateDate < tomorrow
-                         select new TodayPriceChange
-                         {
-                             Code = price.Code,
-                             GroupName = gem.GroupName,
-                             PreviousPrice = price.PreviousPrice,
-                             NewPrice = price.NewPrice,
-                             ChangeAmount = price.NewPrice - price.PreviousPrice,
-                             ChangePercentage = price.PreviousPrice > 0 ? ((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100 : 0,
-                             ChangeDate = price.CreateDate,
-                             ChangeBy = price.CreateBy
-                         })
+                          join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
+                          where price.CreateDate >= today && price.CreateDate < tomorrow
+                          select new TodayPriceChange
+                          {
+                              Code = price.Code,
+                              GroupName = gem.GroupName,
+                              PreviousPrice = price.PreviousPrice,
+                              NewPrice = price.NewPrice,
+                              ChangeAmount = price.NewPrice - price.PreviousPrice,
+                              ChangePercentage = price.PreviousPrice > 0 ? ((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100 : 0,
+                              ChangeDate = price.CreateDate,
+                              ChangeBy = price.CreateBy
+                          })
                 .OrderByDescending(x => x.ChangeDate)
                 .ToListAsync();
         }
