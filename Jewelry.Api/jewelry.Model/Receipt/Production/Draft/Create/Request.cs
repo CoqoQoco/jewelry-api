@@ -14,6 +14,7 @@ namespace jewelry.Model.Receipt.Production.Draft.Create
         //public string WoText { get; set; }
         public string ReceiptNumber { get; set; }
 
+        public IEnumerable<Material> BreakDown { get; set; }
         public List<Stock> Stocks { get; set; }
     }
 

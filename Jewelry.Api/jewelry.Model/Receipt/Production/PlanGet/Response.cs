@@ -49,7 +49,7 @@ namespace jewelry.Model.Receipt.Production.PlanGet
         public int QtyRunning { get; set; }
 
         public IEnumerable<Gem> Gems { get; set; }
-
+        public IEnumerable<Material> BreakDown { get; set; } = new List<Material>();
         public List<ReceiptStock> Stocks { get; set; }
     }
     public class ReceiptStock

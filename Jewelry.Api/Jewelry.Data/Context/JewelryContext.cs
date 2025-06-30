@@ -2256,6 +2256,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.IsComplete).HasColumnName("is_complete");
             entity.Property(e => e.IsRunning).HasColumnName("is_running");
+            entity.Property(e => e.JsonBreakdown)
+                .HasColumnType("json")
+                .HasColumnName("json_breakdown");
             entity.Property(e => e.JsonDraft)
                 .HasColumnType("json")
                 .HasColumnName("json_draft");

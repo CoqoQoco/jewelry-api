@@ -25,6 +25,15 @@ namespace Jewelry.Service.Receipt.Production
             };
             return JsonSerializer.Serialize(request.Stocks, options);
         }
+        public static string MapToTbtStockProductReceiptPlanBreakdownJson(this jewelry.Model.Receipt.Production.Draft.Create.Request request)
+        {
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            return JsonSerializer.Serialize(request.BreakDown, options);
+        }
         public static string MapToTbtStockProductReceiptPlanJson(this jewelry.Model.Receipt.Production.PlanGet.Response request)
         {
             var options = new JsonSerializerOptions
@@ -48,6 +57,26 @@ namespace Jewelry.Service.Receipt.Production
             try
             {
                 return JsonSerializer.Deserialize<List<jewelry.Model.Receipt.Production.PlanGet.ReceiptStock>>(plan.JsonDraft, options) ?? new List<jewelry.Model.Receipt.Production.PlanGet.ReceiptStock>();
+            }
+            catch (Exception ex)
+            {
+                throw new HandleException($"ไม่สามารถแปลงข้อมูล Draft ได้ เนื่องจากรูปแบบข้อมูลไม่ถูกต้อง กรุณาตรวจสอบข้อมูลหรือลองใหม่อีกครั้ง");
+            }
+        }
+
+        public static List<jewelry.Model.Receipt.Production.PlanGet.Material> GetStocksFromBreakdownJsonDraft(this TbtStockProductReceiptPlan plan)
+        {
+            if (string.IsNullOrEmpty(plan.JsonBreakdown))
+                return new List<jewelry.Model.Receipt.Production.PlanGet.Material>();
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            try
+            {
+                return JsonSerializer.Deserialize<List<jewelry.Model.Receipt.Production.PlanGet.Material>>(plan.JsonBreakdown, options) ?? new List<jewelry.Model.Receipt.Production.PlanGet.Material>();
             }
             catch (Exception ex)
             {

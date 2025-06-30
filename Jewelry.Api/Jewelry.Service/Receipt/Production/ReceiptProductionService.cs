@@ -1,5 +1,6 @@
 ﻿using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
+using jewelry.Model.Receipt.Production.PlanGet;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
@@ -21,6 +22,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Jewelry.Service.Receipt.Production
 {
@@ -222,6 +224,9 @@ namespace Jewelry.Service.Receipt.Production
             {
                 var draft = query.item.GetStocksFromJsonDraft();
                 response.Stocks.AddRange(draft);
+
+                var breakdown = query.item.GetStocksFromBreakdownJsonDraft();
+                response.BreakDown = breakdown.AsEnumerable();
             }
             else
             {
@@ -266,25 +271,47 @@ namespace Jewelry.Service.Receipt.Production
 
                     var transactions = query.plan.TbtProductionPlanPrice;
                     var planQty = query.plan.ProductQty;
-                    foreach (var transaction in transactions)
+
+                    //gold saction
+                    var goldTrueWeight = transactions.Where(x => x.Name == "น้ำหนักทองรวมหลังหักเพชรพลอย").FirstOrDefault();
+                    if (goldTrueWeight != null)
                     {
                         var material = new jewelry.Model.Receipt.Production.PlanGet.Material
                         {
-                            Type = transaction.NameGroup,
-                            TypeName = transaction.Name,
-                            TypeNameDescription = transaction.NameDescription,
+                            Type = "Gold",
+                            TypeName = goldTrueWeight.Name,
+                            TypeNameDescription = goldTrueWeight.NameDescription,
                             TypeBarcode = null,
-
-                            Qty = Math.Round(transaction.Qty / planQty, 2),
-                            QtyPrice = Math.Round(transaction.QtyPrice, 2),
-                            QtyWeight = Math.Round(transaction.QtyWeight / planQty, 2),
-                            QtyWeightPrice = Math.Round(transaction.QtyWeightPrice, 2),
-
+                            Qty = Math.Round(goldTrueWeight.Qty / planQty, 2),
+                            QtyPrice = Math.Round(goldTrueWeight.QtyPrice, 2),
+                            QtyWeight = Math.Round(goldTrueWeight.QtyWeight / planQty, 2),
+                            QtyWeightPrice = Math.Round(goldTrueWeight.QtyWeightPrice, 2),
                             IsOrigin = true
                         };
+                        materials.Add(material);
+                    }
 
-                        if (material.Type == "Gem")
+                    //gem saction 
+                    var gemTrueWeight = transactions.Where(x => x.NameGroup == "Gem");
+                    if (gemTrueWeight.Any())
+                    {
+                        foreach (var gem in gemTrueWeight)
                         {
+                            var material = new jewelry.Model.Receipt.Production.PlanGet.Material
+                            {
+                                Type = gem.NameGroup,
+                                TypeName = gem.Name,
+                                TypeNameDescription = gem.NameDescription,
+                                TypeBarcode = null,
+
+                                Qty = Math.Round(gem.Qty / planQty, 2),
+                                QtyPrice = Math.Round(gem.QtyPrice, 2),
+                                QtyWeight = Math.Round(gem.QtyWeight / planQty, 2),
+                                QtyWeightPrice = Math.Round(gem.QtyWeightPrice, 2),
+
+                                IsOrigin = true
+                            };
+
                             var matchGems = masterGem.FirstOrDefault(x => x.NameEn.Contains(material.TypeName));
                             if (matchGems == null)
                             {
@@ -296,12 +323,89 @@ namespace Jewelry.Service.Receipt.Production
                                 material.TypeCode = matchGems.Code;
                                 material.TypeCodeName = matchGems.NameEn;
                             }
+                            materials.Add(material);
                         }
+                    }
+
+                    //worker zone
+                    var workerPrice = transactions.Where(x => x.NameGroup == "Worker");
+                    if (workerPrice.Any())
+                    {
+                        var _qty = workerPrice.Sum(x => x.Qty);
+                        var _qtyPrice = workerPrice.Sum(x => x.QtyPrice);
+                        var _qtyWeight = workerPrice.Sum(x => x.QtyWeight);
+                        var _qtyWeightPrice = workerPrice.Sum(x => x.QtyWeightPrice);
+                        var material = new jewelry.Model.Receipt.Production.PlanGet.Material
+                        {
+                            Type = "Worker",
+                            TypeName = "Worker",
+                            TypeNameDescription = "Worker",
+                            TypeBarcode = null,
+
+                            Qty = Math.Round(_qty / planQty, 2),
+                            QtyPrice = Math.Round(_qtyPrice, 2),
+                            QtyWeight = Math.Round(_qtyWeight / planQty, 2),
+                            QtyWeightPrice = Math.Round(_qtyWeightPrice, 2),
+
+                            IsOrigin = true
+                        };
                         materials.Add(material);
+                    }
+
+                    //embbed zone
+                    var embedPrice = transactions.Where(x => x.NameGroup == "Embed");
+                    if (workerPrice.Any())
+                    {
+                        var _qty = workerPrice.Sum(x => x.Qty);
+                        var _qtyPrice = workerPrice.Sum(x => x.QtyPrice);
+                        var _qtyWeight = workerPrice.Sum(x => x.QtyWeight);
+                        var _qtyWeightPrice = workerPrice.Sum(x => x.QtyWeightPrice);
+                        var material = new jewelry.Model.Receipt.Production.PlanGet.Material
+                        {
+                            Type = "Setting",
+                            TypeName = "Setting",
+                            TypeNameDescription = "Setting",
+                            TypeBarcode = null,
+
+                            Qty = Math.Round(_qty / planQty, 2),
+                            QtyPrice = Math.Round(_qtyPrice, 2),
+                            QtyWeight = Math.Round(_qtyWeight / planQty, 2),
+                            QtyWeightPrice = Math.Round(_qtyWeightPrice, 2),
+
+                            IsOrigin = true
+                        };
+                        materials.Add(material);
+                    }
+
+
+                    //embbed zone
+                    var EtcPrice = transactions.Where(x => x.NameGroup == "ETC");
+                    if (workerPrice.Any())
+                    {
+                        foreach (var gem in gemTrueWeight)
+                        {
+                            var material = new jewelry.Model.Receipt.Production.PlanGet.Material
+                            {
+                                Type = "ETC",
+                                TypeName = gem.Name,
+                                TypeNameDescription = gem.NameDescription,
+                                TypeBarcode = null,
+
+                                Qty = Math.Round(gem.Qty / planQty, 2),
+                                QtyPrice = Math.Round(gem.QtyPrice, 2),
+                                QtyWeight = Math.Round(gem.QtyWeight / planQty, 2),
+                                QtyWeightPrice = Math.Round(gem.QtyWeightPrice, 2),
+
+                                IsOrigin = true
+                            };
+                            materials.Add(material);
+                        }
                     }
 
                 }
 
+                //add braekdown by materials
+                response.BreakDown = materials.AsEnumerable();
 
                 int running = 1;
                 foreach (var receipt in receiptStock)
@@ -564,6 +668,7 @@ namespace Jewelry.Service.Receipt.Production
             }
 
             receiptPlan.JsonDraft = request.MapToTbtStockProductReceiptPlanJson();
+            receiptPlan.JsonBreakdown = request.MapToTbtStockProductReceiptPlanBreakdownJson();
             receiptPlan.UpdateBy = CurrentUsername;
             receiptPlan.UpdateDate = DateTime.UtcNow;
 
