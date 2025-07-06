@@ -10,6 +10,7 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public List<TransactionTrend> Trends { get; set; } = new List<TransactionTrend>();
         public List<TopGemMovement> TopMovements { get; set; } = new List<TopGemMovement>();
         public List<PriceChangeAlert> PriceAlerts { get; set; } = new List<PriceChangeAlert>();
+        public List<LastActivity> LastActivities { get; set; } = new List<LastActivity>();
     }
 
     public class StockSummary
@@ -78,5 +79,23 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public decimal ChangePercentage { get; set; }
         public DateTime ChangeDate { get; set; }
         public string ChangeType { get; set; } = string.Empty; // INCREASE, DECREASE
+    }
+
+    public class LastActivity
+    {
+        public string Code { get; set; } = string.Empty;
+        public string GroupName { get; set; } = string.Empty;
+        public string Shape { get; set; } = string.Empty;
+        public string Grade { get; set; } = string.Empty;
+        public string Size { get; set; } = string.Empty;
+        public int Type { get; set; }
+        public string TypeName { get; set; } = string.Empty;
+        public decimal Qty { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string JobOrPo { get; set; } = string.Empty;
+        public string Running { get; set; }
+        public DateTime CreateDate { get; set; }
+        public string CreateBy { get; set; } = string.Empty;
+        public string UpdateBy { get; set; } = string.Empty;
     }
 }

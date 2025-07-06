@@ -43,6 +43,15 @@ namespace Jewelry.Service.Receipt.Production
             };
             return JsonSerializer.Serialize(request.Stocks, options);
         }
+        public static string MapToTbtStockProductReceiptPlanBreakdownJson(this jewelry.Model.Receipt.Production.PlanGet.Response request)
+        {
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            return JsonSerializer.Serialize(request.BreakDown, options);
+        }
 
         public static List<jewelry.Model.Receipt.Production.PlanGet.ReceiptStock> GetStocksFromJsonDraft(this TbtStockProductReceiptPlan plan)
         {

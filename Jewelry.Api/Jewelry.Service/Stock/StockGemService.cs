@@ -6,6 +6,7 @@ using jewelry.Model.Stock.Gem.Search;
 using jewelry.Model.Stock.Gem.Dashboard;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Helper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NetTopologySuite.Index.HPRtree;
@@ -304,9 +305,9 @@ namespace Jewelry.Service.Stock
         public async Task<DashboardResponse> GetStockGemDashboard(DashboardRequest request)
         {
             var response = new DashboardResponse();
-            var now = DateTime.UtcNow;
-            var startDate = request.StartDate ?? now.Date.AddDays(-30);
-            var endDate = request.EndDate ?? now.Date.AddDays(1);
+            var now = DateTimeOffset.UtcNow;
+            var startDate = request.StartDate?.StartOfDayUtc() ?? now.Date.AddDays(-30);
+            var endDate = request.EndDate?.EndOfDayUtc() ?? now.Date.AddDays(1);
 
             // Get stock summary
             response.Summary = await GetStockSummary(request);
@@ -323,12 +324,15 @@ namespace Jewelry.Service.Stock
             // Get price change alerts
             response.PriceAlerts = await GetPriceChangeAlerts(startDate, endDate, request);
 
+            // Get last activities (10 recent transactions)
+            response.LastActivities = await GetLastActivities(request);
+
             return response;
         }
 
         public async Task<TodayReportResponse> GetTodayReport(DashboardRequest request)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.UtcNow;
             var tomorrow = today.AddDays(1);
 
             var response = new TodayReportResponse
@@ -387,7 +391,7 @@ namespace Jewelry.Service.Stock
 
         public async Task<MonthlyReportResponse> GetMonthlyReport(DashboardRequest request)
         {
-            var now = DateTime.UtcNow;
+            var now = DateTimeOffset.UtcNow;
             var startOfMonth = new DateTime(now.Year, now.Month, 1);
             var endOfMonth = startOfMonth.AddMonths(1);
 
@@ -469,17 +473,17 @@ namespace Jewelry.Service.Stock
                              })
                              .OrderByDescending(x => x.GroupName);
 
-            return await group.Where(x => x.TotalQuantity > 0 
-                                       || x.TotalQuantityWeight > 0 
-                                       || x.TotalOnProcessQuantity > 0 
+            return await group.Where(x => x.TotalQuantity > 0
+                                       || x.TotalQuantityWeight > 0
+                                       || x.TotalOnProcessQuantity > 0
                                        || x.TotalOnProcessQuantityWeight > 0)
                               .ToListAsync();
         }
 
-        private async Task<List<TransactionTrend>> GetTransactionTrends(DateTime startDate, DateTime endDate, DashboardRequest request)
+        private async Task<List<TransactionTrend>> GetTransactionTrends(DateTimeOffset startDate, DateTimeOffset endDate, DashboardRequest request)
         {
             var transactionQuery = _jewelryContext.TbtStockGemTransection
-                .Where(x => x.CreateDate >= startDate && x.CreateDate < endDate);
+                .Where(x => x.CreateDate >= startDate.StartOfDayUtc() && x.CreateDate < endDate.EndOfDayUtc());
 
             if (!string.IsNullOrEmpty(request.GroupName))
             {
@@ -507,10 +511,10 @@ namespace Jewelry.Service.Stock
                 .ToListAsync();
         }
 
-        private async Task<List<TopGemMovement>> GetTopGemMovements(DateTime startDate, DateTime endDate, DashboardRequest request)
+        private async Task<List<TopGemMovement>> GetTopGemMovements(DateTimeOffset startDate, DateTimeOffset endDate, DashboardRequest request)
         {
             var transactionQuery = _jewelryContext.TbtStockGemTransection
-                .Where(x => x.CreateDate >= startDate && x.CreateDate < endDate);
+                .Where(x => x.CreateDate >= startDate.StartOfDayUtc() && x.CreateDate < endDate.EndOfDayUtc());
 
             return await (from trans in transactionQuery
                           join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
@@ -537,10 +541,10 @@ namespace Jewelry.Service.Stock
                 .ToListAsync();
         }
 
-        private async Task<List<PriceChangeAlert>> GetPriceChangeAlerts(DateTime startDate, DateTime endDate, DashboardRequest request)
+        private async Task<List<PriceChangeAlert>> GetPriceChangeAlerts(DateTimeOffset startDate, DateTimeOffset endDate, DashboardRequest request)
         {
             var priceChangeQuery = _jewelryContext.TbtStockGemTransectionPrice
-                .Where(x => x.CreateDate >= startDate && x.CreateDate < endDate);
+                .Where(x => x.CreateDate >= startDate.StartOfDayUtc() && x.CreateDate < endDate.EndOfDayUtc());
 
             return await (from price in priceChangeQuery
                           join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
@@ -564,6 +568,47 @@ namespace Jewelry.Service.Stock
                 .Take(10)
                 .ToListAsync();
         }
+
+        private async Task<List<LastActivity>> GetLastActivities(DashboardRequest request)
+        {
+            var query = _jewelryContext.TbtStockGemTransection.AsQueryable();
+
+            if (!string.IsNullOrEmpty(request.GroupName))
+            {
+                var gemCodes = await _jewelryContext.TbtStockGem
+                    .Where(x => x.GroupName == request.GroupName)
+                    .Select(x => x.Code)
+                    .ToListAsync();
+                query = query.Where(x => gemCodes.Contains(x.Code));
+            }
+
+            return await (from trans in query
+                          join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                          where (string.IsNullOrEmpty(request.Shape) || gem.Shape == request.Shape) &&
+                                (string.IsNullOrEmpty(request.Grade) || gem.Grade == request.Grade)
+                          orderby trans.CreateDate descending
+                          select new LastActivity
+                          {
+                              Code = trans.Code,
+                              GroupName = gem.GroupName,
+                              Shape = gem.Shape,
+                              Grade = gem.Grade,
+                              Size = gem.Size,
+                              Type = trans.Type,
+                              TypeName = StockGemServiceStatic.GetTransactionTypeName(trans.Type),
+                              Qty = trans.Qty,
+                              Status = trans.Stastus,
+                              JobOrPo = trans.JobOrPo,
+                              Running = trans.Running,
+                              CreateDate = trans.CreateDate,
+                              CreateBy = trans.CreateBy ?? string.Empty,
+                              UpdateBy = trans.UpdateBy ?? string.Empty
+                          })
+                .Take(10)
+                .ToListAsync();
+        }
+
+      
 
         private IQueryable<TbtStockGem> BuildStockQuery(DashboardRequest request)
         {
@@ -775,5 +820,23 @@ namespace Jewelry.Service.Stock
 
         #endregion
 
+    }
+
+    public static class StockGemServiceStatic
+    {
+        public static string GetTransactionTypeName(int type)
+        {
+            return type switch
+            {
+                1 => "รับเข้าคลัง [พลอยใหม่]",
+                2 => "รับเข้าคลัง [พลอยนอกสต๊อก]",
+                3 => "รับเข้าคลัง [พลอยคืน]",
+                4 => "จ่ายออกคลัง",
+                5 => "ยืมออกคลัง",
+                6 => "คืนเข้าคลัง",
+                7 => "เบิกออกคลัง",
+                _ => "อื่นๆ"
+            };
+        }
     }
 }

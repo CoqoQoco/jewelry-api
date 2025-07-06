@@ -354,12 +354,12 @@ namespace Jewelry.Service.Receipt.Production
 
                     //embbed zone
                     var embedPrice = transactions.Where(x => x.NameGroup == "Embed");
-                    if (workerPrice.Any())
+                    if (embedPrice.Any())
                     {
-                        var _qty = workerPrice.Sum(x => x.Qty);
-                        var _qtyPrice = workerPrice.Sum(x => x.QtyPrice);
-                        var _qtyWeight = workerPrice.Sum(x => x.QtyWeight);
-                        var _qtyWeightPrice = workerPrice.Sum(x => x.QtyWeightPrice);
+                        var _qty = embedPrice.Sum(x => x.Qty);
+                        var _qtyPrice = embedPrice.Sum(x => x.QtyPrice);
+                        var _qtyWeight = embedPrice.Sum(x => x.QtyWeight);
+                        var _qtyWeightPrice = embedPrice.Sum(x => x.QtyWeightPrice);
                         var material = new jewelry.Model.Receipt.Production.PlanGet.Material
                         {
                             Type = "Setting",
@@ -380,21 +380,21 @@ namespace Jewelry.Service.Receipt.Production
 
                     //embbed zone
                     var EtcPrice = transactions.Where(x => x.NameGroup == "ETC");
-                    if (workerPrice.Any())
+                    if (EtcPrice.Any())
                     {
-                        foreach (var gem in gemTrueWeight)
+                        foreach (var item in EtcPrice)
                         {
                             var material = new jewelry.Model.Receipt.Production.PlanGet.Material
                             {
                                 Type = "ETC",
-                                TypeName = gem.Name,
-                                TypeNameDescription = gem.NameDescription,
+                                TypeName = item.Name,
+                                TypeNameDescription = item.NameDescription,
                                 TypeBarcode = null,
 
-                                Qty = Math.Round(gem.Qty / planQty, 2),
-                                QtyPrice = Math.Round(gem.QtyPrice, 2),
-                                QtyWeight = Math.Round(gem.QtyWeight / planQty, 2),
-                                QtyWeightPrice = Math.Round(gem.QtyWeightPrice, 2),
+                                Qty = Math.Round(item.Qty / planQty, 2),
+                                QtyPrice = Math.Round(item.QtyPrice, 2),
+                                QtyWeight = Math.Round(item.QtyWeight / planQty, 2),
+                                QtyWeightPrice = Math.Round(item.QtyWeightPrice, 2),
 
                                 IsOrigin = true
                             };
@@ -442,6 +442,8 @@ namespace Jewelry.Service.Receipt.Production
                 }
 
                 query.item.JsonDraft = response.MapToTbtStockProductReceiptPlanJson();
+                query.item.JsonBreakdown = response.MapToTbtStockProductReceiptPlanBreakdownJson();
+
                 query.item.UpdateBy = CurrentUsername;
                 query.item.UpdateDate = DateTime.UtcNow;
 
