@@ -306,7 +306,7 @@ namespace Jewelry.Service.Stock
         public async Task<DashboardResponse> GetStockGemDashboard(DashboardRequest request)
         {
             var response = new DashboardResponse();
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTime.UtcNow;
             var startDate = request.StartDate?.StartOfDayUtc() ?? now.Date.AddDays(-30);
             var endDate = request.EndDate?.EndOfDayUtc() ?? now.Date.AddDays(1);
 
@@ -392,7 +392,7 @@ namespace Jewelry.Service.Stock
 
         public async Task<MonthlyReportResponse> GetMonthlyReport(DashboardRequest request)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTime.UtcNow;
             var startOfMonth = new DateTime(now.Year, now.Month, 1);
             var endOfMonth = startOfMonth.AddMonths(1);
 
@@ -639,16 +639,16 @@ namespace Jewelry.Service.Stock
         // Note: The following methods are simplified implementations
         // In a production environment, you would implement more sophisticated logic for each
 
-        private async Task<TodayStockSummary> GetTodaySummary(DateTime today, DateTime tomorrow, DashboardRequest request)
+        private async Task<TodayStockSummary> GetTodaySummary(DateTimeOffset today, DateTimeOffset tomorrow, DashboardRequest request)
         {
             var transactionQuery = _jewelryContext.TbtStockGemTransection
-                .Where(x => x.CreateDate >= today && x.CreateDate < tomorrow);
+                .Where(x => x.CreateDate >= today.StartOfDayUtc() && x.CreateDate < tomorrow.EndOfDayUtc());
 
             var priceChangeQuery = _jewelryContext.TbtStockGemTransectionPrice
-                .Where(x => x.CreateDate >= today && x.CreateDate < tomorrow);
+                .Where(x => x.CreateDate >= today.StartOfDayUtc() && x.CreateDate < tomorrow.EndOfDayUtc());
 
             var newStockQuery = _jewelryContext.TbtStockGem
-                .Where(x => x.CreateDate >= today && x.CreateDate < tomorrow);
+                .Where(x => x.CreateDate >= today.StartOfDayUtc() && x.CreateDate < tomorrow.EndOfDayUtc());
 
             return new TodayStockSummary
             {
@@ -662,11 +662,11 @@ namespace Jewelry.Service.Stock
             };
         }
 
-        private async Task<List<TodayTransaction>> GetTodayTransactions(DateTime today, DateTime tomorrow, DashboardRequest request)
+        private async Task<List<TodayTransaction>> GetTodayTransactions(DateTimeOffset today, DateTimeOffset tomorrow, DashboardRequest request)
         {
             return await (from trans in _jewelryContext.TbtStockGemTransection
                           join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                          where trans.CreateDate >= today && trans.CreateDate < tomorrow
+                          where trans.CreateDate >= today.StartOfDayUtc() && trans.CreateDate < tomorrow.EndOfDayUtc()
                           select new TodayTransaction
                           {
                               Running = trans.Running,
@@ -688,11 +688,11 @@ namespace Jewelry.Service.Stock
                 .ToListAsync();
         }
 
-        private async Task<List<TodayPriceChange>> GetTodayPriceChanges(DateTime today, DateTime tomorrow, DashboardRequest request)
+        private async Task<List<TodayPriceChange>> GetTodayPriceChanges(DateTimeOffset today, DateTimeOffset tomorrow, DashboardRequest request)
         {
             return await (from price in _jewelryContext.TbtStockGemTransectionPrice
                           join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
-                          where price.CreateDate >= today && price.CreateDate < tomorrow
+                          where price.CreateDate >= today.StartOfDayUtc() && price.CreateDate < tomorrow.EndOfDayUtc()
                           select new TodayPriceChange
                           {
                               Code = price.Code,
@@ -708,10 +708,10 @@ namespace Jewelry.Service.Stock
                 .ToListAsync();
         }
 
-        private async Task<List<TodayNewStock>> GetTodayNewStocks(DateTime today, DateTime tomorrow, DashboardRequest request)
+        private async Task<List<TodayNewStock>> GetTodayNewStocks(DateTimeOffset today, DateTimeOffset tomorrow, DashboardRequest request)
         {
             return await _jewelryContext.TbtStockGem
-                .Where(x => x.CreateDate >= today && x.CreateDate < tomorrow)
+                .Where(x => x.CreateDate >= today.StartOfDayUtc() && x.CreateDate < tomorrow.EndOfDayUtc())
                 .Select(x => new TodayNewStock
                 {
                     Code = x.Code,
@@ -753,48 +753,48 @@ namespace Jewelry.Service.Stock
         // Placeholder methods for weekly and monthly reports
         // These would need similar detailed implementations
 
-        private async Task<WeeklyStockSummary> GetWeeklySummary(DateTime startOfWeek, DateTime endOfWeek, DashboardRequest request)
+        private async Task<WeeklyStockSummary> GetWeeklySummary(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
             // Implementation similar to daily but aggregated for week
             return new WeeklyStockSummary();
         }
 
-        private async Task<List<DailyMovement>> GetDailyMovements(DateTime startOfWeek, DateTime endOfWeek, DashboardRequest request)
+        private async Task<List<DailyMovement>> GetDailyMovements(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
             // Implementation for daily breakdown within the week
             return new List<DailyMovement>();
         }
 
-        private async Task<List<WeeklyTopMovement>> GetWeeklyTopMovements(DateTime startOfWeek, DateTime endOfWeek, DashboardRequest request)
+        private async Task<List<WeeklyTopMovement>> GetWeeklyTopMovements(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
             // Implementation for weekly top movements
             return new List<WeeklyTopMovement>();
         }
 
-        private async Task<List<WeeklyPerformance>> GetWeeklyPerformance(DateTime startOfWeek, DateTime endOfWeek, DashboardRequest request)
+        private async Task<List<WeeklyPerformance>> GetWeeklyPerformance(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
             // Implementation for weekly performance metrics
             return new List<WeeklyPerformance>();
         }
 
-        private async Task<List<WeeklyTrendAnalysis>> GetWeeklyTrendAnalysis(DateTime startOfWeek, DateTime endOfWeek, DashboardRequest request)
+        private async Task<List<WeeklyTrendAnalysis>> GetWeeklyTrendAnalysis(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
             // Implementation for weekly trend analysis
             return new List<WeeklyTrendAnalysis>();
         }
 
-        private async Task<MonthlyStockSummary> GetMonthlySummary(DateTime startOfMonth, DateTime endOfMonth, DashboardRequest request)
+        private async Task<MonthlyStockSummary> GetMonthlySummary(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             var transactionQuery = _jewelryContext.TbtStockGemTransection
-                .Where(x => x.CreateDate >= startOfMonth && x.CreateDate < endOfMonth);
+                .Where(x => x.CreateDate >= startOfMonth.StartOfDayUtc() && x.CreateDate < endOfMonth.EndOfDayUtc());
 
             var completedTransactions = transactionQuery.Where(x => x.Stastus == "completed");
 
             var priceChangeQuery = _jewelryContext.TbtStockGemTransectionPrice
-                .Where(x => x.CreateDate >= startOfMonth && x.CreateDate < endOfMonth);
+                .Where(x => x.CreateDate >= startOfMonth.StartOfDayUtc() && x.CreateDate < endOfMonth.EndOfDayUtc());
 
             var newStockQuery = _jewelryContext.TbtStockGem
-                .Where(x => x.CreateDate >= startOfMonth && x.CreateDate < endOfMonth);
+                .Where(x => x.CreateDate >= startOfMonth.StartOfDayUtc() && x.CreateDate < endOfMonth.EndOfDayUtc());
 
             // Calculate totals from completed transactions only
             var inboundTransactions = completedTransactions.Where(x => x.Type == 1 || x.Type == 2 || x.Type == 3 || x.Type == 6);
@@ -840,7 +840,7 @@ namespace Jewelry.Service.Stock
             };
         }
 
-        private async Task<List<WeeklyComparison>> GetWeeklyComparisons(DateTime startOfMonth, DateTime endOfMonth, DashboardRequest request)
+        private async Task<List<WeeklyComparison>> GetWeeklyComparisons(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             var weeklyData = new List<WeeklyComparison>();
             
@@ -867,8 +867,8 @@ namespace Jewelry.Service.Stock
                 weeklyData.Add(new WeeklyComparison
                 {
                     WeekNumber = weekNumber,
-                    WeekStartDate = current,
-                    WeekEndDate = weekEnd.AddDays(-1),
+                    WeekStartDate = current.DateTime,
+                    WeekEndDate = weekEnd.AddDays(-1).DateTime,
                     TransactionCount = weeklyTransactions.Count,
                     QuantityIn = inboundTransactions.Sum(x => x.Qty),
                     QuantityOut = outboundTransactions.Sum(x => x.Qty),
@@ -886,11 +886,11 @@ namespace Jewelry.Service.Stock
             return weeklyData;
         }
 
-        private async Task<List<MonthlyTopPerformer>> GetMonthlyTopPerformers(DateTime startOfMonth, DateTime endOfMonth, DashboardRequest request)
+        private async Task<List<MonthlyTopPerformer>> GetMonthlyTopPerformers(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
                                               join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                                              where trans.CreateDate >= startOfMonth && trans.CreateDate < endOfMonth 
+                                              where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDayUtc()
                                                     && trans.Stastus == "completed"
                                               select new { trans, gem })
                                               .ToListAsync();
@@ -928,11 +928,11 @@ namespace Jewelry.Service.Stock
             return gemPerformance;
         }
 
-        private async Task<List<MonthlyInventoryAnalysis>> GetMonthlyInventoryAnalysis(DateTime startOfMonth, DateTime endOfMonth, DashboardRequest request)
+        private async Task<List<MonthlyInventoryAnalysis>> GetMonthlyInventoryAnalysis(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
                                               join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                                              where trans.CreateDate >= startOfMonth && trans.CreateDate < endOfMonth 
+                                              where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDay() 
                                                     && trans.Stastus == "completed"
                                               select new { trans, gem })
                                               .ToListAsync();
@@ -963,13 +963,13 @@ namespace Jewelry.Service.Stock
             return inventoryAnalysis;
         }
 
-        private async Task<List<MonthlyPriceAnalysis>> GetMonthlyPriceAnalysis(DateTime startOfMonth, DateTime endOfMonth, DashboardRequest request)
+        private async Task<List<MonthlyPriceAnalysis>> GetMonthlyPriceAnalysis(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             // Implementation for monthly price analysis
             return new List<MonthlyPriceAnalysis>();
         }
 
-        private async Task<List<MonthlySupplierAnalysis>> GetMonthlySupplierAnalysis(DateTime startOfMonth, DateTime endOfMonth, DashboardRequest request)
+        private async Task<List<MonthlySupplierAnalysis>> GetMonthlySupplierAnalysis(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             // Implementation for monthly supplier analysis
             return new List<MonthlySupplierAnalysis>();
@@ -978,13 +978,17 @@ namespace Jewelry.Service.Stock
         // New method to get monthly transaction summaries by gem type
         public async Task<List<MonthlyGemTransactionSummary>> GetMonthlyGemTransactionSummaries(DashboardRequest request)
         {
-            var now = DateTimeOffset.UtcNow;
-            var startOfMonth = new DateTime(now.Year, now.Month, 1);
-            var endOfMonth = startOfMonth.AddMonths(1);
+            //var now = DateTime.UtcNow;
+            //var startOfMonth = new DateTime(now.Year, now.Month, 1);
+            //var endOfMonth = startOfMonth.AddMonths(1);
+
+            var nowOffset = DateTimeOffset.UtcNow;
+            var startOfMonthOffset = new DateTimeOffset(nowOffset.Year, nowOffset.Month, 1, 0, 0, 0, TimeSpan.Zero);
+            var endOfMonthOffset = startOfMonthOffset.AddMonths(1);
 
             var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
                                               join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                                              where trans.CreateDate >= startOfMonth && trans.CreateDate < endOfMonth 
+                                              where trans.CreateDate >= startOfMonthOffset.StartOfDayUtc() && trans.CreateDate < endOfMonthOffset.EndOfDayUtc()
                                                     && trans.Stastus == "completed"
                                               select new { trans, gem })
                                               .ToListAsync();
