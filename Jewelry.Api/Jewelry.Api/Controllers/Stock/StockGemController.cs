@@ -199,6 +199,24 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("Dashboard/Monthly/GemTransactionSummaries")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<MonthlyGemTransactionSummary>))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetMonthlyGemTransactionSummaries([FromBody] DashboardWrapperRequest request)
+        {
+            try
+            {
+                var response = await _service.GetMonthlyGemTransactionSummaries(request.Dashboard);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         #endregion
     }
 }
