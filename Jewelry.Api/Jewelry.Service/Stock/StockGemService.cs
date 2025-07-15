@@ -470,7 +470,7 @@ namespace Jewelry.Service.Stock
                                  TotalQuantityWeight = g.Sum(x => x.QuantityWeight),
                                  TotalOnProcessQuantityWeight = g.Sum(x => x.QuantityWeightOnProcess),
                                  TotalValue = g.Sum(x => x.UnitCode == "Q" ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price)),
-                                 AveragePrice = g.Average(x => x.Price)
+                                 AveragePrice = g.Any() ? g.Average(x => x.Price) : 0
                              })
                              .OrderByDescending(x => x.GroupName);
 
@@ -951,7 +951,7 @@ namespace Jewelry.Service.Stock
                     TotalValue = g.Sum(x => x.trans.SupplierCost ?? 0),
                     AverageQuantityPerItem = g.Select(x => x.gem.Code).Distinct().Count() > 0 ? 
                         g.Sum(x => x.trans.Qty) / g.Select(x => x.gem.Code).Distinct().Count() : 0,
-                    AveragePricePerUnit = g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price),
+                    AveragePricePerUnit = g.Where(x => x.gem.Price > 0).Any() ? g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price) : 0,
                     InventoryDays = 30, // TODO: Calculate based on usage rate
                     InventoryStatus = "OPTIMAL", // TODO: Determine based on business rules
                     RecommendedOrderQuantity = 0, // TODO: Calculate based on demand
@@ -985,9 +985,15 @@ namespace Jewelry.Service.Stock
             var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
                                               join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
                                               where trans.CreateDate >= startOfMonthOffset.StartOfDayUtc() && trans.CreateDate < endOfMonthOffset.EndOfDayUtc()
-                                                    && trans.Stastus == "completed"
+                                                    && (trans.Stastus == "completed" || trans.Stastus == "COMPLETED" || string.IsNullOrEmpty(trans.Stastus))
                                               select new { trans, gem })
                                               .ToListAsync();
+
+            // If no transactions found, return empty list instead of throwing error
+            if (!completedTransactions.Any())
+            {
+                return new List<MonthlyGemTransactionSummary>();
+            }
 
             // Group by gem type and calculate summaries with detailed transaction type breakdown
             var gemSummaries = completedTransactions
@@ -1027,12 +1033,12 @@ namespace Jewelry.Service.Stock
                     TotalValue = g.Sum(x => x.trans.SupplierCost ?? 0),
                     
                     // Current stock levels
-                    CurrentQuantity = g.Max(x => x.gem.Quantity),
-                    CurrentWeight = g.Max(x => x.gem.QuantityWeight),
+                    CurrentQuantity = g.Any() ? g.Max(x => x.gem.Quantity) : 0,
+                    CurrentWeight = g.Any() ? g.Max(x => x.gem.QuantityWeight) : 0,
                     
                     // Activity metrics
                     MostActiveGemCode = g.OrderByDescending(x => x.trans.Qty).FirstOrDefault()?.gem.Code ?? "",
-                    LastTransactionDate = g.Max(x => x.trans.CreateDate)
+                    LastTransactionDate = g.Any() ? g.Max(x => x.trans.CreateDate) : DateTimeOffset.MinValue.DateTime
                 })
                 .OrderByDescending(x => x.TotalTransactions)
                 .ThenByDescending(x => x.TotalQuantityUsed)
