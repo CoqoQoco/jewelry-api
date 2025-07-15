@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace jewelry.Model.Stock.Gem.Dashboard
 {
@@ -12,6 +13,9 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public int TotalTransactions { get; set; }
         public int InboundTransactions { get; set; }
         public int OutboundTransactions { get; set; }
+        
+        // Detailed transaction type breakdown
+        public List<TransactionTypeSummary> TransactionsByType { get; set; } = new List<TransactionTypeSummary>();
         
         // Quantity totals
         public decimal TotalQuantityUsed { get; set; }

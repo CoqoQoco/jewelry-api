@@ -306,7 +306,7 @@ namespace Jewelry.Service.Stock
         public async Task<DashboardResponse> GetStockGemDashboard(DashboardRequest request)
         {
             var response = new DashboardResponse();
-            var now = DateTime.UtcNow;
+            var now = DateTimeOffset.UtcNow;
             var startDate = request.StartDate?.StartOfDayUtc() ?? now.Date.AddDays(-30);
             var endDate = request.EndDate?.EndOfDayUtc() ?? now.Date.AddDays(1);
 
@@ -333,12 +333,12 @@ namespace Jewelry.Service.Stock
 
         public async Task<TodayReportResponse> GetTodayReport(DashboardRequest request)
         {
-            var today = DateTime.UtcNow;
+            var today = DateTimeOffset.UtcNow;
             var tomorrow = today.AddDays(1);
 
             var response = new TodayReportResponse
             {
-                ReportDate = today
+                ReportDate = today.DateTime
             };
 
             // Today's summary
@@ -361,15 +361,15 @@ namespace Jewelry.Service.Stock
 
         public async Task<WeeklyReportResponse> GetWeeklyReport(DashboardRequest request)
         {
-            var now = DateTime.UtcNow;
-            var startOfWeek = now.Date.AddDays(-(int)now.DayOfWeek);
+            var now = DateTimeOffset.UtcNow;
+            var startOfWeek = new DateTimeOffset(now.Date.AddDays(-(int)now.DayOfWeek), now.Offset);
             var endOfWeek = startOfWeek.AddDays(7);
 
             var response = new WeeklyReportResponse
             {
-                WeekStartDate = startOfWeek,
-                WeekEndDate = endOfWeek,
-                WeekNumber = $"Week {GetWeekOfYear(now)}"
+                WeekStartDate = startOfWeek.DateTime,
+                WeekEndDate = endOfWeek.DateTime,
+                WeekNumber = $"Week {GetWeekOfYear(now.DateTime)}"
             };
 
             // Weekly summary
@@ -392,8 +392,8 @@ namespace Jewelry.Service.Stock
 
         public async Task<MonthlyReportResponse> GetMonthlyReport(DashboardRequest request)
         {
-            var now = DateTime.UtcNow;
-            var startOfMonth = new DateTime(now.Year, now.Month, 1);
+            var now = DateTimeOffset.UtcNow;
+            var startOfMonth = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, now.Offset);
             var endOfMonth = startOfMonth.AddMonths(1);
 
             var response = new MonthlyReportResponse
@@ -401,8 +401,8 @@ namespace Jewelry.Service.Stock
                 Year = now.Year,
                 Month = now.Month,
                 MonthName = now.ToString("MMMM"),
-                MonthStartDate = startOfMonth,
-                MonthEndDate = endOfMonth.AddDays(-1)
+                MonthStartDate = startOfMonth.DateTime,
+                MonthEndDate = endOfMonth.AddDays(-1).DateTime
             };
 
             // Monthly summary
@@ -932,7 +932,7 @@ namespace Jewelry.Service.Stock
         {
             var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
                                               join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                                              where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDay() 
+                                              where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDayUtc() 
                                                     && trans.Stastus == "completed"
                                               select new { trans, gem })
                                               .ToListAsync();
@@ -978,12 +978,8 @@ namespace Jewelry.Service.Stock
         // New method to get monthly transaction summaries by gem type
         public async Task<List<MonthlyGemTransactionSummary>> GetMonthlyGemTransactionSummaries(DashboardRequest request)
         {
-            //var now = DateTime.UtcNow;
-            //var startOfMonth = new DateTime(now.Year, now.Month, 1);
-            //var endOfMonth = startOfMonth.AddMonths(1);
-
             var nowOffset = DateTimeOffset.UtcNow;
-            var startOfMonthOffset = new DateTimeOffset(nowOffset.Year, nowOffset.Month, 1, 0, 0, 0, TimeSpan.Zero);
+            var startOfMonthOffset = new DateTimeOffset(nowOffset.Year, nowOffset.Month, 1, 0, 0, 0, nowOffset.Offset);
             var endOfMonthOffset = startOfMonthOffset.AddMonths(1);
 
             var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
@@ -993,7 +989,7 @@ namespace Jewelry.Service.Stock
                                               select new { trans, gem })
                                               .ToListAsync();
 
-            // Group by gem type and calculate summaries
+            // Group by gem type and calculate summaries with detailed transaction type breakdown
             var gemSummaries = completedTransactions
                 .GroupBy(x => new { x.gem.GroupName, x.gem.Shape, x.gem.Grade })
                 .Select(g => new MonthlyGemTransactionSummary
@@ -1005,7 +1001,19 @@ namespace Jewelry.Service.Stock
                     TotalQuantityUsed = g.Sum(x => x.trans.Qty),
                     TotalWeightUsed = g.Sum(x => x.trans.QtyWeight),
                     
-                    // Transaction type breakdown
+                    // Transaction type breakdown using GetTransactionTypeName
+                    TransactionsByType = g.GroupBy(x => x.trans.Type)
+                                         .Select(tg => new TransactionTypeSummary
+                                         {
+                                             Type = tg.Key,
+                                             TypeName = StockGemServiceStatic.GetTransactionTypeName(tg.Key),
+                                             Count = tg.Count(),
+                                             TotalQuantity = tg.Sum(x => x.trans.Qty),
+                                             TotalWeight = tg.Sum(x => x.trans.QtyWeight),
+                                             TotalCost = tg.Sum(x => x.trans.SupplierCost ?? 0)
+                                         }).ToList(),
+                    
+                    // Simplified inbound/outbound totals
                     InboundTransactions = g.Count(x => x.trans.Type == 1 || x.trans.Type == 2 || x.trans.Type == 3 || x.trans.Type == 6),
                     OutboundTransactions = g.Count(x => x.trans.Type == 4 || x.trans.Type == 5 || x.trans.Type == 7),
                     
@@ -1015,7 +1023,7 @@ namespace Jewelry.Service.Stock
                     InboundWeight = g.Where(x => x.trans.Type == 1 || x.trans.Type == 2 || x.trans.Type == 3 || x.trans.Type == 6).Sum(x => x.trans.QtyWeight),
                     OutboundWeight = g.Where(x => x.trans.Type == 4 || x.trans.Type == 5 || x.trans.Type == 7).Sum(x => x.trans.QtyWeight),
                     
-                    AveragePrice = g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price),
+                    AveragePrice = g.Where(x => x.gem.Price > 0).Any() ? g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price) : 0,
                     TotalValue = g.Sum(x => x.trans.SupplierCost ?? 0),
                     
                     // Current stock levels
