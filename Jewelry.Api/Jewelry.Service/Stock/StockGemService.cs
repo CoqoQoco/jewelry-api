@@ -1017,17 +1017,34 @@ namespace Jewelry.Service.Stock
                                              TotalQuantity = tg.Sum(x => x.trans.Qty),
                                              TotalWeight = tg.Sum(x => x.trans.QtyWeight),
                                              TotalCost = tg.Sum(x => x.trans.SupplierCost ?? 0)
-                                         }).ToList(),
+                                         }).OrderBy(x => x.Type).ToList(),
                     
-                    // Simplified inbound/outbound totals
+                    // Updated transaction categorization based on new rules
+                    // Inbound: Types 1, 2, 3 (regular inbound) + Type 6 (return from borrow)
                     InboundTransactions = g.Count(x => x.trans.Type == 1 || x.trans.Type == 2 || x.trans.Type == 3 || x.trans.Type == 6),
+                    // Outbound: Type 4 (regular outbound) + Type 5 (process borrow) + Type 7 (outbound from borrow)
                     OutboundTransactions = g.Count(x => x.trans.Type == 4 || x.trans.Type == 5 || x.trans.Type == 7),
                     
+                    // Process borrow transactions (Type 5 and related)
+                    ProcessBorrowTransactions = g.Count(x => x.trans.Type == 5),
+                    ProcessBorrowReturnTransactions = g.Count(x => x.trans.Type == 6),
+                    ProcessBorrowOutboundTransactions = g.Count(x => x.trans.Type == 7),
+                    
+                    // Quantity breakdowns with updated classification
                     InboundQuantity = g.Where(x => x.trans.Type == 1 || x.trans.Type == 2 || x.trans.Type == 3 || x.trans.Type == 6).Sum(x => x.trans.Qty),
                     OutboundQuantity = g.Where(x => x.trans.Type == 4 || x.trans.Type == 5 || x.trans.Type == 7).Sum(x => x.trans.Qty),
                     
+                    ProcessBorrowQuantity = g.Where(x => x.trans.Type == 5).Sum(x => x.trans.Qty),
+                    ProcessBorrowReturnQuantity = g.Where(x => x.trans.Type == 6).Sum(x => x.trans.Qty),
+                    ProcessBorrowOutboundQuantity = g.Where(x => x.trans.Type == 7).Sum(x => x.trans.Qty),
+                    
+                    // Weight breakdowns with updated classification
                     InboundWeight = g.Where(x => x.trans.Type == 1 || x.trans.Type == 2 || x.trans.Type == 3 || x.trans.Type == 6).Sum(x => x.trans.QtyWeight),
                     OutboundWeight = g.Where(x => x.trans.Type == 4 || x.trans.Type == 5 || x.trans.Type == 7).Sum(x => x.trans.QtyWeight),
+                    
+                    ProcessBorrowWeight = g.Where(x => x.trans.Type == 5).Sum(x => x.trans.QtyWeight),
+                    ProcessBorrowReturnWeight = g.Where(x => x.trans.Type == 6).Sum(x => x.trans.QtyWeight),
+                    ProcessBorrowOutboundWeight = g.Where(x => x.trans.Type == 7).Sum(x => x.trans.QtyWeight),
                     
                     AveragePrice = g.Where(x => x.gem.Price > 0).Any() ? g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price) : 0,
                     TotalValue = g.Sum(x => x.trans.SupplierCost ?? 0),
@@ -1061,7 +1078,9 @@ namespace Jewelry.Service.Stock
                 2 => "รับเข้าคลัง [พลอยนอกสต๊อก]",
                 3 => "รับเข้าคลัง [พลอยคืน]",
                 4 => "จ่ายออกคลัง",
+
                 5 => "ยืมออกคลัง",
+
                 6 => "คืนเข้าคลัง",
                 7 => "เบิกออกคลัง",
                 _ => "อื่นๆ"

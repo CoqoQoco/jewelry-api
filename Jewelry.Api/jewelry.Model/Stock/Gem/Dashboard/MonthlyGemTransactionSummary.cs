@@ -14,6 +14,11 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public int InboundTransactions { get; set; }
         public int OutboundTransactions { get; set; }
         
+        // Process borrow transaction counts
+        public int ProcessBorrowTransactions { get; set; }
+        public int ProcessBorrowReturnTransactions { get; set; }
+        public int ProcessBorrowOutboundTransactions { get; set; }
+        
         // Detailed transaction type breakdown
         public List<TransactionTypeSummary> TransactionsByType { get; set; } = new List<TransactionTypeSummary>();
         
@@ -22,10 +27,20 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public decimal InboundQuantity { get; set; }
         public decimal OutboundQuantity { get; set; }
         
+        // Process borrow quantity totals
+        public decimal ProcessBorrowQuantity { get; set; }
+        public decimal ProcessBorrowReturnQuantity { get; set; }
+        public decimal ProcessBorrowOutboundQuantity { get; set; }
+        
         // Weight totals
         public decimal TotalWeightUsed { get; set; }
         public decimal InboundWeight { get; set; }
         public decimal OutboundWeight { get; set; }
+        
+        // Process borrow weight totals
+        public decimal ProcessBorrowWeight { get; set; }
+        public decimal ProcessBorrowReturnWeight { get; set; }
+        public decimal ProcessBorrowOutboundWeight { get; set; }
         
         // Value metrics
         public decimal AveragePrice { get; set; }
