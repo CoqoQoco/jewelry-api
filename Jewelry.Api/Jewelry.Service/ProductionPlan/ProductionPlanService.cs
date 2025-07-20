@@ -2787,7 +2787,7 @@ namespace Jewelry.Service.ProductionPlan
 
                 if (!checkPermission)
                 {
-                    throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PlanCompleted}");
+                    throw new HandleException($"{request.Wo}-{request.WoNumber} --> {ErrorMessage.PermissionFail}");
                 }
             }
             if (plan.Status == ProductionPlanStatus.Melted)

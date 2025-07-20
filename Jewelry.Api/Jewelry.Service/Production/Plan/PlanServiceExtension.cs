@@ -23,7 +23,7 @@ namespace Jewelry.Service.Production.Plan
             };
         }
 
-        public static int GetWatingStatus(this ProductionPlanStatusEnum currentStatus)
+        public static int GetWatingStatus(this ProductionPlanStatusEnum currentStatus, bool isCVD)
         {
             return currentStatus switch
             {
@@ -32,7 +32,7 @@ namespace Jewelry.Service.Production.Plan
                 ProductionPlanStatusEnum.Gems => (int)ProductionPlanStatusEnum.WaitGems,
                 ProductionPlanStatusEnum.Embed => (int)ProductionPlanStatusEnum.WaitEmbed,
                 ProductionPlanStatusEnum.Plated => (int)ProductionPlanStatusEnum.WaitPlated,
-                ProductionPlanStatusEnum.Price => (int)ProductionPlanStatusEnum.WaitPrice,
+                ProductionPlanStatusEnum.Price => isCVD ? (int)ProductionPlanStatusEnum.Price : (int)ProductionPlanStatusEnum.WaitPrice,
                 ProductionPlanStatusEnum.Completed => (int)ProductionPlanStatusEnum.Completed,
                 _ => (int)currentStatus
             };

@@ -93,14 +93,14 @@ namespace Jewelry.Service.Base
             // ตรวจสอบว่ามี topic นั้นใน map หรือไม่
             if (!permissionMap.ContainsKey(topic))
             {
-                throw new KeyNotFoundException($"ไม่พบการกำหนดสิทธิ์สำหรับ {topic}");
+                throw new KeyNotFoundException($"ไม่พบการกำหนดสิทธิ์");
             }
 
             // ตรวจสอบสิทธิ์
             var allowedRoles = permissionMap[topic];
             if (!allowedRoles.Any(role => CurrentUserRoles.Contains(role)))
             {
-                throw new UnauthorizedAccessException($"คุณไม่มีสิทธิ์เข้าถึง: {topic}");
+                throw new UnauthorizedAccessException($"คุณไม่มีสิทธิ์เข้าถึง");
             }
 
             return true;

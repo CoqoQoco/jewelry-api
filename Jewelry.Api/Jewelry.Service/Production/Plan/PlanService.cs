@@ -246,6 +246,15 @@ namespace Jewelry.Service.Production.Plan
             {
                 throw new HandleException(ErrorMessage.InvalidRequest);
             }
+
+            if (request.TargetStatus == ProductionPlanStatus.Price && request.TargetStatusCvd.HasValue && request.TargetStatusCvd.Value)
+            {
+                var checkPermission = GetPermissionLevel("update_plan");
+                if (!checkPermission)
+                {
+                    throw new HandleException($"{ErrorMessage.PermissionFail}");
+                }
+            }
         }
         private async Task<List<TbtProductionPlan>> GetProductionPlans(int[] planIds)
         {
@@ -424,8 +433,13 @@ namespace Jewelry.Service.Production.Plan
                 data.ReceiptRunning = receiptRunning;
             }
 
-            plan.Status = currentStatus.GetWatingStatus();
+            bool isCvd = request.TargetStatusCvd.HasValue ? request.TargetStatusCvd.Value : false;
+
+            plan.Status = currentStatus.GetWatingStatus(isCvd);
             plan.UpdateDate = data.DateNow;
+
+
+
             plan.UpdateBy = CurrentUsername;
             data.UpdatePlans.Add(plan);
         }

@@ -11,6 +11,7 @@ namespace jewelry.Model.Production.Plan.Transfer
     {
         public int FormerStatus { get; set; }
         public int TargetStatus { get; set; }
+        public bool? TargetStatusCvd { get; set; } = false;
 
         public string? WorkerCode { get; set; }
         public string? WorkerName { get; set; }
