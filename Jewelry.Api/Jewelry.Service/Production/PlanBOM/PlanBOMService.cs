@@ -294,16 +294,26 @@ namespace Jewelry.Service.Production.PlanBOM
                             .Include(x => x.Production.ProductTypeNavigation)
                            where bom.Production.IsActive == true
                            && bom.Production.Status == ProductionPlanStatus.Completed
-                           && bom.Production.CompletedDate >= request.Start.StartOfDayUtc()
-                           && bom.Production.CompletedDate <= request.End.EndOfDayUtc()
+                           //&& bom.Production.CompletedDate >= request.Start.StartOfDayUtc()
+                           //&& bom.Production.CompletedDate <= request.End.EndOfDayUtc()
                            //&& ((bom.NameGroup == "Gold" && bom.Name == goldSpecificName) || (bom.NameGroup == "Gem"))
-                           && (bom.NameGroup == "Gold"  || bom.NameGroup == "Gem")
+                           && (bom.NameGroup == "Gold" || bom.NameGroup == "Gem")
                            select bom;
+
+            //filte by date range
+            if (request.Start.HasValue)
+            {
+                bomQuery = bomQuery.Where(x => x.Production.CompletedDate >= request.Start.Value.StartOfDayUtc());
+            }
+            if (request.End.HasValue)
+            {
+                bomQuery = bomQuery.Where(x => x.Production.CompletedDate <= request.End.Value.EndOfDayUtc());
+            }
 
             // Apply text filters
             if (!string.IsNullOrEmpty(request.Text))
             {
-                bomQuery = bomQuery.Where(x => x.Name.Contains(request.Text) 
+                bomQuery = bomQuery.Where(x => x.Name.Contains(request.Text)
                     || x.NameDescription.Contains(request.Text)
                     || x.Production.ProductNumber.Contains(request.Text));
             }
@@ -357,15 +367,16 @@ namespace Jewelry.Service.Production.PlanBOM
 
             return bomQuery.Select(b => new jewelry.Model.Production.PlanBOM.List.Response
             {
-                Name = b.Name,
+                Name = b.NameGroup == "Gold"  ? (b.Production.Type == "Silver" ? $"{b.Name} ({b.Production.Type})" : $"{b.Name} ({b.Production.Type} {b.Production.TypeSize})")
+                                              : b.Name,
                 NameDescription = b.NameDescription,
                 NameGroup = b.NameGroup,
-                
+
                 Date = b.Production.CompletedDate,
-                
+
                 Qty = b.Qty,
                 QtyPrice = b.QtyPrice,
-                
+
                 QtyWeight = b.QtyWeight,
                 QtyWeightPrice = b.QtyWeightPrice,
 

@@ -14,8 +14,8 @@ namespace jewelry.Model.Production.PlanBOM.List
 
     public class Criteria
     {
-        public DateTimeOffset Start { get; set; }
-        public DateTimeOffset End { get; set; }
+        public DateTimeOffset? Start { get; set; }
+        public DateTimeOffset? End { get; set; }
 
         public string? Text { get; set; }
         public string? WoText { get; set; }
