@@ -9,5 +9,8 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public string? GroupName { get; set; }
         public string? Shape { get; set; }
         public string? Grade { get; set; }
+        
+        // Additional properties for monthly filtering (support up to 10 months)
+       
     }
 }

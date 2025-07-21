@@ -208,7 +208,7 @@ namespace Jewelry.Api.Controllers.Stock
         {
             try
             {
-                var response = await _service.GetMonthlyGemTransactionSummaries(request.Dashboard);
+                var response = await _service.GetTransactionSummariesByType(request.Dashboard);
                 return Ok(response);
             }
             catch (HandleException ex)

@@ -35,7 +35,8 @@ namespace Jewelry.Service.Stock
         Task<TodayReportResponse> GetTodayReport(DashboardRequest request);
         Task<WeeklyReportResponse> GetWeeklyReport(DashboardRequest request);
         Task<MonthlyReportResponse> GetMonthlyReport(DashboardRequest request);
-        Task<List<MonthlyGemTransactionSummary>> GetMonthlyGemTransactionSummaries(DashboardRequest request);
+
+        Task<List<TransactionTypeCategorySummary>> GetTransactionSummariesByType(DashboardRequest request);
     }
     public class StockGemService : IStockGemService
     {
@@ -598,6 +599,7 @@ namespace Jewelry.Service.Stock
                               Type = trans.Type,
                               TypeName = StockGemServiceStatic.GetTransactionTypeName(trans.Type),
                               Qty = trans.Qty,
+                              QtyWeight = trans.QtyWeight,
                               Status = trans.Stastus,
                               JobOrPo = trans.JobOrPo,
                               Running = trans.Running,
@@ -609,7 +611,7 @@ namespace Jewelry.Service.Stock
                 .ToListAsync();
         }
 
-      
+
 
         private IQueryable<TbtStockGem> BuildStockQuery(DashboardRequest request)
         {
@@ -843,27 +845,27 @@ namespace Jewelry.Service.Stock
         private async Task<List<WeeklyComparison>> GetWeeklyComparisons(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             var weeklyData = new List<WeeklyComparison>();
-            
+
             // Get all weeks in the month
             var current = startOfMonth;
             var weekNumber = 1;
-            
+
             while (current < endOfMonth)
             {
                 var weekEnd = current.AddDays(7);
                 if (weekEnd > endOfMonth) weekEnd = endOfMonth;
-                
+
                 var weeklyTransactions = await _jewelryContext.TbtStockGemTransection
                     .Where(x => x.CreateDate >= current && x.CreateDate < weekEnd && x.Stastus == "completed")
                     .ToListAsync();
-                
+
                 var inboundTransactions = weeklyTransactions.Where(x => x.Type == 1 || x.Type == 2 || x.Type == 3 || x.Type == 6);
                 var outboundTransactions = weeklyTransactions.Where(x => x.Type == 4 || x.Type == 5 || x.Type == 7);
-                
+
                 var priceChanges = await _jewelryContext.TbtStockGemTransectionPrice
                     .Where(x => x.CreateDate >= current && x.CreateDate < weekEnd)
                     .CountAsync();
-                
+
                 weeklyData.Add(new WeeklyComparison
                 {
                     WeekNumber = weekNumber,
@@ -878,21 +880,21 @@ namespace Jewelry.Service.Stock
                     TotalValue = weeklyTransactions.Sum(x => x.SupplierCost ?? 0),
                     WeekOverWeekChange = 0 // TODO: Calculate week-over-week change
                 });
-                
+
                 current = weekEnd;
                 weekNumber++;
             }
-            
+
             return weeklyData;
         }
 
         private async Task<List<MonthlyTopPerformer>> GetMonthlyTopPerformers(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
-                                              join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                                              where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDayUtc()
-                                                    && trans.Stastus == "completed"
-                                              select new { trans, gem })
+                                               join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                               where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDayUtc()
+                                                     && trans.Stastus == "completed"
+                                               select new { trans, gem })
                                               .ToListAsync();
 
             // Group by gem type and calculate performance metrics
@@ -931,10 +933,10 @@ namespace Jewelry.Service.Stock
         private async Task<List<MonthlyInventoryAnalysis>> GetMonthlyInventoryAnalysis(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
             var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
-                                              join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                                              where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDayUtc() 
-                                                    && trans.Stastus == "completed"
-                                              select new { trans, gem })
+                                               join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                               where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDayUtc()
+                                                     && trans.Stastus == "completed"
+                                               select new { trans, gem })
                                               .ToListAsync();
 
             // Group by gem characteristics and calculate inventory metrics
@@ -949,7 +951,7 @@ namespace Jewelry.Service.Stock
                     TotalQuantity = g.Sum(x => x.trans.Qty),
                     TotalQuantityWeight = g.Sum(x => x.trans.QtyWeight),
                     TotalValue = g.Sum(x => x.trans.SupplierCost ?? 0),
-                    AverageQuantityPerItem = g.Select(x => x.gem.Code).Distinct().Count() > 0 ? 
+                    AverageQuantityPerItem = g.Select(x => x.gem.Code).Distinct().Count() > 0 ?
                         g.Sum(x => x.trans.Qty) / g.Select(x => x.gem.Code).Distinct().Count() : 0,
                     AveragePricePerUnit = g.Where(x => x.gem.Price > 0).Any() ? g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price) : 0,
                     InventoryDays = 30, // TODO: Calculate based on usage rate
@@ -975,93 +977,127 @@ namespace Jewelry.Service.Stock
             return new List<MonthlySupplierAnalysis>();
         }
 
-        // New method to get monthly transaction summaries by gem type
-        public async Task<List<MonthlyGemTransactionSummary>> GetMonthlyGemTransactionSummaries(DashboardRequest request)
+        // New method that categorizes results by transaction type (not inbound/outbound)
+        public async Task<List<TransactionTypeCategorySummary>> GetTransactionSummariesByType(DashboardRequest request)
         {
-            var nowOffset = DateTimeOffset.UtcNow;
-            var startOfMonthOffset = new DateTimeOffset(nowOffset.Year, nowOffset.Month, 1, 0, 0, 0, nowOffset.Offset);
-            var endOfMonthOffset = startOfMonthOffset.AddMonths(1);
-
-            var completedTransactions = await (from trans in _jewelryContext.TbtStockGemTransection
-                                              join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                                              where trans.CreateDate >= startOfMonthOffset.StartOfDayUtc() && trans.CreateDate < endOfMonthOffset.EndOfDayUtc()
-                                                    && (trans.Stastus == "completed" || trans.Stastus == "COMPLETED" || string.IsNullOrEmpty(trans.Stastus))
-                                              select new { trans, gem })
-                                              .ToListAsync();
-
-            // If no transactions found, return empty list instead of throwing error
-            if (!completedTransactions.Any())
+            if (!request.StartDate.HasValue || !request.EndDate.HasValue)
             {
-                return new List<MonthlyGemTransactionSummary>();
+                throw new ArgumentException("StartDate and EndDate must be provided.");
             }
 
-            // Group by gem type and calculate summaries with detailed transaction type breakdown
-            var gemSummaries = completedTransactions
-                .GroupBy(x => new { x.gem.GroupName, x.gem.Shape, x.gem.Grade })
-                .Select(g => new MonthlyGemTransactionSummary
-                {
-                    GroupName = g.Key.GroupName,
-                    Shape = g.Key.Shape,
-                    Grade = g.Key.Grade,
-                    TotalTransactions = g.Count(),
-                    TotalQuantityUsed = g.Sum(x => x.trans.Qty),
-                    TotalWeightUsed = g.Sum(x => x.trans.QtyWeight),
-                    
-                    // Transaction type breakdown using GetTransactionTypeName
-                    TransactionsByType = g.GroupBy(x => x.trans.Type)
-                                         .Select(tg => new TransactionTypeSummary
-                                         {
-                                             Type = tg.Key,
-                                             TypeName = StockGemServiceStatic.GetTransactionTypeName(tg.Key),
-                                             Count = tg.Count(),
-                                             TotalQuantity = tg.Sum(x => x.trans.Qty),
-                                             TotalWeight = tg.Sum(x => x.trans.QtyWeight),
-                                             TotalCost = tg.Sum(x => x.trans.SupplierCost ?? 0)
-                                         }).OrderBy(x => x.Type).ToList(),
-                    
-                    // Updated transaction categorization based on new rules
-                    // Inbound: Types 1, 2, 3 (regular inbound) + Type 6 (return from borrow)
-                    InboundTransactions = g.Count(x => x.trans.Type == 1 || x.trans.Type == 2 || x.trans.Type == 3 || x.trans.Type == 6),
-                    // Outbound: Type 4 (regular outbound) + Type 5 (process borrow) + Type 7 (outbound from borrow)
-                    OutboundTransactions = g.Count(x => x.trans.Type == 4 || x.trans.Type == 5 || x.trans.Type == 7),
-                    
-                    // Process borrow transactions (Type 5 and related)
-                    ProcessBorrowTransactions = g.Count(x => x.trans.Type == 5),
-                    ProcessBorrowReturnTransactions = g.Count(x => x.trans.Type == 6),
-                    ProcessBorrowOutboundTransactions = g.Count(x => x.trans.Type == 7),
-                    
-                    // Quantity breakdowns with updated classification
-                    InboundQuantity = g.Where(x => x.trans.Type == 1 || x.trans.Type == 2 || x.trans.Type == 3 || x.trans.Type == 6).Sum(x => x.trans.Qty),
-                    OutboundQuantity = g.Where(x => x.trans.Type == 4 || x.trans.Type == 5 || x.trans.Type == 7).Sum(x => x.trans.Qty),
-                    
-                    ProcessBorrowQuantity = g.Where(x => x.trans.Type == 5).Sum(x => x.trans.Qty),
-                    ProcessBorrowReturnQuantity = g.Where(x => x.trans.Type == 6).Sum(x => x.trans.Qty),
-                    ProcessBorrowOutboundQuantity = g.Where(x => x.trans.Type == 7).Sum(x => x.trans.Qty),
-                    
-                    // Weight breakdowns with updated classification
-                    InboundWeight = g.Where(x => x.trans.Type == 1 || x.trans.Type == 2 || x.trans.Type == 3 || x.trans.Type == 6).Sum(x => x.trans.QtyWeight),
-                    OutboundWeight = g.Where(x => x.trans.Type == 4 || x.trans.Type == 5 || x.trans.Type == 7).Sum(x => x.trans.QtyWeight),
-                    
-                    ProcessBorrowWeight = g.Where(x => x.trans.Type == 5).Sum(x => x.trans.QtyWeight),
-                    ProcessBorrowReturnWeight = g.Where(x => x.trans.Type == 6).Sum(x => x.trans.QtyWeight),
-                    ProcessBorrowOutboundWeight = g.Where(x => x.trans.Type == 7).Sum(x => x.trans.QtyWeight),
-                    
-                    AveragePrice = g.Where(x => x.gem.Price > 0).Any() ? g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price) : 0,
-                    TotalValue = g.Sum(x => x.trans.SupplierCost ?? 0),
-                    
-                    // Current stock levels
-                    CurrentQuantity = g.Any() ? g.Max(x => x.gem.Quantity) : 0,
-                    CurrentWeight = g.Any() ? g.Max(x => x.gem.QuantityWeight) : 0,
-                    
-                    // Activity metrics
-                    MostActiveGemCode = g.OrderByDescending(x => x.trans.Qty).FirstOrDefault()?.gem.Code ?? "",
-                    LastTransactionDate = g.Any() ? g.Max(x => x.trans.CreateDate) : DateTimeOffset.MinValue.DateTime
-                })
-                .OrderByDescending(x => x.TotalTransactions)
-                .ThenByDescending(x => x.TotalQuantityUsed)
-                .ToList();
+            var startDate = request.StartDate.Value.StartOfDayUtc();
+            var endDate = request.EndDate.Value.EndOfDayUtc();
 
-            return gemSummaries;
+            // Step 1: Get TbtStockGemTransection with joined TbtStockGem filter by startDate && endDate
+            var transactionsQuery = from trans in _jewelryContext.TbtStockGemTransection
+                                    join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                    where trans.CreateDate >= startDate && trans.CreateDate < endDate
+                                    select new { trans, gem };
+
+            var allTransactions = await transactionsQuery.ToListAsync();
+
+            if (!allTransactions.Any())
+            {
+                return new List<TransactionTypeCategorySummary>();
+            }
+
+            // Step 2: Categorized data by TbtStockGemTransection.type map to TransactionTypeCategorySummary
+            var transactionTypeSummaries = new List<TransactionTypeCategorySummary>();
+            var transactionsByType = allTransactions.GroupBy(x => x.trans.Type);
+
+            foreach (var typeGroup in transactionsByType)
+            {
+                if (typeGroup.Key == 7)
+                {
+                    // แยก IDs ออกมาก่อน
+                    var type7TransactionIds = typeGroup.Select(tg => tg.trans.Id).ToList();
+
+                    // Step 3: In type 7 must do join tbtproductionplan to, then categorized data type by tbtproductionplan.type and tbtproductionplan.typeSize
+                    var type7TransactionsWithPlan = await (from trans in _jewelryContext.TbtStockGemTransection
+                                                           join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                                           join plan in _jewelryContext.TbtProductionPlan
+                                                           on new { Wo = trans.ProductionPlanWo, WoNumber = trans.ProductionPlanWoNumber ?? 0 }
+                                                           equals new { Wo = plan.Wo, WoNumber = plan.WoNumber }
+                                                           where trans.CreateDate >= startDate && trans.CreateDate < endDate
+                                                                 && trans.Type == 7
+                                                                 && type7TransactionIds.Contains(trans.Id) // ใช้ Contains แทน Any
+                                                           select new { trans, gem, plan })
+                                                          .ToListAsync();
+
+                    var type7Summary = new TransactionTypeCategorySummary
+                    {
+                        Type = typeGroup.Key,
+                        TypeName = StockGemServiceStatic.GetTransactionTypeName(typeGroup.Key),
+                        TotalTransactions = typeGroup.Count(),
+                        TotalQuantity = typeGroup.Sum(x => x.trans.Qty),
+                        TotalWeight = typeGroup.Sum(x => x.trans.QtyWeight),
+                        //TotalCost = typeGroup.Sum(x => x.trans.SupplierCost ?? 0),
+
+                        // Group by groupname, production.type, production.typeSize for Type 7
+                        GemDetails = type7TransactionsWithPlan
+                            .GroupBy(x => new {
+                                x.gem.GroupName,
+                                x.plan.Type,
+                                x.plan.TypeSize
+                            })
+                            .Select(gemGroup => new GemTransactionDetail
+                            {
+                                Code = string.Empty,
+                                GroupName = gemGroup.Key.GroupName,
+                                TransactionCount = gemGroup.Count(),
+                                TotalQuantity = gemGroup.Sum(x => x.trans.Qty),
+                                TotalWeight = gemGroup.Sum(x => x.trans.QtyWeight),
+                                //TotalCost = gemGroup.Sum(x => x.trans.SupplierCost ?? 0),
+                                CurrentQuantity = gemGroup.FirstOrDefault()?.gem.Quantity ?? 0,
+                                CurrentWeight = gemGroup.FirstOrDefault()?.gem.QuantityWeight ?? 0,
+                                LastTransactionDate = gemGroup.Max(x => x.trans.CreateDate),
+
+                                // Production categorization for Type 7
+                                ProductionType = gemGroup.Key.Type,
+                                ProductionTypeName = gemGroup.Key.TypeSize
+                            })
+                            .OrderBy(x => x.ProductionType)
+                            .ThenBy(x => x.GroupName)
+                            .ToList()
+                    };
+
+                    transactionTypeSummaries.Add(type7Summary);
+                }
+                else
+                {
+                    // For other types: Group by groupname only
+                    var standardSummary = new TransactionTypeCategorySummary
+                    {
+                        Type = typeGroup.Key,
+                        TypeName = StockGemServiceStatic.GetTransactionTypeName(typeGroup.Key),
+                        TotalTransactions = typeGroup.Count(),
+                        TotalQuantity = typeGroup.Sum(x => x.trans.Qty),
+                        TotalWeight = typeGroup.Sum(x => x.trans.QtyWeight), // เอา comment ออก
+                        TotalCost = typeGroup.Sum(x => x.trans.SupplierCost ?? 0),
+
+                        GemDetails = typeGroup
+                            .GroupBy(x => x.gem.GroupName)
+                            .Select(gemGroup => new GemTransactionDetail
+                            {
+                                Code = string.Empty,
+                                GroupName = gemGroup.Key,
+                                TransactionCount = gemGroup.Count(),
+                                TotalQuantity = gemGroup.Sum(x => x.trans.Qty),
+                                TotalWeight = gemGroup.Sum(x => x.trans.QtyWeight),
+                                //TotalCost = gemGroup.Sum(x => x.trans.SupplierCost ?? 0),
+                                CurrentQuantity = gemGroup.FirstOrDefault()?.gem.Quantity ?? 0,
+                                CurrentWeight = gemGroup.FirstOrDefault()?.gem.QuantityWeight ?? 0,
+                                LastTransactionDate = gemGroup.Max(x => x.trans.CreateDate)
+                            })
+                            .OrderBy(x => x.GroupName)
+                            .ToList()
+                    };
+
+                    transactionTypeSummaries.Add(standardSummary);
+                }
+            }
+
+            return transactionTypeSummaries.OrderBy(x => x.Type).ToList();
         }
 
         #endregion
@@ -1086,5 +1122,12 @@ namespace Jewelry.Service.Stock
                 _ => "อื่นๆ"
             };
         }
+    }
+
+    public class TransactionWithPlanDto
+    {
+        public TbtStockGemTransection Transaction { get; set; }
+        public TbtStockGem Gem { get; set; }
+        public TbtProductionPlan Plan { get; set; }
     }
 }

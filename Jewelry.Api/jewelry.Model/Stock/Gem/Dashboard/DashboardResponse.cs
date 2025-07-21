@@ -91,6 +91,7 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public int Type { get; set; }
         public string TypeName { get; set; } = string.Empty;
         public decimal Qty { get; set; }
+        public decimal QtyWeight { get; set; }
         public string Status { get; set; } = string.Empty;
         public string JobOrPo { get; set; } = string.Empty;
         public string Running { get; set; }
