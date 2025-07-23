@@ -5,6 +5,7 @@ using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using jewelry.Model.ProductionPlanCost.GoldCostList;
 using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
+using jewelry.Model.ProductionPlanCost.ScrapWeightDashboard;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
@@ -34,6 +35,7 @@ namespace Jewelry.Service.ProductionPlan
         Task<string> UpdateGoldCost(GoldCostUpdateRequest request);
 
         IQueryable<GoldCostItemResponse> ListGoldCostItem(GoldCostItemSearch request);
+        ScrapWeightDashboardResponse GetScrapWeightDashboard();
     }
     public class ProductionPlanCostService : BaseService, IProductionPlanCostService
     {
@@ -842,6 +844,122 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             return query;
+        }
+
+        public ScrapWeightDashboardResponse GetScrapWeightDashboard()
+        {
+            var currentYear = DateTime.UtcNow.Year;
+            var startOfYear = new DateTime(currentYear, 1, 1).ToUniversalTime();
+            var endOfYear = new DateTime(currentYear, 12, 31, 23, 59, 59).ToUniversalTime();
+
+            // Get all TbtProductionPlanCostGold data for current year
+            var query = (from item in _jewelryContext.TbtProductionPlanCostGold
+                         .Include(x => x.GoldNavigation)
+                         .Include(x => x.GoldSizeNavigation)
+                         where item.IsActive == true
+                         && ((item.ReturnMeltScrapWeightDate.HasValue && item.ReturnMeltScrapWeightDate.Value >= startOfYear && item.ReturnMeltScrapWeightDate.Value <= endOfYear)
+                         || (item.ReturnCastScrapWeightDate.HasValue && item.ReturnCastScrapWeightDate.Value >= startOfYear && item.ReturnCastScrapWeightDate.Value <= endOfYear))
+                         select item).ToList();
+
+            var response = new ScrapWeightDashboardResponse();
+            var monthNames = new string[] { "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", 
+                                          "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม" };
+
+            // Initialize 12 months for both datasets
+            for (int month = 1; month <= 12; month++)
+            {
+                response.MeltScrapData.Add(new ScrapWeightMonthlyData
+                {
+                    Month = month,
+                    MonthName = monthNames[month],
+                    GoldCategories = new List<ScrapWeightGoldCategory>(),
+                    TotalWeight = 0
+                });
+
+                response.CastScrapData.Add(new ScrapWeightMonthlyData
+                {
+                    Month = month,
+                    MonthName = monthNames[month],
+                    GoldCategories = new List<ScrapWeightGoldCategory>(),
+                    TotalWeight = 0
+                });
+            }
+
+            // Process Melt Scrap Weight Data
+            var meltScrapData = query.Where(x => x.ReturnMeltScrapWeightDate.HasValue && x.ReturnMeltScrapWeight.HasValue && x.ReturnMeltScrapWeight.Value > 0)
+                                   .GroupBy(x => new {
+                                       Month = x.ReturnMeltScrapWeightDate.Value.Month,
+                                       GoldCode = x.GoldNavigation.Code,
+                                       GoldName = x.GoldNavigation.NameTh,
+                                       GoldSizeCode = x.GoldSizeNavigation.Code,
+                                       GoldSizeName = x.GoldSizeNavigation.NameTh
+                                   })
+                                   .Select(g => new {
+                                       g.Key.Month,
+                                       g.Key.GoldCode,
+                                       g.Key.GoldName,
+                                       g.Key.GoldSizeCode,
+                                       g.Key.GoldSizeName,
+                                       TotalWeight = g.Sum(x => x.ReturnMeltScrapWeight.Value),
+                                       LastDate = g.Max(x => x.ReturnMeltScrapWeightDate.Value)
+                                   });
+
+            foreach (var item in meltScrapData)
+            {
+                var monthData = response.MeltScrapData.FirstOrDefault(x => x.Month == item.Month);
+                if (monthData != null)
+                {
+                    monthData.GoldCategories.Add(new ScrapWeightGoldCategory
+                    {
+                        GoldCode = item.GoldCode,
+                        GoldName = item.GoldName,
+                        GoldSizeCode = item.GoldSizeCode,
+                        GoldSizeName = item.GoldSizeName,
+                        Weight = item.TotalWeight,
+                        Date = item.LastDate
+                    });
+                    monthData.TotalWeight += item.TotalWeight;
+                }
+            }
+
+            // Process Cast Scrap Weight Data
+            var castScrapData = query.Where(x => x.ReturnCastScrapWeightDate.HasValue && x.ReturnCastScrapWeight.HasValue && x.ReturnCastScrapWeight.Value > 0)
+                                   .GroupBy(x => new {
+                                       Month = x.ReturnCastScrapWeightDate.Value.Month,
+                                       GoldCode = x.GoldNavigation.Code,
+                                       GoldName = x.GoldNavigation.NameTh,
+                                       GoldSizeCode = x.GoldSizeNavigation.Code,
+                                       GoldSizeName = x.GoldSizeNavigation.NameTh
+                                   })
+                                   .Select(g => new {
+                                       g.Key.Month,
+                                       g.Key.GoldCode,
+                                       g.Key.GoldName,
+                                       g.Key.GoldSizeCode,
+                                       g.Key.GoldSizeName,
+                                       TotalWeight = g.Sum(x => x.ReturnCastScrapWeight.Value),
+                                       LastDate = g.Max(x => x.ReturnCastScrapWeightDate.Value)
+                                   });
+
+            foreach (var item in castScrapData)
+            {
+                var monthData = response.CastScrapData.FirstOrDefault(x => x.Month == item.Month);
+                if (monthData != null)
+                {
+                    monthData.GoldCategories.Add(new ScrapWeightGoldCategory
+                    {
+                        GoldCode = item.GoldCode,
+                        GoldName = item.GoldName,
+                        GoldSizeCode = item.GoldSizeCode,
+                        GoldSizeName = item.GoldSizeName,
+                        Weight = item.TotalWeight,
+                        Date = item.LastDate
+                    });
+                    monthData.TotalWeight += item.TotalWeight;
+                }
+            }
+
+            return response;
         }
     }
 }

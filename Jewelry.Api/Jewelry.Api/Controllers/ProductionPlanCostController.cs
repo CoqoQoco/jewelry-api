@@ -5,6 +5,7 @@ using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using jewelry.Model.ProductionPlanCost.GoldCostList;
 using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
+using jewelry.Model.ProductionPlanCost.ScrapWeightDashboard;
 using Jewelry.Api.Controllers.Production;
 using Jewelry.Api.Extension;
 using Jewelry.Service.ProductionPlan;
@@ -140,6 +141,23 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
+        [Route("ScrapWeightDashboard")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(ScrapWeightDashboardResponse))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult ScrapWeightDashboard()
+        {
+            try
+            {
+                var report = _IProductionPlanCostService.GetScrapWeightDashboard();
+                return Ok(report);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
     }
