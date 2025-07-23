@@ -75,6 +75,10 @@ public partial class TbtProductionPlanCostGold
 
     public decimal Cost { get; set; }
 
+    public DateTime? ReturnMeltScrapWeightDate { get; set; }
+
+    public DateTime? ReturnCastScrapWeightDate { get; set; }
+
     public virtual TbmGold GoldNavigation { get; set; } = null!;
 
     public virtual TbmGoldSize GoldSizeNavigation { get; set; } = null!;

@@ -1339,8 +1339,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ReturnCastMoldWeight).HasColumnName("return_cast_mold_weight");
             entity.Property(e => e.ReturnCastPowderWeight).HasColumnName("return_cast_powder_weight");
             entity.Property(e => e.ReturnCastScrapWeight).HasColumnName("return_cast_scrap_weight");
+            entity.Property(e => e.ReturnCastScrapWeightDate).HasColumnName("return_cast_scrap_weight_date");
             entity.Property(e => e.ReturnCastWeight).HasColumnName("return_cast_weight");
             entity.Property(e => e.ReturnMeltScrapWeight).HasColumnName("return_melt_scrap_weight");
+            entity.Property(e => e.ReturnMeltScrapWeightDate).HasColumnName("return_melt_scrap_weight_date");
             entity.Property(e => e.ReturnMeltWeight).HasColumnName("return_melt_weight");
             entity.Property(e => e.RunningNumber)
                 .HasColumnType("character varying")

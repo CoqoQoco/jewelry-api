@@ -118,6 +118,7 @@ namespace Jewelry.Service.ProductionPlan
                                 MeltWeight = item.MeltWeight,
                                 ReturnMeltWeight = item.ReturnMeltWeight,
                                 ReturnMeltScrapWeight = item.ReturnMeltScrapWeight,
+                                ReturnMeltScrapWeightDate = item.ReturnMeltScrapWeightDate,
                                 MeltWeightLoss = item.MeltWeightLoss,
                                 MeltWeightOver = item.MeltWeightOver,
 
@@ -129,6 +130,7 @@ namespace Jewelry.Service.ProductionPlan
                                 ReturnCastBodyBrokenWeight = item.ReturnCastBodyBrokenedWeight,
                                 ReturnCastBodyWeightTotal = item.ReturnCastBodyWeightTotal,
                                 ReturnCastScrapWeight = item.ReturnCastScrapWeight,
+                                ReturnCastScrapWeightDate = item.ReturnCastScrapWeightDate,
                                 ReturnCastPowderWeight = item.ReturnCastPowderWeight,
                                 CastWeightLoss = item.CastWeightLoss,
                                 CastWeightOver = item.CastWeightOver,
@@ -212,6 +214,7 @@ namespace Jewelry.Service.ProductionPlan
                                 MeltWeight = item.MeltWeight,
                                 ReturnMeltWeight = item.ReturnMeltWeight,
                                 ReturnMeltScrapWeight = item.ReturnMeltScrapWeight,
+                                ReturnMeltScrapWeightDate = item.ReturnMeltScrapWeightDate,
                                 MeltWeightLoss = item.MeltWeightLoss,
                                 MeltWeightOver = item.MeltWeightOver,
 
@@ -223,6 +226,7 @@ namespace Jewelry.Service.ProductionPlan
                                 ReturnCastBodyBrokenWeight = item.ReturnCastBodyBrokenedWeight,
                                 ReturnCastBodyWeightTotal = item.ReturnCastBodyWeightTotal,
                                 ReturnCastScrapWeight = item.ReturnCastScrapWeight,
+                                ReturnCastScrapWeightDate = item.ReturnCastScrapWeightDate,
                                 ReturnCastPowderWeight = item.ReturnCastPowderWeight,
                                 CastWeightLoss = item.CastWeightLoss,
                                 CastWeightOver = item.CastWeightOver,
@@ -304,6 +308,7 @@ namespace Jewelry.Service.ProductionPlan
                                 MeltWeight = item.MeltWeight,
                                 ReturnMeltWeight = item.ReturnMeltWeight,
                                 ReturnMeltScrapWeight = item.ReturnMeltScrapWeight,
+                                ReturnMeltScrapWeightDate = item.ReturnMeltScrapWeightDate,
                                 MeltWeightLoss = item.MeltWeightLoss,
                                 MeltWeightOver = item.MeltWeightOver,
 
@@ -315,6 +320,7 @@ namespace Jewelry.Service.ProductionPlan
                                 ReturnCastBodyBrokenWeight = item.ReturnCastBodyBrokenedWeight,
                                 ReturnCastBodyWeightTotal = item.ReturnCastBodyWeightTotal,
                                 ReturnCastScrapWeight = item.ReturnCastScrapWeight,
+                                ReturnCastScrapWeightDate = item.ReturnCastScrapWeightDate,
                                 ReturnCastPowderWeight = item.ReturnCastPowderWeight,
                                 CastWeightLoss = item.CastWeightLoss,
                                 CastWeightOver = item.CastWeightOver,
@@ -394,6 +400,7 @@ namespace Jewelry.Service.ProductionPlan
                     MeltWeight = request.MeltWeight,
                     ReturnMeltWeight = request.ReturnMeltWeight,
                     ReturnMeltScrapWeight = request.ReturnMeltScrapWeight,
+                    ReturnMeltScrapWeightDate = request.ReturnMeltScrapWeightDate.HasValue ? request.ReturnMeltScrapWeightDate.Value.UtcDateTime : null,
                     MeltWeightLoss = request.MeltWeightLoss,
                     MeltWeightOver = request.MeltWeightOver,
 
@@ -405,6 +412,7 @@ namespace Jewelry.Service.ProductionPlan
                     ReturnCastBodyBrokenedWeight = request.ReturnCastBodyBrokenWeight,
                     ReturnCastBodyWeightTotal = request.Items.Sum(x => x.ReturnWeight),
                     ReturnCastScrapWeight = request.ReturnCastScrapWeight,
+                    ReturnCastScrapWeightDate = request.ReturnCastScrapWeightDate.HasValue ? request.ReturnCastScrapWeightDate.Value.UtcDateTime : null,
                     ReturnCastPowderWeight = request.ReturnCastPowderWeight,
                     CastWeightLoss = request.CastWeightLoss,
                     CastWeightOver = request.CastWeightOver,
@@ -663,6 +671,7 @@ namespace Jewelry.Service.ProductionPlan
                 data.MeltWeight = request.MeltWeight;
                 data.ReturnMeltWeight = request.ReturnMeltWeight;
                 data.ReturnMeltScrapWeight = request.ReturnMeltScrapWeight;
+                data.ReturnMeltScrapWeightDate = request.ReturnMeltScrapWeightDate.HasValue ? request.ReturnMeltScrapWeightDate.Value.UtcDateTime : null;
                 data.MeltWeightLoss = request.MeltWeightLoss;
                 data.MeltWeightOver = request.MeltWeightOver;
 
@@ -674,6 +683,7 @@ namespace Jewelry.Service.ProductionPlan
                 data.ReturnCastBodyBrokenedWeight = request.ReturnCastBodyBrokenWeight;
                 data.ReturnCastBodyWeightTotal = request.Items.Sum(x => x.ReturnWeight);
                 data.ReturnCastScrapWeight = request.ReturnCastScrapWeight;
+                data.ReturnCastScrapWeightDate = request.ReturnCastScrapWeightDate.HasValue ? request.ReturnCastScrapWeightDate.Value.UtcDateTime : null;
                 data.ReturnCastPowderWeight = request.ReturnCastPowderWeight;
                 data.CastWeightLoss = request.CastWeightLoss;
                 data.CastWeightOver = request.CastWeightOver;
@@ -796,6 +806,7 @@ namespace Jewelry.Service.ProductionPlan
                              MeltWeight = item.TbtProductionPlanCostGold.MeltWeight,
                              ReturnMeltWeight = item.TbtProductionPlanCostGold.ReturnMeltWeight,
                              ReturnMeltScrapWeight = item.TbtProductionPlanCostGold.ReturnMeltScrapWeight,
+                             ReturnMeltScrapWeightDate = item.TbtProductionPlanCostGold.ReturnMeltScrapWeightDate,
                              MeltWeightLoss = item.TbtProductionPlanCostGold.MeltWeightLoss,
                              MeltWeightOver = item.TbtProductionPlanCostGold.MeltWeightOver,
 
@@ -807,6 +818,7 @@ namespace Jewelry.Service.ProductionPlan
                              ReturnCastBodyBrokenWeight = item.TbtProductionPlanCostGold.ReturnCastBodyBrokenedWeight,
                              ReturnCastBodyWeightTotal = item.TbtProductionPlanCostGold.ReturnCastBodyWeightTotal,
                              ReturnCastScrapWeight = item.TbtProductionPlanCostGold.ReturnCastScrapWeight,
+                             ReturnCastScrapWeightDate = item.TbtProductionPlanCostGold.ReturnCastScrapWeightDate,
                              ReturnCastPowderWeight = item.TbtProductionPlanCostGold.ReturnCastPowderWeight,
                              CastWeightLoss = item.TbtProductionPlanCostGold.CastWeightLoss,
                              CastWeightOver = item.TbtProductionPlanCostGold.CastWeightOver,

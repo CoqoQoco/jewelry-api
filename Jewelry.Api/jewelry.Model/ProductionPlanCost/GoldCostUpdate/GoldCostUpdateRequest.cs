@@ -24,6 +24,7 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostUpdate
         public decimal? MeltWeight { get; set; }
         public decimal? ReturnMeltWeight { get; set; }
         public decimal? ReturnMeltScrapWeight { get; set; }
+        public DateTimeOffset? ReturnMeltScrapWeightDate { get; set; }
         public decimal? MeltWeightLoss { get; set; }
         public decimal? MeltWeightOver { get; set; }
 
@@ -35,6 +36,7 @@ namespace jewelry.Model.ProductionPlanCost.GoldCostUpdate
         public decimal? ReturnCastBodyWeight { get; set; }
         public decimal? ReturnCastBodyBrokenWeight { get; set; }
         public decimal? ReturnCastScrapWeight { get; set; }
+        public DateTimeOffset? ReturnCastScrapWeightDate { get; set; }
         public decimal? ReturnCastPowderWeight { get; set; }
         public decimal? CastWeightLoss { get; set; }
         public decimal? CastWeightOver { get; set; }
