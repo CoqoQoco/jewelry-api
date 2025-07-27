@@ -101,5 +101,23 @@ namespace Jewelry.Api.Controllers.Production
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("MonthlyReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.MonthlyReport.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetPlanSuccessMonthlyReport([FromBody] jewelry.Model.Production.Plan.MonthlyReport.Request request)
+        {
+            try
+            {
+                var response = await _planService.GetPlanSuccessMonthlyReport(request.Search);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }

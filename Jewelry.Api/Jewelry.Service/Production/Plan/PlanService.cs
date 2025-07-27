@@ -1052,5 +1052,88 @@ namespace Jewelry.Service.Production.Plan
             };
         }
         #endregion
+
+        #region --- monthly success report ---
+        public async Task<jewelry.Model.Production.Plan.MonthlyReport.Response> GetPlanSuccessMonthlyReport(jewelry.Model.Production.Plan.MonthlyReport.Criteria request)
+        {
+            var query = from statusHeader in _jewelryContext.TbtProductionPlanStatusHeader
+                       join productionPlan in _jewelryContext.TbtProductionPlan on statusHeader.ProductionPlanId equals productionPlan.Id
+                       join productType in _jewelryContext.TbmProductType on productionPlan.ProductType equals productType.Code into productTypeJoin
+                       from pt in productTypeJoin.DefaultIfEmpty()
+                       join customerType in _jewelryContext.TbmCustomerType on productionPlan.CustomerType equals customerType.Code into customerTypeJoin
+                       from ct in customerTypeJoin.DefaultIfEmpty()
+                       where statusHeader.Status == 100 // success status
+                       && statusHeader.CreateDate >= request.StartDate.StartOfDayUtc()
+                       && statusHeader.CreateDate <= request.EndDate.EndOfDayUtc()
+                       && statusHeader.IsActive == true
+                       && productionPlan.IsActive == true
+                       select new
+                       {
+                           ProductionPlan = productionPlan,
+                           ProductType = pt != null ? pt.Code : productionPlan.ProductType,
+                           ProductTypeName = pt != null ? pt.NameTh : productionPlan.ProductType,
+                           CustomerType = ct != null ? ct.Code : productionPlan.CustomerType,
+                           CustomerTypeName = ct != null ? ct.NameTh : productionPlan.CustomerType,
+                           Type = !string.IsNullOrEmpty(productionPlan.Type) ? productionPlan.Type : "ไม่ระบุ",
+                           TypeName = !string.IsNullOrEmpty(productionPlan.Type) ? productionPlan.Type : "ไม่ระบุ"
+                       };
+
+            var data = await query.ToListAsync();
+            var totalCount = data.Count;
+            var totalQty = data.Sum(x => x.ProductionPlan.ProductQty);
+
+            // 1. Plan finish by Type (Gold Type)
+            var planFinishByType = data
+                .Where(x => !string.IsNullOrEmpty(x.Type))
+                .GroupBy(x => new { x.Type, x.TypeName })
+                .Select(g => new jewelry.Model.Production.Plan.MonthlyReport.PlanFinishByType
+                {
+                    Type = g.Key.Type ?? string.Empty,
+                    TypeName = g.Key.TypeName ?? string.Empty,
+                    Count = g.Count(),
+                    TotalQty = g.Sum(x => x.ProductionPlan.ProductQty),
+                    Percentage = totalCount > 0 ? Math.Round((decimal)g.Count() * 100 / totalCount, 2) : 0
+                })
+                .OrderByDescending(x => x.Count)
+                .ToList();
+
+            // 2. Plan finish by ProductType
+            var planFinishByProductType = data
+                .GroupBy(x => new { x.ProductType, x.ProductTypeName })
+                .Select(g => new jewelry.Model.Production.Plan.MonthlyReport.PlanFinishByProductType
+                {
+                    ProductType = g.Key.ProductType ?? string.Empty,
+                    ProductTypeName = g.Key.ProductTypeName ?? string.Empty,
+                    Count = g.Count(),
+                    TotalQty = g.Sum(x => x.ProductionPlan.ProductQty),
+                    Percentage = totalCount > 0 ? Math.Round((decimal)g.Count() * 100 / totalCount, 2) : 0
+                })
+                .OrderByDescending(x => x.Count)
+                .ToList();
+
+            // 3. Plan finish by CustomerType
+            var planFinishByCustomerType = data
+                .GroupBy(x => new { x.CustomerType, x.CustomerTypeName })
+                .Select(g => new jewelry.Model.Production.Plan.MonthlyReport.PlanFinishByCustomerType
+                {
+                    CustomerType = g.Key.CustomerType ?? string.Empty,
+                    CustomerTypeName = g.Key.CustomerTypeName ?? string.Empty,
+                    Count = g.Count(),
+                    TotalQty = g.Sum(x => x.ProductionPlan.ProductQty),
+                    Percentage = totalCount > 0 ? Math.Round((decimal)g.Count() * 100 / totalCount, 2) : 0
+                })
+                .OrderByDescending(x => x.Count)
+                .ToList();
+
+            return new jewelry.Model.Production.Plan.MonthlyReport.Response
+            {
+                StartDate = request.StartDate,
+                EndDate = request.EndDate,
+                PlanFinishByType = planFinishByType,
+                PlanFinishByProductType = planFinishByProductType,
+                PlanFinishByCustomerType = planFinishByCustomerType
+            };
+        }
+        #endregion
     }
 }
