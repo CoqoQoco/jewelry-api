@@ -36,6 +36,8 @@ namespace jewelry.Model.Stock.Gem.Search
         public string? Remark1 { get; set; }
         public string? Remark2 { get; set; }
 
+        public string? Region { get; set; }
+
         public DateTime CreateDate { get; set; }
         public string CreateBy { get; set; } = null!;
         public DateTime? UpdateDate { get; set; }

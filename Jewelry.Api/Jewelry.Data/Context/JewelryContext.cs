@@ -1850,6 +1850,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.QuantityOnProcess).HasColumnName("quantity_on_process");
             entity.Property(e => e.QuantityWeight).HasColumnName("quantity_weight");
             entity.Property(e => e.QuantityWeightOnProcess).HasColumnName("quantity_weight_on_process");
+            entity.Property(e => e.Region)
+                .HasColumnType("character varying")
+                .HasColumnName("region");
             entity.Property(e => e.Remark1)
                 .HasMaxLength(50)
                 .HasColumnName("remark_1");

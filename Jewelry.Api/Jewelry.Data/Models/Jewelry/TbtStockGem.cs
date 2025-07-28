@@ -53,6 +53,8 @@ public partial class TbtStockGem
 
     public decimal QuantityWeightOnProcess { get; set; }
 
+    public string? Region { get; set; }
+
     public virtual TbmGoldSize? GradeCodeNavigation { get; set; }
 
     public virtual TbmGemShape ShapeNavigation { get; set; } = null!;

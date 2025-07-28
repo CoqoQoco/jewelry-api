@@ -17,5 +17,6 @@ namespace jewelry.Model.Receipt.Gem.Update
         public string GradeCode { get; set; }
 
         public string Remark { get; set; }
+        public string? Region { get; set; }
     }
 }

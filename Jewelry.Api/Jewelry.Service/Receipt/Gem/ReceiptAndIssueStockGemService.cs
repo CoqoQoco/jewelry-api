@@ -51,9 +51,9 @@ namespace Jewelry.Service.Receipt.Gem
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
-        public ReceiptAndIssueStockGemService(JewelryContext JewelryContext, 
-            IHostEnvironment HostingEnvironment, 
-            IHttpContextAccessor httpContextAccessor, 
+        public ReceiptAndIssueStockGemService(JewelryContext JewelryContext,
+            IHostEnvironment HostingEnvironment,
+            IHttpContextAccessor httpContextAccessor,
             IRunningNumber runningNumberService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
@@ -90,6 +90,8 @@ namespace Jewelry.Service.Receipt.Gem
                 Price = 0,
                 PriceQty = 0,
                 Quantity = 0,
+
+                Region = request.Region?.Trim() ?? string.Empty,
             };
             _jewelryContext.TbtStockGem.Add(newGem);
             await _jewelryContext.SaveChangesAsync();
@@ -119,6 +121,8 @@ namespace Jewelry.Service.Receipt.Gem
 
             gem.UpdateDate = DateTime.UtcNow;
             gem.UpdateBy = CurrentUsername;
+
+            gem.Region = request.Region?.Trim() ?? string.Empty;
 
             _jewelryContext.TbtStockGem.Update(gem);
             await _jewelryContext.SaveChangesAsync();
@@ -582,7 +586,7 @@ namespace Jewelry.Service.Receipt.Gem
         {
 
             var query = (from item in _jewelryContext.TbtStockGemTransection
-                        select item);
+                         select item);
 
             // Apply all filters before executing the query
             if (!string.IsNullOrEmpty(request.Running))
@@ -637,59 +641,59 @@ namespace Jewelry.Service.Receipt.Gem
 
 
             var response = (from item in query
-                           join gem in _jewelryContext.TbtStockGem on item.Code equals gem.Code
-                           group new { item, gem } by item.Running into grouped
-                           select new PicklistResponse
-                           {
-                               Running = grouped.Key,
-                               Type = grouped.First().item.Type,
-                               RequestDate = grouped.First().item.RequestDate,
-                               ReturnDate = grouped.First().item.ReturnDate,
-                               Remark = grouped.First().item.Remark1,
-                               Stastus = grouped.First().item.Stastus,
-                               CreateBy = grouped.First().item.CreateBy,
-                               CreateDate = grouped.First().item.CreateDate,
-                               UpdateBy = grouped.First().item.UpdateBy,
-                               UpdateDate = grouped.First().item.UpdateDate,
-                               IsOverPick = grouped.First().item.ReturnDate != null && grouped.First().item.ReturnDate < DateTime.UtcNow,
-                               OperatorBy = grouped.First().item.OperatorBy,
-                               Items = grouped.Select(g => new PicklistItem
-                               {
-                                   Code = g.item.Code,
-                                   GroupName = g.item.Code,
-                                   Name = $"{g.item.Code}-{g.gem.Shape}-{g.gem.Size}-{g.gem.Grade}-{g.gem.GroupName}",
-                                   Size = g.gem.Size,
-                                   Shape = g.gem.Shape,
-                                   Grade = g.gem.Grade,
-                                   GradeDia = g.gem.GradeDia,
-                                   Status = g.item.Stastus,
-                                   RequestDate = g.item.RequestDate,
-                                   Running = g.item.Running,
-                                   Type = g.item.Type,
-                                   JobOrPo = g.item.JobOrPo,
-                                   SupplierCost = g.item.SupplierCost,
-                                   Remark1 = g.item.Remark1,
-                                   Remark2 = g.item.Remark2,
-                                   Qty = g.item.Qty,
-                                   QtyWeight = g.item.QtyWeight,
-                                   SubpplierName = g.item.SubpplierName,
-                                   CreateDate = g.item.CreateDate,
-                                   CreateBy = g.item.CreateBy,
-                                   UpdateDate = g.item.UpdateDate,
-                                   UpdateBy = g.item.UpdateBy,
+                            join gem in _jewelryContext.TbtStockGem on item.Code equals gem.Code
+                            group new { item, gem } by item.Running into grouped
+                            select new PicklistResponse
+                            {
+                                Running = grouped.Key,
+                                Type = grouped.First().item.Type,
+                                RequestDate = grouped.First().item.RequestDate,
+                                ReturnDate = grouped.First().item.ReturnDate,
+                                Remark = grouped.First().item.Remark1,
+                                Stastus = grouped.First().item.Stastus,
+                                CreateBy = grouped.First().item.CreateBy,
+                                CreateDate = grouped.First().item.CreateDate,
+                                UpdateBy = grouped.First().item.UpdateBy,
+                                UpdateDate = grouped.First().item.UpdateDate,
+                                IsOverPick = grouped.First().item.ReturnDate != null && grouped.First().item.ReturnDate < DateTime.UtcNow,
+                                OperatorBy = grouped.First().item.OperatorBy,
+                                Items = grouped.Select(g => new PicklistItem
+                                {
+                                    Code = g.item.Code,
+                                    GroupName = g.item.Code,
+                                    Name = $"{g.item.Code}-{g.gem.Shape}-{g.gem.Size}-{g.gem.Grade}-{g.gem.GroupName}",
+                                    Size = g.gem.Size,
+                                    Shape = g.gem.Shape,
+                                    Grade = g.gem.Grade,
+                                    GradeDia = g.gem.GradeDia,
+                                    Status = g.item.Stastus,
+                                    RequestDate = g.item.RequestDate,
+                                    Running = g.item.Running,
+                                    Type = g.item.Type,
+                                    JobOrPo = g.item.JobOrPo,
+                                    SupplierCost = g.item.SupplierCost,
+                                    Remark1 = g.item.Remark1,
+                                    Remark2 = g.item.Remark2,
+                                    Qty = g.item.Qty,
+                                    QtyWeight = g.item.QtyWeight,
+                                    SubpplierName = g.item.SubpplierName,
+                                    CreateDate = g.item.CreateDate,
+                                    CreateBy = g.item.CreateBy,
+                                    UpdateDate = g.item.UpdateDate,
+                                    UpdateBy = g.item.UpdateBy,
 
-                                   WO = g.item.ProductionPlanWo,
-                                   WONumber = g.item.ProductionPlanWoNumber,
-                                   WOText = g.item.ProductionPlanWoText,
-                                   Mold = g.item.ProductionPlanMold,
+                                    WO = g.item.ProductionPlanWo,
+                                    WONumber = g.item.ProductionPlanWoNumber,
+                                    WOText = g.item.ProductionPlanWoText,
+                                    Mold = g.item.ProductionPlanMold,
 
-                                   Price = g.gem.Price,
-                                   PriceQty = g.gem.PriceQty,
-                                   Unit = g.gem.Unit,
-                                   UnitCode = g.gem.UnitCode,
-                                   OperatorBy = g.item.OperatorBy,
-                               })
-                           }).ToList();
+                                    Price = g.gem.Price,
+                                    PriceQty = g.gem.PriceQty,
+                                    Unit = g.gem.Unit,
+                                    UnitCode = g.gem.UnitCode,
+                                    OperatorBy = g.item.OperatorBy,
+                                })
+                            }).ToList();
 
             if (!string.IsNullOrEmpty(request.Code))
             {
@@ -699,7 +703,7 @@ namespace Jewelry.Service.Receipt.Gem
 
             return response.AsQueryable();
         }
-       
+
         public IQueryable<PicklistResponse> OldPicklist(PicklistFilter request)
         {
 
@@ -707,119 +711,119 @@ namespace Jewelry.Service.Receipt.Gem
                         select item);
 
             var response = (from item in _jewelryContext.TbtStockGemTransection
-                         join gem in _jewelryContext.TbtStockGem on item.Code equals gem.Code
-                         group new { item, gem } by item.Running into grouped
-                         select new PicklistResponse
-                         {
-                             Running = grouped.Key,
-                             Type = grouped.First().item.Type,
-                             RequestDate = grouped.First().item.RequestDate,
-                             ReturnDate = grouped.First().item.ReturnDate,
-                             Remark = grouped.First().item.Remark1,
-                             Stastus = grouped.First().item.Stastus,
-                             CreateBy = grouped.First().item.CreateBy,
-                             CreateDate = grouped.First().item.CreateDate,
-                             UpdateBy = grouped.First().item.UpdateBy,
-                             UpdateDate = grouped.First().item.UpdateDate,
-                             IsOverPick = grouped.First().item.ReturnDate != null && grouped.First().item.ReturnDate < DateTime.UtcNow,
-                             OperatorBy = grouped.First().item.OperatorBy,
-                             Items = grouped.Select(g => new PicklistItem
-                             {
-                                 Code = g.item.Code,
-                                 GroupName = g.item.Code,
-                                 Name = $"{g.item.Code}-{g.gem.Shape}-{g.gem.Size}-{g.gem.Grade}-{g.gem.GroupName}",
-                                 Size = g.gem.Size,
-                                 Shape = g.gem.Shape,
-                                 Grade = g.gem.Grade,
-                                 GradeDia = g.gem.GradeDia,
-                                 Status = g.item.Stastus,
-                                 RequestDate = g.item.RequestDate,
-                                 Running = g.item.Running,
-                                 Type = g.item.Type,
-                                 JobOrPo = g.item.JobOrPo,
-                                 SupplierCost = g.item.SupplierCost,
-                                 Remark1 = g.item.Remark1,
-                                 Remark2 = g.item.Remark2,
-                                 Qty = g.item.Qty,
-                                 QtyWeight = g.item.QtyWeight,
-                                 SubpplierName = g.item.SubpplierName,
-                                 CreateDate = g.item.CreateDate,
-                                 CreateBy = g.item.CreateBy,
-                                 UpdateDate = g.item.UpdateDate,
-                                 UpdateBy = g.item.UpdateBy,
-                                 WO = g.item.ProductionPlanWo,
-                                 WONumber = g.item.ProductionPlanWoNumber,
-                                 WOText = g.item.ProductionPlanWoText,
-                                 Mold = g.item.ProductionPlanMold,
+                            join gem in _jewelryContext.TbtStockGem on item.Code equals gem.Code
+                            group new { item, gem } by item.Running into grouped
+                            select new PicklistResponse
+                            {
+                                Running = grouped.Key,
+                                Type = grouped.First().item.Type,
+                                RequestDate = grouped.First().item.RequestDate,
+                                ReturnDate = grouped.First().item.ReturnDate,
+                                Remark = grouped.First().item.Remark1,
+                                Stastus = grouped.First().item.Stastus,
+                                CreateBy = grouped.First().item.CreateBy,
+                                CreateDate = grouped.First().item.CreateDate,
+                                UpdateBy = grouped.First().item.UpdateBy,
+                                UpdateDate = grouped.First().item.UpdateDate,
+                                IsOverPick = grouped.First().item.ReturnDate != null && grouped.First().item.ReturnDate < DateTime.UtcNow,
+                                OperatorBy = grouped.First().item.OperatorBy,
+                                Items = grouped.Select(g => new PicklistItem
+                                {
+                                    Code = g.item.Code,
+                                    GroupName = g.item.Code,
+                                    Name = $"{g.item.Code}-{g.gem.Shape}-{g.gem.Size}-{g.gem.Grade}-{g.gem.GroupName}",
+                                    Size = g.gem.Size,
+                                    Shape = g.gem.Shape,
+                                    Grade = g.gem.Grade,
+                                    GradeDia = g.gem.GradeDia,
+                                    Status = g.item.Stastus,
+                                    RequestDate = g.item.RequestDate,
+                                    Running = g.item.Running,
+                                    Type = g.item.Type,
+                                    JobOrPo = g.item.JobOrPo,
+                                    SupplierCost = g.item.SupplierCost,
+                                    Remark1 = g.item.Remark1,
+                                    Remark2 = g.item.Remark2,
+                                    Qty = g.item.Qty,
+                                    QtyWeight = g.item.QtyWeight,
+                                    SubpplierName = g.item.SubpplierName,
+                                    CreateDate = g.item.CreateDate,
+                                    CreateBy = g.item.CreateBy,
+                                    UpdateDate = g.item.UpdateDate,
+                                    UpdateBy = g.item.UpdateBy,
+                                    WO = g.item.ProductionPlanWo,
+                                    WONumber = g.item.ProductionPlanWoNumber,
+                                    WOText = g.item.ProductionPlanWoText,
+                                    Mold = g.item.ProductionPlanMold,
 
-                                 Price = g.gem.Price,
-                                 PriceQty = g.gem.PriceQty,
-                                 Unit = g.gem.Unit,
-                                 UnitCode = g.gem.UnitCode,
+                                    Price = g.gem.Price,
+                                    PriceQty = g.gem.PriceQty,
+                                    Unit = g.gem.Unit,
+                                    UnitCode = g.gem.UnitCode,
 
-                                 OperatorBy = g.item.OperatorBy,
-                             }),
+                                    OperatorBy = g.item.OperatorBy,
+                                }),
 
-                         }).ToList();
+                            }).ToList();
 
             if (!string.IsNullOrEmpty(request.Running))
             {
                 response = (from item in response
-                         where item.Running.Contains(request.Running)
-                         select item).ToList();
+                            where item.Running.Contains(request.Running)
+                            select item).ToList();
             }
             if (request.Type != null && request.Type.Any())
             {
                 response = (from item in response
-                         where request.Type.Contains(item.Type)
-                         select item).ToList();
+                            where request.Type.Contains(item.Type)
+                            select item).ToList();
             }
             if (request.Status != null && request.Status.Any())
             {
                 response = (from item in response
-                         where request.Status.Contains(item.Stastus)
-                         select item).ToList();
+                            where request.Status.Contains(item.Stastus)
+                            select item).ToList();
             }
 
             if (request.RequestDateStart.HasValue)
             {
                 response = (from item in response
-                         where item.RequestDate >= request.RequestDateStart.Value.StartOfDayUtc()
-                         select item).ToList();
+                            where item.RequestDate >= request.RequestDateStart.Value.StartOfDayUtc()
+                            select item).ToList();
             }
             if (request.RequestDateEnd.HasValue)
             {
                 response = (from item in response
-                         where item.RequestDate <= request.RequestDateEnd.Value.EndOfDayUtc()
-                         select item).ToList();
+                            where item.RequestDate <= request.RequestDateEnd.Value.EndOfDayUtc()
+                            select item).ToList();
             }
 
             if (request.ReturnDateStart.HasValue)
             {
                 response = (from item in response
-                         where item.ReturnDate >= request.ReturnDateStart.Value.StartOfDayUtc()
-                         select item).ToList();
+                            where item.ReturnDate >= request.ReturnDateStart.Value.StartOfDayUtc()
+                            select item).ToList();
             }
             if (request.ReturnDateEnd.HasValue)
             {
                 response = (from item in response
-                         where item.ReturnDate <= request.ReturnDateEnd.Value.EndOfDayUtc()
-                         select item).ToList();
+                            where item.ReturnDate <= request.ReturnDateEnd.Value.EndOfDayUtc()
+                            select item).ToList();
             }
 
             if (!string.IsNullOrEmpty(request.GetRunning))
             {
                 response = (from item in response
-                         where item.Running == request.GetRunning
-                         select item).ToList();
+                            where item.Running == request.GetRunning
+                            select item).ToList();
             }
 
             if (!string.IsNullOrEmpty(request.Code))
             {
                 response = (from item in response
-                         where item.Items.Any(x => x.Code.Contains(request.Code.ToUpper()))
-                         //where item.Code.Contains(request.Code.ToUpper())
-                         select item).ToList();
+                            where item.Items.Any(x => x.Code.Contains(request.Code.ToUpper()))
+                            //where item.Code.Contains(request.Code.ToUpper())
+                            select item).ToList();
             }
 
             return response.AsQueryable();

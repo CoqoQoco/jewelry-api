@@ -172,6 +172,8 @@ namespace Jewelry.Service.Stock
 
                                 Remark1 = item.Remark1,
                                 Remark2 = item.Remark2,
+
+                                Region = item.Region
                             });
 
             return response;
