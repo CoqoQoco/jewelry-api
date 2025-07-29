@@ -230,10 +230,10 @@ namespace Jewelry.Service.Production.Plan
             var response = new jewelry.Model.Production.Plan.Transfer.Response { Message = "success" };
             var transferData = await PrepareTransferData(request, plans, plansCost);
 
-            if (transferData.HasAnyValidPlans)
-            {
-                await ProcessTransfer(transferData);
-            }
+            //if (transferData.HasAnyValidPlans)
+            //{
+            //}
+            await ProcessTransfer(transferData);
 
             response.TransferNumber = transferData.TransferRunning;
             response.ReceiptNumber = transferData.ReceiptRunning;
@@ -358,7 +358,16 @@ namespace Jewelry.Service.Production.Plan
                 {
                     var targetPlan = plans.First(x => x.Id == planRequest.Id);
                     var targetPlansGoldCostItem = plansGoldCostItem.Where(x => x.ProductionPlanId == $"{targetPlan.Wo}-{targetPlan.WoNumber}").ToList();
-                    await AddValidPlanData(data, targetPlan, targetPlansGoldCostItem, request, receiptRunning);
+                    await AddValidPlanData(data, targetPlan, targetPlansGoldCostItem, request, receiptRunning, false);
+                }
+                else if (validationResult.ErrorMessage == ErrorMessage.StatusAlready
+                        && request.TargetStatusCvd.HasValue
+                        && request.TargetStatusCvd.Value
+                        && request.TargetStatus == ProductionPlanStatus.Price)
+                {
+                    var targetPlan = plans.First(x => x.Id == planRequest.Id);
+                    var targetPlansGoldCostItem = plansGoldCostItem.Where(x => x.ProductionPlanId == $"{targetPlan.Wo}-{targetPlan.WoNumber}").ToList();
+                    await AddValidPlanData(data, targetPlan, targetPlansGoldCostItem, request, receiptRunning, true);
                 }
                 else
                 {
@@ -369,6 +378,7 @@ namespace Jewelry.Service.Production.Plan
                         WoNumber = planRequest.WoNumber,
                         Message = validationResult.ErrorMessage
                     });
+
                 }
             }
 
@@ -402,18 +412,21 @@ namespace Jewelry.Service.Production.Plan
             TbtProductionPlan plan,
             List<GoldCostItemResponse> plansGoldCostItem,
             jewelry.Model.Production.Plan.Transfer.Request request,
-            string receiptRunning)
+            string receiptRunning,
+            bool isSkibByCVD)
         {
+            if (isSkibByCVD == false)
+            {
+                var newStatus = CreateNewStatus(plan, request, data.DateNow);
+                data.NewStatuses.Add(newStatus);
 
-            var newStatus = CreateNewStatus(plan, request, data.DateNow);
-            data.NewStatuses.Add(newStatus);
+                //new status detial
+                var newStatusDetail = await CreateNewStatusDetial(plan, plansGoldCostItem, request, data.DateNow);
+                data.NewStatusDetail.AddRange(newStatusDetail);
 
-            //new status detial
-            var newStatusDetail = await CreateNewStatusDetial(plan, plansGoldCostItem, request, data.DateNow);
-            data.NewStatusDetail.AddRange(newStatusDetail);
-
-            var transferStatus = CreateTransferStatus(plan, request, data.TransferRunning, data.DateNow);
-            data.TransferStatuses.Add(transferStatus);
+                var transferStatus = CreateTransferStatus(plan, request, data.TransferRunning, data.DateNow);
+                data.TransferStatuses.Add(transferStatus);
+            }
 
             var currentStatus = (ProductionPlanStatusEnum)request.TargetStatus;
 
@@ -1057,26 +1070,26 @@ namespace Jewelry.Service.Production.Plan
         public async Task<jewelry.Model.Production.Plan.MonthlyReport.Response> GetPlanSuccessMonthlyReport(jewelry.Model.Production.Plan.MonthlyReport.Criteria request)
         {
             var query = from statusHeader in _jewelryContext.TbtProductionPlanStatusHeader
-                       join productionPlan in _jewelryContext.TbtProductionPlan on statusHeader.ProductionPlanId equals productionPlan.Id
-                       join productType in _jewelryContext.TbmProductType on productionPlan.ProductType equals productType.Code into productTypeJoin
-                       from pt in productTypeJoin.DefaultIfEmpty()
-                       join customerType in _jewelryContext.TbmCustomerType on productionPlan.CustomerType equals customerType.Code into customerTypeJoin
-                       from ct in customerTypeJoin.DefaultIfEmpty()
-                       where statusHeader.Status == 100 // success status
-                       && statusHeader.CreateDate >= request.StartDate.StartOfDayUtc()
-                       && statusHeader.CreateDate <= request.EndDate.EndOfDayUtc()
-                       && statusHeader.IsActive == true
-                       && productionPlan.IsActive == true
-                       select new
-                       {
-                           ProductionPlan = productionPlan,
-                           ProductType = pt != null ? pt.Code : productionPlan.ProductType,
-                           ProductTypeName = pt != null ? pt.NameTh : productionPlan.ProductType,
-                           CustomerType = ct != null ? ct.Code : productionPlan.CustomerType,
-                           CustomerTypeName = ct != null ? ct.NameTh : productionPlan.CustomerType,
-                           Type = !string.IsNullOrEmpty(productionPlan.Type) ? productionPlan.Type : "ไม่ระบุ",
-                           TypeName = !string.IsNullOrEmpty(productionPlan.Type) ? productionPlan.Type : "ไม่ระบุ"
-                       };
+                        join productionPlan in _jewelryContext.TbtProductionPlan on statusHeader.ProductionPlanId equals productionPlan.Id
+                        join productType in _jewelryContext.TbmProductType on productionPlan.ProductType equals productType.Code into productTypeJoin
+                        from pt in productTypeJoin.DefaultIfEmpty()
+                        join customerType in _jewelryContext.TbmCustomerType on productionPlan.CustomerType equals customerType.Code into customerTypeJoin
+                        from ct in customerTypeJoin.DefaultIfEmpty()
+                        where statusHeader.Status == 100 // success status
+                        && statusHeader.CreateDate >= request.StartDate.StartOfDayUtc()
+                        && statusHeader.CreateDate <= request.EndDate.EndOfDayUtc()
+                        && statusHeader.IsActive == true
+                        && productionPlan.IsActive == true
+                        select new
+                        {
+                            ProductionPlan = productionPlan,
+                            ProductType = pt != null ? pt.Code : productionPlan.ProductType,
+                            ProductTypeName = pt != null ? pt.NameTh : productionPlan.ProductType,
+                            CustomerType = ct != null ? ct.Code : productionPlan.CustomerType,
+                            CustomerTypeName = ct != null ? ct.NameTh : productionPlan.CustomerType,
+                            Type = !string.IsNullOrEmpty(productionPlan.Type) ? productionPlan.Type : "ไม่ระบุ",
+                            TypeName = !string.IsNullOrEmpty(productionPlan.Type) ? productionPlan.Type : "ไม่ระบุ"
+                        };
 
             var data = await query.ToListAsync();
             var totalCount = data.Count;
