@@ -10,6 +10,7 @@ using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using NetTopologySuite.Index.HPRtree;
 using NPOI.OpenXmlFormats.Dml;
 using System;
 using System.Collections.Generic;
@@ -387,7 +388,6 @@ namespace Jewelry.Service.Production.PlanBOM
                 WoText = b.Production.WoText,
 
                 CompletedDate = b.Production.CompletedDate,
-                ProductNumber = b.Production.ProductNumber,
 
                 CustomerCode = b.Production.CustomerTypeNavigation != null ? b.Production.CustomerTypeNavigation.Code : string.Empty,
                 CustomerName = b.Production.CustomerTypeNavigation != null ? b.Production.CustomerTypeNavigation.NameTh : string.Empty,
@@ -396,7 +396,10 @@ namespace Jewelry.Service.Production.PlanBOM
                 GoldSize = b.Production.TypeSize,
 
                 Mold = b.Production.Mold,
-                ProductType = b.Production.ProductTypeNavigation.NameTh,
+
+                ProductNumber = b.Production.ProductNumber,
+                ProductType = b.Production.ProductType,
+                ProductTypeName = b.Production.ProductTypeNavigation.NameTh,
 
             });
         }

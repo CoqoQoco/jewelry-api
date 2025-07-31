@@ -28,12 +28,16 @@ namespace jewelry.Model.Production.PlanBOM.List
 
         public DateTime? CompletedDate { get; set; }
 
+        public string ProductName { get; set; }
+        public string ProductType { get; set; }
+        public string ProductTypeName { get; set; }
+
         public string ProductNumber { get; set; }
         public string CustomerCode { get; set; }
         public string CustomerName { get; set; }
+
         public string Gold { get; set; }
         public string GoldSize { get; set; }
         public string Mold { get; set; }
-        public string ProductType { get; set; }
     }
 }
