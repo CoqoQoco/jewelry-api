@@ -301,6 +301,9 @@ namespace Jewelry.Service.Production.PlanBOM
                            && (bom.NameGroup == "Gold" || bom.NameGroup == "Gem")
                            select bom;
 
+            var masterGem = (from gem in _jewelryContext.TbmGem
+                             select gem).ToList();
+
             //filte by date range
             if (request.Start.HasValue)
             {
@@ -368,10 +371,13 @@ namespace Jewelry.Service.Production.PlanBOM
 
             return bomQuery.Select(b => new jewelry.Model.Production.PlanBOM.List.Response
             {
-                Name = b.NameGroup == "Gold"  ? (b.Production.Type == "Silver" ? $"{b.Name} ({b.Production.Type})" : $"{b.Name} ({b.Production.Type} {b.Production.TypeSize})")
+                Name = b.NameGroup == "Gold" ? (b.Production.Type == "Silver" ? $"{b.Name} ({b.Production.Type})" : $"{b.Name} ({b.Production.Type} {b.Production.TypeSize})")
                                               : b.Name,
                 NameDescription = b.NameDescription,
                 NameGroup = b.NameGroup,
+
+                NameMaster = b.NameGroup == "Gold" ? (b.Production.Type == "Silver" ? $"{b.Name} ({b.Production.Type})" : $"{b.Name} ({b.Production.Type} {b.Production.TypeSize})")
+                                              : b.Name.GetMasterGem(masterGem, b.Name),
 
                 Date = b.Production.CompletedDate,
 

@@ -11,6 +11,7 @@ namespace jewelry.Model.Production.PlanBOM.List
         public string Name { get; set; }
         public string NameDescription { get; set; }
         public string NameGroup { get; set; }
+        public string NameMaster { get; set; }
 
         public DateTime? Date { get; set; }
 
