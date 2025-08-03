@@ -84,6 +84,7 @@ namespace Jewelry.Service.Master
                                 NameEn = item.NameEn,
                                 NameTh = item.NameTh,
                                 Code = item.Code,
+                                Color = item.Color,
                                 Description = $"{item.Code}: {item.NameTh}"
                             });
 
@@ -170,6 +171,7 @@ namespace Jewelry.Service.Master
                                     NameEn = item.NameEn,
                                     NameTh = item.NameTh,
                                     Code = item.Code,
+                                    Color = item.Color,
                                     Description = $"{item.Code}: {item.NameTh}"
                                 });
 
@@ -180,6 +182,7 @@ namespace Jewelry.Service.Master
                                 where item.Code.Contains(request.Text.ToUpper())
                                 || item.NameTh.Contains(request.Text.ToUpper())
                                 || item.NameEn.Contains(request.Text.ToUpper())
+                                || item.Color.Contains(request.Text.ToUpper())
                                 select item);
                 }
 
@@ -363,6 +366,8 @@ namespace Jewelry.Service.Master
                 gem.NameEn = request.NameEn;
                 gem.NameTh = request.NameTh;
 
+                gem.Color = request.Color;
+
                 _jewelryContext.TbmGem.Update(gem);
                 await _jewelryContext.SaveChangesAsync();
             }
@@ -542,6 +547,7 @@ namespace Jewelry.Service.Master
                     Code = request.Code.ToUpper(),
                     NameEn = request.NameEn,
                     NameTh = request.NameTh,
+                    Color = request.Color,
                     CreateDate = DateTime.UtcNow,
                     CreateBy = CurrentUsername,
                     IsActive = true,
