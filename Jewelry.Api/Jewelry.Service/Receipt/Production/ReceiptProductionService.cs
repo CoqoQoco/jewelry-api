@@ -796,100 +796,78 @@ namespace Jewelry.Service.Receipt.Production
 
         public async Task<string> ImportProduct()
         {
-            //var oldProduct = (from item in _jewelryContext.StockFromConvert
-            //                  where item.Typejob != "convert"
-            //                  select item).Take(1000).ToList();
-
-            var oldProduct = (from sfc in _jewelryContext.StockFromConvert
+            const int BATCH_SIZE = 500; // Reduced batch size for better memory management
+            
+            // Optimized query - only get unprocessed records and avoid loading all TbtStockProduct
+            var oldProductQuery = from sfc in _jewelryContext.StockFromConvert
                               join sp in _jewelryContext.TbtStockProduct
-                              on sfc.NoCode equals sp.ProductCode into joined
+                              on sfc.Noproduct equals sp.ProductCode into joined
                               from sp in joined.DefaultIfEmpty()
-                              where sp == null
-                              select sfc).Take(1000).ToList();
+                              where sp == null && (sfc.Typejob != "convert" || sfc.Typejob == null)
+                              select sfc;
 
-
-
-
-            var actualProduct = (from item in _jewelryContext.TbtStockProduct
-                                 select item).ToList();
-
-            var masterProductType = (from item in _jewelryContext.TbmProductType
-                                     select item).ToList();
-
-            var masterGold = (from item in _jewelryContext.TbmGold
-                              select item).ToList();
-
-            var masterGoldSize = (from item in _jewelryContext.TbmGoldSize
-                                  select item).ToList();
-
+            var oldProduct = await oldProductQuery.Take(BATCH_SIZE).ToListAsync();
 
             if (!oldProduct.Any())
             {
                 return "No Data";
             }
 
+            // Load master data once and cache
+            var masterProductType = await _jewelryContext.TbmProductType.ToListAsync();
+            var masterGold = await _jewelryContext.TbmGold.ToListAsync();
+            var masterGoldSize = await _jewelryContext.TbmGoldSize.ToListAsync();
+
+            // Pre-generate running numbers in batch to avoid multiple DB calls
             var _receiptRunning = await _runningNumberService.GenerateRunningNumber("REP");
+            var stockRunningNumbers = new List<string>();
+            for (int i = 0; i < oldProduct.Count; i++)
+            {
+                stockRunningNumbers.Add(await _runningNumberService.GenerateRunningNumberForStockProductHash("DK"));
+            }
 
             var addProducts = new List<TbtStockProduct>();
             var addProductsMaterial = new List<TbtStockProductMaterial>();
+            var itemsToUpdate = new List<StockFromConvert>();
             int add = 0;
+            int runningIndex = 0;
 
             foreach (var item in oldProduct)
             {
-                item.Typejob = "convert";
-
                 if (string.IsNullOrEmpty(item.NoCode))
                 {
                     continue;
                 }
 
-                var match = actualProduct.Where(x => x.ProductCode == item.Noproduct).FirstOrDefault();
-                if (match != null)
-                {
-                    continue;
-                }
-
-                string prefix = "DK";
-                var _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
-
+                var _stockRunning = stockRunningNumbers[runningIndex++];
                 add++;
 
                 var newProduct = new TbtStockProduct
                 {
                     StockNumber = _stockRunning,
                     Status = StockProductStatus.Available,
-
                     ReceiptNumber = _receiptRunning,
                     ReceiptDate = DateTime.UtcNow,
                     ReceiptType = "convert",
-
                     Mold = item.NoCode,
                     MoldDesign = item.NoCode,
-
-                    Qty = item.Quantity.HasValue ? item.Quantity.Value : 1,
-
-                    ProductPrice = item.Pricesale.HasValue ? item.Pricesale.Value : 0,
-                    ProductCost = string.IsNullOrEmpty(item.Pricecost) ? 0 : decimal.Parse(item.Pricecost),
-
+                    Qty = item.Quantity ?? 1,
+                    ProductPrice = item.Pricesale ?? 0,
+                    ProductCost = string.IsNullOrEmpty(item.Pricecost) ? 0 : 
+                        decimal.TryParse(item.Pricecost, out var cost) ? cost : 0,
                     ProductCode = item.Noproduct,
                     ProductNumber = item.Codeproduct,
                     ProductNameTh = item.Productname ?? "DK",
                     ProductNameEn = item.Productname ?? "DK",
-
                     ImageName = item.NoCode,
                     ImagePath = $"{item.NoCode}.jpg",
-
-                    //Wo = plan.Wo,
-                    //WoNumber = plan.WoNumber,
-
                     Size = item.Ringsize,
                     Remark = item.Remark,
-
                     CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow
                 };
 
-                //check product type
+                // Optimize product type assignment
                 if (!string.IsNullOrEmpty(item.Typep))
                 {
                     var productType = GetProductType(masterProductType, item.Typep);
@@ -897,125 +875,75 @@ namespace Jewelry.Service.Receipt.Production
                     newProduct.ProductTypeName = productType.NameTh;
                 }
 
-                //get production date
                 newProduct.ProductionDate = GetProductionDate(item.Dateproduct);
-
-                //get production type
                 newProduct.ProductionType = ProducttionType(masterGold, item.Typeg);
-
-                //get production type size
                 newProduct.ProductionTypeSize = ProducttionTypeSize(masterGoldSize, item.Productname);
-
-                //get wo
                 newProduct.WoOrigin = item.Jobno;
                 newProduct.Wo = GetWO(item.Jobno);
                 newProduct.WoNumber = GetWONumber(item.Jobno);
 
-                //add product
                 addProducts.Add(newProduct);
 
-                //gold
-                if (!string.IsNullOrEmpty(item.Typeg))
+                // Process materials more efficiently
+                var materialTypes = new[]
                 {
-                    var check = item.Typeg.ToUpper().Trim();
-                    var newMaterial = GetMaterial(_stockRunning, check, item.Typeg, item.Typed1, item.Qtyg, item.Wg, item.Unit1, item.Priceg, null);
+                    new { Type = item.Typeg, TypeCode = item.Typed1, Qty = item.Qtyg, Weight = item.Wg, Unit = item.Unit1, Price = item.Priceg, Size = (string)null },
+                    new { Type = item.Typed, TypeCode = item.Typed1, Qty = item.Qtyd, Weight = item.Wd, Unit = item.Unit2, Price = item.Priced, Size = (string)null },
+                    new { Type = item.Typer, TypeCode = item.Typed1, Qty = item.Qtyr, Weight = item.Wr, Unit = item.Unit3, Price = item.Pricer, Size = item.Sizer },
+                    new { Type = item.TypeS, TypeCode = item.Typed1, Qty = item.Qtys, Weight = item.Ws, Unit = item.Unit4, Price = item.Prices, Size = item.Sizes },
+                    new { Type = item.Typee, TypeCode = item.Typed1, Qty = item.Qtye, Weight = item.We, Unit = item.Unit5, Price = item.Pricee, Size = item.Sizee },
+                    new { Type = item.Typem, TypeCode = item.Typed1, Qty = item.Qtym, Weight = item.Wm, Unit = item.Unit6, Price = item.Pricem, Size = item.Sizem }
+                };
 
-                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
-                    {
-                        addProductsMaterial.Add(newMaterial);
-                    }
-                }
-
-
-                //check typD
-                if (!string.IsNullOrEmpty(item.Typed))
+                foreach (var mat in materialTypes)
                 {
-                    var check = item.Typed.ToUpper().Trim();
-                    var newMaterial = GetMaterial(_stockRunning, check, item.Typed, item.Typed1, item.Qtyd, item.Wd, item.Unit2, item.Priced, null);
-
-                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                    if (!string.IsNullOrEmpty(mat.Type))
                     {
-                        addProductsMaterial.Add(newMaterial);
+                        var newMaterial = GetMaterial(_stockRunning, mat.Type.ToUpper().Trim(), 
+                            mat.Type, mat.TypeCode, mat.Qty, mat.Weight, mat.Unit, mat.Price, mat.Size);
+
+                        if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                        {
+                            addProductsMaterial.Add(newMaterial);
+                        }
                     }
-                }
-
-                //check typeR
-                if (!string.IsNullOrEmpty(item.Typer))
-                {
-                    var check = item.Typer.ToUpper().Trim();
-                    var newMaterial = GetMaterial(_stockRunning, check, item.Typer, item.Typed1, item.Qtyr, item.Wr, item.Unit3, item.Pricer, item.Sizer);
-
-                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
-                    {
-                        addProductsMaterial.Add(newMaterial);
-                    }
-
-                }
-
-                //check typeS
-                if (!string.IsNullOrEmpty(item.TypeS))
-                {
-                    var check = item.TypeS.ToUpper().Trim();
-                    var newMaterial = GetMaterial(_stockRunning, check, item.TypeS, item.Typed1, item.Qtys, item.Ws, item.Unit4, item.Prices, item.Sizes);
-
-                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
-                    {
-                        addProductsMaterial.Add(newMaterial);
-                    }
-
-                }
-
-                //check typeE
-                if (!string.IsNullOrEmpty(item.Typee))
-                {
-                    var check = item.Typee.ToUpper().Trim();
-                    var newMaterial = GetMaterial(_stockRunning, check, item.Typee, item.Typed1, item.Qtye, item.We, item.Unit5, item.Pricee, item.Sizee);
-
-                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
-                    {
-                        addProductsMaterial.Add(newMaterial);
-                    }
-
-                }
-
-                //check typeM
-                if (!string.IsNullOrEmpty(item.Typem))
-                {
-                    var check = item.Typem.ToUpper().Trim();
-                    var newMaterial = GetMaterial(_stockRunning, check, item.Typem, item.Typed1, item.Qtym, item.Wm, item.Unit6, item.Pricem, item.Sizem);
-
-                    if (CheckTypeOrigin(newMaterial.TypeOrigin))
-                    {
-                        addProductsMaterial.Add(newMaterial);
-                    }
-
                 }
 
                 item.Typejob = "convert";
+                itemsToUpdate.Add(item);
             }
 
-            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            // Use smaller transaction scope and batch operations
+            using var scope = new TransactionScope(
+                TransactionScopeOption.Required,
+                new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+                TransactionScopeAsyncFlowOption.Enabled);
+
+            try
             {
+                // Batch insert operations
                 if (addProducts.Any())
                 {
                     _jewelryContext.TbtStockProduct.AddRange(addProducts);
-                    await _jewelryContext.SaveChangesAsync();
                 }
 
                 if (addProductsMaterial.Any())
                 {
                     _jewelryContext.TbtStockProductMaterial.AddRange(addProductsMaterial);
-                    //await _jewelryContext.SaveChangesAsync();
                 }
 
-                if (oldProduct.Any())
+                if (itemsToUpdate.Any())
                 {
-                    _jewelryContext.StockFromConvert.UpdateRange(oldProduct);
+                    _jewelryContext.StockFromConvert.UpdateRange(itemsToUpdate);
                 }
 
                 await _jewelryContext.SaveChangesAsync();
-
                 scope.Complete();
+            }
+            catch
+            {
+                scope.Dispose();
+                throw;
             }
 
             return $"success {add} item";
