@@ -1450,5 +1450,269 @@ namespace Jewelry.Service.Receipt.Production
 
             return response;
         }
+
+        public async Task<string> ImportBraceletStock()
+        {
+            const int BATCH_SIZE = 700; // Reduced batch size for better memory management
+            
+            // Optimized query - only get unprocessed bracelet records
+            var oldBraceletQuery = from sb in _jewelryContext.StockBracelet
+                              join sp in _jewelryContext.TbtStockProduct
+                              on sb.Productno equals sp.ProductCode into joined
+                              from sp in joined.DefaultIfEmpty()
+                              where sp == null && !string.IsNullOrEmpty(sb.Productno)
+                              select sb;
+
+            var oldBracelets = await oldBraceletQuery.Take(BATCH_SIZE).ToListAsync();
+
+            if (!oldBracelets.Any())
+            {
+                return "No Bracelet Data";
+            }
+
+            // Load master data once and cache
+            var masterProductType = await _jewelryContext.TbmProductType.ToListAsync();
+            var masterGold = await _jewelryContext.TbmGold.ToListAsync();
+            var masterGoldSize = await _jewelryContext.TbmGoldSize.ToListAsync();
+
+            // Pre-generate running numbers in batch to avoid multiple DB calls
+            var _receiptRunning = await _runningNumberService.GenerateRunningNumber("REP");
+            var stockRunningNumbers = new List<string>();
+            for (int i = 0; i < oldBracelets.Count; i++)
+            {
+                // Use "B" prefix for Bracelet
+                stockRunningNumbers.Add(await _runningNumberService.GenerateRunningNumberForStockProductHash("BR"));
+            }
+
+            var addProducts = new List<TbtStockProduct>();
+            var addProductsMaterial = new List<TbtStockProductMaterial>();
+            int add = 0;
+            int runningIndex = 0;
+
+            foreach (var bracelet in oldBracelets)
+            {
+                if (string.IsNullOrEmpty(bracelet.Productno))
+                {
+                    continue;
+                }
+
+                var _stockRunning = stockRunningNumbers[runningIndex++];
+                add++;
+
+                var newProduct = new TbtStockProduct
+                {
+                    StockNumber = _stockRunning,
+                    Status = StockProductStatus.Available,
+                    ReceiptNumber = _receiptRunning,
+                    ReceiptDate = DateTime.UtcNow,
+                    ReceiptType = "bracelet_import",
+                    Mold = bracelet.Styleno ?? bracelet.Productno,
+                    MoldDesign = bracelet.Styleno ?? bracelet.Productno,
+                    Qty = 1, // Default quantity for bracelet
+                    ProductPrice = bracelet.Price ?? 0,
+                    ProductCost = bracelet.Price ?? 0, // Use price as cost if no separate cost
+                    ProductCode = bracelet.Productno,
+                    ProductNumber = bracelet.Productno,
+                    ProductNameTh = bracelet.Description ?? "Bracelet",
+                    ProductNameEn = bracelet.Description ?? "Bracelet",
+                    ImageName = bracelet.Styleno ?? bracelet.Productno,
+                    ImagePath = $"{bracelet.Styleno ?? bracelet.Productno}.jpg",
+                    Size = null, // Bracelet doesn't have size like ring
+                    Remark = $"Imported from StockBracelet - Style: {bracelet.Styleno}",
+                    CreateBy = CurrentUsername,
+                    CreateDate = DateTime.UtcNow
+                };
+
+                // Set product type as Bracelet
+                var braceletType = masterProductType.FirstOrDefault(x => x.Code == "B");
+                if (braceletType != null)
+                {
+                    newProduct.ProductType = braceletType.Code;
+                    newProduct.ProductTypeName = braceletType.NameTh;
+                }
+                else
+                {
+                    // Fallback if bracelet type not found
+                    newProduct.ProductType = "B";
+                    newProduct.ProductTypeName = "สร้อยข้อมือ";
+                }
+
+                // Set default gold type (assume White Gold if not specified)
+                var defaultGold = masterGold.FirstOrDefault(x => bracelet.Description.ToUpper().Contains(x.Code));
+                if (defaultGold != null)
+                {
+                    newProduct.ProductionType = defaultGold.NameEn;
+                }
+
+                // Set default gold size (assume 18K if not specified)
+                var defaultGoldSize = masterGoldSize.FirstOrDefault(x => bracelet.Description.ToUpper().Contains(x.NameEn));
+                if (defaultGoldSize != null)
+                {
+                    newProduct.ProductionTypeSize = defaultGoldSize.NameEn;
+                }
+
+                newProduct.ProductionDate = DateTime.UtcNow;
+                newProduct.WoOrigin = null;
+                newProduct.Wo = null;
+                newProduct.WoNumber = null;
+
+                addProducts.Add(newProduct);
+
+                // Process bracelet materials
+                var braceletMaterials = new List<TbtStockProductMaterial>();
+
+                // Add Gold material if weight exists
+                if (bracelet.GoldWeigh.HasValue && bracelet.GoldWeigh > 0)
+                {
+                    braceletMaterials.Add(new TbtStockProductMaterial
+                    {
+                        StockNumber = _stockRunning,
+                        Type = "Gold",
+                        //TypeOrigin = "Gold",
+                        TypeName = "Gold",
+                        TypeCode = newProduct.ProductionType, // Default to White Gold
+                        //TypeBarcode = $"{bracelet.GoldWeigh} g Gold",
+                        Qty = 1,
+                        Weight = bracelet.GoldWeigh.Value,
+                        WeightUnit = "g",
+                        Price = 0, // No separate gold price in bracelet table
+                        CreateBy = CurrentUsername,
+                        CreateDate = DateTime.UtcNow
+                    });
+                }
+
+                // Add Diamond material if exists
+                if (bracelet.DaimondQty.HasValue && bracelet.DaimondQty > 0)
+                {
+                    braceletMaterials.Add(new TbtStockProductMaterial
+                    {
+                        StockNumber = _stockRunning,
+                        Type = "Diamond",
+                        //TypeOrigin = "Diamond",
+                       // TypeName = "Diamond",
+                        TypeCode = "Diamond",
+                        TypeBarcode = $"{bracelet.DaimondQty}pc Diamond {bracelet.DiamondWeight}ct",
+                        Qty = bracelet.DaimondQty.Value,
+                        Weight = bracelet.DiamondWeight ?? 0,
+                        WeightUnit = "ct",
+                        Price = bracelet.DiamondPrice ?? 0,
+                        CreateBy = CurrentUsername,
+                        CreateDate = DateTime.UtcNow
+                    });
+                }
+
+                // Add Ruby material if exists
+                if (bracelet.RubyQty.HasValue && bracelet.RubyQty > 0)
+                {
+                    braceletMaterials.Add(new TbtStockProductMaterial
+                    {
+                        StockNumber = _stockRunning,
+                        Type = "Gem",
+                        //TypeOrigin = "Ruby",
+                        //TypeName = "Ruby",
+                        TypeCode = "Ruby",
+                        TypeBarcode = $"{bracelet.RubyQty}pc Ruby {bracelet.RubyWeght}ct",
+                        Qty = bracelet.RubyQty.Value,
+                        Weight = bracelet.RubyWeght ?? 0,
+                        WeightUnit = "ct",
+                        Price = bracelet.RubyPrice ?? 0,
+                        CreateBy = CurrentUsername,
+                        CreateDate = DateTime.UtcNow
+                    });
+                }
+
+                // Add Sapphire material if exists
+                if (bracelet.SapphireQty.HasValue && bracelet.SapphireQty > 0)
+                {
+                    braceletMaterials.Add(new TbtStockProductMaterial
+                    {
+                        StockNumber = _stockRunning,
+                        Type = "Gem",
+                        //TypeOrigin = "Sapphire",
+                        //TypeName = "Sapphire",
+                        TypeCode = "Sapphire",
+                        TypeBarcode = $"{bracelet.SapphireQty}pc Sapphire {bracelet.SapphireWeight}ct",
+                        Qty = bracelet.SapphireQty.Value,
+                        Weight = bracelet.SapphireWeight ?? 0,
+                        WeightUnit = "ct",
+                        Price = bracelet.SapphirePrice ?? 0,
+                        CreateBy = CurrentUsername,
+                        CreateDate = DateTime.UtcNow
+                    });
+                }
+
+                // Add Emerald material if exists
+                if (bracelet.EmeraldQty.HasValue && bracelet.EmeraldQty > 0)
+                {
+                    braceletMaterials.Add(new TbtStockProductMaterial
+                    {
+                        StockNumber = _stockRunning,
+                        Type = "Gem",
+                        //TypeOrigin = "Emerald",
+                        //TypeName = "Emerald",
+                        TypeCode = "Emerald",
+                        TypeBarcode = $"{bracelet.EmeraldQty}pc Emerald {bracelet.EmeraldWeight}ct",
+                        Qty = bracelet.EmeraldQty.Value,
+                        Weight = bracelet.EmeraldWeight ?? 0,
+                        WeightUnit = "ct",
+                        Price = bracelet.EmeraldPrice ?? 0,
+                        CreateBy = CurrentUsername,
+                        CreateDate = DateTime.UtcNow
+                    });
+                }
+
+                // Add Mix Color material if exists
+                if (bracelet.MixcolorQty.HasValue && bracelet.MixcolorQty > 0)
+                {
+                    braceletMaterials.Add(new TbtStockProductMaterial
+                    {
+                        StockNumber = _stockRunning,
+                        Type = "Gem",
+                        //TypeOrigin = "MixColor",
+                        //TypeName = "Mix Color Stone",
+                        TypeCode = "Mix Stone",
+                        TypeBarcode = $"{bracelet.MixcolorQty}pc Mix Color {bracelet.MixcolorWeight}ct",
+                        Qty = bracelet.MixcolorQty.Value,
+                        Weight = bracelet.MixcolorWeight ?? 0,
+                        WeightUnit = "ct",
+                        Price = bracelet.MixcolorPrice ?? 0,
+                        CreateBy = CurrentUsername,
+                        CreateDate = DateTime.UtcNow
+                    });
+                }
+
+                addProductsMaterial.AddRange(braceletMaterials);
+            }
+
+            // Use smaller transaction scope and batch operations
+            using var scope = new TransactionScope(
+                TransactionScopeOption.Required,
+                new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+                TransactionScopeAsyncFlowOption.Enabled);
+
+            try
+            {
+                // Batch insert operations
+                if (addProducts.Any())
+                {
+                    _jewelryContext.TbtStockProduct.AddRange(addProducts);
+                }
+
+                if (addProductsMaterial.Any())
+                {
+                    _jewelryContext.TbtStockProductMaterial.AddRange(addProductsMaterial);
+                }
+
+                await _jewelryContext.SaveChangesAsync();
+                scope.Complete();
+            }
+            catch
+            {
+                scope.Dispose();
+                throw;
+            }
+
+            return $"success {add} bracelet items imported";
+        }
     }
 }

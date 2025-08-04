@@ -12,6 +12,8 @@ public partial class JewelryContext : DbContext
     {
     }
 
+    public virtual DbSet<StockBracelet> StockBracelet { get; set; }
+
     public virtual DbSet<StockFromConvert> StockFromConvert { get; set; }
 
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
@@ -115,6 +117,40 @@ public partial class JewelryContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("pg_catalog", "adminpack");
+
+        modelBuilder.Entity<StockBracelet>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("stock_bracelet");
+
+            entity.Property(e => e.DaimondQty).HasColumnName("daimond_qty");
+            entity.Property(e => e.Description)
+                .HasMaxLength(400)
+                .HasColumnName("description");
+            entity.Property(e => e.DiamondPrice).HasColumnName("diamond_price");
+            entity.Property(e => e.DiamondWeight).HasColumnName("diamond_weight");
+            entity.Property(e => e.EmeraldPrice).HasColumnName("emerald_price");
+            entity.Property(e => e.EmeraldQty).HasColumnName("emerald_qty");
+            entity.Property(e => e.EmeraldWeight).HasColumnName("emerald_weight");
+            entity.Property(e => e.GoldWeigh).HasColumnName("gold_weigh");
+            entity.Property(e => e.MixcolorPrice).HasColumnName("mixcolor_price");
+            entity.Property(e => e.MixcolorQty).HasColumnName("mixcolor_qty");
+            entity.Property(e => e.MixcolorWeight).HasColumnName("mixcolor_weight");
+            entity.Property(e => e.Price).HasColumnName("price");
+            entity.Property(e => e.Productno)
+                .HasMaxLength(400)
+                .HasColumnName("productno");
+            entity.Property(e => e.RubyPrice).HasColumnName("ruby_price");
+            entity.Property(e => e.RubyQty).HasColumnName("ruby_qty");
+            entity.Property(e => e.RubyWeght).HasColumnName("ruby_weght");
+            entity.Property(e => e.SapphirePrice).HasColumnName("sapphire_price");
+            entity.Property(e => e.SapphireQty).HasColumnName("sapphire_qty");
+            entity.Property(e => e.SapphireWeight).HasColumnName("sapphire_weight");
+            entity.Property(e => e.Styleno)
+                .HasMaxLength(400)
+                .HasColumnName("styleno");
+        });
 
         modelBuilder.Entity<StockFromConvert>(entity =>
         {
@@ -447,6 +483,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
+            entity.Property(e => e.Color)
+                .HasColumnType("character varying")
+                .HasColumnName("color");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
@@ -472,9 +511,6 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Code)
                 .HasColumnType("character varying")
                 .HasColumnName("code");
-            entity.Property(e => e.Color)
-                .HasColumnType("character varying")
-                .HasColumnName("color");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");

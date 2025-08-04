@@ -16,5 +16,6 @@ namespace Jewelry.Service.Receipt.Production
 
         Task<string> Darft(jewelry.Model.Receipt.Production.Draft.Create.Request request);
         Task<string> ImportProduct();
+        Task<string> ImportBraceletStock();
     }
 }
