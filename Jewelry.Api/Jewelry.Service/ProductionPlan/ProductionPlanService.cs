@@ -407,7 +407,7 @@ namespace Jewelry.Service.ProductionPlan
                                                 : item.UpdateDate,
 
                              IsOverPlan = item.RequestDate < DateTime.UtcNow && !succesStatus.Contains(item.Status), // ประเมินราคา
-                             IsSuccessWithoutCost = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false, 
+                             IsSuccessWithoutCost = item.Status == ProductionPlanStatus.Completed && item.TbtProductionPlanPrice.Any() == false,
 
                              ProductType = item.ProductType,
                              ProductTypeName = item.ProductTypeNavigation.NameTh,
@@ -662,13 +662,13 @@ namespace Jewelry.Service.ProductionPlan
 
                 IsActive = plan.item.IsActive,
                 Status = plan.item.Status,
-                StatusName = plan.item.Status == ProductionPlanStatus.Completed 
-                                                 && plan.item.TbtProductionPlanPrice.Any() == false 
-                                                 ? plan.item.StatusNavigation.Reference 
+                StatusName = plan.item.Status == ProductionPlanStatus.Completed
+                                                 && plan.item.TbtProductionPlanPrice.Any() == false
+                                                 ? plan.item.StatusNavigation.Reference
                                                  : plan.item.StatusNavigation.NameTh,
                 Remark = plan.item.Remark,
 
-                Gold = !string.IsNullOrEmpty(plan.item.Type)  ? plan.item.Type.Trim() : string.Empty,
+                Gold = !string.IsNullOrEmpty(plan.item.Type) ? plan.item.Type.Trim() : string.Empty,
                 GoldSize = !string.IsNullOrEmpty(plan.item.TypeSize) ? plan.item.TypeSize.Trim() : string.Empty,
 
                 TbtProductionPlanStatusHeader = (from item in plan.item.TbtProductionPlanStatusHeader
@@ -745,8 +745,8 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        Code = gem.GemCode,
                                                                                        Name = gem.GemName,
                                                                                        QTY = gem.GemQty,
-                                                                                       Price = gem.GemPrice.HasValue && gem.GemPrice.Value > 0 
-                                                                                                                      ? gem.GemPrice 
+                                                                                       Price = gem.GemPrice.HasValue && gem.GemPrice.Value > 0
+                                                                                                                      ? gem.GemPrice
                                                                                                                       : (gemStock.UnitCode == "Q" ? gemStock.PriceQty : gemStock.Price),
                                                                                        Weight = gem.GemWeight,
 
@@ -1656,7 +1656,7 @@ namespace Jewelry.Service.ProductionPlan
 
             //ใหลบทุกกรณี
             var removeGems = header.TbtProductionPlanStatusDetailGem;
-                //.Where(item => string.IsNullOrEmpty(item.OutboundRunning));
+            //.Where(item => string.IsNullOrEmpty(item.OutboundRunning));
 
             if (removeGems.Any())
             {
@@ -2631,33 +2631,33 @@ namespace Jewelry.Service.ProductionPlan
                                      .ThenInclude(x => x.ProductionPlan)
                                      .ThenInclude(x => x.StatusNavigation)
 
-                                     join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                                    join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
 
-                                     where item.Header.ProductionPlan.Wo == wo
-                                     && item.Header.ProductionPlan.WoNumber == woNumber
-                                     && item.IsActive == true
-                                     && item.Header.IsActive == true
-                                     && getEmbedSatus.Contains(item.Header.Status)
+                                    where item.Header.ProductionPlan.Wo == wo
+                                    && item.Header.ProductionPlan.WoNumber == woNumber
+                                    && item.IsActive == true
+                                    && item.Header.IsActive == true
+                                    && getEmbedSatus.Contains(item.Header.Status)
 
-                                     select new TransectionItem()
-                                     {
-                                         Name = status.NameTh,
-                                         NameDescription = $"[{status.NameTh}] {item.Description} [{item.GoldQtySend} ชิ้น]",
-                                         NameGroup = TypeofPrice.Embed,
+                                    select new TransectionItem()
+                                    {
+                                        Name = status.NameTh,
+                                        NameDescription = $"[{status.NameTh}] {item.Description} [{item.GoldQtySend} ชิ้น]",
+                                        NameGroup = TypeofPrice.Embed,
 
-                                         Date = item.RequestDate,
+                                        Date = item.RequestDate,
 
-                                         //จำนวนวง
-                                         Qty = item.GoldQtyCheck,
-                                         QtyPrice = item.Wages,
+                                        //จำนวนวง
+                                        Qty = item.GoldQtyCheck,
+                                        QtyPrice = item.Wages,
 
-                                         QtyWeight = item.GoldWeightCheck,
-                                         QtyWeightPrice = 0,
+                                        QtyWeight = item.GoldWeightCheck,
+                                        QtyWeightPrice = 0,
 
-                                         PriceReference = item.TotalWages,
-                                     });
+                                        PriceReference = item.TotalWages,
+                                    });
 
-          
+
 
             //group 4 --> get gem
             var transectionGem = (from item in _jewelryContext.TbtProductionPlanStatusDetailGem
@@ -2693,13 +2693,25 @@ namespace Jewelry.Service.ProductionPlan
             if (transectionWorker.Any())
             {
                 if (transectionWorker.Where(x => x.Status == 90).Any())
-                { 
+                {
                     decimal? qty = transectionWorker.Where(x => x.Status == 90).Sum(x => x.Qty);
                     decimal? goldWeight = transectionWorker.Where(x => x.Status == 90).Sum(x => x.QtyWeight);
-                    decimal? gemWeight = transectionGem.Any() ?  transectionGem.Sum(x => x.QtyWeight) : 1;
+                    decimal? gemWeight = transectionGem.Any() ? transectionGem.Sum(x => x.QtyWeight) : 1;
                     decimal gemDenominator = 5;
 
-                    var goldCal = MathHelper.RoundDecimal(goldWeight.Value - (MathHelper.SafeDivide(gemWeight.Value, gemDenominator, 2)), 2);
+                    if (goldWeight < 1)
+                    {
+                    }
+
+                    decimal goldCal = 0;
+                    if (gemWeight.HasValue && gemWeight.Value > 0)
+                    {
+                        goldCal = MathHelper.RoundDecimal(goldWeight.Value - (MathHelper.SafeDivide(gemWeight.Value, gemDenominator, 2)), 2);
+                    }
+                    else
+                    {
+                        goldCal = goldWeight.Value;
+                    }
 
                     var realGold = new TransectionItem()
                     {
@@ -2760,7 +2772,7 @@ namespace Jewelry.Service.ProductionPlan
 
                                  }).ToList();
 
-            if (transactonEtc.Any()) 
+            if (transactonEtc.Any())
             {
                 response.Items.AddRange(transactonEtc);
             }
@@ -2836,7 +2848,7 @@ namespace Jewelry.Service.ProductionPlan
 
                         IsManualAdd = item.IsAdd
 
-                        
+
                     };
                     newPrices.Add(newPrice);
                 }
@@ -2867,7 +2879,7 @@ namespace Jewelry.Service.ProductionPlan
             return "success";
         }
 
-         
+
         #endregion
 
         //private int GetTransferStatus(int status)

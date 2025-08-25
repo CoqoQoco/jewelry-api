@@ -47,6 +47,25 @@ namespace Jewelry.Api.Controllers.Production
             }
         }
 
+        [Route("PlanCompleted")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Production.Plan.ListComplete.Response>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult PlanCompleted([FromBody] jewelry.Model.Production.Plan.ListComplete.Request request)
+        {
+            try
+            {
+                var response = _planService.PlanCompleted(request.Search);
+                return response.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
         [Route("TransferList")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Production.Plan.TransferList.Response>))]

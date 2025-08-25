@@ -23,6 +23,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 using static NPOI.HSSF.Util.HSSFColor;
 
 namespace Jewelry.Service.Production.Plan
@@ -125,6 +126,163 @@ namespace Jewelry.Service.Production.Plan
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
                 query = query.Where(x => x.WoText.Contains(request.ProductNumber));
+            }
+
+            return query;
+        }
+        #endregion
+
+        #region --- list plan is success and ขัดชุบ gold ----
+        public IQueryable<jewelry.Model.Production.Plan.ListComplete.Response> PlanCompleted(jewelry.Model.Production.Plan.ListComplete.Search request)
+        {
+            var query = (from statusDetail in _jewelryContext.TbtProductionPlanStatusDetail
+                         .Include(x => x.Header)
+                         .Include(x => x.Header.ProductionPlan)
+                             .ThenInclude(x => x.StatusNavigation)
+                         .Include(x => x.Header.ProductionPlan.TbtProductionPlanPrice)
+                         .Include(x => x.Header.ProductionPlan.ProductTypeNavigation)
+                         .Include(x => x.Header.ProductionPlan.CustomerTypeNavigation)
+                         //.Include(x => x.Header.ProductionPlan.TbtProductionPlanStatusHeader
+                         //    .Where(h => h.IsActive == true))
+
+                             // Left joins using navigation properties instead of manual joins
+                         where statusDetail.IsActive == true
+                            && statusDetail.Header.Status == ProductionPlanStatus.Plated
+                            && statusDetail.Header.IsActive == true
+                            && (statusDetail.Header.ProductionPlan.Status == ProductionPlanStatus.Completed
+                                || statusDetail.Header.ProductionPlan.Status == ProductionPlanStatus.Price)
+
+                         let plan = statusDetail.Header.ProductionPlan
+                         let customer = _jewelryContext.TbmCustomer
+                             .FirstOrDefault(c => c.Code == plan.CustomerNumber)
+                         let mold = _jewelryContext.TbtProductMold
+                             .FirstOrDefault(m => m.Code == plan.Mold)
+                         //let currentStatus = plan.TbtProductionPlanStatusHeader
+                         //    .Where(x => x.IsActive == true && x.Status == plan.Status)
+                         //    .OrderByDescending(x => x.UpdateDate)
+                         //    .FirstOrDefault()
+
+                         select new jewelry.Model.Production.Plan.ListComplete.Response()
+                         {
+                             Id = plan.Id,
+                             Wo = plan.Wo,
+                             WoNumber = plan.WoNumber,
+                             WoText = plan.WoText,
+
+                             Mold = plan.Mold,
+                             MoldSub = mold != null && !string.IsNullOrEmpty(mold.ImageDraft1)
+                                 ? $"{plan.Mold}-Sub" : string.Empty,
+
+                             Status = plan.Status,
+                             StatusName = plan.Status == ProductionPlanStatus.Completed && !plan.TbtProductionPlanPrice.Any()
+                                 ? plan.StatusNavigation.Reference
+                                 : statusDetail.Header.ProductionPlan.StatusNavigation.NameTh,
+
+                             ProductNumber = plan.ProductNumber,
+                             ProductQty = plan.ProductQty,
+
+                             CustomerNumber = plan.CustomerNumber,
+                             CustomerName = customer != null && !string.IsNullOrEmpty(customer.NameTh)
+                                 ? customer.NameTh : null,
+
+                             CustomerType = plan.CustomerType,
+                             CustomerTypeName = plan.CustomerTypeNavigation.NameTh,
+
+                             CreateDate = plan.CreateDate,
+                             RequestDate = plan.RequestDate,
+                             LastUpdateStatus = plan.UpdateDate,
+                             //LastUpdateStatus = currentStatus != null
+                             //    ? currentStatus.UpdateDate
+                             //    : plan.UpdateDate,
+
+                             IsSuccessWithoutCost = plan.Status == ProductionPlanStatus.Completed && !plan.TbtProductionPlanPrice.Any(),
+
+                             ProductType = plan.ProductType,
+                             ProductTypeName = plan.ProductTypeNavigation.NameTh,
+
+                             Gold = plan.Type,
+                             GoldSize = plan.TypeSize,
+
+                             goldPlated = statusDetail.Gold,
+                             GoldQtySend = statusDetail.GoldQtySend,
+                             GoldWeightSend = statusDetail.GoldWeightSend,
+                             GoldQtyCheck = statusDetail.GoldQtyCheck,
+                             GoldWeightCheck = statusDetail.GoldWeightCheck,
+
+                             Description = statusDetail.Description,
+                         });
+
+            // Date filters
+            if (request.Start.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.Start.Value.StartOfDayUtc());
+            }
+            if (request.End.HasValue)
+            {
+                query = query.Where(x => x.CreateDate <= request.End.Value.EndOfDayUtc());
+            }
+            if (request.SendStart.HasValue)
+            {
+                query = query.Where(x => x.LastUpdateStatus >= request.SendStart.Value.StartOfDayUtc());
+            }
+            if (request.SendEnd.HasValue)
+            {
+                query = query.Where(x => x.LastUpdateStatus <= request.SendEnd.Value.EndOfDayUtc());
+            }
+
+            // IsOverPlan filter - ต้องเพิ่ม logic การคำนวณใน select ด้วย
+            if (request.IsOverPlan.HasValue && request.IsOverPlan == 1)
+            {
+                // query = query.Where(x => x.IsOverPlan == true);
+                // ต้องเพิ่ม logic การคำนวณ IsOverPlan ใน projection ด้านบน
+            }
+
+            // Text search
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                var searchText = request.Text.ToUpper();
+                query = query.Where(x =>
+                    x.Wo.Contains(searchText) ||
+                    x.WoText.Contains(request.Text) ||
+                    x.Mold.Contains(request.Text) ||
+                    x.ProductNumber.Contains(request.Text) ||
+                    x.CustomerNumber.Contains(request.Text));
+            }
+
+            // Status filter
+            if (request.Status != null && request.Status.Any())
+            {
+                query = query.Where(x => request.Status.Contains(x.Status));
+            }
+
+            // Other filters
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                query = query.Where(x => x.CustomerNumber.Contains(request.CustomerCode));
+            }
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Gold));
+            }
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => request.GoldSize.Contains(x.GoldSize));
+            }
+            if (request.CustomerType != null && request.CustomerType.Any())
+            {
+                query = query.Where(x => request.CustomerType.Contains(x.CustomerType));
+            }
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.Mold.Contains(request.Mold));
+            }
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
             }
 
             return query;
