@@ -25,6 +25,8 @@ public partial class TbtProductMoldPlan
 
     public string Running { get; set; } = null!;
 
+    public bool IsNewProcess { get; set; }
+
     public virtual TbmProductMoldPlanStatus NextStatusNavigation { get; set; } = null!;
 
     public virtual TbmProductMoldPlanStatus StatusNavigation { get; set; } = null!;

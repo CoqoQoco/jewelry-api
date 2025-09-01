@@ -873,6 +873,7 @@ public partial class JewelryContext : DbContext
                 .IsRequired()
                 .HasDefaultValueSql("true")
                 .HasColumnName("is_active");
+            entity.Property(e => e.IsNewProcess).HasColumnName("is_new_process");
             entity.Property(e => e.NextStatus).HasColumnName("next_status");
             entity.Property(e => e.RemarkUpdate)
                 .HasColumnType("character varying")
@@ -1031,6 +1032,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ImageUrl)
                 .HasColumnType("character varying")
                 .HasColumnName("image_url");
+            entity.Property(e => e.IsNewProcess).HasColumnName("is_new_process");
             entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
             entity.Property(e => e.QtySend).HasColumnName("qty_send");
             entity.Property(e => e.RemarUpdate)
@@ -1039,6 +1041,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
+            entity.Property(e => e.ResinBy)
+                .HasColumnType("character varying")
+                .HasColumnName("resin_by");
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");

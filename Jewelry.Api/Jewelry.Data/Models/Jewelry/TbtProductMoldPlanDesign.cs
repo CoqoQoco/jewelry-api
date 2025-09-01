@@ -31,6 +31,10 @@ public partial class TbtProductMoldPlanDesign
 
     public string? DesignBy { get; set; }
 
+    public string? ResinBy { get; set; }
+
+    public bool IsNewProcess { get; set; }
+
     public virtual TbmProductType CategoryCodeNavigation { get; set; } = null!;
 
     public virtual TbtProductMoldPlan Plan { get; set; } = null!;
