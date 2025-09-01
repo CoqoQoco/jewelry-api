@@ -1158,14 +1158,25 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CuttingBy)
+                .HasColumnType("character varying")
+                .HasColumnName("cutting_by");
             entity.Property(e => e.ImageUrl)
                 .HasColumnType("character varying")
                 .HasColumnName("image_url");
+            entity.Property(e => e.IsNewProcess).HasColumnName("is_new_process");
             entity.Property(e => e.Location)
                 .HasColumnType("character varying")
                 .HasColumnName("location");
+            entity.Property(e => e.PrintBy)
+                .HasColumnType("character varying")
+                .HasColumnName("print_by");
             entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
+            entity.Property(e => e.QtyResin).HasColumnName("qty_resin");
             entity.Property(e => e.QtySend).HasColumnName("qty_send");
+            entity.Property(e => e.QtySilvercast)
+                .HasColumnType("character varying")
+                .HasColumnName("qty_silvercast");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");

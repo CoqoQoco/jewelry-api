@@ -31,5 +31,15 @@ public partial class TbtProductMoldPlanStore
 
     public string Location { get; set; } = null!;
 
+    public decimal? QtyResin { get; set; }
+
+    public string? QtySilvercast { get; set; }
+
+    public string? PrintBy { get; set; }
+
+    public string? CuttingBy { get; set; }
+
+    public bool IsNewProcess { get; set; }
+
     public virtual TbtProductMoldPlan Plan { get; set; } = null!;
 }
