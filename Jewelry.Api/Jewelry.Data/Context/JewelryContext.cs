@@ -1011,17 +1011,19 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbtProductMoldPlanDesign>(entity =>
         {
-            entity.HasKey(e => new { e.PlanId, e.CodePlan }).HasName("tbt_product_mold_plan_design_pk");
+            entity.HasKey(e => e.PlanId).HasName("tbt_product_mold_plan_design_pk");
 
             entity.ToTable("tbt_product_mold_plan_design");
 
-            entity.Property(e => e.PlanId).HasColumnName("plan_id");
-            entity.Property(e => e.CodePlan)
-                .HasColumnType("character varying")
-                .HasColumnName("code_plan");
+            entity.Property(e => e.PlanId)
+                .ValueGeneratedNever()
+                .HasColumnName("plan_id");
             entity.Property(e => e.CategoryCode)
                 .HasColumnType("character varying")
                 .HasColumnName("category_code");
+            entity.Property(e => e.CodePlan)
+                .HasColumnType("character varying")
+                .HasColumnName("code_plan");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
@@ -1054,8 +1056,8 @@ public partial class JewelryContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_product_mold_plan_design_type_fk");
 
-            entity.HasOne(d => d.Plan).WithMany(p => p.TbtProductMoldPlanDesign)
-                .HasForeignKey(d => d.PlanId)
+            entity.HasOne(d => d.Plan).WithOne(p => p.TbtProductMoldPlanDesign)
+                .HasForeignKey<TbtProductMoldPlanDesign>(d => d.PlanId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_product_mold_plan_design_fk");
         });
@@ -1174,9 +1176,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.QtyReceive).HasColumnName("qty_receive");
             entity.Property(e => e.QtyResin).HasColumnName("qty_resin");
             entity.Property(e => e.QtySend).HasColumnName("qty_send");
-            entity.Property(e => e.QtySilvercast)
-                .HasColumnType("character varying")
-                .HasColumnName("qty_silvercast");
+            entity.Property(e => e.QtySilvercast).HasColumnName("qty_silvercast");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");

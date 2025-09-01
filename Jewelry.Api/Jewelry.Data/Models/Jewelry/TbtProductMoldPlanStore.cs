@@ -33,7 +33,7 @@ public partial class TbtProductMoldPlanStore
 
     public decimal? QtyResin { get; set; }
 
-    public string? QtySilvercast { get; set; }
+    public decimal? QtySilvercast { get; set; }
 
     public string? PrintBy { get; set; }
 

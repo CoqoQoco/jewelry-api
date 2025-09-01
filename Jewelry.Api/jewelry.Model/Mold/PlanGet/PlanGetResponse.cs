@@ -14,6 +14,8 @@ namespace jewelry.Model.Mold.PlanGet
         public DateTime CreateDate { get; set; }
         public DateTime UpdateDate { get; set; }
 
+        public bool IsNewProcess { get; set; }
+
         public int Status { get; set; }
         public string StatusName { get; set; }
         public int NextStatus { get; set; }
@@ -61,5 +63,12 @@ namespace jewelry.Model.Mold.PlanGet
         public string? Code { get; set; }
 
         public string? Location { get; set; }
+
+        public string? ResinBy { get; set; }
+        public decimal? QtyResin { get; set; }
+        public decimal? QtySilverCast { get; set; }
+
+        public string? PrintBy { get; set; }
+        public string? CuttingBy { get; set; }
     }
 }

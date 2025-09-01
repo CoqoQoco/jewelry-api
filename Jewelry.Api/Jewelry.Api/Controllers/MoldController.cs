@@ -177,6 +177,7 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
         [Route("PlanDesign")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
@@ -194,6 +195,25 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+        [Route("NewPlanDesign")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> NewPlanDesign([FromForm] PlanDesignRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.NewPlanDesign(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
         [Route("PlanResin")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
@@ -262,6 +282,7 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
         [Route("PlanStore")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
@@ -279,6 +300,25 @@ namespace Jewelry.Api.Controllers
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+        [Route("NewPlanStore")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> NewPlanStore([FromForm] PlanStoreRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.NewPlanStore(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
         [Route("PlanRemodel")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]

@@ -46,6 +46,9 @@ namespace Jewelry.Service.Mold
         Task<string> PlanCutting(PlanCuttingRequest request);
         Task<string> PlanStore(PlanStoreRequest request);
         Task<string> PlanRemodel(PlanRemodelRequest request);
+
+        Task<string> NewPlanDesign(PlanDesignRequest request);
+        Task<string> NewPlanStore(PlanStoreRequest request);
     }
     public class MoldPlanService : BaseService, IMoldPlanService
     {
@@ -53,10 +56,10 @@ namespace Jewelry.Service.Mold
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
 
-        public MoldPlanService(JewelryContext jewelryContext, 
-            IHostEnvironment hostingEnvironment, 
-            IRunningNumber runningNumberService, 
-            IHttpContextAccessor httpContextAccessor) : base(jewelryContext , httpContextAccessor)
+        public MoldPlanService(JewelryContext jewelryContext,
+            IHostEnvironment hostingEnvironment,
+            IRunningNumber runningNumberService,
+            IHttpContextAccessor httpContextAccessor) : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _hostingEnvironment = hostingEnvironment;
@@ -76,7 +79,7 @@ namespace Jewelry.Service.Mold
                          select new PlanListReponse()
                          {
                              Id = plan.Id,
-                             MoldCode = plan.TbtProductMoldPlanDesign.First().CodePlan,
+                             MoldCode = plan.TbtProductMoldPlanDesign.CodePlan,
                              Code = plan.TbtProductMoldPlanCutting.Any() ? plan.TbtProductMoldPlanCutting.First().Code : string.Empty,
 
                              CreateDate = plan.CreateDate,
@@ -87,10 +90,12 @@ namespace Jewelry.Service.Mold
                              NextStatus = plan.NextStatus,
                              NextStatusName = plan.NextStatusNavigation.NameTh,
 
-                             CatagoryName = plan.TbtProductMoldPlanDesign.First().CategoryCodeNavigation.NameTh,
-                             DesignBy = plan.TbtProductMoldPlanDesign.First().DesignBy,
+                             IsNewProcess = plan.IsNewProcess,
 
-                             ImgDesign = plan.TbtProductMoldPlanDesign.First().ImageUrl ?? string.Empty,
+                             CatagoryName = plan.TbtProductMoldPlanDesign.CategoryCodeNavigation.NameTh,
+                             DesignBy = plan.TbtProductMoldPlanDesign.DesignBy,
+
+                             ImgDesign = plan.TbtProductMoldPlanDesign.ImageUrl ?? string.Empty,
                              ImgResin = plan.TbtProductMoldPlanResin.Any()
                                 ? plan.TbtProductMoldPlanResin.First().ImageUrl ?? string.Empty : string.Empty,
                              ImgCastingSilver = plan.TbtProductMoldPlanCastingSilver.Any()
@@ -151,26 +156,30 @@ namespace Jewelry.Service.Mold
                                 NextStatus = plan.NextStatus,
                                 NextStatusName = plan.NextStatusNavigation.NameTh,
 
+                                IsNewProcess = plan.IsNewProcess,
+
                                 Design = new PlanGetItemStatus()
                                 {
-                                    MoldCode = plan.TbtProductMoldPlanDesign.First().CodePlan,
-                                    Remark = plan.TbtProductMoldPlanDesign.First().Remark,
+                                    MoldCode = plan.TbtProductMoldPlanDesign.CodePlan,
+                                    Remark = plan.TbtProductMoldPlanDesign.Remark,
                                     //SizeGem = plan.TbtProductMoldPlanDesign.First().SizeGem,
                                     //SizeDiamond = plan.TbtProductMoldPlanDesign.First().SizeDiamond,
                                     //QtyGem = plan.TbtProductMoldPlanDesign.First().QtyGem,
                                     //QtyDiamond = plan.TbtProductMoldPlanDesign.First().QtyDiamond,
-                                    QtyReceive = plan.TbtProductMoldPlanDesign.First().QtyReceive,
-                                    QtySend = plan.TbtProductMoldPlanDesign.First().QtySend,
-                                    Image = plan.TbtProductMoldPlanDesign.First().ImageUrl ?? string.Empty,
+                                    QtyReceive = plan.TbtProductMoldPlanDesign.QtyReceive,
+                                    QtySend = plan.TbtProductMoldPlanDesign.QtySend,
+                                    Image = plan.TbtProductMoldPlanDesign.ImageUrl ?? string.Empty,
 
-                                    CreateBy = plan.TbtProductMoldPlanDesign.First().CreateBy,
-                                    CreateDate = plan.TbtProductMoldPlanDesign.First().CreateDate,
-                                    UpdateBy = plan.TbtProductMoldPlanDesign.First().UpdateBy,
-                                    UpdateDate = plan.TbtProductMoldPlanDesign.First().UpdateDate ?? default,
+                                    CreateBy = plan.TbtProductMoldPlanDesign.CreateBy,
+                                    CreateDate = plan.TbtProductMoldPlanDesign.CreateDate,
+                                    UpdateBy = plan.TbtProductMoldPlanDesign.UpdateBy,
+                                    UpdateDate = plan.TbtProductMoldPlanDesign.UpdateDate ?? default,
 
-                                    Catagory = plan.TbtProductMoldPlanDesign.First().CategoryCode,
-                                    CatagoryName = plan.TbtProductMoldPlanDesign.First().CategoryCodeNavigation.NameTh,
-                                    WorkBy = plan.TbtProductMoldPlanDesign.First().DesignBy
+                                    Catagory = plan.TbtProductMoldPlanDesign.CategoryCode,
+                                    CatagoryName = plan.TbtProductMoldPlanDesign.CategoryCodeNavigation.NameTh,
+
+                                    WorkBy = plan.TbtProductMoldPlanDesign.DesignBy,
+                                    ResinBy = plan.TbtProductMoldPlanDesign.ResinBy
                                 },
 
                                 Gems = plan.TbtProductMoldPlanGem.Any() ? plan.TbtProductMoldPlanGem.Select(x => new ModelGem()
@@ -267,6 +276,12 @@ namespace Jewelry.Service.Mold
                                     CreateDate = plan.TbtProductMoldPlanStore.First().CreateDate,
                                     UpdateBy = plan.TbtProductMoldPlanStore.First().UpdateBy,
                                     UpdateDate = plan.TbtProductMoldPlanStore.First().UpdateDate ?? default,
+
+                                    QtyResin = plan.TbtProductMoldPlanStore.First().QtyResin,
+                                    QtySilverCast = plan.TbtProductMoldPlanStore.First().QtySilvercast,
+
+                                    PrintBy = plan.TbtProductMoldPlanStore.First().PrintBy,
+                                    CuttingBy = plan.TbtProductMoldPlanStore.First().CuttingBy,
                                 } : null,
 
 
@@ -390,6 +405,7 @@ namespace Jewelry.Service.Mold
                     UpdateDate = DateTime.UtcNow,
 
                     Running = running,
+                    IsNewProcess = false,
 
                     IsActive = true,
                     Status = MoldPlanStatus.Designed,
@@ -404,13 +420,15 @@ namespace Jewelry.Service.Mold
                 {
                     CodePlan = request.MoldCode.ToUpper(),
                     Remark = request.Remark,
-                    QtySend = request.QtySend,
-                    QtyReceive = request.QtyReceive,
+                    QtySend = request.QtySend.Value,
+                    QtyReceive = request.QtyReceive.Value,
                     CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow,
                     UpdateBy = CurrentUsername,
                     UpdateDate = DateTime.UtcNow,
                     PlanId = plan.Id,
+
+                    IsNewProcess = false,
 
                     CategoryCode = request.Catagory,
                     DesignBy = request.DesignBy
@@ -1093,8 +1111,8 @@ namespace Jewelry.Service.Mold
                 await _jewelryContext.SaveChangesAsync();
 
 
-                mold.Category = plan.TbtProductMoldPlanDesign.First().CategoryCodeNavigation.NameTh;
-                mold.CategoryCode = plan.TbtProductMoldPlanDesign.First().CategoryCodeNavigation.Code;
+                mold.Category = plan.TbtProductMoldPlanDesign.CategoryCodeNavigation.NameTh;
+                mold.CategoryCode = plan.TbtProductMoldPlanDesign.CategoryCodeNavigation.Code;
                 mold.Description = request.Remark;
                 mold.MoldBy = request.WorkerBy;
                 mold.UpdateDate = DateTime.UtcNow;
@@ -1138,7 +1156,7 @@ namespace Jewelry.Service.Mold
                     Category = request.Catagory,
                     CategoryCode = request.CatagoryCode,
                     Description = request.Remark,
-                  
+
                     MoldBy = request.WorkBy,
                     ReModelMold = request.Remodel,
                     IsActive = true,
@@ -1181,6 +1199,329 @@ namespace Jewelry.Service.Mold
 
                 scope.Complete();
             }
+
+            return "success";
+        }
+
+        public async Task<string> NewPlanDesign(PlanDesignRequest request)
+        {
+            #region *** validate ***
+            var codeplan = (from item in _jewelryContext.TbtProductMoldPlanDesign
+                            where item.CodePlan == request.MoldCode.ToUpper()
+                            select item).FirstOrDefault();
+            if (codeplan != null)
+            {
+                throw new HandleException("ไม่สามารถสร้างรหัสเเม่พิมพ์ซ้ำได้");
+            }
+
+            if (request.Images.Any() && request.Images.Count > 2)
+            {
+                throw new HandleException("ไม่สามารถบันทึกรูปต้นเเเบบเเม่พิมพ์มากกว่า 2 รูป");
+            }
+
+
+            #endregion
+            #region *** create ***
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var running = await _runningNumberService.GenerateRunningNumberForGold("MOLD");
+                var plan = new TbtProductMoldPlan()
+                {
+                    CreateBy = CurrentUsername,
+                    CreateDate = DateTime.UtcNow,
+                    UpdateBy = CurrentUsername,
+                    UpdateDate = DateTime.UtcNow,
+
+                    Running = running,
+                    IsNewProcess = true,
+
+                    IsActive = true,
+                    Status = MoldPlanStatus.Designed,
+                    NextStatus = MoldPlanStatus.Store
+
+                };
+
+                _jewelryContext.TbtProductMoldPlan.Add(plan);
+                await _jewelryContext.SaveChangesAsync();
+
+                var design = new TbtProductMoldPlanDesign()
+                {
+                    CodePlan = request.MoldCode.ToUpper(),
+                    Remark = request.Remark,
+
+                    QtySend = 0,
+                    QtyReceive = 0,
+
+                    CreateBy = CurrentUsername,
+                    CreateDate = DateTime.UtcNow,
+                    UpdateBy = CurrentUsername,
+                    UpdateDate = DateTime.UtcNow,
+
+                    PlanId = plan.Id,
+                    IsNewProcess = true,
+
+                    CategoryCode = request.Catagory,
+                    DesignBy = request.DesignBy,
+                    ResinBy = request.ResinBy,
+                };
+
+                if (request.Images.Any())
+                {
+                    int count = 1;
+                    //array to store stirng name image url
+                    List<string> imagesUrl = new List<string>();
+                    foreach (var item in request.Images)
+                    {
+                        try
+                        {
+                            string imageName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Design.png";
+                            string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanDesign");
+                            if (!Directory.Exists(imagePath))
+                            {
+                                Directory.CreateDirectory(imagePath);
+                            }
+                            string imagePathWithFileName = Path.Combine(imagePath, imageName);
+
+                            //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
+                            using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                            {
+                                item.CopyTo(fileStream);
+                                fileStream.Close();
+                            }
+
+                            //design.ImageUrl = imageName;
+
+                            //add image url to array
+                            imagesUrl.Add(imageName);
+
+                            count++;
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                        }
+
+                    }
+                    if (imagesUrl != null)
+                    {
+                        //split image url by comma
+                        design.ImageUrl = string.Join(",", imagesUrl);
+                    }
+                }
+
+                _jewelryContext.TbtProductMoldPlanDesign.Add(design);
+                await _jewelryContext.SaveChangesAsync();
+
+                if (request.Gems.Any())
+                {
+                    var gems = new List<TbtProductMoldPlanGem>();
+
+                    foreach (var item in request.Gems)
+                    {
+                        var gem = new TbtProductMoldPlanGem()
+                        {
+                            PlanId = plan.Id,
+                            CreateBy = CurrentUsername,
+                            CreateDate = DateTime.UtcNow,
+                            UpdateBy = CurrentUsername,
+                            UpdateDate = DateTime.UtcNow,
+
+                            Size = item.Size,
+                            Qty = item.Qty,
+
+                            GemCode = item.GemCode,
+                            GemShapeCode = item.GemShapeCode,
+                        };
+
+                        gems.Add(gem);
+                    }
+
+                    if (gems.Any())
+                    {
+                        _jewelryContext.TbtProductMoldPlanGem.AddRange(gems);
+                        await _jewelryContext.SaveChangesAsync();
+                    }
+                }
+
+                scope.Complete();
+            }
+
+            #endregion
+
+            return "success";
+        }
+        public async Task<string> NewPlanStore(PlanStoreRequest request)
+        {
+            #region *** validate ***
+            var codeplan = (from item in _jewelryContext.TbtProductMoldPlanStore
+                            where item.CodePlan == request.MoldCode
+                            && item.PlanId == request.PlanId
+                            && item.Code == request.Code
+                            select item).FirstOrDefault();
+            if (codeplan != null)
+            {
+                throw new HandleException("ไม่สามารถสร้างรหัสเเม่พิมพ์ซ้ำได้");
+            }
+
+
+            var designList = (from item in _jewelryContext.TbtProductMoldPlanDesign
+                          .Include(x => x.CategoryCodeNavigation)
+                                  //where item.PlanId == request.PlanId
+                              select item);
+
+            var design = designList.FirstOrDefault(x => x.PlanId == request.PlanId);
+            if (design == null)
+            {
+                throw new HandleException("ไม่พบข้อมูลเเม่พิมพ์ [Design] กรุณาลองใหม่อีกครั้ง");
+            }
+
+
+            if (design.CodePlan != request.MoldCode.ToUpper())
+            {
+                var dubplicateMold = designList.FirstOrDefault(x => x.CodePlan == request.MoldCode.ToUpper());
+                if (dubplicateMold != null)
+                {
+                    throw new HandleException("ไม่สามารถสร้างรหัสเเม่พิมพ์ซ้ำได้");
+                }
+            }
+
+
+            if (request.Images.Any() && request.Images.Count > 1)
+            {
+                throw new HandleException("ไม่สามารถบันทึกเเม่พิมพ์สำเร็จมากกว่า 1 รูป");
+            }
+
+            var plan = (from item in _jewelryContext.TbtProductMoldPlan
+                            //.Include(x => x.TbtProductMoldPlanDesign)
+                            //.ThenInclude(x => x.CategoryCodeNavigation)
+                        where item.Id == request.PlanId
+                        select item).FirstOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException("ไม่พบข้อมูลเเม่พิมพ์ กรุณาลองใหม่อีกครั้ง");
+            }
+            if (plan.Status != MoldPlanStatus.Designed)
+            {
+                throw new HandleException("ไม่สามารถทำรายการได้[invalid status] กรุณาลองใหม่อีกครั้ง");
+            }
+
+            var mold = (from item in _jewelryContext.TbtProductMold
+                        where item.Code == request.Code.ToUpper()
+                        && item.IsActive == false
+                        select item).FirstOrDefault();
+
+            if (mold != null)
+            {
+                throw new HandleException($"มีข้อมูลเเม่พิมพ์สำเร็จรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+            }
+
+
+
+            #endregion
+            #region *** create ***
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+
+                plan.UpdateBy = CurrentUsername;
+                plan.UpdateDate = DateTime.UtcNow;
+                plan.Status = MoldPlanStatus.Store;
+                plan.NextStatus = MoldPlanStatus.Success;
+
+                _jewelryContext.TbtProductMoldPlan.Update(plan);
+                await _jewelryContext.SaveChangesAsync();
+
+                design.CodePlan = request.MoldCode.ToUpper();
+                design.UpdateBy = CurrentUsername;
+                design.UpdateDate = DateTime.UtcNow;
+
+                _jewelryContext.TbtProductMoldPlanDesign.Update(design);
+                await _jewelryContext.SaveChangesAsync();
+
+
+                var store = new TbtProductMoldPlanStore()
+                {
+                    CodePlan = request.MoldCode,
+                    PlanId = plan.Id,
+                    Code = request.Code,
+
+                    QtySend = 0,
+                    QtyReceive = 0,
+
+                    WorkerBy = request.WorkerBy,
+                    Remark = request.Remark,
+
+                    Location = request.Location,
+
+                    CreateBy = CurrentUsername,
+                    CreateDate = DateTime.UtcNow,
+
+                    QtyResin = request.QtyResin,
+                    QtySilvercast = request.QtySilverCast,
+
+                    PrintBy = request.PrintBy,
+                    CuttingBy = request.CuttingBy,
+
+                    //UpdateBy = CurrentUsername,
+                    //UpdateDate = DateTime.UtcNow,
+                };
+
+                if (request.Images.Any())
+                {
+                    var img = request.Images[0];
+                    try
+                    {
+                        string imageName = $"{request.Code.ToUpper().Trim()}-Mold.png";
+                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
+                        if (!Directory.Exists(imagePath))
+                        {
+                            Directory.CreateDirectory(imagePath);
+                        }
+                        string imagePathWithFileName = Path.Combine(imagePath, imageName);
+
+                        //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
+                        using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                        {
+                            img.CopyTo(fileStream);
+                            fileStream.Close();
+                        }
+
+                        store.ImageUrl = imageName;
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                    }
+
+                }
+
+                _jewelryContext.TbtProductMoldPlanStore.Add(store);
+                await _jewelryContext.SaveChangesAsync();
+
+                ///create mold
+                var addMold = new TbtProductMold()
+                {
+                    Code = request.Code.Trim().ToUpper(),
+                    Category = design.CategoryCodeNavigation.NameTh,
+                    CategoryCode = design.CategoryCodeNavigation.Code,
+                    Description = request.Remark,
+
+                    MoldBy = request.WorkerBy,
+
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = CurrentUsername,
+
+                    IsActive = true,
+                    Image = store.ImageUrl ?? string.Empty,
+                    PlanId = plan.Id
+                };
+                _jewelryContext.TbtProductMold.Add(addMold);
+                await _jewelryContext.SaveChangesAsync();
+
+                scope.Complete();
+            }
+
+            #endregion
 
             return "success";
         }

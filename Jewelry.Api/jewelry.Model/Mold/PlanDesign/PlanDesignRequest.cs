@@ -14,6 +14,7 @@ namespace jewelry.Model.Mold.PlanDesign
 
         public string Catagory { get; set; }
         public string DesignBy { get; set; }
+        public string? ResinBy { get; set; }
 
         public string? Remark { get; set; }
 
@@ -21,8 +22,8 @@ namespace jewelry.Model.Mold.PlanDesign
         //public string? SizeDiamond { get; set; }
         //public decimal? QtyGem { get; set; }
         //public decimal? QtyDiamond { get; set; }
-        public decimal QtyReceive { get; set; }
-        public decimal QtySend { get; set; }
+        public decimal? QtyReceive { get; set; }
+        public decimal? QtySend { get; set; }
 
         public List<ModelGem> Gems { get; set; }
 

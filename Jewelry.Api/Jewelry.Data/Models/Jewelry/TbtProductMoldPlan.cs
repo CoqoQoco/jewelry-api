@@ -39,7 +39,7 @@ public partial class TbtProductMoldPlan
 
     public virtual ICollection<TbtProductMoldPlanCutting> TbtProductMoldPlanCutting { get; set; } = new List<TbtProductMoldPlanCutting>();
 
-    public virtual ICollection<TbtProductMoldPlanDesign> TbtProductMoldPlanDesign { get; set; } = new List<TbtProductMoldPlanDesign>();
+    public virtual TbtProductMoldPlanDesign? TbtProductMoldPlanDesign { get; set; }
 
     public virtual ICollection<TbtProductMoldPlanGem> TbtProductMoldPlanGem { get; set; } = new List<TbtProductMoldPlanGem>();
 

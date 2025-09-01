@@ -21,6 +21,8 @@ namespace jewelry.Model.Mold.PlanList
         public int Status { get; set; }
         public string StatusName { get; set; }
 
+        public bool IsNewProcess { get; set; }
+
         public string? CatagoryName { get; set; }
         public string? DesignBy { get; set; }
 
