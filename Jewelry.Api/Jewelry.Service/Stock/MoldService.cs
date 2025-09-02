@@ -3,6 +3,7 @@ using jewelry.Model.Mold;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
+using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using NPOI.SS.Formula.Functions;
@@ -12,6 +13,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace Jewelry.Service.Stock
 {
@@ -149,7 +151,16 @@ namespace Jewelry.Service.Stock
                         select item);
             }
 
-            return mold.OrderByDescending(x => x.CreateDate);
+            if (request.UpdateStart.HasValue)
+            {
+                mold = mold.Where(x => x.UpdateDate >= request.UpdateStart.Value.StartOfDayUtc());
+            }
+            if (request.UpdateEnd.HasValue)
+            {
+                mold = mold.Where(x => x.UpdateDate <= request.UpdateEnd.Value.EndOfDayUtc());
+            }
+
+            return mold;
         }
     }
 

@@ -15,5 +15,7 @@ namespace jewelry.Model.Mold
     public class SearchMold
     {
         public string? Text { get; set; }
+        public DateTimeOffset? UpdateStart { get; set; }
+        public DateTimeOffset? UpdateEnd { get; set; }
     }
 }

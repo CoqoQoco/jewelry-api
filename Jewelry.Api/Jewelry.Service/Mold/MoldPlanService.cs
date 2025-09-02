@@ -115,20 +115,20 @@ namespace Jewelry.Service.Mold
 
             if (request.CreateStart.HasValue)
             {
-                query = query.Where(x => x.CreateDate >= request.CreateStart);
+                query = query.Where(x => x.CreateDate >= request.CreateStart.Value.StartOfDayUtc());
             }
             if (request.CreateEnd.HasValue)
             {
-                query = query.Where(x => x.CreateDate <= request.CreateEnd);
+                query = query.Where(x => x.CreateDate <= request.CreateEnd.Value.EndOfDayUtc());
             }
 
             if (request.UpdateStart.HasValue)
             {
-                query = query.Where(x => x.UpdateDate >= request.UpdateStart);
+                query = query.Where(x => x.UpdateDate >= request.UpdateStart.Value.StartOfDayUtc());
             }
             if (request.UpdateEnd.HasValue)
             {
-                query = query.Where(x => x.UpdateDate <= request.UpdateEnd);
+                query = query.Where(x => x.UpdateDate <= request.UpdateEnd.Value.EndOfDayUtc());
             }
 
             return query;
