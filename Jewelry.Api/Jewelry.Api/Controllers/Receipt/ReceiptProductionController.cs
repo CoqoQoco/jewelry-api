@@ -4,6 +4,7 @@ using jewelry.Model.Receipt.Gem.Picklist;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Receipt.Gem;
 using Jewelry.Service.Receipt.Production;
+using Jewelry.Service.TransferStock;
 using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,7 @@ namespace Jewelry.Api.Controllers.Receipt
     {
         private readonly ILogger<MoldController> _logger;
         private readonly IReceiptProductionService _receiptProduction;
+        private readonly IOldStockService _oldStockService;
 
         public ReceiptProductionController(ILogger<MoldController> logger,
            IReceiptProductionService receiptProduction,
@@ -169,5 +171,25 @@ namespace Jewelry.Api.Controllers.Receipt
             }
         }
 
+
+        [Route("Transfer/18K")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Transfer18K()
+        {
+            try
+            {
+
+
+                var response = await _oldStockService.TransferStock18K();
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }
