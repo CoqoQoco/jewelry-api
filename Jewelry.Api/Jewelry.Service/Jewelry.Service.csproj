@@ -19,4 +19,8 @@
     <ProjectReference Include="..\jewelry.Model\jewelry.Model.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Sale\SaleOrder\" />
+  </ItemGroup>
+
 </Project>

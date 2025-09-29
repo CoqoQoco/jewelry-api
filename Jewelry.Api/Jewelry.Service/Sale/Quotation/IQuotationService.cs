@@ -10,5 +10,6 @@ namespace Jewelry.Service.Sale.Quotation
     {
         Task<string> Upsert(jewelry.Model.Sale.Quotation.Create.Request request);
         Task<jewelry.Model.Sale.Quotation.Get.Response> Get(jewelry.Model.Sale.Quotation.Get.Request request);
+        IQueryable<jewelry.Model.Sale.Quotation.List.Response> List(jewelry.Model.Sale.Quotation.List.Request request);
     }
 }

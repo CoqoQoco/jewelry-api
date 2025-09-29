@@ -137,5 +137,74 @@ namespace Jewelry.Service.Sale.Quotation
                 Date = quotation.Date.HasValue ? quotation.Date.Value : null
             };
         }
+
+        public IQueryable<jewelry.Model.Sale.Quotation.List.Response> List(jewelry.Model.Sale.Quotation.List.Request _request)
+        {
+            var request = _request.Search;
+            var query = from quotation in _jewelryContext.TbtSaleQuotation
+                        select new jewelry.Model.Sale.Quotation.List.Response
+                        {
+                            Number = quotation.Number ?? string.Empty,
+                            Running = quotation.Running ?? string.Empty,
+                            CustomerName = quotation.CustomerName ?? string.Empty,
+                            CustomerPhone = quotation.CustomerPhone ?? string.Empty,
+                            CustomerEmail = quotation.CustomerEmail ?? string.Empty,
+                            CustomerAddress = quotation.CustomerAddress ?? string.Empty,
+                            Currency = quotation.Currency ?? string.Empty,
+                            CurrencyRate = quotation.CurrencyRate ?? 0,
+                            MarkUp = quotation.MarkUp ?? 0,
+                            Discount = quotation.Discount ?? 0,
+                            Freight = quotation.Freight,
+                            Remark = quotation.Remark ?? string.Empty,
+                            Date = quotation.Date,
+                            CreateDate = quotation.CreateDate,
+                            CreateBy = quotation.CreateBy ?? string.Empty,
+                            UpdateDate = quotation.UpdateDate,
+                            UpdateBy = quotation.UpdateBy ?? string.Empty
+                        };
+
+            // Apply filters
+            if (!string.IsNullOrEmpty(request.Number))
+            {
+                query = query.Where(x => x.Number.Contains(request.Number.ToUpper()));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerName))
+            {
+                query = query.Where(x => x.CustomerName.Contains(request.CustomerName));
+            }
+
+            if (!string.IsNullOrEmpty(request.Currency))
+            {
+                query = query.Where(x => x.Currency.Contains(request.Currency));
+            }
+
+            if (!string.IsNullOrEmpty(request.CreateBy))
+            {
+                query = query.Where(x => x.CreateBy.Contains(request.CreateBy));
+            }
+
+            if (request.CreateDateStart.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.CreateDateStart.Value);
+            }
+
+            if (request.CreateDateEnd.HasValue)
+            {
+                query = query.Where(x => x.CreateDate <= request.CreateDateEnd.Value.AddDays(1));
+            }
+
+            if (request.QuotationDateStart.HasValue)
+            {
+                query = query.Where(x => x.Date.HasValue && x.Date.Value >= request.QuotationDateStart.Value);
+            }
+
+            if (request.QuotationDateEnd.HasValue)
+            {
+                query = query.Where(x => x.Date.HasValue && x.Date.Value <= request.QuotationDateEnd.Value.AddDays(1));
+            }
+
+            return query;
+        }
     }
 }
