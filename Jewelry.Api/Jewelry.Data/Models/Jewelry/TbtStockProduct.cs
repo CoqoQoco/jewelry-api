@@ -92,5 +92,9 @@ public partial class TbtStockProduct
 
     public string? WoOrigin { get; set; }
 
+    public decimal QtySale { get; set; }
+
+    public decimal? QtyRemaining { get; set; }
+
     public virtual ICollection<TbtStockProductMaterial> TbtStockProductMaterial { get; set; } = new List<TbtStockProductMaterial>();
 }

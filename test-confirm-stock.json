@@ -1,0 +1,23 @@
+{
+  "soNumber": "SO-TEST-001", 
+  "stockItems": [
+    {
+      "stockNumber": "ST-TEST-001",
+      "id": 1,
+      "productNumber": "PROD-TEST-001",
+      "qty": 1.0,
+      "appraisalPrice": 15000.0,
+      "isConfirmed": true,
+      "confirmedAt": "2025-10-02T10:00:00Z"
+    },
+    {
+      "stockNumber": "ST-TEST-002", 
+      "id": 2,
+      "productNumber": "PROD-TEST-002",
+      "qty": 1.0,
+      "appraisalPrice": 8500.0,
+      "isConfirmed": true,
+      "confirmedAt": "2025-10-02T10:00:00Z"
+    }
+  ]
+}

@@ -96,6 +96,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtRunningNumber> TbtRunningNumber { get; set; }
 
+    public virtual DbSet<TbtSaleOrder> TbtSaleOrder { get; set; }
+
+    public virtual DbSet<TbtSaleOrderProduct> TbtSaleOrderProduct { get; set; }
+
     public virtual DbSet<TbtSaleQuotation> TbtSaleQuotation { get; set; }
 
     public virtual DbSet<TbtStockGem> TbtStockGem { get; set; }
@@ -1999,6 +2003,126 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Number).HasColumnName("number");
         });
 
+        modelBuilder.Entity<TbtSaleOrder>(entity =>
+        {
+            entity.HasKey(e => new { e.Running, e.SoNumber }).HasName("tbt_sale_order_pk");
+
+            entity.ToTable("tbt_sale_order");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.SoNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("so_number");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CurrencyRate).HasColumnName("currency_rate");
+            entity.Property(e => e.CurrencyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("currency_unit");
+            entity.Property(e => e.CustomerAddress)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_address");
+            entity.Property(e => e.CustomerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_code");
+            entity.Property(e => e.CustomerEmail)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_email");
+            entity.Property(e => e.CustomerName)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_name");
+            entity.Property(e => e.CustomerRemark)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_remark");
+            entity.Property(e => e.CustomerTel)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_tel");
+            entity.Property(e => e.Data)
+                .HasColumnType("character varying")
+                .HasColumnName("data");
+            entity.Property(e => e.DeliveryDate).HasColumnName("delivery_date");
+            entity.Property(e => e.DepositPercent).HasColumnName("deposit_percent");
+            entity.Property(e => e.Discount).HasColumnName("discount");
+            entity.Property(e => e.GoldRate).HasColumnName("gold_rate");
+            entity.Property(e => e.Markup).HasColumnName("markup");
+            entity.Property(e => e.PaymantName)
+                .HasColumnType("character varying")
+                .HasColumnName("paymant_name");
+            entity.Property(e => e.Payment).HasColumnName("payment");
+            entity.Property(e => e.Priority)
+                .HasColumnType("character varying")
+                .HasColumnName("priority");
+            entity.Property(e => e.RefQuotation)
+                .HasColumnType("character varying")
+                .HasColumnName("ref_quotation");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.SoDate).HasColumnName("so_date");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtSaleOrderProduct>(entity =>
+        {
+            entity.HasKey(e => new { e.Running, e.SoNumber, e.Id, e.StockNumber }).HasName("tbt_sale_order_product_pk");
+
+            entity.ToTable("tbt_sale_order_product");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.SoNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("so_number");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CurrencyRate).HasColumnName("currency_rate");
+            entity.Property(e => e.CurrencyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("currency_unit");
+            entity.Property(e => e.Discount).HasColumnName("discount");
+            entity.Property(e => e.GoldRate).HasColumnName("gold_rate");
+            entity.Property(e => e.Markup).HasColumnName("markup");
+            entity.Property(e => e.NetPrice)
+                .HasColumnType("character varying")
+                .HasColumnName("net_price");
+            entity.Property(e => e.PriceAfterCurrecyRate).HasColumnName("price_after_currecy_rate");
+            entity.Property(e => e.PriceDiscount).HasColumnName("price_discount");
+            entity.Property(e => e.PriceOrigin)
+                .HasComment("Price in THB")
+                .HasColumnName("price_origin");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.Stocknumberorigin)
+                .HasColumnType("character varying")
+                .HasColumnName("stocknumberorigin");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
         modelBuilder.Entity<TbtSaleQuotation>(entity =>
         {
             entity.HasKey(e => new { e.Running, e.Number }).HasName("tbt_sale_quotation_pk");
@@ -2284,6 +2408,10 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("production_type_size");
             entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.QtyRemaining)
+                .HasComputedColumnSql("(COALESCE(qty, (0)::numeric) - COALESCE(qty_sale, (0)::numeric))", true)
+                .HasColumnName("qty_remaining");
+            entity.Property(e => e.QtySale).HasColumnName("qty_sale");
             entity.Property(e => e.ReceiptDate).HasColumnName("receipt_date");
             entity.Property(e => e.ReceiptNumber)
                 .HasColumnType("character varying")
