@@ -13,5 +13,6 @@ namespace Jewelry.Service.Sale.SaleOrder
         IQueryable<jewelry.Model.Sale.SaleOrder.List.Response> List(jewelry.Model.Sale.SaleOrder.List.Request request);
         Task<string> GenerateRunningNumber();
         Task<jewelry.Model.Sale.SaleOrder.ConfirmStock.Response> ConfirmStockItems(jewelry.Model.Sale.SaleOrder.ConfirmStock.Request request);
+        Task<jewelry.Model.Sale.SaleOrder.UnconfirmStock.Response> UnconfirmStockItems(jewelry.Model.Sale.SaleOrder.UnconfirmStock.Request request);
     }
 }

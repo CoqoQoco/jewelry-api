@@ -47,4 +47,8 @@ public partial class TbtSaleOrderProduct
     public decimal PriceAfterCurrecyRate { get; set; }
 
     public decimal Qty { get; set; }
+
+    public string? Invoice { get; set; }
+
+    public string? InvoiceItem { get; set; }
 }

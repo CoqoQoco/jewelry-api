@@ -49,7 +49,20 @@ namespace jewelry.Model.Sale.SaleOrder.Get
 
         public string? Remark { get; set; }
 
-        public string[]? StockConfirm { get; set; }
+        public List<StockConfirm> StockConfirm { get; set; }
         
+    }
+
+    public class StockConfirm
+    {
+        public long Id { get; set; }
+        public string StockNumber { get; set; }
+
+        public bool IsConfirm { get; set; }
+        public string PriceOrigin { get; set; }
+
+        public bool IsInvoice => !string.IsNullOrEmpty(Invoice);
+        public string? Invoice { get; set; }
+        public string? InvoiceItem { get; set; }
     }
 }

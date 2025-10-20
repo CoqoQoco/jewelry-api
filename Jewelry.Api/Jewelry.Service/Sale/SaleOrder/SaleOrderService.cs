@@ -210,9 +210,22 @@ namespace Jewelry.Service.Sale.SaleOrder
                 Remark = saleOrder.Remark
             };
 
-            response.StockConfirm = (from item in _jewelryContext.TbtSaleOrderProduct
-                                     where item.SoNumber == response.SoNumber && item.Running == response.Running
-                                     select item.StockNumber).ToArray();
+            var stockConfrim = (from item in _jewelryContext.TbtSaleOrderProduct
+                                where item.SoNumber == response.SoNumber && item.Running == response.Running
+                                select item).ToList();
+
+            if (stockConfrim.Any())
+            { 
+                response.StockConfirm = stockConfrim.Select(s => new jewelry.Model.Sale.SaleOrder.Get.StockConfirm
+                {
+                    Id = s.Id,
+                    StockNumber = s.StockNumber,
+                    IsConfirm = true,
+
+                   Invoice = s.Invoice,
+                   InvoiceItem = s.InvoiceItem,
+                }).ToList();
+            }
 
             return response;
         }
@@ -386,10 +399,10 @@ namespace Jewelry.Service.Sale.SaleOrder
                     continue;
                 }
 
-               
+
                 var stockProduct = stockProducts.FirstOrDefault(s => s.StockNumber == stockItem.StockNumber);
-                if(stockProduct == null)
-                    {
+                if (stockProduct == null)
+                {
                     errors.Add($"Stock item {stockItem.StockNumber} not found in inventory.");
                     continue;
                 }
@@ -438,14 +451,14 @@ namespace Jewelry.Service.Sale.SaleOrder
                         CurrencyUnit = saleOrder.CurrencyUnit ?? "THB",
                         CurrencyRate = saleOrder.CurrencyRate,
                         Qty = stockItem.Qty,
-                        
+
                         // Calculate price after currency rate and discount
                         PriceAfterCurrecyRate = stockItem.AppraisalPrice / (saleOrder.CurrencyRate),
                         Markup = saleOrder.Markup ?? 0,
                         Discount = saleOrder.Discount ?? 0,
                         PriceDiscount = stockItem.AppraisalPrice * (1 - (saleOrder.Discount ?? 0) / 100),
                         GoldRate = saleOrder.GoldRate,
-                        
+
                         CreateDate = confirmedDate,
                         CreateBy = CurrentUsername
                     };
@@ -484,6 +497,119 @@ namespace Jewelry.Service.Sale.SaleOrder
             {
                 await transaction.RollbackAsync();
                 throw new HandleException($"Error confirming stock items: {ex.Message}");
+            }
+        }
+
+        public async Task<jewelry.Model.Sale.SaleOrder.UnconfirmStock.Response> UnconfirmStockItems(jewelry.Model.Sale.SaleOrder.UnconfirmStock.Request request)
+        {
+            // Basic validation
+            if (string.IsNullOrEmpty(request.SoNumber))
+            {
+                throw new HandleException("Sale Order Number is required.");
+            }
+
+            if (request.StockItems == null || !request.StockItems.Any())
+            {
+                throw new HandleException("No stock items provided for unconfirmation.");
+            }
+
+            // Validate Sale Order exists
+            var saleOrder = await _jewelryContext.TbtSaleOrder
+                .FirstOrDefaultAsync(so => so.SoNumber == request.SoNumber.ToUpper());
+
+            if (saleOrder == null)
+            {
+                throw new HandleException($"Sale Order {request.SoNumber} not found.");
+            }
+
+            var unconfirmedStockNumbers = new List<string>();
+            var errors = new List<string>();
+            var unconfirmedDate = DateTime.UtcNow;
+
+            // Validate each stock item before processing
+            foreach (var stockItem in request.StockItems)
+            {
+                // Required field validation
+                if (string.IsNullOrEmpty(stockItem.StockNumber))
+                {
+                    errors.Add("Stock Number is required for all items.");
+                    continue;
+                }
+
+                // Check if item is confirmed in this sale order
+                var confirmedProduct = await _jewelryContext.TbtSaleOrderProduct
+                    .FirstOrDefaultAsync(p => p.SoNumber == request.SoNumber.ToUpper() &&
+                                              p.StockNumber == stockItem.StockNumber &&
+                                              p.Id == stockItem.Id);
+
+                if (confirmedProduct == null)
+                {
+                    errors.Add($"Stock item {stockItem.StockNumber} (ID: {stockItem.Id}) is not confirmed in this sale order.");
+                    continue;
+                }
+
+                // Check if item has invoice - cannot unconfirm if already invoiced
+                if (!string.IsNullOrEmpty(confirmedProduct.Invoice))
+                {
+                    errors.Add($"Cannot unconfirm stock item {stockItem.StockNumber} - already included in invoice {confirmedProduct.Invoice}.");
+                    continue;
+                }
+            }
+
+            // If there are validation errors, return them
+            if (errors.Any())
+            {
+                throw new HandleException($"Validation errors: {string.Join("; ", errors)}");
+            }
+
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
+            {
+                foreach (var stockItem in request.StockItems)
+                {
+                    // Get the confirmed product entry
+                    var confirmedProduct = await _jewelryContext.TbtSaleOrderProduct
+                        .FirstOrDefaultAsync(p => p.SoNumber == request.SoNumber.ToUpper() &&
+                                                  p.StockNumber == stockItem.StockNumber &&
+                                                  p.Id == stockItem.Id);
+
+                    if (confirmedProduct != null)
+                    {
+                        // Update stock quantity (restore available quantity)
+                        var stockProduct = await _jewelryContext.TbtStockProduct
+                            .FirstOrDefaultAsync(s => s.StockNumber == stockItem.StockNumber);
+
+                        if (stockProduct != null)
+                        {
+                            stockProduct.QtySale -= confirmedProduct.Qty;
+                            stockProduct.UpdateDate = unconfirmedDate;
+                            stockProduct.UpdateBy = CurrentUsername;
+                            _jewelryContext.TbtStockProduct.Update(stockProduct);
+                        }
+
+                        // Remove confirmed product entry
+                        _jewelryContext.TbtSaleOrderProduct.Remove(confirmedProduct);
+                        unconfirmedStockNumbers.Add(stockItem.StockNumber);
+                    }
+                }
+
+                // Save all changes
+                await _jewelryContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return new jewelry.Model.Sale.SaleOrder.UnconfirmStock.Response
+                {
+                    Success = true,
+                    Message = $"Successfully unconfirmed {unconfirmedStockNumbers.Count} stock items.",
+                    UnconfirmedItemsCount = unconfirmedStockNumbers.Count,
+                    UnconfirmedStockNumbers = unconfirmedStockNumbers,
+                    UnconfirmedDate = unconfirmedDate
+                };
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"Error unconfirming stock items: {ex.Message}");
             }
         }
     }

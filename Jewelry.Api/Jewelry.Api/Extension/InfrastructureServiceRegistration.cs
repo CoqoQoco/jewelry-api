@@ -11,6 +11,7 @@ using Jewelry.Service.Receipt.Gem;
 using Jewelry.Service.Receipt.Production;
 using Jewelry.Service.Sale.Quotation;
 using Jewelry.Service.Sale.SaleOrder;
+using Jewelry.Service.Sale.Invoice;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
@@ -62,6 +63,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<ILoginService, LoginService>();
             services.AddScoped<IQuotationService, QuotationService>();
             services.AddScoped<ISaleOrderService, SaleOrderService>();
+            services.AddScoped<IInvoiceService, InvoiceService>();
             services.AddScoped<IOldStockService, OldStockService>();
 
             return services;
