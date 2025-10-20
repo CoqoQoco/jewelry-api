@@ -221,6 +221,7 @@ namespace Jewelry.Service.Worker
                          }).ToList() // ดึงข้อมูลมาก่อน
                         .GroupBy(x => x.WoText)
                         .OrderBy(g => g.Min(x => x.JobDate))
+                        .ThenBy(x => x.Key)
                         .SelectMany(g => g.OrderBy(x => x.JobDate)
                         .ThenByDescending(x => x.Gold)
                         .ThenBy(x => x.ItemNo));
