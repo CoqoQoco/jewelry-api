@@ -13,8 +13,6 @@ public partial class TbtStockGem
 
     public string GroupName { get; set; } = null!;
 
-    public string Size { get; set; } = null!;
-
     public string Shape { get; set; } = null!;
 
     public string? Original { get; set; }
@@ -44,6 +42,8 @@ public partial class TbtStockGem
     public DateTime? UpdateDate { get; set; }
 
     public string? UpdateBy { get; set; }
+
+    public string Size { get; set; } = null!;
 
     public string? GradeCode { get; set; }
 

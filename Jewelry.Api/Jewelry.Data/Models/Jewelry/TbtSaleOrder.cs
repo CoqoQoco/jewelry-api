@@ -25,12 +25,6 @@ public partial class TbtSaleOrder
 
     public string? RefQuotation { get; set; }
 
-    public int Payment { get; set; }
-
-    public string? PaymantName { get; set; }
-
-    public int? DepositPercent { get; set; }
-
     public string Priority { get; set; } = null!;
 
     public string? Data { get; set; }
@@ -51,13 +45,11 @@ public partial class TbtSaleOrder
 
     public decimal CurrencyRate { get; set; }
 
-    public decimal? Markup { get; set; }
-
-    public decimal? Discount { get; set; }
-
-    public decimal? GoldRate { get; set; }
-
     public string? Remark { get; set; }
 
     public DateTime? SoDate { get; set; }
+
+    public decimal? GoldRate { get; set; }
+
+    public decimal? MarkUp { get; set; }
 }

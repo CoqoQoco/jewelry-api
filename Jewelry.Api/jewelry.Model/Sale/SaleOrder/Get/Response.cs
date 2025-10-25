@@ -23,11 +23,6 @@ namespace jewelry.Model.Sale.SaleOrder.Get
 
         public string? RefQuotation { get; set; }
 
-        public int Payment { get; set; }
-        public string? PaymentName { get; set; }
-
-        public int? DepositPercent { get; set; }
-
         public string Priority { get; set; }
 
         public string? Data { get; set; }
@@ -44,7 +39,6 @@ namespace jewelry.Model.Sale.SaleOrder.Get
         public string CurrencyUnit { get; set; }
         public decimal CurrencyRate { get; set; }
         public decimal? Markup { get; set; }
-        public decimal? Discount { get; set; }
         public decimal? GoldRate { get; set; }
 
         public string? Remark { get; set; }
@@ -58,11 +52,19 @@ namespace jewelry.Model.Sale.SaleOrder.Get
         public long Id { get; set; }
         public string StockNumber { get; set; }
 
-        public bool IsConfirm { get; set; }
-        public string PriceOrigin { get; set; }
+        public decimal PriceOrigin { get; set; }
+        public decimal Qty { get; set; }
+        public decimal? Discount { get; set; }
+        public string? Remark { get; set; }
+        public decimal? NetPrice { get; set; }
 
-        public bool IsInvoice => !string.IsNullOrEmpty(Invoice);
         public string? Invoice { get; set; }
         public string? InvoiceItem { get; set; }
+
+        public bool IsConfirm { get; set; } = false;
+        public bool IsInvoice => !string.IsNullOrEmpty(Invoice);
+
+        public bool IsRemainProduct { get; set; } = true;
+        public string? Message { get; set; }
     }
 }

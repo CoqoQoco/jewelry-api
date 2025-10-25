@@ -17,15 +17,15 @@ public partial class TbtProductMoldPlanDesign
 
     public string CodePlan { get; set; } = null!;
 
-    public decimal QtyReceive { get; set; }
-
-    public decimal QtySend { get; set; }
-
     public string? Remark { get; set; }
 
     public string? ImageUrl { get; set; }
 
     public string? RemarUpdate { get; set; }
+
+    public decimal QtyReceive { get; set; }
+
+    public decimal QtySend { get; set; }
 
     public string CategoryCode { get; set; } = null!;
 

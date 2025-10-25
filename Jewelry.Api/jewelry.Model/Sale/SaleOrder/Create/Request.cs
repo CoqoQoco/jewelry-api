@@ -13,16 +13,13 @@ namespace jewelry.Model.Sale.SaleOrder.Create
         public DateTimeOffset? DeliveryDate { get; set; }
         public DateTimeOffset? SODate { get; set; }
 
-        public int Status { get; set; }
-        public string StatusName { get; set; }
+        //public int Status { get; set; }
+        //public string StatusName { get; set; }
 
         public string? RefQuotation { get; set; }
 
-        public int Payment { get; set; }
-        public string PaymentName { get; set; }
 
-        public int? DepositPercent { get; set; }
-
+        //public int Priority { get; set; }
         public string Priority { get; set; }
 
         public string? Data { get; set; }

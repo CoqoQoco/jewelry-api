@@ -23,11 +23,6 @@ namespace jewelry.Model.Sale.SaleOrder.List
 
         public string? RefQuotation { get; set; }
 
-        public int Payment { get; set; }
-        public string? PaymentName { get; set; }
-
-        public int? DepositPercent { get; set; }
-
         public string Priority { get; set; }
 
         // Customer Information
@@ -40,7 +35,6 @@ namespace jewelry.Model.Sale.SaleOrder.List
         public string CurrencyUnit { get; set; }
         public decimal CurrencyRate { get; set; }
         public decimal? Markup { get; set; }
-        public decimal? Discount { get; set; }
         public decimal? GoldRate { get; set; }
     }
 }

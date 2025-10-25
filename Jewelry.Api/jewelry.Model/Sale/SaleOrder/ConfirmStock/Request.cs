@@ -6,7 +6,6 @@ namespace jewelry.Model.Sale.SaleOrder.ConfirmStock
     {
         [Required]
         public string SoNumber { get; set; } = null!;
-
         [Required]
         public List<StockItemConfirmation> StockItems { get; set; } = new List<StockItemConfirmation>();
     }
@@ -22,6 +21,7 @@ namespace jewelry.Model.Sale.SaleOrder.ConfirmStock
         public int Qty { get; set; }
         [Range(0.001, double.MaxValue, ErrorMessage = "Appraisal price must be greater than 0")]
         public decimal AppraisalPrice { get; set; }
-        
+        public decimal Discount { get; set; }
+
     }
 }

@@ -28,23 +28,11 @@ public partial class TbtSaleOrderProduct
     /// </summary>
     public decimal PriceOrigin { get; set; }
 
-    public string CurrencyUnit { get; set; } = null!;
-
-    public decimal CurrencyRate { get; set; }
-
-    public decimal? Markup { get; set; }
-
     public decimal? Discount { get; set; }
-
-    public decimal? GoldRate { get; set; }
 
     public string? Remark { get; set; }
 
-    public string? NetPrice { get; set; }
-
-    public decimal PriceDiscount { get; set; }
-
-    public decimal PriceAfterCurrecyRate { get; set; }
+    public decimal? NetPrice { get; set; }
 
     public decimal Qty { get; set; }
 

@@ -7,6 +7,8 @@ public partial class TbtProductionPlanStatusDetail
 {
     public int ProductionPlanId { get; set; }
 
+    public bool IsActive { get; set; }
+
     public string ItemNo { get; set; } = null!;
 
     public string? Gold { get; set; }
@@ -20,8 +22,6 @@ public partial class TbtProductionPlanStatusDetail
     public decimal? GoldWeightDiff { get; set; }
 
     public decimal? GoldWeightDiffPercent { get; set; }
-
-    public bool IsActive { get; set; }
 
     public decimal? GoldQtySend { get; set; }
 

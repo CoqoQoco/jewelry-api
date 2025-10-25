@@ -56,8 +56,7 @@ namespace Jewelry.Service.Sale.Invoice
             //check all stock not exist invoice
             var stockArray = request.Items.Select(i => i.StockNumber).ToArray();
             var getstockConfrim = await _jewelryContext.TbtSaleOrderProduct
-                .Where(x => x.SoNumber == request.SoNumber
-                            && stockArray.Contains(x.StockNumber))
+                .Where(x => x.SoNumber == request.SoNumber && stockArray.Contains(x.StockNumber))
                 .ToListAsync();
 
             if (!getstockConfrim.Any())
@@ -80,6 +79,7 @@ namespace Jewelry.Service.Sale.Invoice
 
                 CreateBy = CurrentUsername,
                 CreateDate = DateTime.UtcNow,
+
                 CurrencyRate = request.CurrencyRate,
                 CurrencyUnit = request.CurrencyUnit,
                 CustomerAddress = request.CustomerAddress,
@@ -88,20 +88,27 @@ namespace Jewelry.Service.Sale.Invoice
                 CustomerName = request.CustomerName,
                 CustomerRemark = request.CustomerRemark,
                 CustomerTel = request.CustomerTel,
-                Data = request.Data,
-                DeliveryDate = request.DeliveryDate,
-                DepositPercent = request.DepositPercent,
-                Discount = request.Discount,
+
+                DeliveryDate = request.DeliveryDate.HasValue ? request.DeliveryDate.Value.UtcDateTime : null,
+                Deposit = request.Deposit,
+
                 GoldRate = request.GoldRate,
                 Markup = request.Markup,
+
                 PaymantName = request.PaymentName,
                 Payment = request.Payment,
+                PaymentDay = request.PaymentDay,
+
                 Priority = request.Priority,
                 RefQuotation = request.RefQuotation,
                 Remark = request.Remark,
 
                 Status = 100,
                 StatusName = "invoice",
+
+                SpecialDiscount = request.SpecialDiscount,
+                SpecialAddition = request.SpecialAddition,
+                FreightAndInsurance = request.FreightAndInsurance
             };
 
             _jewelryContext.TbtSaleInvoiceHeader.Add(invoiceHeader);
@@ -115,6 +122,7 @@ namespace Jewelry.Service.Sale.Invoice
                 //                            && x.Id == item.Id);
                 item.Invoice = invoiceNumber;
                 item.InvoiceItem = $"{invoiceNumber}-{item.Id}";
+                
                 item.UpdateBy = CurrentUsername;
                 item.UpdateDate = DateTime.UtcNow;
             }
@@ -174,37 +182,45 @@ namespace Jewelry.Service.Sale.Invoice
             {
                 InvoiceNumber = invoiceHeader.Running,
                 SoNumber = soNumber,
-                CreateBy = invoiceHeader.CreateBy,
+
                 CreateDate = invoiceHeader.CreateDate,
+                CreateBy = invoiceHeader.CreateBy,
                 UpdateBy = invoiceHeader.UpdateBy,
                 UpdateDate = invoiceHeader.UpdateDate,
+
                 CurrencyRate = invoiceHeader.CurrencyRate,
                 CurrencyUnit = invoiceHeader.CurrencyUnit,
-                CustomerAddress = invoiceHeader.CustomerAddress,
+                
                 CustomerCode = invoiceHeader.CustomerCode,
-                CustomerEmail = invoiceHeader.CustomerEmail,
                 CustomerName = invoiceHeader.CustomerName,
-                CustomerRemark = invoiceHeader.CustomerRemark,
+                CustomerAddress = invoiceHeader.CustomerAddress,
+                CustomerEmail = invoiceHeader.CustomerEmail,
                 CustomerTel = invoiceHeader.CustomerTel,
+                CustomerRemark = invoiceHeader.CustomerRemark,
 
                 // Pass Sale Order Data as-is (JSON string with all items)
-                Data = saleOrderHeader.Data,
 
                 DeliveryDate = invoiceHeader.DeliveryDate,
-                DepositPercent = invoiceHeader.DepositPercent,
-                Discount = invoiceHeader.Discount,
+                Deposit = invoiceHeader.Deposit,
+
                 GoldRate = invoiceHeader.GoldRate,
                 Markup = invoiceHeader.Markup,
+
                 PaymentName = invoiceHeader.PaymantName,
                 Payment = invoiceHeader.Payment,
+                PaymentDay = invoiceHeader.PaymentDay,
+
                 Priority = invoiceHeader.Priority,
                 RefQuotation = invoiceHeader.RefQuotation,
                 Remark = invoiceHeader.Remark,
 
                 Status = invoiceHeader.Status,
-                StatusName = invoiceHeader.StatusName ?? "Unknown",
+                StatusName = invoiceHeader.StatusName,
 
-                // List of items with invoice info (like Sale Order's StockConfirm)
+                SpecialDiscount = invoiceHeader.SpecialDiscount,
+                SpecialAddition = invoiceHeader.SpecialAddition,
+                FreightAndInsurance = invoiceHeader.FreightAndInsurance,
+
                 ConfirmedItems = confirmedItems
             };
         }
@@ -215,12 +231,16 @@ namespace Jewelry.Service.Sale.Invoice
                         select new jewelry.Model.Sale.Invoice.List.Response
                         {
                             InvoiceNumber = invoice.Running,
+
                             CreateBy = invoice.CreateBy,
                             CreateDate = invoice.CreateDate,
+
                             UpdateBy = invoice.UpdateBy,
                             UpdateDate = invoice.UpdateDate,
+
                             CurrencyRate = invoice.CurrencyRate,
                             CurrencyUnit = invoice.CurrencyUnit,
+
                             CustomerAddress = invoice.CustomerAddress,
                             CustomerCode = invoice.CustomerCode,
                             CustomerEmail = invoice.CustomerEmail,
@@ -228,8 +248,7 @@ namespace Jewelry.Service.Sale.Invoice
                             CustomerRemark = invoice.CustomerRemark,
                             CustomerTel = invoice.CustomerTel,
                             DeliveryDate = invoice.DeliveryDate,
-                            DepositPercent = invoice.DepositPercent,
-                            Discount = invoice.Discount,
+                            //DepositPercent = invoice.DepositPercent,
                             GoldRate = invoice.GoldRate,
                             Markup = invoice.Markup,
                             PaymentName = invoice.PaymantName,
@@ -242,9 +261,9 @@ namespace Jewelry.Service.Sale.Invoice
                             //StatusName = invoice.StatusName,
 
                             ItemCount = _jewelryContext.TbtSaleOrderProduct.Count(x => x.Invoice == invoice.Running),
-                            TotalAmount = _jewelryContext.TbtSaleOrderProduct
-                                .Where(x => x.Invoice == invoice.Running)
-                                .Sum(x => x.PriceAfterCurrecyRate * x.Qty)
+                            //TotalAmount = _jewelryContext.TbtSaleOrderProduct
+                            //    .Where(x => x.Invoice == invoice.Running)
+                            //    .Sum(x => x.PriceAfterCurrecyRate * x.Qty)
                         };
 
             // Apply filters
@@ -393,6 +412,137 @@ namespace Jewelry.Service.Sale.Invoice
         {
             var runningNumber = await _runningNumberService.GenerateRunningNumberForGold("INV");
             return runningNumber;
+        }
+
+        public async Task<jewelry.Model.Sale.InvoiceVersion.Upsert.Response> UpsertVersion(jewelry.Model.Sale.InvoiceVersion.Upsert.Request request)
+        {
+            // Validate required fields
+            if (string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                throw new HandleException("Invoice Number is Required.");
+            }
+
+            if (string.IsNullOrEmpty(request.SoNumber))
+            {
+                throw new HandleException("Sale Order Number is Required.");
+            }
+
+            if (string.IsNullOrEmpty(request.Data))
+            {
+                throw new HandleException("Version Data is Required.");
+            }
+
+            // Check if invoice exists
+            var invoiceExists = await _jewelryContext.TbtSaleInvoiceHeader
+                .AnyAsync(x => x.Running == request.InvoiceNumber);
+
+            if (!invoiceExists)
+            {
+                throw new HandleException($"Invoice {request.InvoiceNumber} not found.");
+            }
+
+            // Generate version number
+            var versionNumber = await GenerateVersionNumber(request.InvoiceNumber);
+
+            // Create new version
+            var invoiceVersion = new TbtSaleInvoiceVersion
+            {
+                Running = versionNumber,
+                InvoiceRunning = request.InvoiceNumber,
+                SoRunning = request.SoNumber,
+                Data = request.Data,
+                IsActive = true,
+                CreateBy = CurrentUsername,
+                CreateDate = DateTime.UtcNow
+            };
+
+            _jewelryContext.TbtSaleInvoiceVersion.Add(invoiceVersion);
+            await _jewelryContext.SaveChangesAsync();
+
+            return new jewelry.Model.Sale.InvoiceVersion.Upsert.Response
+            {
+                VersionNumber = versionNumber,
+                InvoiceNumber = request.InvoiceNumber,
+                SoNumber = request.SoNumber
+            };
+        }
+
+        public async Task<jewelry.Model.Sale.InvoiceVersion.Get.Response> GetVersion(jewelry.Model.Sale.InvoiceVersion.Get.Request request)
+        {
+            if (string.IsNullOrEmpty(request.VersionNumber))
+            {
+                throw new HandleException("Version Number is Required.");
+            }
+
+            var version = await _jewelryContext.TbtSaleInvoiceVersion
+                .FirstOrDefaultAsync(x => x.Running == request.VersionNumber);
+
+            if (version == null)
+            {
+                throw new HandleException($"Invoice Version not found: {request.VersionNumber}");
+            }
+
+            return new jewelry.Model.Sale.InvoiceVersion.Get.Response
+            {
+                VersionNumber = version.Running,
+                InvoiceNumber = version.InvoiceRunning,
+                SoNumber = version.SoRunning,
+                Data = version.Data,
+                CreateDate = version.CreateDate,
+                CreateBy = version.CreateBy,
+                UpdateDate = version.UpdateDate,
+                UpdateBy = version.UpdateBy,
+                IsActive = version.IsActive
+            };
+        }
+
+        public IQueryable<jewelry.Model.Sale.InvoiceVersion.List.Response> ListVersions(jewelry.Model.Sale.InvoiceVersion.List.Request request)
+        {
+            var query = from version in _jewelryContext.TbtSaleInvoiceVersion
+                        select new jewelry.Model.Sale.InvoiceVersion.List.Response
+                        {
+                            VersionNumber = version.Running,
+                            InvoiceNumber = version.InvoiceRunning,
+                            SoNumber = version.SoRunning,
+                            CreateDate = version.CreateDate,
+                            CreateBy = version.CreateBy,
+                            UpdateDate = version.UpdateDate,
+                            UpdateBy = version.UpdateBy,
+                            IsActive = version.IsActive
+                        };
+
+            // Apply filters
+            if (!string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                query = query.Where(x => x.InvoiceNumber == request.InvoiceNumber);
+            }
+
+            if (!string.IsNullOrEmpty(request.SoNumber))
+            {
+                query = query.Where(x => x.SoNumber == request.SoNumber);
+            }
+
+            if (request.IsActive.HasValue)
+            {
+                query = query.Where(x => x.IsActive == request.IsActive.Value);
+            }
+
+            // Order by creation date descending (newest first)
+            query = query.OrderByDescending(x => x.CreateDate);
+
+            return query;
+        }
+
+        private async Task<string> GenerateVersionNumber(string invoiceNumber)
+        {
+            // Get the count of existing versions for this invoice
+            var versionCount = await _jewelryContext.TbtSaleInvoiceVersion
+                .CountAsync(x => x.InvoiceRunning == invoiceNumber);
+
+            // Generate version number: INV-XXXXX-V001, INV-XXXXX-V002, etc.
+            var versionNumber = $"{invoiceNumber}-V{(versionCount + 1):D3}";
+
+            return versionNumber;
         }
     }
 }

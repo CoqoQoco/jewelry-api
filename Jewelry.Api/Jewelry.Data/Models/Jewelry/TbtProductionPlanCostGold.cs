@@ -35,8 +35,6 @@ public partial class TbtProductionPlanCostGold
 
     public decimal? ReturnCastWeight { get; set; }
 
-    public decimal? ReturnCastBodyWeightTotal { get; set; }
-
     public decimal? ReturnCastScrapWeight { get; set; }
 
     public decimal? ReturnCastPowderWeight { get; set; }
@@ -62,6 +60,8 @@ public partial class TbtProductionPlanCostGold
     public bool IsActive { get; set; }
 
     public DateTime? CastDate { get; set; }
+
+    public decimal? ReturnCastBodyWeightTotal { get; set; }
 
     public string? RunningNumber { get; set; }
 

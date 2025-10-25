@@ -4,13 +4,15 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Jewelry.Service.Sale.SaleOrder
@@ -64,16 +66,14 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                     SoDate = request.SODate.HasValue ? request.SODate.Value.UtcDateTime : null,
                     DeliveryDate = request.DeliveryDate.HasValue ? request.DeliveryDate.Value.UtcDateTime : null,
-                    Status = request.Status,
-                    StatusName = request.StatusName ?? "",
+
+                    Status = 1,
+                    StatusName = "DK-SO",
 
                     RefQuotation = request.RefQuotation,
 
-                    Payment = request.Payment,
-                    PaymantName = request.PaymentName,
-                    DepositPercent = request.DepositPercent,
 
-                    Priority = request.Priority ?? "‡∏õ‡∏Å‡∏ï‡∏¥",
+                    Priority = request.Priority ?? "Normal",
 
                     Data = request.Data,
 
@@ -88,8 +88,8 @@ namespace Jewelry.Service.Sale.SaleOrder
                     // Currency and Pricing
                     CurrencyUnit = request.CurrencyUnit ?? "THB",
                     CurrencyRate = request.CurrencyRate,
-                    Markup = request.Markup,
-                    Discount = request.Discount,
+
+                    MarkUp = request.Markup,
                     GoldRate = request.GoldRate,
 
                     Remark = request.Remark,
@@ -112,14 +112,11 @@ namespace Jewelry.Service.Sale.SaleOrder
                 // Update existing sale order
                 saleOrder.SoDate = request.SODate.HasValue ? request.SODate.Value.UtcDateTime : saleOrder.SoDate;
                 saleOrder.DeliveryDate = request.DeliveryDate.HasValue ? request.DeliveryDate.Value.UtcDateTime : null;
-                saleOrder.Status = request.Status;
-                saleOrder.StatusName = request.StatusName ?? saleOrder.StatusName;
+                //saleOrder.Status = request.Status;
+                //saleOrder.StatusName = request.StatusName ?? saleOrder.StatusName;
 
                 saleOrder.RefQuotation = request.RefQuotation;
 
-                saleOrder.Payment = request.Payment;
-                saleOrder.PaymantName = request.PaymentName;
-                saleOrder.DepositPercent = request.DepositPercent;
 
                 saleOrder.Priority = request.Priority ?? saleOrder.Priority;
 
@@ -136,8 +133,8 @@ namespace Jewelry.Service.Sale.SaleOrder
                 // Currency and Pricing
                 saleOrder.CurrencyUnit = request.CurrencyUnit ?? saleOrder.CurrencyUnit;
                 saleOrder.CurrencyRate = request.CurrencyRate;
-                saleOrder.Markup = request.Markup;
-                saleOrder.Discount = request.Discount;
+
+                saleOrder.MarkUp = request.Markup;
                 saleOrder.GoldRate = request.GoldRate;
 
                 saleOrder.Remark = request.Remark;
@@ -184,9 +181,6 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                 RefQuotation = saleOrder.RefQuotation,
 
-                Payment = saleOrder.Payment,
-                PaymentName = saleOrder.PaymantName,
-                DepositPercent = saleOrder.DepositPercent,
 
                 Priority = saleOrder.Priority,
 
@@ -203,29 +197,141 @@ namespace Jewelry.Service.Sale.SaleOrder
                 // Currency and Pricing
                 CurrencyUnit = saleOrder.CurrencyUnit,
                 CurrencyRate = saleOrder.CurrencyRate,
-                Markup = saleOrder.Markup,
-                Discount = saleOrder.Discount,
+
+                Markup = saleOrder.MarkUp,
                 GoldRate = saleOrder.GoldRate,
 
                 Remark = saleOrder.Remark
             };
 
+            if (!string.IsNullOrEmpty(response.Data))
+            {
+                try
+                {
+                    using (JsonDocument doc = JsonDocument.Parse(response.Data))
+                    {
+                        var root = doc.RootElement;
+                        var stockNumbers = new List<string>();
+
+                        if (root.TryGetProperty("stockItems", out JsonElement stockItemsElement))
+                        {
+                            foreach (var item in stockItemsElement.EnumerateArray())
+                            {
+                                if (item.TryGetProperty("stockNumber", out JsonElement stockNumberElement))
+                                {
+                                    stockNumbers.Add(stockNumberElement.GetString());
+                                }
+                            }
+                        }
+
+                        if (stockNumbers.Any())
+                        { 
+                            response.StockConfirm = stockNumbers.Select(s => new jewelry.Model.Sale.SaleOrder.Get.StockConfirm
+                            {
+                                StockNumber = s,
+                                IsConfirm = false
+                            }).ToList();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    //Console.WriteLine($"Error: {ex.Message}");
+                }
+            }
+
+           
+            #region *** get stock confirm ***
             var stockConfrim = (from item in _jewelryContext.TbtSaleOrderProduct
                                 where item.SoNumber == response.SoNumber && item.Running == response.Running
                                 select item).ToList();
 
             if (stockConfrim.Any())
-            { 
-                response.StockConfirm = stockConfrim.Select(s => new jewelry.Model.Sale.SaleOrder.Get.StockConfirm
+            {
+                if (response.StockConfirm.Any())
                 {
-                    Id = s.Id,
-                    StockNumber = s.StockNumber,
-                    IsConfirm = true,
+                    foreach (var stock in stockConfrim)
+                    {
+                        var matchStock = response.StockConfirm.FirstOrDefault(s => s.StockNumber == stock.StockNumber);
+                        if (matchStock != null)
+                        {
+                            matchStock.Id = stock.Id;
+                            matchStock.PriceOrigin = stock.PriceOrigin;
+                            matchStock.IsConfirm = true;
 
-                   Invoice = s.Invoice,
-                   InvoiceItem = s.InvoiceItem,
-                }).ToList();
+                            matchStock.Qty = stock.Qty;
+                            matchStock.Discount = stock.Discount;
+                            matchStock.Remark = stock.Remark;
+                            matchStock.NetPrice = stock.NetPrice;
+
+                            matchStock.Invoice = stock.Invoice;
+                            matchStock.InvoiceItem = stock.InvoiceItem;
+                        }
+                        else
+                        {
+                            response.StockConfirm.Add(new jewelry.Model.Sale.SaleOrder.Get.StockConfirm
+                            {
+                                Id = stock.Id,
+                                StockNumber = stock.StockNumber,
+                                IsConfirm = true,
+
+                                PriceOrigin = stock.PriceOrigin,
+                                Qty = stock.Qty,
+                                Discount = stock.Discount,
+                                Remark = stock.Remark,
+                                NetPrice = stock.NetPrice,
+
+                                Invoice = stock.Invoice,
+                                InvoiceItem = stock.InvoiceItem,
+                            });
+                        }
+                    }
+                }
+                else
+                {
+                    response.StockConfirm = stockConfrim.Select(s => new jewelry.Model.Sale.SaleOrder.Get.StockConfirm
+                    {
+                        Id = s.Id,
+                        StockNumber = s.StockNumber,
+
+                        PriceOrigin = s.PriceOrigin,
+                        Qty = s.Qty,
+                        Discount = s.Discount,
+                        Remark = s.Remark,
+                        NetPrice = s.NetPrice,
+
+                        Invoice = s.Invoice,
+                        InvoiceItem = s.InvoiceItem,
+                    }).ToList();
+                }
+
             }
+            #endregion
+            #region *** get stock product ***
+            if (response.StockConfirm.Any())
+            { 
+                var stockArray = response.StockConfirm.Select(s => s.StockNumber).ToArray();
+                var stockProducts = (from item in _jewelryContext.TbtStockProduct
+                                     where stockArray.Contains(item.StockNumber)
+                                     select item).ToList();
+
+                if(stockProducts.Any())
+                {
+                    foreach(var stock in response.StockConfirm)
+                    {
+                        var matchStock = stockProducts.FirstOrDefault(s => s.StockNumber == stock.StockNumber);
+                        if(matchStock != null)
+                        {
+                            if (matchStock.QtyRemaining <= 0)
+                            {
+                                stock.IsRemainProduct = false;
+                                stock.Message = stock.IsConfirm || stock.IsInvoice ? null : " ‘π§È“À¡¥ µÁÕ°";
+                            }
+                        }
+                    }
+                }
+            }
+            #endregion
 
             return response;
         }
@@ -250,9 +356,6 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                             RefQuotation = saleOrder.RefQuotation ?? string.Empty,
 
-                            Payment = saleOrder.Payment,
-                            PaymentName = saleOrder.PaymantName ?? string.Empty,
-                            DepositPercent = saleOrder.DepositPercent,
 
                             Priority = saleOrder.Priority ?? string.Empty,
 
@@ -265,8 +368,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                             // Currency and Pricing
                             CurrencyUnit = saleOrder.CurrencyUnit ?? string.Empty,
                             CurrencyRate = saleOrder.CurrencyRate,
-                            Markup = saleOrder.Markup,
-                            Discount = saleOrder.Discount,
+                            Markup = saleOrder.MarkUp,
                             GoldRate = saleOrder.GoldRate
                         };
 
@@ -447,17 +549,10 @@ namespace Jewelry.Service.Sale.SaleOrder
                         SoNumber = saleOrder.SoNumber,
                         StockNumber = stockItem.StockNumber,
                         Stocknumberorigin = stockItem.ProductNumber ?? stockItem.StockNumber,
-                        PriceOrigin = stockItem.AppraisalPrice,
-                        CurrencyUnit = saleOrder.CurrencyUnit ?? "THB",
-                        CurrencyRate = saleOrder.CurrencyRate,
-                        Qty = stockItem.Qty,
 
-                        // Calculate price after currency rate and discount
-                        PriceAfterCurrecyRate = stockItem.AppraisalPrice / (saleOrder.CurrencyRate),
-                        Markup = saleOrder.Markup ?? 0,
-                        Discount = saleOrder.Discount ?? 0,
-                        PriceDiscount = stockItem.AppraisalPrice * (1 - (saleOrder.Discount ?? 0) / 100),
-                        GoldRate = saleOrder.GoldRate,
+                        PriceOrigin = stockItem.AppraisalPrice,
+                        Qty = stockItem.Qty,
+                        NetPrice = stockItem.AppraisalPrice * (1 - (stockItem.Discount) / 100),
 
                         CreateDate = confirmedDate,
                         CreateBy = CurrentUsername

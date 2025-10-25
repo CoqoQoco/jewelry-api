@@ -5,33 +5,46 @@ namespace jewelry.Model.Sale.Invoice.Get
 {
     public class Response
     {
-        public string InvoiceNumber { get; set; } = null!;
-        public string SoNumber { get; set; } = null!;
-        public string CreateBy { get; set; } = null!;
+        public string InvoiceNumber { get; set; }
+        public string SoNumber { get; set; }
+
         public DateTime CreateDate { get; set; }
-        public string? UpdateBy { get; set; }
+        public string CreateBy { get; set; }
         public DateTime? UpdateDate { get; set; }
-        public decimal CurrencyRate { get; set; }
-        public string CurrencyUnit { get; set; } = null!;
+        public string? UpdateBy { get; set; }
+
+        public string CustomerCode { get; set; }
+        public string CustomerName { get; set; }
         public string? CustomerAddress { get; set; }
-        public string CustomerCode { get; set; } = null!;
-        public string? CustomerEmail { get; set; }
-        public string CustomerName { get; set; } = null!;
-        public string? CustomerRemark { get; set; }
         public string? CustomerTel { get; set; }
-        public string? Data { get; set; }
+        public string? CustomerEmail { get; set; }
+        public string? CustomerRemark { get; set; }
+
+        public string CurrencyUnit { get; set; }
+        public decimal CurrencyRate { get; set; }
+
         public DateTime? DeliveryDate { get; set; }
-        public int? DepositPercent { get; set; }
-        public decimal? Discount { get; set; }
+        public decimal Deposit { get; set; }
+
         public decimal? GoldRate { get; set; }
         public decimal? Markup { get; set; }
-        public string? PaymentName { get; set; }
+
         public int Payment { get; set; }
-        public string Priority { get; set; } = null!;
+        public string PaymentName { get; set; }
+        public int PaymentDay { get; set; }
+
+        public string? Priority { get; set; }
         public string? RefQuotation { get; set; }
         public string? Remark { get; set; }
+
+
+        public decimal SpecialDiscount { get; set; }
+        public decimal SpecialAddition { get; set; }
+        public decimal FreightAndInsurance { get; set; }
+
         public int Status { get; set; }
-        public string StatusName { get; set; } = null!;
+        public string StatusName { get; set; }
+
 
         // List of confirmed items with invoice info (like Sale Order's StockConfirm)
         public List<Item> ConfirmedItems { get; set; } = new List<Item>();

@@ -165,6 +165,8 @@ namespace Jewelry.Service.Stock.Product
                          where item.Status == "Available"
                          select item);
 
+            query = query.Where(x => x.QtyRemaining > 0);
+
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
                 query = query.Where(x => x.StockNumber == request.StockNumber);

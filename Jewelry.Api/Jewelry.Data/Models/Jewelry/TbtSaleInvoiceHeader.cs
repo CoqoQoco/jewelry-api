@@ -31,19 +31,15 @@ public partial class TbtSaleInvoiceHeader
 
     public string? CustomerTel { get; set; }
 
-    public string? Data { get; set; }
-
     public DateTime? DeliveryDate { get; set; }
 
-    public int? DepositPercent { get; set; }
+    public decimal Deposit { get; set; }
 
-    public decimal? Discount { get; set; }
+    public decimal GoldRate { get; set; }
 
-    public decimal? GoldRate { get; set; }
+    public decimal Markup { get; set; }
 
-    public decimal? Markup { get; set; }
-
-    public string? PaymantName { get; set; }
+    public string PaymantName { get; set; } = null!;
 
     public int Payment { get; set; }
 
@@ -58,4 +54,12 @@ public partial class TbtSaleInvoiceHeader
     public string StatusName { get; set; } = null!;
 
     public string SoRunning { get; set; } = null!;
+
+    public decimal SpecialDiscount { get; set; }
+
+    public decimal SpecialAddition { get; set; }
+
+    public decimal FreightAndInsurance { get; set; }
+
+    public int PaymentDay { get; set; }
 }

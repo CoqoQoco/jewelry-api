@@ -13,5 +13,10 @@ namespace Jewelry.Service.Sale.Invoice
         IQueryable<jewelry.Model.Sale.Invoice.List.Response> List(jewelry.Model.Sale.Invoice.List.Request request);
         Task<string> Delete(jewelry.Model.Sale.Invoice.Delete.Request request);
         Task<string> GenerateInvoiceNumber();
+
+        // Invoice Version methods
+        Task<jewelry.Model.Sale.InvoiceVersion.Upsert.Response> UpsertVersion(jewelry.Model.Sale.InvoiceVersion.Upsert.Request request);
+        Task<jewelry.Model.Sale.InvoiceVersion.Get.Response> GetVersion(jewelry.Model.Sale.InvoiceVersion.Get.Request request);
+        IQueryable<jewelry.Model.Sale.InvoiceVersion.List.Response> ListVersions(jewelry.Model.Sale.InvoiceVersion.List.Request request);
     }
 }
