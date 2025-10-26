@@ -123,8 +123,8 @@ namespace Jewelry.Service.Sale.SaleOrder
                 saleOrder.Data = request.Data;
 
                 // Customer Information
-                saleOrder.CustomerName = request.CustomerName ?? saleOrder.CustomerName;
-                saleOrder.CustomerCode = request.CustomerCode ?? saleOrder.CustomerCode;
+                //saleOrder.CustomerName = request.CustomerName ?? saleOrder.CustomerName;
+                //saleOrder.CustomerCode = request.CustomerCode ?? saleOrder.CustomerCode;
                 saleOrder.CustomerAddress = request.CustomerAddress;
                 saleOrder.CustomerTel = request.CustomerTel;
                 saleOrder.CustomerEmail = request.CustomerEmail;
