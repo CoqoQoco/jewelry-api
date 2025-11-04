@@ -62,4 +62,10 @@ public partial class TbtSaleInvoiceHeader
     public decimal FreightAndInsurance { get; set; }
 
     public int PaymentDay { get; set; }
+
+    public bool IsDelete { get; set; }
+
+    public string? DeleteReason { get; set; }
+
+    public virtual ICollection<TbtSaleInvoicePaymentItem> TbtSaleInvoicePaymentItem { get; set; } = new List<TbtSaleInvoicePaymentItem>();
 }

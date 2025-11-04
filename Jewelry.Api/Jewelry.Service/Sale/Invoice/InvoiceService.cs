@@ -64,7 +64,7 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException("No matching Sale Order Products found for the provided items.");
             }
             if (getstockConfrim.Any(x => !string.IsNullOrEmpty(x.Invoice)))
-            { 
+            {
                 throw new HandleException("One or more items have already been invoiced.");
             }
 
@@ -122,7 +122,7 @@ namespace Jewelry.Service.Sale.Invoice
                 //                            && x.Id == item.Id);
                 item.Invoice = invoiceNumber;
                 item.InvoiceItem = $"{invoiceNumber}-{item.Id}";
-                
+
                 item.UpdateBy = CurrentUsername;
                 item.UpdateDate = DateTime.UtcNow;
             }
@@ -141,7 +141,9 @@ namespace Jewelry.Service.Sale.Invoice
             }
 
             var invoiceHeader = await _jewelryContext.TbtSaleInvoiceHeader
-                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber);
+                                                     .Include(x => x.TbtSaleInvoicePaymentItem)
+                                                     .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber
+                                                                            && x.IsDelete == false);
 
             if (invoiceHeader == null)
             {
@@ -178,7 +180,7 @@ namespace Jewelry.Service.Sale.Invoice
                 })
                 .ToListAsync();
 
-            return new jewelry.Model.Sale.Invoice.Get.Response
+            var response = new jewelry.Model.Sale.Invoice.Get.Response
             {
                 InvoiceNumber = invoiceHeader.Running,
                 SoNumber = soNumber,
@@ -190,7 +192,7 @@ namespace Jewelry.Service.Sale.Invoice
 
                 CurrencyRate = invoiceHeader.CurrencyRate,
                 CurrencyUnit = invoiceHeader.CurrencyUnit,
-                
+
                 CustomerCode = invoiceHeader.CustomerCode,
                 CustomerName = invoiceHeader.CustomerName,
                 CustomerAddress = invoiceHeader.CustomerAddress,
@@ -223,11 +225,38 @@ namespace Jewelry.Service.Sale.Invoice
 
                 ConfirmedItems = confirmedItems
             };
+
+            if (invoiceHeader.TbtSaleInvoicePaymentItem.Any())
+            {
+                response.Payments = invoiceHeader.TbtSaleInvoicePaymentItem
+                    .Where(x => x.IsDelete == false)
+                    .Select(x => new jewelry.Model.Sale.Invoice.Get.Payment
+                    {
+                        Running = x.Running,
+                        PaymentDate = x.PaymentDate,
+
+                        Amount = x.Amount,
+                        CurrencyUnit = x.CurrencyUnit,
+
+                        PaymentMethod = x.PaymantName,
+                        ReferenceNumber = x.ReferenceNumber1,
+                        Remark = x.Remark,
+                        ImagePath = x.ImagePath,
+                        CreateBy = x.CreateBy,
+                        CreateDate = x.CreateDate,
+                        UpdateBy = x.UpdateBy,
+                        UpdateDate = x.UpdateDate
+                    })
+                    .ToList();
+            }
+
+            return response;
         }
 
         public IQueryable<jewelry.Model.Sale.Invoice.List.Response> List(jewelry.Model.Sale.Invoice.List.Request request)
         {
             var query = from invoice in _jewelryContext.TbtSaleInvoiceHeader
+                        where invoice.IsDelete == false
                         select new jewelry.Model.Sale.Invoice.List.Response
                         {
                             InvoiceNumber = invoice.Running,
@@ -400,8 +429,12 @@ namespace Jewelry.Service.Sale.Invoice
                 product.UpdateDate = DateTime.UtcNow;
             }
 
+            invoiceHeader.UpdateDate = DateTime.UtcNow;
+            invoiceHeader.UpdateBy = CurrentUsername;
+            invoiceHeader.IsDelete = true;
+
             // Delete invoice header
-            _jewelryContext.TbtSaleInvoiceHeader.Remove(invoiceHeader);
+            _jewelryContext.TbtSaleInvoiceHeader.Update(invoiceHeader);
 
             await _jewelryContext.SaveChangesAsync();
 
@@ -544,5 +577,163 @@ namespace Jewelry.Service.Sale.Invoice
 
             return versionNumber;
         }
+
+        // Payment Functions
+
+        public async Task<string> CreatePayment(jewelry.Model.Sale.InvoicePayment.Create.Request request)
+        {
+            // Validate required fields
+            if (string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                throw new HandleException("Invoice Number is Required.");
+            }
+
+            if (request.Amount <= 0)
+            {
+                throw new HandleException("Payment Amount must be greater than 0.");
+            }
+
+            if (string.IsNullOrEmpty(request.PaymentName))
+            {
+                throw new HandleException("Payment Method is Required.");
+            }
+
+            // Check if invoice exists
+            var invoice = await _jewelryContext.TbtSaleInvoiceHeader
+                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber && x.IsDelete == false);
+
+            if (invoice == null)
+            {
+                throw new HandleException($"Invoice {request.InvoiceNumber} not found.");
+            }
+
+            // Generate payment running number
+            var paymentRunning = await _runningNumberService.GenerateRunningNumberForGold($"PAY-{request.InvoiceNumber}");
+
+            // Handle image upload if provided
+            string imagePath = string.Empty;
+            if (request.ReceiptImage != null)
+            {
+                try
+                {
+                    string imageDirectory = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Payment");
+                    if (!Directory.Exists(imageDirectory))
+                    {
+                        Directory.CreateDirectory(imageDirectory);
+                    }
+
+                    // Generate unique filename
+                    string fileExtension = Path.GetExtension(request.ReceiptImage.FileName);
+                    string fileName = $"{paymentRunning}{fileExtension}";
+                    string fullPath = Path.Combine(imageDirectory, fileName);
+
+                    using (Stream fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write))
+                    {
+                        await request.ReceiptImage.CopyToAsync(fileStream);
+                    }
+
+                    imagePath = fileName;
+                }
+                catch (Exception ex)
+                {
+                    throw new HandleException($"Failed to save receipt image: {ex.Message}");
+                }
+            }
+
+            // Create payment record
+            var payment = new TbtSaleInvoicePaymentItem
+            {
+                Running = paymentRunning,
+                InvoiceRunning = request.InvoiceNumber,
+                SoRunning = invoice.SoRunning,
+
+                PaymentDate = request.PaymentDate.UtcDateTime,
+                
+                Amount = request.Amount,
+                CurrencyUnit = invoice.CurrencyUnit,
+
+                PaymantName = request.PaymentName,
+                Payment = request.Payment,
+
+                ReferenceNumber1 = request.ReferenceNumber,
+                Remark = request.Remark,
+                ImagePath = imagePath,
+
+                CreateBy = CurrentUsername,
+                CreateDate = DateTime.UtcNow
+            };
+
+            _jewelryContext.TbtSaleInvoicePaymentItem.Add(payment);
+            await _jewelryContext.SaveChangesAsync();
+
+            return paymentRunning;
+        }
+
+        public IQueryable<jewelry.Model.Sale.InvoicePayment.List.Response> GetPaymentList(jewelry.Model.Sale.InvoicePayment.List.Request request)
+        {
+            if (string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                throw new HandleException("Invoice Number is Required.");
+            }
+
+            var query = from payment in _jewelryContext.TbtSaleInvoicePaymentItem
+                        where payment.InvoiceRunning == request.InvoiceNumber
+                           && payment.IsDelete == false
+                        select new jewelry.Model.Sale.InvoicePayment.List.Response
+                        {
+                            Running = payment.Running,
+                            InvoiceNumber = payment.InvoiceRunning,
+                            SoNumber = payment.SoRunning,
+
+                            PaymentDate = payment.PaymentDate,
+                            Amount = payment.Amount,
+                            CurrencyUnit = payment.CurrencyUnit,
+
+                            PaymentMethod = payment.PaymantName,
+                            ReferenceNumber = payment.ReferenceNumber1,
+                            Remark = payment.Remark,
+                            ImagePath = payment.ImagePath,
+
+                            CreateBy = payment.CreateBy,
+                            CreateDate = payment.CreateDate,
+                            UpdateBy = payment.UpdateBy,
+                            UpdateDate = payment.UpdateDate
+                        };
+
+            // Order by payment date descending (newest first)
+            query = query.OrderByDescending(x => x.PaymentDate).ThenByDescending(x => x.CreateDate);
+
+            return query;
+        }
+
+        public async Task<string> DeletePayment(jewelry.Model.Sale.InvoicePayment.Delete.Request request)
+        {
+            if (string.IsNullOrEmpty(request.PaymentRunning))
+            {
+                throw new HandleException("Payment Running Number is Required.");
+            }
+
+            var payment = await _jewelryContext.TbtSaleInvoicePaymentItem
+                .FirstOrDefaultAsync(x => x.Running == request.PaymentRunning && x.IsDelete == false);
+
+            if (payment == null)
+            {
+                throw new HandleException($"Payment record {request.PaymentRunning} not found.");
+            }
+
+            // Soft delete
+            payment.IsDelete = true;
+            payment.UpdateBy = CurrentUsername;
+            payment.UpdateDate = DateTime.UtcNow;
+
+            _jewelryContext.TbtSaleInvoicePaymentItem.Update(payment);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"Payment {request.PaymentRunning} deleted successfully";
+        }
+
+
+
+
     }
 }

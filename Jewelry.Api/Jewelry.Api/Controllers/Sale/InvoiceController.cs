@@ -212,5 +212,76 @@ namespace Jewelry.Api.Controllers.Sale
                     new { message = "An error occurred while listing invoice versions" });
             }
         }
+
+        // Invoice Payment Endpoints
+        [HttpPost("Payment/Create")]
+        public async Task<IActionResult> CreatePayment([FromForm] jewelry.Model.Sale.InvoicePayment.Create.Request request)
+        {
+            try
+            {
+                var result = await _service.CreatePayment(request);
+                return Ok(new { paymentRunning = result, message = "Payment record created successfully" });
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error creating payment for invoice: {InvoiceNumber}", request.InvoiceNumber);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error creating payment for invoice: {InvoiceNumber}", request.InvoiceNumber);
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while creating payment record" });
+            }
+        }
+
+        [HttpPost("Payment/List")]
+        public IActionResult GetPaymentList(jewelry.Model.Sale.InvoicePayment.List.Request request)
+        {
+            try
+            {
+                var query = _service.GetPaymentList(request);
+                var result = query.ToList();
+                var total = result.Count;
+
+                return Ok(new
+                {
+                    data = result,
+                    total = total
+                });
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error listing payments for invoice: {InvoiceNumber}", request.InvoiceNumber);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error listing payments");
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while listing payment records" });
+            }
+        }
+
+        [HttpPost("Payment/Delete")]
+        public async Task<IActionResult> DeletePayment(jewelry.Model.Sale.InvoicePayment.Delete.Request request)
+        {
+            try
+            {
+                var result = await _service.DeletePayment(request);
+                return Ok(new { message = result });
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error deleting payment: {PaymentRunning}", request.PaymentRunning);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error deleting payment: {PaymentRunning}", request.PaymentRunning);
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while deleting payment record" });
+            }
+        }
     }
 }

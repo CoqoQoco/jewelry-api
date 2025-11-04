@@ -98,6 +98,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleInvoiceHeader> TbtSaleInvoiceHeader { get; set; }
 
+    public virtual DbSet<TbtSaleInvoicePaymentItem> TbtSaleInvoicePaymentItem { get; set; }
+
     public virtual DbSet<TbtSaleInvoiceVersion> TbtSaleInvoiceVersion { get; set; }
 
     public virtual DbSet<TbtSaleOrder> TbtSaleOrder { get; set; }
@@ -2039,10 +2041,14 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CustomerTel)
                 .HasColumnType("character varying")
                 .HasColumnName("customer_tel");
+            entity.Property(e => e.DeleteReason)
+                .HasColumnType("character varying")
+                .HasColumnName("delete_reason");
             entity.Property(e => e.DeliveryDate).HasColumnName("delivery_date");
             entity.Property(e => e.Deposit).HasColumnName("deposit");
             entity.Property(e => e.FreightAndInsurance).HasColumnName("freight_and_insurance");
             entity.Property(e => e.GoldRate).HasColumnName("gold_rate");
+            entity.Property(e => e.IsDelete).HasColumnName("is_delete");
             entity.Property(e => e.Markup).HasColumnName("markup");
             entity.Property(e => e.PaymantName)
                 .HasColumnType("character varying")
@@ -2068,6 +2074,55 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtSaleInvoicePaymentItem>(entity =>
+        {
+            entity.HasKey(e => new { e.Running, e.InvoiceRunning, e.SoRunning }).HasName("tbt_sale_invoice_payment_item_pk");
+
+            entity.ToTable("tbt_sale_invoice_payment_item");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.InvoiceRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_running");
+            entity.Property(e => e.SoRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("so_running");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CurrencyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("currency_unit");
+            entity.Property(e => e.ImagePath)
+                .HasColumnType("character varying")
+                .HasColumnName("image_path");
+            entity.Property(e => e.IsDelete).HasColumnName("is_delete");
+            entity.Property(e => e.PaymantName)
+                .HasColumnType("character varying")
+                .HasColumnName("paymant_name");
+            entity.Property(e => e.Payment).HasColumnName("payment");
+            entity.Property(e => e.PaymentDate).HasColumnName("payment_date");
+            entity.Property(e => e.ReferenceNumber1)
+                .HasColumnType("character varying")
+                .HasColumnName("reference_number_1");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.TbtSaleInvoiceHeader).WithMany(p => p.TbtSaleInvoicePaymentItem)
+                .HasForeignKey(d => new { d.InvoiceRunning, d.SoRunning })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_sale_invoice_payment_item_fk");
         });
 
         modelBuilder.Entity<TbtSaleInvoiceVersion>(entity =>

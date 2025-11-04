@@ -18,5 +18,10 @@ namespace Jewelry.Service.Sale.Invoice
         Task<jewelry.Model.Sale.InvoiceVersion.Upsert.Response> UpsertVersion(jewelry.Model.Sale.InvoiceVersion.Upsert.Request request);
         Task<jewelry.Model.Sale.InvoiceVersion.Get.Response> GetVersion(jewelry.Model.Sale.InvoiceVersion.Get.Request request);
         IQueryable<jewelry.Model.Sale.InvoiceVersion.List.Response> ListVersions(jewelry.Model.Sale.InvoiceVersion.List.Request request);
+
+        // Invoice Payment methods
+        Task<string> CreatePayment(jewelry.Model.Sale.InvoicePayment.Create.Request request);
+        IQueryable<jewelry.Model.Sale.InvoicePayment.List.Response> GetPaymentList(jewelry.Model.Sale.InvoicePayment.List.Request request);
+        Task<string> DeletePayment(jewelry.Model.Sale.InvoicePayment.Delete.Request request);
     }
 }
