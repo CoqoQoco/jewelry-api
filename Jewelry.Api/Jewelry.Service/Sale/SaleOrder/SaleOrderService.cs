@@ -266,6 +266,7 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                             matchStock.Invoice = stock.Invoice;
                             matchStock.InvoiceItem = stock.InvoiceItem;
+                            matchStock.DKInvoiceNumber = stock.DkInvoiceNumber;
                         }
                         else
                         {
@@ -283,6 +284,7 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                                 Invoice = stock.Invoice,
                                 InvoiceItem = stock.InvoiceItem,
+                                DKInvoiceNumber = stock.DkInvoiceNumber
                             });
                         }
                     }
@@ -302,6 +304,7 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                         Invoice = s.Invoice,
                         InvoiceItem = s.InvoiceItem,
+                        DKInvoiceNumber = s.DkInvoiceNumber,
                     }).ToList();
                 }
 
@@ -550,8 +553,9 @@ namespace Jewelry.Service.Sale.SaleOrder
                         StockNumber = stockItem.StockNumber,
                         Stocknumberorigin = stockItem.ProductNumber ?? stockItem.StockNumber,
 
-                        PriceOrigin = stockItem.AppraisalPrice,
                         Qty = stockItem.Qty,
+                        PriceOrigin = stockItem.AppraisalPrice,
+                        Discount = stockItem.Discount,
                         NetPrice = stockItem.AppraisalPrice * (1 - (stockItem.Discount) / 100),
 
                         CreateDate = confirmedDate,

@@ -58,6 +58,7 @@ namespace jewelry.Model.Sale.SaleOrder.Get
         public string? Remark { get; set; }
         public decimal? NetPrice { get; set; }
 
+        public string? DKInvoiceNumber { get; set; }
         public string? Invoice { get; set; }
         public string? InvoiceItem { get; set; }
 

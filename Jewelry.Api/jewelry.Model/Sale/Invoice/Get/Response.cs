@@ -6,6 +6,7 @@ namespace jewelry.Model.Sale.Invoice.Get
     public class Response
     {
         public string InvoiceNumber { get; set; }
+        public string? DKInvoiceNumber { get; set; }
         public string SoNumber { get; set; }
 
         public DateTime CreateDate { get; set; }
@@ -41,6 +42,7 @@ namespace jewelry.Model.Sale.Invoice.Get
         public decimal SpecialDiscount { get; set; }
         public decimal SpecialAddition { get; set; }
         public decimal FreightAndInsurance { get; set; }
+        public decimal Vat { get; set; }
 
         public int Status { get; set; }
         public string StatusName { get; set; }

@@ -2046,6 +2046,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("delete_reason");
             entity.Property(e => e.DeliveryDate).HasColumnName("delivery_date");
             entity.Property(e => e.Deposit).HasColumnName("deposit");
+            entity.Property(e => e.DkInvoiceNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("dk_invoice_number");
             entity.Property(e => e.FreightAndInsurance).HasColumnName("freight_and_insurance");
             entity.Property(e => e.GoldRate).HasColumnName("gold_rate");
             entity.Property(e => e.IsDelete).HasColumnName("is_delete");
@@ -2074,6 +2077,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.Vat).HasColumnName("vat");
         });
 
         modelBuilder.Entity<TbtSaleInvoicePaymentItem>(entity =>
@@ -2244,6 +2248,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.Discount).HasColumnName("discount");
+            entity.Property(e => e.DkInvoiceNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("dk_invoice_number");
             entity.Property(e => e.Invoice)
                 .HasColumnType("character varying")
                 .HasColumnName("invoice");

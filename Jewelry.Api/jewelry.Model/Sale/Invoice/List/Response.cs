@@ -5,6 +5,7 @@ namespace jewelry.Model.Sale.Invoice.List
     public class Response
     {
         public string InvoiceNumber { get; set; } = null!;
+        public string? DKInvoiceNumber { get; set; }
         public string CreateBy { get; set; } = null!;
         public DateTime CreateDate { get; set; }
         public string? UpdateBy { get; set; }
@@ -31,5 +32,6 @@ namespace jewelry.Model.Sale.Invoice.List
         public string StatusName { get; set; } = null!;
         public int ItemCount { get; set; }
         public decimal TotalAmount { get; set; }
+        public decimal Vat { get; set; }
     }
 }

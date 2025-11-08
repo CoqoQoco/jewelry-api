@@ -53,6 +53,18 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException("Invoice items are required.");
             }
 
+            //check duplicate DK Invoice Number
+            if (!string.IsNullOrEmpty(request.DKInvoiceNumber))
+            {
+                var dkInvoiceExists = await _jewelryContext.TbtSaleInvoiceHeader
+                    .AnyAsync(x => x.DkInvoiceNumber == request.DKInvoiceNumber && x.IsDelete == false);
+
+                if (dkInvoiceExists)
+                {
+                    throw new HandleException($"DK Invoice Number {request.DKInvoiceNumber} already exists.");
+                }
+            }
+
             //check all stock not exist invoice
             var stockArray = request.Items.Select(i => i.StockNumber).ToArray();
             var getstockConfrim = await _jewelryContext.TbtSaleOrderProduct
@@ -75,6 +87,7 @@ namespace Jewelry.Service.Sale.Invoice
             var invoiceHeader = new TbtSaleInvoiceHeader
             {
                 Running = invoiceNumber,
+                DkInvoiceNumber = request.DKInvoiceNumber,
                 SoRunning = request.SoNumber,
 
                 CreateBy = CurrentUsername,
@@ -108,7 +121,8 @@ namespace Jewelry.Service.Sale.Invoice
 
                 SpecialDiscount = request.SpecialDiscount,
                 SpecialAddition = request.SpecialAddition,
-                FreightAndInsurance = request.FreightAndInsurance
+                FreightAndInsurance = request.FreightAndInsurance,
+                Vat = request.Vat,
             };
 
             _jewelryContext.TbtSaleInvoiceHeader.Add(invoiceHeader);
@@ -122,6 +136,7 @@ namespace Jewelry.Service.Sale.Invoice
                 //                            && x.Id == item.Id);
                 item.Invoice = invoiceNumber;
                 item.InvoiceItem = $"{invoiceNumber}-{item.Id}";
+                item.DkInvoiceNumber = request.DKInvoiceNumber;
 
                 item.UpdateBy = CurrentUsername;
                 item.UpdateDate = DateTime.UtcNow;
@@ -183,6 +198,7 @@ namespace Jewelry.Service.Sale.Invoice
             var response = new jewelry.Model.Sale.Invoice.Get.Response
             {
                 InvoiceNumber = invoiceHeader.Running,
+                DKInvoiceNumber = invoiceHeader.DkInvoiceNumber,
                 SoNumber = soNumber,
 
                 CreateDate = invoiceHeader.CreateDate,
@@ -222,6 +238,7 @@ namespace Jewelry.Service.Sale.Invoice
                 SpecialDiscount = invoiceHeader.SpecialDiscount,
                 SpecialAddition = invoiceHeader.SpecialAddition,
                 FreightAndInsurance = invoiceHeader.FreightAndInsurance,
+                Vat = invoiceHeader.Vat,
 
                 ConfirmedItems = confirmedItems
             };
@@ -260,6 +277,7 @@ namespace Jewelry.Service.Sale.Invoice
                         select new jewelry.Model.Sale.Invoice.List.Response
                         {
                             InvoiceNumber = invoice.Running,
+                            DKInvoiceNumber = invoice.DkInvoiceNumber,
 
                             CreateBy = invoice.CreateBy,
                             CreateDate = invoice.CreateDate,
@@ -425,6 +443,8 @@ namespace Jewelry.Service.Sale.Invoice
             {
                 product.Invoice = null;
                 product.InvoiceItem = null;
+                product.DkInvoiceNumber = null;
+
                 product.UpdateBy = CurrentUsername;
                 product.UpdateDate = DateTime.UtcNow;
             }

@@ -5,6 +5,7 @@ namespace jewelry.Model.Sale.Invoice.Create
 {
     public class Request
     {
+        public string? DKInvoiceNumber { get; set; }
         public string SoNumber { get; set; }
 
         public string CustomerCode { get; set; }
@@ -35,6 +36,7 @@ namespace jewelry.Model.Sale.Invoice.Create
         public decimal SpecialDiscount { get; set; }
         public decimal SpecialAddition { get; set; }
         public decimal FreightAndInsurance { get; set; }
+        public decimal Vat { get; set; }
 
         public List<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
     }

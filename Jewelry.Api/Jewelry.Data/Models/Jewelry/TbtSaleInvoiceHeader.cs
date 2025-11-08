@@ -67,5 +67,9 @@ public partial class TbtSaleInvoiceHeader
 
     public string? DeleteReason { get; set; }
 
+    public string? DkInvoiceNumber { get; set; }
+
+    public decimal Vat { get; set; }
+
     public virtual ICollection<TbtSaleInvoicePaymentItem> TbtSaleInvoicePaymentItem { get; set; } = new List<TbtSaleInvoicePaymentItem>();
 }
