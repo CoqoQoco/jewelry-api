@@ -15,7 +15,7 @@ namespace Jewelry.Api.Controllers.Receipt
 {
     [Route("/[controller]")]
     [ApiController]
-    //[Authorize]
+    [Authorize]
     public class ReceiptProductionController : ApiControllerBase
     {
         private readonly ILogger<MoldController> _logger;
