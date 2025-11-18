@@ -12,13 +12,9 @@ public partial class JewelryContext : DbContext
     {
     }
 
-    public virtual DbSet<Stock18k> Stock18k { get; set; }
+    public virtual DbSet<Stock> Stock { get; set; }
 
-    public virtual DbSet<Stock18kTarget> Stock18kTarget { get; set; }
-
-    public virtual DbSet<StockBracelet> StockBracelet { get; set; }
-
-    public virtual DbSet<StockFromConvert> StockFromConvert { get; set; }
+    public virtual DbSet<Stock9k> Stock9k { get; set; }
 
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
 
@@ -130,382 +126,201 @@ public partial class JewelryContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Stock18k>(entity =>
+        modelBuilder.Entity<Stock>(entity =>
         {
             entity
                 .HasNoKey()
-                .ToTable("stock_18k");
+                .ToTable("stock");
 
             entity.Property(e => e.Codeproduct)
-                .HasMaxLength(400)
+                .HasMaxLength(20)
                 .HasColumnName("codeproduct");
             entity.Property(e => e.Dateadd)
-                .HasMaxLength(400)
+                .HasMaxLength(10)
                 .HasColumnName("dateadd");
             entity.Property(e => e.Dateproduct)
-                .HasMaxLength(400)
+                .HasMaxLength(8)
                 .HasColumnName("dateproduct");
             entity.Property(e => e.Descthai)
-                .HasMaxLength(400)
+                .HasMaxLength(250)
                 .HasColumnName("descthai");
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
             entity.Property(e => e.Issueno)
-                .HasMaxLength(400)
+                .HasMaxLength(10)
                 .HasColumnName("issueno");
             entity.Property(e => e.Jobno)
-                .HasMaxLength(400)
+                .HasMaxLength(20)
                 .HasColumnName("jobno");
             entity.Property(e => e.NoCode)
-                .HasMaxLength(400)
+                .HasMaxLength(20)
                 .HasColumnName("no_code");
             entity.Property(e => e.Noproduct)
-                .HasMaxLength(400)
+                .HasMaxLength(15)
                 .HasColumnName("noproduct");
             entity.Property(e => e.OriginD)
-                .HasMaxLength(400)
+                .HasMaxLength(50)
                 .HasColumnName("origin_d");
             entity.Property(e => e.OriginD1)
-                .HasMaxLength(400)
+                .HasMaxLength(50)
                 .HasColumnName("origin_d1");
             entity.Property(e => e.Partno)
-                .HasMaxLength(400)
+                .HasMaxLength(25)
                 .HasColumnName("partno");
             entity.Property(e => e.Partnoold)
-                .HasMaxLength(400)
+                .HasMaxLength(10)
                 .HasColumnName("partnoold");
             entity.Property(e => e.Pricecost)
-                .HasMaxLength(400)
+                .HasMaxLength(50)
                 .HasColumnName("pricecost");
             entity.Property(e => e.Priced).HasColumnName("priced");
             entity.Property(e => e.Priced1).HasColumnName("priced1");
             entity.Property(e => e.Pricee).HasColumnName("pricee");
-            entity.Property(e => e.Priceg).HasColumnName("priceg");
+            entity.Property(e => e.Priceg)
+                .HasDefaultValueSql("0")
+                .HasColumnName("priceg");
             entity.Property(e => e.Pricem).HasColumnName("pricem");
             entity.Property(e => e.Pricer).HasColumnName("pricer");
             entity.Property(e => e.Prices).HasColumnName("prices");
-            entity.Property(e => e.Pricesale).HasColumnName("pricesale");
-            entity.Property(e => e.Priceus).HasColumnName("priceus");
+            entity.Property(e => e.Pricesale)
+                .HasDefaultValueSql("0")
+                .HasColumnName("pricesale");
+            entity.Property(e => e.Priceus)
+                .HasDefaultValueSql("0")
+                .HasColumnName("priceus");
             entity.Property(e => e.Productname)
-                .HasMaxLength(400)
+                .HasMaxLength(50)
                 .HasColumnName("productname");
             entity.Property(e => e.Qtyd).HasColumnName("qtyd");
             entity.Property(e => e.Qtyd1).HasColumnName("qtyd1");
             entity.Property(e => e.Qtye).HasColumnName("qtye");
-            entity.Property(e => e.Qtyg).HasColumnName("qtyg");
+            entity.Property(e => e.Qtyg)
+                .HasDefaultValueSql("0")
+                .HasColumnName("qtyg");
             entity.Property(e => e.Qtym).HasColumnName("qtym");
             entity.Property(e => e.Qtyr).HasColumnName("qtyr");
             entity.Property(e => e.Qtys).HasColumnName("qtys");
-            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.Quantity)
+                .HasDefaultValueSql("0")
+                .HasColumnName("quantity");
             entity.Property(e => e.Recgen).HasColumnName("recgen");
             entity.Property(e => e.Remark)
-                .HasMaxLength(400)
+                .HasMaxLength(255)
                 .HasColumnName("remark");
             entity.Property(e => e.Ringsize)
-                .HasMaxLength(400)
+                .HasMaxLength(5)
                 .HasColumnName("ringsize");
             entity.Property(e => e.Sizee)
-                .HasMaxLength(400)
+                .HasMaxLength(50)
                 .HasColumnName("sizee");
             entity.Property(e => e.Sizem)
-                .HasMaxLength(400)
+                .HasMaxLength(50)
                 .HasColumnName("sizem");
             entity.Property(e => e.Sizer)
-                .HasMaxLength(400)
+                .HasMaxLength(50)
                 .HasColumnName("sizer");
             entity.Property(e => e.Sizes)
-                .HasMaxLength(400)
+                .HasMaxLength(50)
                 .HasColumnName("sizes");
             entity.Property(e => e.StatusP)
-                .HasMaxLength(400)
+                .HasMaxLength(6)
                 .HasColumnName("status_p");
             entity.Property(e => e.Stockid).HasColumnName("stockid");
-            entity.Property(e => e.TypeS).HasMaxLength(400);
-            entity.Property(e => e.Typed)
-                .HasMaxLength(400)
-                .HasColumnName("typed");
-            entity.Property(e => e.Typed1)
-                .HasMaxLength(400)
-                .HasColumnName("typed1");
-            entity.Property(e => e.Typedesc)
-                .HasMaxLength(400)
-                .HasColumnName("typedesc");
-            entity.Property(e => e.Typee)
-                .HasMaxLength(400)
-                .HasColumnName("typee");
-            entity.Property(e => e.Typeg)
-                .HasMaxLength(400)
-                .HasColumnName("typeg");
-            entity.Property(e => e.Typejob)
-                .HasMaxLength(400)
-                .HasColumnName("typejob");
-            entity.Property(e => e.Typem)
-                .HasMaxLength(400)
-                .HasColumnName("typem");
-            entity.Property(e => e.Typep)
-                .HasMaxLength(400)
-                .HasColumnName("typep");
-            entity.Property(e => e.Typer)
-                .HasMaxLength(400)
-                .HasColumnName("typer");
-            entity.Property(e => e.Typesil)
-                .HasMaxLength(400)
-                .HasColumnName("typesil");
-            entity.Property(e => e.Unit)
-                .HasMaxLength(400)
-                .HasColumnName("unit");
-            entity.Property(e => e.Unit1)
-                .HasMaxLength(400)
-                .HasColumnName("unit1");
-            entity.Property(e => e.Unit2)
-                .HasMaxLength(400)
-                .HasColumnName("unit2");
-            entity.Property(e => e.Unit3)
-                .HasMaxLength(400)
-                .HasColumnName("unit3");
-            entity.Property(e => e.Unit4)
-                .HasMaxLength(400)
-                .HasColumnName("unit4");
-            entity.Property(e => e.Unit5)
-                .HasMaxLength(400)
-                .HasColumnName("unit5");
-            entity.Property(e => e.Unit6)
-                .HasMaxLength(400)
-                .HasColumnName("unit6");
-            entity.Property(e => e.Unitd1)
-                .HasMaxLength(400)
-                .HasColumnName("unitd1");
-            entity.Property(e => e.Unitsil)
-                .HasMaxLength(400)
-                .HasColumnName("unitsil");
-            entity.Property(e => e.Username)
-                .HasMaxLength(400)
-                .HasColumnName("username");
-            entity.Property(e => e.Wd).HasColumnName("wd");
-            entity.Property(e => e.Wd1).HasColumnName("wd1");
-            entity.Property(e => e.We).HasColumnName("we");
-            entity.Property(e => e.Wg).HasColumnName("wg");
-            entity.Property(e => e.Whno)
-                .HasMaxLength(400)
-                .HasColumnName("whno");
-            entity.Property(e => e.Wm).HasColumnName("wm");
-            entity.Property(e => e.Wr).HasColumnName("wr");
-            entity.Property(e => e.Ws).HasColumnName("ws");
-            entity.Property(e => e.Wsil)
-                .HasMaxLength(400)
-                .HasColumnName("wsil");
-        });
-
-        modelBuilder.Entity<Stock18kTarget>(entity =>
-        {
-            entity
-                .HasNoKey()
-                .ToTable("stock_18k_target");
-
-            entity.Property(e => e.IsTransfer).HasColumnName("is_transfer");
-            entity.Property(e => e.Noproduct)
-                .HasMaxLength(400)
-                .HasColumnName("noproduct");
-        });
-
-        modelBuilder.Entity<StockBracelet>(entity =>
-        {
-            entity
-                .HasNoKey()
-                .ToTable("stock_bracelet");
-
-            entity.Property(e => e.DaimondQty).HasColumnName("daimond_qty");
-            entity.Property(e => e.Description)
-                .HasMaxLength(400)
-                .HasColumnName("description");
-            entity.Property(e => e.DiamondPrice).HasColumnName("diamond_price");
-            entity.Property(e => e.DiamondWeight).HasColumnName("diamond_weight");
-            entity.Property(e => e.EmeraldPrice).HasColumnName("emerald_price");
-            entity.Property(e => e.EmeraldQty).HasColumnName("emerald_qty");
-            entity.Property(e => e.EmeraldWeight).HasColumnName("emerald_weight");
-            entity.Property(e => e.GoldWeigh).HasColumnName("gold_weigh");
-            entity.Property(e => e.MixcolorPrice).HasColumnName("mixcolor_price");
-            entity.Property(e => e.MixcolorQty).HasColumnName("mixcolor_qty");
-            entity.Property(e => e.MixcolorWeight).HasColumnName("mixcolor_weight");
-            entity.Property(e => e.Price).HasColumnName("price");
-            entity.Property(e => e.Productno)
-                .HasMaxLength(400)
-                .HasColumnName("productno");
-            entity.Property(e => e.RubyPrice).HasColumnName("ruby_price");
-            entity.Property(e => e.RubyQty).HasColumnName("ruby_qty");
-            entity.Property(e => e.RubyWeght).HasColumnName("ruby_weght");
-            entity.Property(e => e.SapphirePrice).HasColumnName("sapphire_price");
-            entity.Property(e => e.SapphireQty).HasColumnName("sapphire_qty");
-            entity.Property(e => e.SapphireWeight).HasColumnName("sapphire_weight");
             entity.Property(e => e.Styleno)
                 .HasMaxLength(400)
                 .HasColumnName("styleno");
-        });
-
-        modelBuilder.Entity<StockFromConvert>(entity =>
-        {
-            entity.HasKey(e => e.Recgen).HasName("stock_from_convert_pk");
-
-            entity.ToTable("stock_from_convert");
-
-            entity.Property(e => e.Recgen)
-                .ValueGeneratedNever()
-                .HasColumnName("recgen");
-            entity.Property(e => e.Codeproduct)
-                .HasMaxLength(255)
-                .HasColumnName("codeproduct");
-            entity.Property(e => e.Dateadd)
-                .HasMaxLength(255)
-                .HasColumnName("dateadd");
-            entity.Property(e => e.Dateproduct)
-                .HasMaxLength(255)
-                .HasColumnName("dateproduct");
-            entity.Property(e => e.Descthai)
-                .HasMaxLength(255)
-                .HasColumnName("descthai");
-            entity.Property(e => e.Issueno)
-                .HasMaxLength(255)
-                .HasColumnName("issueno");
-            entity.Property(e => e.Jobno)
-                .HasMaxLength(255)
-                .HasColumnName("jobno");
-            entity.Property(e => e.NoCode)
-                .HasMaxLength(255)
-                .HasColumnName("no_code");
-            entity.Property(e => e.Noproduct)
-                .HasMaxLength(255)
-                .HasColumnName("noproduct");
-            entity.Property(e => e.OriginD)
-                .HasMaxLength(255)
-                .HasColumnName("origin_d");
-            entity.Property(e => e.OriginD1)
-                .HasMaxLength(255)
-                .HasColumnName("origin_d1");
-            entity.Property(e => e.Partno)
-                .HasMaxLength(255)
-                .HasColumnName("partno");
-            entity.Property(e => e.Partnoold)
-                .HasMaxLength(255)
-                .HasColumnName("partnoold");
-            entity.Property(e => e.Pricecost)
-                .HasMaxLength(255)
-                .HasColumnName("pricecost");
-            entity.Property(e => e.Priced).HasColumnName("priced");
-            entity.Property(e => e.Priced1).HasColumnName("priced1");
-            entity.Property(e => e.Pricee).HasColumnName("pricee");
-            entity.Property(e => e.Priceg).HasColumnName("priceg");
-            entity.Property(e => e.Pricem).HasColumnName("pricem");
-            entity.Property(e => e.Pricer).HasColumnName("pricer");
-            entity.Property(e => e.Prices).HasColumnName("prices");
-            entity.Property(e => e.Pricesale).HasColumnName("pricesale");
-            entity.Property(e => e.Priceus).HasColumnName("priceus");
-            entity.Property(e => e.Productname)
-                .HasMaxLength(255)
-                .HasColumnName("productname");
-            entity.Property(e => e.Qtyd).HasColumnName("qtyd");
-            entity.Property(e => e.Qtyd1).HasColumnName("qtyd1");
-            entity.Property(e => e.Qtye).HasColumnName("qtye");
-            entity.Property(e => e.Qtyg).HasColumnName("qtyg");
-            entity.Property(e => e.Qtym).HasColumnName("qtym");
-            entity.Property(e => e.Qtyr).HasColumnName("qtyr");
-            entity.Property(e => e.Qtys).HasColumnName("qtys");
-            entity.Property(e => e.Quantity).HasColumnName("quantity");
-            entity.Property(e => e.Remark)
-                .HasMaxLength(255)
-                .HasColumnName("remark");
-            entity.Property(e => e.Ringsize)
-                .HasMaxLength(255)
-                .HasColumnName("ringsize");
-            entity.Property(e => e.Sizee)
-                .HasMaxLength(255)
-                .HasColumnName("sizee");
-            entity.Property(e => e.Sizem)
-                .HasMaxLength(255)
-                .HasColumnName("sizem");
-            entity.Property(e => e.Sizer)
-                .HasMaxLength(255)
-                .HasColumnName("sizer");
-            entity.Property(e => e.Sizes)
-                .HasMaxLength(255)
-                .HasColumnName("sizes");
-            entity.Property(e => e.StatusP)
-                .HasMaxLength(255)
-                .HasColumnName("status_p");
-            entity.Property(e => e.Stockid)
-                .HasMaxLength(255)
-                .HasColumnName("stockid");
-            entity.Property(e => e.TypeS).HasMaxLength(255);
+            entity.Property(e => e.TypeS).HasMaxLength(50);
             entity.Property(e => e.Typed)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("typed");
             entity.Property(e => e.Typed1)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("typed1");
             entity.Property(e => e.Typedesc)
-                .HasMaxLength(255)
+                .HasMaxLength(10)
                 .HasColumnName("typedesc");
             entity.Property(e => e.Typee)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("typee");
             entity.Property(e => e.Typeg)
-                .HasMaxLength(255)
+                .HasMaxLength(20)
                 .HasColumnName("typeg");
             entity.Property(e => e.Typejob)
-                .HasMaxLength(255)
+                .HasMaxLength(2)
                 .HasColumnName("typejob");
             entity.Property(e => e.Typem)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("typem");
             entity.Property(e => e.Typep)
-                .HasMaxLength(255)
+                .HasMaxLength(20)
                 .HasColumnName("typep");
             entity.Property(e => e.Typer)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("typer");
             entity.Property(e => e.Typesil)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("typesil");
             entity.Property(e => e.Unit)
-                .HasMaxLength(255)
+                .HasMaxLength(6)
                 .HasColumnName("unit");
             entity.Property(e => e.Unit1)
-                .HasMaxLength(255)
+                .HasMaxLength(3)
                 .HasColumnName("unit1");
             entity.Property(e => e.Unit2)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("unit2");
             entity.Property(e => e.Unit3)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("unit3");
             entity.Property(e => e.Unit4)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("unit4");
             entity.Property(e => e.Unit5)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("unit5");
             entity.Property(e => e.Unit6)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("unit6");
             entity.Property(e => e.Unitd1)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("unitd1");
             entity.Property(e => e.Unitsil)
-                .HasMaxLength(255)
+                .HasMaxLength(50)
                 .HasColumnName("unitsil");
             entity.Property(e => e.Username)
-                .HasMaxLength(255)
+                .HasMaxLength(20)
                 .HasColumnName("username");
             entity.Property(e => e.Wd).HasColumnName("wd");
             entity.Property(e => e.Wd1).HasColumnName("wd1");
             entity.Property(e => e.We).HasColumnName("we");
-            entity.Property(e => e.Wg).HasColumnName("wg");
+            entity.Property(e => e.Wg)
+                .HasDefaultValueSql("0")
+                .HasColumnName("wg");
             entity.Property(e => e.Whno)
-                .HasMaxLength(255)
+                .HasMaxLength(10)
                 .HasColumnName("whno");
             entity.Property(e => e.Wm).HasColumnName("wm");
             entity.Property(e => e.Wr).HasColumnName("wr");
             entity.Property(e => e.Ws).HasColumnName("ws");
-            entity.Property(e => e.Wsil)
-                .HasMaxLength(255)
-                .HasColumnName("wsil");
+            entity.Property(e => e.Wsil).HasColumnName("wsil");
+        });
+
+        modelBuilder.Entity<Stock9k>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("stock_9k_pk");
+
+            entity.ToTable("stock_9k");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.IsTransfer).HasColumnName("is_transfer");
+            entity.Property(e => e.NoProduct)
+                .HasColumnType("character varying")
+                .HasColumnName("no_product");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.StyleNo)
+                .HasColumnType("character varying")
+                .HasColumnName("style_no");
         });
 
         modelBuilder.Entity<TbmAccount>(entity =>

@@ -15,7 +15,7 @@ namespace Jewelry.Api.Controllers.Receipt
 {
     [Route("/[controller]")]
     [ApiController]
-    [Authorize]
+    //[Authorize]
     public class ReceiptProductionController : ApiControllerBase
     {
         private readonly ILogger<MoldController> _logger;
@@ -24,11 +24,13 @@ namespace Jewelry.Api.Controllers.Receipt
 
         public ReceiptProductionController(ILogger<MoldController> logger,
            IReceiptProductionService receiptProduction,
+           IOldStockService oldStockService,
            IOptions<ApiBehaviorOptions> apiBehaviorOptions)
            : base(apiBehaviorOptions)
         {
             _logger = logger;
             _receiptProduction = receiptProduction;
+            _oldStockService = oldStockService;
         }
 
         [Route("ListPlan")]
@@ -58,7 +60,7 @@ namespace Jewelry.Api.Controllers.Receipt
         {
             try
             {
-       
+
 
                 var response = await _receiptProduction.GetPlan(request);
                 return Ok(response);
@@ -131,59 +133,38 @@ namespace Jewelry.Api.Controllers.Receipt
         }
 
 
-        [Route("Import")]
+        //[Route("Transfer/18K")]
+        //[HttpPost]
+        //[ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        //[ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        //[ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        //public async Task<IActionResult> Transfer18K()
+        //{
+        //    try
+        //    {
+
+
+        //        var response = await _oldStockService.TransferStock18K();
+        //        return Ok(response);
+        //    }
+        //    catch (HandleException ex)
+        //    {
+        //        return BadRequest(new NotFoundResponse() { Message = ex.Message });
+        //    }
+        //}
+
+        [Route("Transfer/9K")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public async Task<IActionResult> Import()
+        public async Task<IActionResult> Transfer18K(jewelry.Model.Stock.OldStock._9K.Request request)
         {
             try
             {
 
 
-                var response = await _receiptProduction.ImportProduct();
-                return Ok(response);
-            }
-            catch (HandleException ex)
-            {
-                return BadRequest(new NotFoundResponse() { Message = ex.Message });
-            }
-        }
-
-        [Route("ImportBraceletStock")]
-        [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public async Task<IActionResult> ImportBraceletStock()
-        {
-            try
-            {
-
-
-                var response = await _receiptProduction.ImportBraceletStock();
-                return Ok(response);
-            }
-            catch (HandleException ex)
-            {
-                return BadRequest(new NotFoundResponse() { Message = ex.Message });
-            }
-        }
-
-
-        [Route("Transfer/18K")]
-        [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public async Task<IActionResult> Transfer18K()
-        {
-            try
-            {
-
-
-                var response = await _oldStockService.TransferStock18K();
+                var response = await _oldStockService.TransferStock9K(request);
                 return Ok(response);
             }
             catch (HandleException ex)

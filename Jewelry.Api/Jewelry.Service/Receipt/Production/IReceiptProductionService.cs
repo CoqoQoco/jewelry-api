@@ -15,7 +15,6 @@ namespace Jewelry.Service.Receipt.Production
         IQueryable<jewelry.Model.Receipt.Production.History.List.Response> ListHistory(jewelry.Model.Receipt.Production.History.List.Search request);
 
         Task<string> Darft(jewelry.Model.Receipt.Production.Draft.Create.Request request);
-        Task<string> ImportProduct();
-        Task<string> ImportBraceletStock();
+
     }
 }
