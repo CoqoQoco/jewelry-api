@@ -72,6 +72,18 @@ namespace Jewelry.Service.Stock.Product
                 var productTypeArray = request.ProductType.Select(x => x).ToArray();
                 stock = stock.Where(x => productTypeArray.Contains(x.ProductType));
             }
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                var productTypeArray = request.Gold.Select(x => x).ToArray();
+                stock = stock.Where(x => productTypeArray.Contains(x.ProductionType));
+            }
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                var productTypeArray = request.GoldSize.Select(x => x).ToArray();
+                stock = stock.Where(x => productTypeArray.Contains(x.ProductionTypeSize));
+            }
+
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
                 stock = stock.Where(x => x.ProductNumber.Contains(request.ProductNumber));
