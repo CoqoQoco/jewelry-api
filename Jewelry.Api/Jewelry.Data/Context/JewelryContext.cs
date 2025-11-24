@@ -14,6 +14,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<Stock> Stock { get; set; }
 
+    public virtual DbSet<Stock18k> Stock18k { get; set; }
+
     public virtual DbSet<Stock9k> Stock9k { get; set; }
 
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
@@ -304,6 +306,23 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Wr).HasColumnName("wr");
             entity.Property(e => e.Ws).HasColumnName("ws");
             entity.Property(e => e.Wsil).HasColumnName("wsil");
+        });
+
+        modelBuilder.Entity<Stock18k>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("stock_18k_pk");
+
+            entity.ToTable("stock_18k");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.IsTransfer).HasColumnName("is_transfer");
+            entity.Property(e => e.NoProduct)
+                .HasColumnType("character varying")
+                .HasColumnName("no_product");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.StyleNo)
+                .HasColumnType("character varying")
+                .HasColumnName("style_no");
         });
 
         modelBuilder.Entity<Stock9k>(entity =>
