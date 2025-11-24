@@ -1694,12 +1694,19 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("gem_code");
             entity.Property(e => e.GemId).HasColumnName("gem_id");
+            entity.Property(e => e.GemLength).HasColumnName("gem_length");
+            entity.Property(e => e.GemLengthUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_length_unit");
             entity.Property(e => e.GemName)
                 .HasColumnType("character varying")
                 .HasColumnName("gem_name");
             entity.Property(e => e.GemPrice).HasColumnName("gem_price");
             entity.Property(e => e.GemQty).HasColumnName("gem_qty");
             entity.Property(e => e.GemWeight).HasColumnName("gem_weight");
+            entity.Property(e => e.GemWeightUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_weight_unit");
             entity.Property(e => e.HeaderId).HasColumnName("header_id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.OutboundDate).HasColumnName("outbound_date");

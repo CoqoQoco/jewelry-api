@@ -35,5 +35,11 @@ public partial class TbtProductionPlanStatusDetailGem
 
     public DateTime? OutboundDate { get; set; }
 
+    public decimal? GemLength { get; set; }
+
+    public string? GemLengthUnit { get; set; }
+
+    public string? GemWeightUnit { get; set; }
+
     public virtual TbtProductionPlanStatusHeader Header { get; set; } = null!;
 }

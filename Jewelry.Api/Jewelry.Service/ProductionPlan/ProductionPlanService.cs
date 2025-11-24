@@ -13,6 +13,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
 using jewelry.Model.ProductionPlanCost.GoldCostItem;
+using jewelry.Model.Receipt.Production.PlanGet;
 using jewelry.Model.Worker.TrackingWorker;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -744,13 +745,17 @@ namespace Jewelry.Service.ProductionPlan
                                                                                        Id = gem.GemId,
                                                                                        Code = gem.GemCode,
                                                                                        Name = gem.GemName,
-                                                                                       QTY = gem.GemQty,
                                                                                        Price = gem.GemPrice.HasValue && gem.GemPrice.Value > 0
                                                                                                                       ? gem.GemPrice
                                                                                                                       : (gemStock.UnitCode == "Q" ? gemStock.PriceQty : gemStock.Price),
-                                                                                       Weight = gem.GemWeight,
-
+                                                                                       QTY = gem.GemQty,
                                                                                        Unit = gemStock != null ? gemStock.Unit : "",
+
+                                                                                       Weight = gem.GemWeight,
+                                                                                       WeightUnit = gem.GemWeightUnit,
+
+                                                                                       Length = gem.GemLength,
+                                                                                       LengthUnit = gem.GemLengthUnit,
 
                                                                                        OutboundDate = gem.OutboundDate,
                                                                                        OutboundName = gem.OutboundName,
@@ -1752,6 +1757,9 @@ namespace Jewelry.Service.ProductionPlan
                         GemName = gem.Name,
                         GemPrice = gem.Price,
 
+                        GemLength = gem.Length,
+                        GemLengthUnit = gem.LengthUnit, 
+
                         OutboundDate = gem.OutboundDate.HasValue ? gem.OutboundDate.Value.UtcDateTime : null,
                         OutboundRunning = gem.OutboundRunning ?? null,
                         OutboundName = gem.OutboundName ?? null
@@ -2023,6 +2031,9 @@ namespace Jewelry.Service.ProductionPlan
                                             GemWeight = item.Weight,
                                             GemName = item.Name,
                                             GemPrice = item.Price,
+
+                                            GemLength = item.Length,
+                                            GemLengthUnit = item.LengthUnit,
                                         };
                                         addStatusItemGem.Add(newGem);
                                     }
@@ -2392,6 +2403,9 @@ namespace Jewelry.Service.ProductionPlan
                                                 GemWeight = item.Weight,
                                                 GemName = item.Name,
                                                 GemPrice = item.Price,
+
+                                                GemLength = item.Length,
+                                                GemLengthUnit = item.LengthUnit,
                                             };
                                             addStatusItemGem.Add(newGem);
                                         }

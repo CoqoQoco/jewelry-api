@@ -116,7 +116,12 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public decimal? Price { get; set; }
 
         public decimal? QTY { get; set; }
+
         public decimal? Weight { get; set; }
+        public string? WeightUnit { get; set; }
+
+        public decimal? Length { get; set; }
+        public string? LengthUnit { get; set; }
 
         public string? OutboundRunning { get; set; }
         public string? OutboundName { get; set; }

@@ -58,6 +58,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
         public decimal? QTY { get; set; }
         public decimal? Weight { get; set; }
 
+        public decimal? Length { get; set; }
+        public string? LengthUnit { get; set; }
+
         public decimal? Price { get; set; }
     }
 }
