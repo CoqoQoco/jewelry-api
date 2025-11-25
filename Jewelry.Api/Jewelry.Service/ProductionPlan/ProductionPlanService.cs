@@ -1758,7 +1758,7 @@ namespace Jewelry.Service.ProductionPlan
                         GemPrice = gem.Price,
 
                         GemLength = gem.Length,
-                        GemLengthUnit = gem.LengthUnit, 
+                        GemLengthUnit = gem.LengthUnit,
 
                         OutboundDate = gem.OutboundDate.HasValue ? gem.OutboundDate.Value.UtcDateTime : null,
                         OutboundRunning = gem.OutboundRunning ?? null,
@@ -2697,10 +2697,26 @@ namespace Jewelry.Service.ProductionPlan
                                       Qty = item.GemQty,
                                       QtyPrice = gem.PriceQty,
 
+                                      Length = item.GemLength,
+                                      LengthUnit = item.GemLengthUnit,
+
                                       QtyWeight = item.GemWeight,
                                       QtyWeightPrice = gem.Price,
 
                                   }).ToList();
+
+
+
+            if (transectionGem.Any())
+            {
+                foreach (var item in transectionGem)
+                {
+                    if (item.Length.HasValue && item.Length.Value > 0)
+                    { 
+                        item.NameDescription = $"{item.NameDescription} [ความยาว {item.Length} {item.LengthUnit}]";
+                    }
+                }
+            }
 
 
             //add worker

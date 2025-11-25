@@ -35,6 +35,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection
         public decimal? QtyWeight { get; set; }
         public decimal? QtyWeightPrice { get; set; }
 
+        public decimal? Length { get; set; }
+        public string? LengthUnit { get; set; }
+
         public decimal? PriceReference { get; set; }
 
         public bool IsAdd { get; set; } = false;
