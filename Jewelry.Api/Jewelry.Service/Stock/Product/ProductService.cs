@@ -1,4 +1,5 @@
 ﻿using jewelry.Model.Exceptions;
+using jewelry.Model.Stock.Product.Dashboard;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
@@ -398,6 +399,346 @@ namespace Jewelry.Service.Stock.Product
 
             throw new HandleException("Mode is Required");
         }
+
+        #region Dashboard APIs
+
+        public async Task<DashboardResponse> GetProductDashboard(DashboardRequest request)
+        {
+            var response = new DashboardResponse
+            {
+                DataAtDate = DateTimeOffset.UtcNow.DateTime
+            };
+
+            // Get stock summary
+            response.Summary = await GetStockSummary(request);
+
+            // Get category breakdown (grouped by ProductTypeName, ProductionType, ProductionTypeSize)
+            response.Categories = await GetCategoryBreakdown(request);
+
+            // Get last activities (recent 10 products)
+            response.LastActivities = await GetLastActivities(request);
+
+            return response;
+        }
+
+        public async Task<TodayReportResponse> GetTodayReport(DashboardRequest request)
+        {
+            var today = DateTime.UtcNow.Date;
+            var tomorrow = today.AddDays(1);
+
+            var response = new TodayReportResponse
+            {
+                ReportDate = today
+            };
+
+            // Today's summary
+            response.Summary = await GetTodaySummary(today, tomorrow, request);
+
+            // Today's transactions (products created today)
+            response.Transactions = await GetTodayTransactions(today, tomorrow, request);
+
+            return response;
+        }
+
+        public async Task<WeeklyReportResponse> GetWeeklyReport(DashboardRequest request)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var startOfWeek = new DateTimeOffset(now.Date.AddDays(-(int)now.DayOfWeek), now.Offset);
+            var endOfWeek = startOfWeek.AddDays(7);
+
+            var response = new WeeklyReportResponse
+            {
+                WeekStartDate = startOfWeek.UtcDateTime,
+                WeekEndDate = endOfWeek.DateTime,
+                WeekNumber = $"Week {GetWeekOfYear(now.DateTime)}"
+            };
+
+            // Weekly summary
+            response.Summary = await GetWeeklySummary(startOfWeek, endOfWeek, request);
+
+            // Daily movements
+            response.DailyMovements = await GetDailyMovements(startOfWeek, endOfWeek, request);
+
+            return response;
+        }
+
+        public async Task<MonthlyReportResponse> GetMonthlyReport(DashboardRequest request)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var startOfMonth = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, now.Offset);
+            var endOfMonth = startOfMonth.AddMonths(1);
+
+            var response = new MonthlyReportResponse
+            {
+                Year = now.Year,
+                Month = now.Month,
+                MonthName = now.ToString("MMMM"),
+                MonthStartDate = startOfMonth.DateTime,
+                MonthEndDate = endOfMonth.AddDays(-1).DateTime
+            };
+
+            // Monthly summary
+            response.Summary = await GetMonthlySummary(startOfMonth, endOfMonth, request);
+
+            // Weekly comparisons
+            response.WeeklyComparisons = await GetWeeklyComparisons(startOfMonth, endOfMonth, request);
+
+            return response;
+        }
+
+        #endregion
+
+        #region Private Helper Methods
+
+        private IQueryable<TbtStockProduct> BuildStockQuery(DashboardRequest request)
+        {
+            var query = _jewelryContext.TbtStockProduct
+                .Where(x => x.QtyRemaining > 0)
+                .AsNoTracking();
+
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+
+            if (request.ProductionType != null && request.ProductionType.Any())
+            {
+                query = query.Where(x => request.ProductionType.Contains(x.ProductionType));
+            }
+
+            if (request.ProductionTypeSize != null && request.ProductionTypeSize.Any())
+            {
+                query = query.Where(x => request.ProductionTypeSize.Contains(x.ProductionTypeSize));
+            }
+
+            if (!string.IsNullOrEmpty(request.Status))
+            {
+                query = query.Where(x => x.Status == request.Status);
+            }
+
+            return query;
+        }
+
+        private async Task<StockSummary> GetStockSummary(DashboardRequest request)
+        {
+            var query = BuildStockQuery(request);
+
+            var summary = await query
+                .GroupBy(x => 1)
+                .Select(g => new StockSummary
+                {
+                    TotalProducts = g.Count(),
+                    TotalQuantity = g.Sum(x => x.Qty),
+                    TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
+                    AvailableQuantity = g.Where(x => x.Status == "Available").Sum(x => x.Qty),
+                    OnProcessQuantity = g.Where(x => x.Status != "Available").Sum(x => x.Qty),
+                    AvailableCount = g.Count(x => x.Status == "Available"),
+                    OnProcessCount = g.Count(x => x.Status != "Available")
+                })
+                .FirstOrDefaultAsync();
+
+            return summary ?? new StockSummary();
+        }
+
+        private async Task<List<ProductCategoryBreakdown>> GetCategoryBreakdown(DashboardRequest request)
+        {
+            var query = BuildStockQuery(request);
+
+            var categories = await query
+                .GroupBy(x => new
+                {
+                    x.ProductTypeName,
+                    x.ProductionType,
+                    x.ProductionTypeSize
+                })
+                .Select(g => new ProductCategoryBreakdown
+                {
+                    ProductTypeName = g.Key.ProductTypeName ?? "Unknown",
+                    ProductionType = g.Key.ProductionType ?? "Unknown",
+                    ProductionTypeSize = g.Key.ProductionTypeSize ?? "Unknown",
+                    Count = g.Count(),
+                    TotalQuantity = g.Sum(x => x.Qty),
+                    TotalOnProcessQuantity = g.Where(x => x.Status != "Available").Sum(x => x.Qty),
+                    TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
+                    AveragePrice = g.Average(x => x.ProductPrice)
+                })
+                .OrderByDescending(x => x.TotalValue)
+                .ToListAsync();
+
+            return categories;
+        }
+
+        private async Task<List<LastActivity>> GetLastActivities(DashboardRequest request)
+        {
+            var query = BuildStockQuery(request);
+
+            var activities = await query
+                .OrderByDescending(x => x.CreateDate)
+                .Take(10)
+                .Select(x => new LastActivity
+                {
+                    StockNumber = x.StockNumber,
+                    ProductNumber = x.ProductNumber,
+                    ProductNameTh = x.ProductNameTh,
+                    ProductNameEn = x.ProductNameEn,
+                    ProductTypeName = x.ProductTypeName,
+                    ProductionType = x.ProductionType,
+                    ProductionTypeSize = x.ProductionTypeSize,
+                    Status = x.Status,
+                    Qty = x.Qty,
+                    ProductPrice = x.ProductPrice,
+                    Mold = x.MoldDesign ?? x.Mold,
+                    WoText = x.Wo + x.WoNumber.ToString(),
+                    CreateDate = x.CreateDate,
+                    CreateBy = x.CreateBy
+                })
+                .ToListAsync();
+
+            return activities;
+        }
+
+        private async Task<TodaySummary> GetTodaySummary(DateTimeOffset today, DateTimeOffset tomorrow, DashboardRequest request)
+        {
+            var query = BuildStockQuery(request)
+                .Where(x => x.CreateDate >= today.StartOfDayUtc() && x.CreateDate < tomorrow.EndOfDayUtc());
+
+            var summary = await query
+                .GroupBy(x => 1)
+                .Select(g => new TodaySummary
+                {
+                    TotalTransactions = g.Count(),
+                    NewStockItems = g.Count(),
+                    TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
+                    PriceChanges = 0, // TODO: Implement price change tracking if needed
+                    LowStockAlerts = 0 // TODO: Implement low stock logic if needed
+                })
+                .FirstOrDefaultAsync();
+
+            return summary ?? new TodaySummary();
+        }
+
+        private async Task<List<LastActivity>> GetTodayTransactions(DateTimeOffset today, DateTimeOffset tomorrow, DashboardRequest request)
+        {
+            var query = BuildStockQuery(request)
+                .Where(x => x.CreateDate >= today.StartOfDayUtc() && x.CreateDate < tomorrow.EndOfDayUtc());
+
+            var transactions = await query
+                .OrderByDescending(x => x.CreateDate)
+                .Select(x => new LastActivity
+                {
+                    StockNumber = x.StockNumber,
+                    ProductNumber = x.ProductNumber,
+                    ProductNameTh = x.ProductNameTh,
+                    ProductNameEn = x.ProductNameEn,
+                    ProductTypeName = x.ProductTypeName,
+                    ProductionType = x.ProductionType,
+                    ProductionTypeSize = x.ProductionTypeSize,
+                    Status = x.Status,
+                    Qty = x.Qty,
+                    ProductPrice = x.ProductPrice,
+                    Mold = x.MoldDesign ?? x.Mold,
+                    WoText = x.Wo + x.WoNumber.ToString(),
+                    CreateDate = x.CreateDate,
+                    CreateBy = x.CreateBy
+                })
+                .ToListAsync();
+
+            return transactions;
+        }
+
+        private async Task<WeeklySummary> GetWeeklySummary(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
+        {
+            var query = BuildStockQuery(request)
+                .Where(x => x.CreateDate >= startOfWeek.StartOfDayUtc() && x.CreateDate < endOfWeek.EndOfDayUtc());
+
+            var summary = await query
+                .GroupBy(x => 1)
+                .Select(g => new WeeklySummary
+                {
+                    TotalTransactions = g.Count(),
+                    NewStockItems = g.Count(),
+                    TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
+                    PriceChanges = 0,
+                    LowStockAlerts = 0
+                })
+                .FirstOrDefaultAsync();
+
+            return summary ?? new WeeklySummary();
+        }
+
+        private async Task<List<DailyMovement>> GetDailyMovements(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
+        {
+            var query = BuildStockQuery(request)
+                .Where(x => x.CreateDate >= startOfWeek.StartOfDayUtc() && x.CreateDate < endOfWeek.EndOfDayUtc());
+
+            var movements = await query
+                .GroupBy(x => x.CreateDate.Date)
+                .Select(g => new DailyMovement
+                {
+                    Date = g.Key,
+                    TransactionCount = g.Count(),
+                    NewStockCount = g.Count(),
+                    TotalValue = g.Sum(x => x.ProductPrice * x.Qty)
+                })
+                .OrderBy(x => x.Date)
+                .ToListAsync();
+
+            return movements;
+        }
+
+        private async Task<MonthlySummary> GetMonthlySummary(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
+        {
+            var query = BuildStockQuery(request)
+                .Where(x => x.CreateDate >= startOfMonth.StartOfDayUtc() && x.CreateDate < endOfMonth.EndOfDayUtc());
+
+            var summary = await query
+                .GroupBy(x => 1)
+                .Select(g => new MonthlySummary
+                {
+                    TotalTransactions = g.Count(),
+                    NewStockItems = g.Count(),
+                    TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
+                    PriceChanges = 0,
+                    TotalAvailableProducts = g.Count(x => x.Status == "Available")
+                })
+                .FirstOrDefaultAsync();
+
+            return summary ?? new MonthlySummary();
+        }
+
+        private async Task<List<WeeklyComparison>> GetWeeklyComparisons(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
+        {
+            var query = BuildStockQuery(request)
+                .Where(x => x.CreateDate >= startOfMonth.StartOfDayUtc() && x.CreateDate < endOfMonth.EndOfDayUtc());
+
+            var data = await query.ToListAsync();
+
+            var weeklyComparisons = data
+                .GroupBy(x => GetWeekOfYear(x.CreateDate))
+                .Select(g => new WeeklyComparison
+                {
+                    WeekNumber = g.Key,
+                    WeekStartDate = g.Min(x => x.CreateDate.Date),
+                    WeekEndDate = g.Max(x => x.CreateDate.Date).AddDays(6),
+                    TransactionCount = g.Count(),
+                    NewStockCount = g.Count(),
+                    TotalValue = g.Sum(x => x.ProductPrice * x.Qty)
+                })
+                .OrderBy(x => x.WeekNumber)
+                .ToList();
+
+            return weeklyComparisons;
+        }
+
+        private static int GetWeekOfYear(DateTime date)
+        {
+            var culture = System.Globalization.CultureInfo.CurrentCulture;
+            var calendar = culture.Calendar;
+            var dateTimeFormatInfo = culture.DateTimeFormat;
+            return calendar.GetWeekOfYear(date, dateTimeFormatInfo.CalendarWeekRule, dateTimeFormatInfo.FirstDayOfWeek);
+        }
+
+        #endregion
 
     }
 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using jewelry.Model.Stock.Product.Dashboard;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,5 +14,11 @@ namespace Jewelry.Service.Stock.Product
 
         Task<string> Update(jewelry.Model.Stock.Product.Update.Request request);
         IQueryable<jewelry.Model.Stock.Product.ListName.Response> ListName(jewelry.Model.Stock.Product.ListName.Request request);
+
+        // Dashboard APIs
+        Task<DashboardResponse> GetProductDashboard(DashboardRequest request);
+        Task<TodayReportResponse> GetTodayReport(DashboardRequest request);
+        Task<WeeklyReportResponse> GetWeeklyReport(DashboardRequest request);
+        Task<MonthlyReportResponse> GetMonthlyReport(DashboardRequest request);
     }
 }

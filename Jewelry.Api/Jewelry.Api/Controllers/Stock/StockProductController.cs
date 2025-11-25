@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.Mold;
 using jewelry.Model.Stock.Gem.Search;
+using jewelry.Model.Stock.Product.Dashboard;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
@@ -127,5 +128,78 @@ namespace Jewelry.Api.Controllers.Stock
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        #region Dashboard APIs
+
+        [Route("Dashboard")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DashboardResponse))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        public async Task<IActionResult> GetProductDashboard([FromBody] DashboardWrapperRequest request)
+        {
+            try
+            {
+                var response = await _service.GetProductDashboard(request.Dashboard);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("Dashboard/Today")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(TodayReportResponse))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetTodayReport([FromBody] DashboardWrapperRequest request)
+        {
+            try
+            {
+                var response = await _service.GetTodayReport(request.Dashboard);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("Dashboard/Weekly")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(WeeklyReportResponse))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetWeeklyReport([FromBody] DashboardWrapperRequest request)
+        {
+            try
+            {
+                var response = await _service.GetWeeklyReport(request.Dashboard);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("Dashboard/Monthly")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(MonthlyReportResponse))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetMonthlyReport([FromBody] DashboardWrapperRequest request)
+        {
+            try
+            {
+                var response = await _service.GetMonthlyReport(request.Dashboard);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        #endregion
     }
 }
