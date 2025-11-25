@@ -142,8 +142,8 @@ namespace Jewelry.Service.Production.Plan
                          .Include(x => x.Header.ProductionPlan.TbtProductionPlanPrice)
                          .Include(x => x.Header.ProductionPlan.ProductTypeNavigation)
                          .Include(x => x.Header.ProductionPlan.CustomerTypeNavigation)
-                         //.Include(x => x.Header.ProductionPlan.TbtProductionPlanStatusHeader
-                         //    .Where(h => h.IsActive == true))
+                             //.Include(x => x.Header.ProductionPlan.TbtProductionPlanStatusHeader
+                             //    .Where(h => h.IsActive == true))
 
                              // Left joins using navigation properties instead of manual joins
                          where statusDetail.IsActive == true
@@ -417,7 +417,7 @@ namespace Jewelry.Service.Production.Plan
         private async Task<List<TbtProductionPlan>> GetProductionPlans(int[] planIds)
         {
             var plans = await _jewelryContext.TbtProductionPlan
-                .Include(x => x.TbtProductionPlanStatusHeader)
+                .Include(x => x.TbtProductionPlanStatusHeader).ThenInclude(x => x.TbtProductionPlanStatusDetail)
                 .Include(x => x.ProductTypeNavigation)
                 .Include(x => x.TbtProductionPlanMaterial)
                 .Where(item => planIds.Contains(item.Id))
@@ -641,11 +641,16 @@ namespace Jewelry.Service.Production.Plan
             jewelry.Model.Production.Plan.Transfer.Request request,
             DateTime dateNow)
         {
+            bool isAddDataFormGold = true;
             var NewStatusDetail = new List<TbtProductionPlanStatusDetail>();
+            var formerStatusDetail = plan.TbtProductionPlanStatusHeader
+                                      .Where(x => x.Status == request.FormerStatus)
+                                      .SelectMany(x => x.TbtProductionPlanStatusDetail);
 
-            if (plansGoldCostItem.Any())
+            if (formerStatusDetail.Any())
             {
-                foreach (var item in plansGoldCostItem)
+                isAddDataFormGold = false;
+                foreach (var item in formerStatusDetail)
                 {
                     var detail = new TbtProductionPlanStatusDetail
                     {
@@ -655,10 +660,10 @@ namespace Jewelry.Service.Production.Plan
                         IsActive = true,
                         RequestDate = dateNow,
 
-                        Gold = item.GoldCode,
+                        Gold = item.Gold,
 
-                        GoldQtySend = item.ReturnQTY,
-                        GoldWeightSend = item.ReturnWeight,
+                        GoldQtySend = item.GoldQtyCheck ?? item.GoldQtySend,
+                        GoldWeightSend = item.GoldWeightCheck ?? item.GoldWeightSend,
 
                         GoldQtyCheck = null,
                         GoldWeightCheck = null,
@@ -672,11 +677,12 @@ namespace Jewelry.Service.Production.Plan
                     NewStatusDetail.Add(detail);
                 }
             }
-            else
+
+            if (isAddDataFormGold)
             {
-                if (plan.TbtProductionPlanMaterial.Any())
+                if (plansGoldCostItem.Any())
                 {
-                    foreach (var item in plan.TbtProductionPlanMaterial)
+                    foreach (var item in plansGoldCostItem)
                     {
                         var detail = new TbtProductionPlanStatusDetail
                         {
@@ -685,10 +691,11 @@ namespace Jewelry.Service.Production.Plan
                             ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{plan.Id}-{request.TargetStatus}"),
                             IsActive = true,
                             RequestDate = dateNow,
-                            Gold = item.Gold,
 
-                            GoldQtySend = item.GoldQty,
-                            GoldWeightSend = null,
+                            Gold = item.GoldCode,
+
+                            GoldQtySend = item.ReturnQTY,
+                            GoldWeightSend = item.ReturnWeight,
 
                             GoldQtyCheck = null,
                             GoldWeightCheck = null,
@@ -702,8 +709,39 @@ namespace Jewelry.Service.Production.Plan
                         NewStatusDetail.Add(detail);
                     }
                 }
-            }
+                else
+                {
+                    if (plan.TbtProductionPlanMaterial.Any())
+                    {
+                        foreach (var item in plan.TbtProductionPlanMaterial)
+                        {
+                            var detail = new TbtProductionPlanStatusDetail
+                            {
+                                //HeaderId = headerId,
+                                ProductionPlanId = plan.Id,
+                                ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{plan.Id}-{request.TargetStatus}"),
+                                IsActive = true,
+                                RequestDate = dateNow,
+                                Gold = item.Gold,
 
+                                GoldQtySend = item.GoldQty,
+                                GoldWeightSend = null,
+
+                                GoldQtyCheck = null,
+                                GoldWeightCheck = null,
+
+                                Worker = null,
+                                WorkerSub = null,
+                                Description = null,
+                                Wages = 0,
+                                TotalWages = 0
+                            };
+                            NewStatusDetail.Add(detail);
+                        }
+                    }
+                }
+            }
+          
 
             return NewStatusDetail;
         }
