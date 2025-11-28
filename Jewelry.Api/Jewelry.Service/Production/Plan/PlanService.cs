@@ -650,8 +650,20 @@ namespace Jewelry.Service.Production.Plan
             if (formerStatusDetail.Any())
             {
                 isAddDataFormGold = false;
+
+               
+
                 foreach (var item in formerStatusDetail)
                 {
+                    var GoldQtySend = item.GoldQtyCheck ?? item.GoldQtySend;
+                    var GoldWeightSend = item.GoldWeightCheck ?? item.GoldWeightSend;
+
+                    //ฝัง ไป ขัดชุบ
+                    if (request.FormerStatus == ProductionPlanStatus.Embedd && request.TargetStatus == ProductionPlanStatus.Plated)
+                    {
+                         GoldQtySend = item.GoldQtySend;
+                    }
+
                     var detail = new TbtProductionPlanStatusDetail
                     {
                         //HeaderId = headerId,
@@ -662,8 +674,8 @@ namespace Jewelry.Service.Production.Plan
 
                         Gold = item.Gold,
 
-                        GoldQtySend = item.GoldQtyCheck ?? item.GoldQtySend,
-                        GoldWeightSend = item.GoldWeightCheck ?? item.GoldWeightSend,
+                        GoldQtySend = GoldQtySend,
+                        GoldWeightSend = GoldWeightSend,
 
                         GoldQtyCheck = null,
                         GoldWeightCheck = null,
