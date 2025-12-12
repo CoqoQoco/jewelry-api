@@ -5,6 +5,7 @@ using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using NetTopologySuite.Index.HPRtree;
@@ -510,6 +511,50 @@ namespace Jewelry.Service.User
 
             return "success";
         }
+        #endregion
+
+
+        #region --- force reset password (Admin only) ---
+        public async Task<string> ForceResetPassword(jewelry.Model.User.ForceResetPassword.Request request)
+        {
+            CheckPermissionLevel("froce_password");
+
+            // 2. หา User ที่ต้องการเปลี่ยน Password
+            var targetUser = await _jewelryContext.TbtUser
+                .Where(x => x.Username == request.TargetUsername && x.IsActive)
+                .FirstOrDefaultAsync();
+
+            if (targetUser == null)
+            {
+                throw new KeyNotFoundException($"ไม่พบผู้ใช้งาน: {request.TargetUsername}");
+            }
+
+            // 3. Validate Password ใหม่
+            var (isValidPassword, errorPassword) = PasswordValidator.ValidatePassword(request.NewPassword);
+            if (!isValidPassword)
+            {
+                throw new HandleException(errorPassword);
+            }
+
+            // 4. Hash Password ใหม่
+            var (passwordHash, passwordSalt) = HashPassword(request.NewPassword);
+
+            // 5. Update Password
+            targetUser.Password = passwordHash;
+            targetUser.Salt = passwordSalt;
+            targetUser.UpdateBy = CurrentUsername;
+            targetUser.UpdateDate = DateTime.UtcNow;
+
+            // ถ้าต้องการให้ user เปลี่ยน password ในครั้งแรกที่ login
+            // targetUser.IsNew = true;
+
+            _jewelryContext.TbtUser.Update(targetUser);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"เปลี่ยน Password ของ {request.TargetUsername} สำเร็จ";
+        }
+
+       
         #endregion
     }
 }

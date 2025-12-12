@@ -17,5 +17,7 @@ namespace Jewelry.Service.User
 
         Task<string> Active(jewelry.Model.User.Active.Request request);
         Task<string> Inactive(jewelry.Model.User.Active.Request request);
+
+        Task<string> ForceResetPassword(jewelry.Model.User.ForceResetPassword.Request request);
     }
 }

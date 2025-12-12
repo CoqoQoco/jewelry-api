@@ -97,6 +97,17 @@ namespace Jewelry.Api.Controllers.User
             var response = await _service.Inactive(request);
             return Ok(response);
         }
+
+        [Route("ForceResetPassword")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ForceResetPassword([FromBody] jewelry.Model.User.ForceResetPassword.Request request)
+        {
+            var response = await _service.ForceResetPassword(request);
+            return Ok(response);
+        }
+
     }
 }
 

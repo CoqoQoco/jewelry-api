@@ -56,7 +56,8 @@ namespace Jewelry.Service.Base
                 ["edit_user"] = new[] { "Admin", "Dev" },
                 ["delete_user"] = new[] { "Admin", "Dev" },
                 ["update_stock"] = new[] { "Dev" },
-                ["update_plan"] = new[] { "UpdatePlan"}
+                ["update_plan"] = new[] { "UpdatePlan"},
+                ["froce_password"] = new[] { "Dev" }
             };
 
             // ตรวจสอบว่ามี topic นั้นใน map หรือไม่
