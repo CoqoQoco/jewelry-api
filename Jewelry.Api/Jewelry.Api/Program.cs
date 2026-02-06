@@ -18,73 +18,92 @@ builder.Services.AddControllers()
         options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore
     );
 
-// JWT Configuration
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
+// JWT Configuration - with null check
+var jwtKey = builder.Configuration["JwtSettings:Key"];
+var jwtIssuer = builder.Configuration["JwtSettings:Issuer"];
+var jwtAudience = builder.Configuration["JwtSettings:Audience"];
+
+if (!string.IsNullOrEmpty(jwtKey))
+{
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
-            ValidAudience = builder.Configuration["JwtSettings:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]!)
-            )
-        };
-
-        // เพิ่ม Events สำหรับตรวจสอบ user status
-        options.Events = new JwtBearerEvents
-        {
-            OnTokenValidated = async context =>
+            options.TokenValidationParameters = new TokenValidationParameters
             {
-                var dbContext = context.HttpContext.RequestServices
-                    .GetRequiredService<JewelryContext>();
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtIssuer,
+                ValidAudience = jwtAudience,
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(jwtKey)
+                )
+            };
 
-                // ดึง user id จาก token claims
-                var userId = int.Parse(context.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-                var username = context.Principal.FindFirst(ClaimTypes.Name)?.Value;
-
-                // ตรวจสอบ user status จาก database
-                var user = await dbContext.TbtUser
-                    .FirstOrDefaultAsync(u => u.Id == userId && u.Username == username);
-
-                if (user == null || !user.IsActive || user.IsNew)
+            // เพิ่ม Events สำหรับตรวจสอบ user status
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
                 {
-                    context.Fail("User is inactive or not found");
-                    return;
+                    var dbContext = context.HttpContext.RequestServices
+                        .GetRequiredService<JewelryContext>();
+
+                    // ดึง user id จาก token claims
+                    var userIdClaim = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    var username = context.Principal?.FindFirst(ClaimTypes.Name)?.Value;
+
+                    if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+                    {
+                        context.Fail("Invalid user claims");
+                        return;
+                    }
+
+                    // ตรวจสอบ user status จาก database
+                    var user = await dbContext.TbtUser
+                        .FirstOrDefaultAsync(u => u.Id == userId && u.Username == username);
+
+                    if (user == null || !user.IsActive || user.IsNew)
+                    {
+                        context.Fail("User is inactive or not found");
+                        return;
+                    }
+                },
+
+                OnAuthenticationFailed = context =>
+                {
+                    if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
+                    {
+                        context.Response.Headers.Append("Token-Expired", "true");
+                    }
+                    return Task.CompletedTask;
+                },
+
+                OnChallenge = context =>
+                {
+                    context.HandleResponse(); // ป้องกัน default response
+
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.Response.ContentType = "application/json";
+
+                    var response = JsonConvert.SerializeObject(new
+                    {
+                        status = 401,
+                        message = "You are not authorized",
+                        error = context.ErrorDescription
+                    });
+
+                    return context.Response.WriteAsync(response);
                 }
-            },
-
-            OnAuthenticationFailed = context =>
-            {
-                if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
-                {
-                    context.Response.Headers.Add("Token-Expired", "true");
-                }
-                return Task.CompletedTask;
-            },
-
-            OnChallenge = context =>
-            {
-                context.HandleResponse(); // ป้องกัน default response
-
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                context.Response.ContentType = "application/json";
-
-                var response = JsonConvert.SerializeObject(new
-                {
-                    status = 401,
-                    message = "You are not authorized",
-                    error = context.ErrorDescription
-                });
-
-                return context.Response.WriteAsync(response);
-            }
-        };
-    });
+            };
+        });
+}
+else
+{
+    // Add dummy authentication for startup without JWT config
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer();
+}
 
 // CORS
 builder.Services.AddCors(c =>
@@ -100,8 +119,6 @@ builder.Services.AddCors(c =>
         .AllowCredentials()
     );
 });
-
-//test
 
 // Learn more about configuring Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -147,11 +164,9 @@ var app = builder.Build();
 app.UseMiddleware<AuthenticationMiddleware>();
 app.UseExceptionMiddleware();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Enable Swagger for all environments (for debugging on Azure)
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAnyOrigin");
@@ -159,20 +174,56 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Health check endpoint
-app.MapGet("/", () => "Welcome to Jewelry API!")
-   .WithName("Home")
-   .WithOpenApi();
+// Health check endpoint - shows config status
+app.MapGet("/", () => 
+{
+    var configStatus = new
+    {
+        message = "Welcome to Jewelry API!",
+        environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Unknown",
+        jwtConfigured = !string.IsNullOrEmpty(jwtKey),
+        timestamp = DateTime.UtcNow
+    };
+    return Results.Json(configStatus);
+})
+.WithName("Home")
+.WithOpenApi();
+
+// Config check endpoint
+app.MapGet("/config-check", () =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    return Results.Json(new
+    {
+        jwtKeyConfigured = !string.IsNullOrEmpty(jwtKey),
+        jwtIssuer = jwtIssuer ?? "NOT SET",
+        jwtAudience = jwtAudience ?? "NOT SET",
+        connectionStringConfigured = !string.IsNullOrEmpty(connectionString),
+        connectionStringPreview = !string.IsNullOrEmpty(connectionString) 
+            ? connectionString.Substring(0, Math.Min(50, connectionString.Length)) + "..." 
+            : "NOT SET",
+        environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"
+    });
+})
+.WithName("ConfigCheck")
+.WithOpenApi();
 
 //Check service/db connection
 app.MapGet("/network-status", async context =>
 {
     var loggerFactory = context.RequestServices.GetService<ILoggerFactory>();
-    var log = loggerFactory.CreateLogger("network-status");
+    var log = loggerFactory?.CreateLogger("network-status");
     await context.Response.WriteAsync("STATUS CHECK" + Environment.NewLine);
 
-    var (canConnectJewelryContext, error) = await CheckConnections.CheckNpgsqlDatabase(app.Configuration.GetConnectionString("DefaultConnection"), log);
-    await context.Response.WriteAsync($"JewelryContext {Environment.NewLine}{app.Configuration.GetConnectionString("DefaultDatabase")} {Environment.NewLine}" +
+    var connectionString = app.Configuration.GetConnectionString("DefaultConnection");
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        await context.Response.WriteAsync("ERROR: DefaultConnection is not configured!" + Environment.NewLine);
+        return;
+    }
+
+    var (canConnectJewelryContext, error) = await CheckConnections.CheckNpgsqlDatabase(connectionString, log);
+    await context.Response.WriteAsync($"JewelryContext {Environment.NewLine}" +
         $"{(canConnectJewelryContext ? "Success" : $"Fail >>>> {error}")}{Environment.NewLine}");
 });
 
