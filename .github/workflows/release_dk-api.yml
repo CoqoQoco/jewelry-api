@@ -1,4 +1,7 @@
-name: Build and deploy ASP.Net Core app to Azure Web App - dk-api
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy container app to Azure Web App - dk-api
 
 on:
   push:
@@ -10,56 +13,41 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: read #This is required for actions/checkout
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up .NET Core
-        uses: actions/setup-dotnet@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to container registry
+        uses: docker/login-action@v2
         with:
-          dotnet-version: '8.x'
+          registry: ghcr.io/
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D7882A633D3F4F089BDA38BD1E418604 }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_AE1A54532E244564858BEBBF70090CCB }}
 
-      - name: Restore dependencies
-        run: dotnet restore ./Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj
-
-      - name: Build
-        run: dotnet build ./Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj --configuration Release --no-restore
-
-      - name: Publish
-        run: dotnet publish ./Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj --configuration Release --no-build --output ${{github.workspace}}/publish
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v3
         with:
-          name: dotnet-app
-          path: ${{github.workspace}}/publish
+          context: .
+          push: true
+          tags: ghcr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D7882A633D3F4F089BDA38BD1E418604 }}/coqoqoco/dk-api@sha256:${{ github.sha }}
+          file: ./Dockerfile
 
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
+    
     needs: build
-
+    
     steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: dotnet-app
-
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_18B23D72127B453EBAD17847B796831C }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_06D24872B2A24379A8389832322D667E }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_CEE629B50CCE4440A73102694A467952 }}
-
+      
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
+        uses: azure/webapps-deploy@v2
         with:
           app-name: 'dk-api'
           slot-name: 'Production'
-          package: .
+          images: 'ghcr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D7882A633D3F4F089BDA38BD1E418604 }}/coqoqoco/dk-api@sha256:${{ github.sha }}'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_95E49DCE177B4C7B8CCEDD8218094A7C }}
