@@ -51,3 +51,8 @@ jobs:
       - name: Output image info
         run: |
           echo "Image pushed: ${{ env.REGISTRY }}/${{ steps.string.outputs.owner }}/${{ env.IMAGE_NAME }}:latest"
+
+      - name: Trigger Azure Web App to pull new image
+        run: |
+          curl -X POST "${{ secrets.AZURE_WEBHOOK_URL }}" -H "Content-Length: 0"
+          echo "Webhook triggered successfully"
