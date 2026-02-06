@@ -5,11 +5,15 @@ on:
     branches: [release]
   workflow_dispatch:
 
+# env:
+#   CONTAINER_APP_NAME: 'dk-api'
+#   RESOURCE_GROUP: 'dk-jewelry'
+#   REGISTRY: ghcr.io
+#   IMAGE_NAME: coqoqoco/dk-api
 env:
-  CONTAINER_APP_NAME: 'dk-api'
-  RESOURCE_GROUP: 'dk-jewelry'
-  REGISTRY: ghcr.io
-  IMAGE_NAME: coqoqoco/dk-api
+  AZURE_WEBAPP_NAME: 'dk-api'            # ⚠️ เปลี่ยนเป็นชื่อ App Service ของคุณ
+  REGISTRY: ghcr.io                      # GitHub Container Registry
+  IMAGE_NAME: coqoqoco/dk-api  # ชื่อ image ต้องเป็น lowercase ทั้งหมด
 
 jobs:
   build-and-deploy:
