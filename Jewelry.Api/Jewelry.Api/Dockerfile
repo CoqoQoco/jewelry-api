@@ -62,7 +62,6 @@ RUN mkdir -p /app/Images/Mold && \
 USER app
 
 # Set environment variables
-ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-ENTRYPOINT ["dotnet", "Jewelry.Api.dll"]
+ENTRYPOINT ["dotnet", "Jewelry.Api.dll"]ENTRYPOINT ["dotnet", "Jewelry.Api.dll"]
