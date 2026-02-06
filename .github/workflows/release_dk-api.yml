@@ -1,7 +1,6 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
+# Build and deploy Docker container to Azure Web App
 
-name: Build and deploy ASP.Net Core app to Azure Web App - dk-api
+name: Build and deploy container to Azure Web App - dk-api
 
 on:
   push:
@@ -9,8 +8,12 @@ on:
       - release
   workflow_dispatch:
 
+env:
+  AZURE_WEBAPP_NAME: dk-api
+  IMAGE_NAME: dk-api
+
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,54 +25,37 @@ jobs:
         run: |
           echo "=== Repository root ==="
           ls -la
-          echo "=== Looking for .csproj files ==="
-          find . -name "*.csproj" -type f
+          echo "=== Jewelry.Api folder ==="
+          ls -la Jewelry.Api/ || echo "Jewelry.Api folder not found"
 
-      - name: Set up .NET Core
-        uses: actions/setup-dotnet@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          dotnet-version: '8.x'
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build with dotnet
-        run: dotnet build Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj --configuration Release
-
-      - name: dotnet publish
-        run: dotnet publish Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj -c Release -o ./publish
-
-      - name: List published files
-        run: |
-          echo "=== Published files ==="
-          ls -la ./publish
-          echo "=== Check for Jewelry.Api.dll ==="
-          find ./publish -name "*.dll" | head -20
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
-          name: .net-app
-          path: ./publish
+          context: .
+          file: ./Jewelry.Api/Jewelry.Api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-and-push
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: .net-app
-          path: ./myapp
-      
-      - name: List downloaded files
-        run: |
-          echo "=== Downloaded artifact files ==="
-          ls -la ./myapp
-          echo "=== Check for Jewelry.Api.dll ==="
-          find ./myapp -name "*.dll" | head -10
-
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -78,9 +64,8 @@ jobs:
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_5CD98B076FA049A3A784E44EEC2148BD }}
 
       - name: Deploy to Azure Web App
-        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'dk-api'
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
           slot-name: 'Production'
-          package: ./myapp
+          images: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}

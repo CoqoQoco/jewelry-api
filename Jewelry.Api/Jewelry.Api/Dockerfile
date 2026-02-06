@@ -11,8 +11,7 @@ RUN mkdir -p /app/Images/Mold && \
     chmod -R 755 /app/Images
 
 # แก้ไข port exposure - ใช้ standard ports
-EXPOSE 80
-EXPOSE 443
+EXPOSE 8080
 
 # เปลี่ยนกลับเป็น app user
 USER app
@@ -22,21 +21,22 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Copy project files
-COPY ["Jewelry.Api/Jewelry.Api.csproj", "Jewelry.Api/"]
-COPY ["DynamicLinqCore/DynamicLinqCore.csproj", "DynamicLinqCore/"]
-COPY ["jewelry.Model/jewelry.Model.csproj", "jewelry.Model/"]
-COPY ["Jewelry.Service/Jewelry.Service.csproj", "Jewelry.Service/"]
-COPY ["Jewelry.Data/Jewelry.Data.csproj", "Jewelry.Data/"]
+# Copy project files - adjusted for repository structure
+# Repository root is jewelry-api, projects are in Jewelry.Api folder
+COPY ["Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj", "Jewelry.Api/"]
+COPY ["Jewelry.Api/DynamicLinqCore/DynamicLinqCore.csproj", "DynamicLinqCore/"]
+COPY ["Jewelry.Api/jewelry.Model/jewelry.Model.csproj", "jewelry.Model/"]
+COPY ["Jewelry.Api/Jewelry.Service/Jewelry.Service.csproj", "Jewelry.Service/"]
+COPY ["Jewelry.Api/Jewelry.Data/Jewelry.Data.csproj", "Jewelry.Data/"]
 
 # Restore dependencies
 RUN dotnet restore "Jewelry.Api/Jewelry.Api.csproj"
 
-# Copy source code
-COPY . .
-WORKDIR "/src/Jewelry.Api"
+# Copy all source code
+COPY ["Jewelry.Api/", "."]
 
 # Build project
+WORKDIR "/src/Jewelry.Api"
 RUN dotnet build "Jewelry.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 # This stage is used to publish the service project to be copied to the final stage
@@ -60,5 +60,9 @@ RUN mkdir -p /app/Images/Mold && \
 
 # เปลี่ยนกลับเป็น app user
 USER app
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
 
 ENTRYPOINT ["dotnet", "Jewelry.Api.dll"]
