@@ -5,15 +5,10 @@ on:
     branches: [release]
   workflow_dispatch:
 
-# env:
-#   CONTAINER_APP_NAME: 'dk-api'
-#   RESOURCE_GROUP: 'dk-jewelry'
-#   REGISTRY: ghcr.io
-#   IMAGE_NAME: coqoqoco/dk-api
 env:
-  AZURE_WEBAPP_NAME: 'dk-api'            # ⚠️ เปลี่ยนเป็นชื่อ App Service ของคุณ
-  REGISTRY: ghcr.io                      # GitHub Container Registry
-  IMAGE_NAME: coqoqoco/dk-api  # ชื่อ image ต้องเป็น lowercase ทั้งหมด
+  AZURE_WEBAPP_NAME: 'dk-api'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: coqoqoco/dk-api
 
 jobs:
   build-and-deploy:
@@ -23,11 +18,9 @@ jobs:
       packages: write
 
     steps:
-      # Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Login to GitHub Container Registry
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -35,35 +28,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract metadata for Docker
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # ใช้ชื่อ branch เป็น Tag
             type=ref,event=branch
-            # ใช้ SHA commit แบบสั้น เป็น Tag
             type=sha,format=short
 
-      # Build and push Docker image
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Jewelry.Api/Jewelry.Api/Dockerfile
           push: true
-          # ใช้ tags ทั้งหมดที่ metadata สร้างไว้
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # Deploy to Azure Web App
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          # ⬇️ แก้ไข: ลบ @sha256: ออก เพื่อป้องกันการซ้ำซ้อน
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
