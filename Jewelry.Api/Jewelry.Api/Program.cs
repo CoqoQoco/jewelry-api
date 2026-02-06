@@ -102,19 +102,31 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         }
     });
 
-// CORS
+// CORS - Update for production
 builder.Services.AddCors(c =>
 {
     c.AddPolicy("AllowAnyOrigin", options =>
-        options.WithOrigins(
-            "http://localhost:7000",
-            "https://localhost:7001",
-            "http://localhost:5173"
-        )
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials()
-    );
+    {
+        var isProduction = builder.Environment.IsProduction();
+        if (isProduction)
+        {
+            // In production, allow all origins (or configure specific ones)
+            options.AllowAnyOrigin()
+                   .AllowAnyMethod()
+                   .AllowAnyHeader();
+        }
+        else
+        {
+            options.WithOrigins(
+                "http://localhost:7000",
+                "https://localhost:7001",
+                "http://localhost:5173"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+        }
+    });
 });
 
 // Learn more about configuring Swagger/OpenAPI
@@ -165,7 +177,12 @@ app.UseExceptionMiddleware();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
+// Remove HTTPS redirection in production (container environment)
+if (!app.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseCors("AllowAnyOrigin");
 app.UseAuthentication();
 app.UseAuthorization();
