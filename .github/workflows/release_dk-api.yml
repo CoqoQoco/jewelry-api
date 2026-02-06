@@ -7,7 +7,7 @@ on:
 
 env:
   CONTAINER_APP_NAME: 'dk-api'
-  RESOURCE_GROUP: 'gem-production'        # ⚠️ แก้ตามของจริง
+  RESOURCE_GROUP: 'dk-jewelry'
   REGISTRY: ghcr.io
   IMAGE_NAME: coqoqoco/dk-api
 
@@ -51,6 +51,11 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Register Azure providers (if needed)
+        run: |
+          az provider register -n Microsoft.App --wait || echo "Already registered"
+          az provider register -n Microsoft.OperationalInsights --wait || echo "Already registered"
 
       - name: Deploy to Container Apps
         uses: azure/container-apps-deploy-action@v1
