@@ -52,11 +52,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Register Azure providers (if needed)
-        run: |
-          az provider register -n Microsoft.App --wait || echo "Already registered"
-          az provider register -n Microsoft.OperationalInsights --wait || echo "Already registered"
-
       - name: Deploy to Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
@@ -74,9 +69,9 @@ jobs:
           echo "🚀 App URL: https://$URL"
           echo "url=https://$URL" >> $GITHUB_OUTPUT
 
-      - name: Health Check
-        run: |
-          URL="${{ steps.get-url.outputs.url }}"
-          echo "Waiting for app to be ready..."
-          sleep 30
-          curl -f "$URL" || echo "⚠️ Health check failed"
+      # - name: Health Check
+      #   run: |
+      #     URL="${{ steps.get-url.outputs.url }}"
+      #     echo "Waiting for app to be ready..."
+      #     sleep 30
+      #     curl -f "$URL" || echo "⚠️ Health check failed"
