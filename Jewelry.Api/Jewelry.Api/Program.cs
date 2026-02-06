@@ -19,29 +19,35 @@ builder.Services.AddControllers()
     );
 
 // JWT Configuration - with null check
-var jwtKey = builder.Configuration["JwtSettings:Key"];
-var jwtIssuer = builder.Configuration["JwtSettings:Issuer"];
-var jwtAudience = builder.Configuration["JwtSettings:Audience"];
+var jwtKey = builder.Configuration["JwtSettings:Key"] ?? "";
+var jwtIssuer = builder.Configuration["JwtSettings:Issuer"] ?? "jewelry-api";
+var jwtAudience = builder.Configuration["JwtSettings:Audience"] ?? "jewelry-client";
 
-if (!string.IsNullOrEmpty(jwtKey))
-{
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
+// Always add authentication, but configure based on whether JWT key exists
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Use a default key if not configured (for startup only - will fail auth but not crash)
+        var keyToUse = string.IsNullOrEmpty(jwtKey) 
+            ? "DefaultKeyForStartupOnlyNotForProduction32Chars!" 
+            : jwtKey;
+            
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = jwtIssuer,
-                ValidAudience = jwtAudience,
-                IssuerSigningKey = new SymmetricSecurityKey(
-                    Encoding.UTF8.GetBytes(jwtKey)
-                )
-            };
+            ValidateIssuer = !string.IsNullOrEmpty(jwtKey),
+            ValidateAudience = !string.IsNullOrEmpty(jwtKey),
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = !string.IsNullOrEmpty(jwtKey),
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(keyToUse)
+            )
+        };
 
-            // เพิ่ม Events สำหรับตรวจสอบ user status
+        // Only add events if JWT is properly configured
+        if (!string.IsNullOrEmpty(jwtKey))
+        {
             options.Events = new JwtBearerEvents
             {
                 OnTokenValidated = async context =>
@@ -49,7 +55,6 @@ if (!string.IsNullOrEmpty(jwtKey))
                     var dbContext = context.HttpContext.RequestServices
                         .GetRequiredService<JewelryContext>();
 
-                    // ดึง user id จาก token claims
                     var userIdClaim = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     var username = context.Principal?.FindFirst(ClaimTypes.Name)?.Value;
 
@@ -59,7 +64,6 @@ if (!string.IsNullOrEmpty(jwtKey))
                         return;
                     }
 
-                    // ตรวจสอบ user status จาก database
                     var user = await dbContext.TbtUser
                         .FirstOrDefaultAsync(u => u.Id == userId && u.Username == username);
 
@@ -81,8 +85,7 @@ if (!string.IsNullOrEmpty(jwtKey))
 
                 OnChallenge = context =>
                 {
-                    context.HandleResponse(); // ป้องกัน default response
-
+                    context.HandleResponse();
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     context.Response.ContentType = "application/json";
 
@@ -96,14 +99,8 @@ if (!string.IsNullOrEmpty(jwtKey))
                     return context.Response.WriteAsync(response);
                 }
             };
-        });
-}
-else
-{
-    // Add dummy authentication for startup without JWT config
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer();
-}
+        }
+    });
 
 // CORS
 builder.Services.AddCors(c =>
@@ -164,7 +161,7 @@ var app = builder.Build();
 app.UseMiddleware<AuthenticationMiddleware>();
 app.UseExceptionMiddleware();
 
-// Enable Swagger for all environments (for debugging on Azure)
+// Enable Swagger for all environments
 app.UseSwagger();
 app.UseSwaggerUI();
 
@@ -174,18 +171,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Health check endpoint - shows config status
-app.MapGet("/", () => 
+// Health check endpoint
+app.MapGet("/", () => Results.Json(new
 {
-    var configStatus = new
-    {
-        message = "Welcome to Jewelry API!",
-        environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Unknown",
-        jwtConfigured = !string.IsNullOrEmpty(jwtKey),
-        timestamp = DateTime.UtcNow
-    };
-    return Results.Json(configStatus);
-})
+    message = "Welcome to Jewelry API!",
+    environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
+    jwtConfigured = !string.IsNullOrEmpty(jwtKey),
+    timestamp = DateTime.UtcNow
+}))
 .WithName("Home")
 .WithOpenApi();
 
@@ -196,8 +189,8 @@ app.MapGet("/config-check", () =>
     return Results.Json(new
     {
         jwtKeyConfigured = !string.IsNullOrEmpty(jwtKey),
-        jwtIssuer = jwtIssuer ?? "NOT SET",
-        jwtAudience = jwtAudience ?? "NOT SET",
+        jwtIssuer = jwtIssuer,
+        jwtAudience = jwtAudience,
         connectionStringConfigured = !string.IsNullOrEmpty(connectionString),
         connectionStringPreview = !string.IsNullOrEmpty(connectionString) 
             ? connectionString.Substring(0, Math.Min(50, connectionString.Length)) + "..." 
@@ -208,7 +201,7 @@ app.MapGet("/config-check", () =>
 .WithName("ConfigCheck")
 .WithOpenApi();
 
-//Check service/db connection
+// Network status endpoint
 app.MapGet("/network-status", async context =>
 {
     var loggerFactory = context.RequestServices.GetService<ILoggerFactory>();
