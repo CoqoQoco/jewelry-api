@@ -64,4 +64,4 @@ USER app
 # Set environment variables
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-ENTRYPOINT ["dotnet", "Jewelry.Api.dll"]ENTRYPOINT ["dotnet", "Jewelry.Api.dll"]
+ENTRYPOINT ["dotnet", "Jewelry.Api.dll"]
