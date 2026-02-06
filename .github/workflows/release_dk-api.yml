@@ -38,9 +38,6 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     needs: build
 
     steps:
@@ -49,17 +46,10 @@ jobs:
         with:
           name: dotnet-app
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_18B23D72127B453EBAD17847B796831C }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_06D24872B2A24379A8389832322D667E }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_CEE629B50CCE4440A73102694A467952 }}
-
       - name: Deploy to Azure Web App
-        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'dk-api'
           slot-name: 'Production'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
