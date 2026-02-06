@@ -29,8 +29,8 @@ namespace Jewelry.Api.Extension
         {
             var SQLServerConnectionString = configuration["ConnectionStrings:DefaultConnection"];
 
-            if (string.IsNullOrEmpty(SQLServerConnectionString))
-                throw new ArgumentNullException(nameof(SQLServerConnectionString));
+            //if (string.IsNullOrEmpty(SQLServerConnectionString))
+            //    throw new ArgumentNullException(nameof(SQLServerConnectionString));
 
             //Register DB
             services.AddDbContext<JewelryContext>(options =>
