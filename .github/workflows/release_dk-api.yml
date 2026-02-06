@@ -54,7 +54,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # Deploy to Azure Web App
+      # Deploy to Azure Web App using publish profile
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
