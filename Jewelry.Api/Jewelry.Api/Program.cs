@@ -188,7 +188,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Health check endpoint
+// Health check endpoint for Azure App Service
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+    .WithName("HealthCheck")
+    .AllowAnonymous();
+
+// Home endpoint
 app.MapGet("/", () => Results.Json(new
 {
     message = "Welcome to Jewelry API!",
