@@ -1,15 +1,13 @@
-# Deploy Docker Container to Azure App Service
-
-name: Build and deploy container to Azure Web App - dk-api
+﻿name: Deploy to Azure Container Apps
 
 on:
   push:
-    branches:
-      - release
+    branches: [release]
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: 'dk-api'
+  CONTAINER_APP_NAME: 'dk-api'
+  RESOURCE_GROUP: 'gem-production'        # ⚠️ แก้ตามของจริง
   REGISTRY: ghcr.io
   IMAGE_NAME: coqoqoco/dk-api
 
@@ -19,45 +17,61 @@ jobs:
     permissions:
       contents: read
       packages: write
-
+    
     steps:
-      # Checkout code
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # Login to GitHub Container Registry
-      - name: Log in to GitHub Container Registry
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract metadata for Docker
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=sha,format=short
-
-      # Build and push Docker image
-      - name: Build and push Docker image
-        id: build
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Jewelry.Api/Jewelry.Api/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # Deploy to Azure Web App
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          containerAppName: ${{ env.CONTAINER_APP_NAME }}
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          imageToDeploy: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          
+      - name: Get URL
+        id: get-url
+        run: |
+          URL=$(az containerapp show \
+            -n ${{ env.CONTAINER_APP_NAME }} \
+            -g ${{ env.RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "🚀 App URL: https://$URL"
+          echo "url=https://$URL" >> $GITHUB_OUTPUT
+
+      - name: Health Check
+        run: |
+          URL="${{ steps.get-url.outputs.url }}"
+          echo "Waiting for app to be ready..."
+          sleep 30
+          curl -f "$URL" || echo "⚠️ Health check failed"
