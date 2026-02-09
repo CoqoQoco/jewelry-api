@@ -106,6 +106,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleQuotation> TbtSaleQuotation { get; set; }
 
+    public virtual DbSet<TbtStockCostVersion> TbtStockCostVersion { get; set; }
+
     public virtual DbSet<TbtStockGem> TbtStockGem { get; set; }
 
     public virtual DbSet<TbtStockGemTransection> TbtStockGemTransection { get; set; }
@@ -2163,6 +2165,54 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
+        modelBuilder.Entity<TbtStockCostVersion>(entity =>
+        {
+            entity.HasKey(e => new { e.Running, e.StockNumber }).HasName("tbt_stock_cost_version_pk");
+
+            entity.ToTable("tbt_stock_cost_version");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CustomerAddress)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_address");
+            entity.Property(e => e.CustomerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_code");
+            entity.Property(e => e.CustomerEmail)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_email");
+            entity.Property(e => e.CustomerName)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_name");
+            entity.Property(e => e.CustomerTel)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_tel");
+            entity.Property(e => e.ProductCostDetail)
+                .HasColumnType("jsonb")
+                .HasColumnName("product_cost_detail");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.StockNumberNavigation).WithMany(p => p.TbtStockCostVersion)
+                .HasForeignKey(d => d.StockNumber)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_cost_version_fk");
+        });
+
         modelBuilder.Entity<TbtStockGem>(entity =>
         {
             entity.HasKey(e => new { e.Id, e.Code }).HasName("tbt_stock_gem_pk");
@@ -2372,6 +2422,10 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("product_code");
             entity.Property(e => e.ProductCost).HasColumnName("product_cost");
+            entity.Property(e => e.ProductCostDetail)
+                .HasComment("ต้นทุนสินค้า")
+                .HasColumnType("jsonb")
+                .HasColumnName("product_cost_detail");
             entity.Property(e => e.ProductNameEn)
                 .HasColumnType("character varying")
                 .HasColumnName("product_name_en");

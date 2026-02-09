@@ -11,9 +11,12 @@ namespace Jewelry.Service.Stock.Product
     {
         IQueryable<jewelry.Model.Stock.Product.List.Response> List(jewelry.Model.Stock.Product.List.Search request);
         Task<jewelry.Model.Stock.Product.Get.Response> Get(jewelry.Model.Stock.Product.Get.Request request);
-
+        IQueryable<jewelry.Model.Stock.Product.List.PriceTransection> GetStockCostDetail(string stockNumber);
         Task<string> Update(jewelry.Model.Stock.Product.Update.Request request);
         IQueryable<jewelry.Model.Stock.Product.ListName.Response> ListName(jewelry.Model.Stock.Product.ListName.Request request);
+
+        Task<string> AddProductCostDeatialVersion(jewelry.Model.Stock.Product.AddProductCost.Request request);
+        IQueryable<jewelry.Model.Stock.Product.ListProductCost.Response> GetProductCostDetailVersion(string stockNumber);
 
         // Dashboard APIs
         Task<DashboardResponse> GetProductDashboard(DashboardRequest request);

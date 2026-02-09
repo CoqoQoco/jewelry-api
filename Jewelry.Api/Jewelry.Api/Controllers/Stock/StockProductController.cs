@@ -56,7 +56,7 @@ namespace Jewelry.Api.Controllers.Stock
 
         [Route("Get")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.Get.Response>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Stock.Product.Get.Response))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
         public async Task<IActionResult> Get([FromBody] jewelry.Model.Stock.Product.Get.Request request)
@@ -64,6 +64,25 @@ namespace Jewelry.Api.Controllers.Stock
             try
             {
                 var response = await _service.Get(request);
+                return Ok(response);
+
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GetStockCostDetail")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.List.PriceTransection>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public  IActionResult GetStockCostDetail(string stockNumber)
+        {
+            try
+            {
+                var response =  _service.GetStockCostDetail(stockNumber);
                 return Ok(response);
 
             }
@@ -84,6 +103,43 @@ namespace Jewelry.Api.Controllers.Stock
             try
             {
                 var response = await _service.Update(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("AddProductCostDeatialVersion")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> AddProductCostDeatialVersion([FromBody] jewelry.Model.Stock.Product.AddProductCost.Request request)
+        {
+            try
+            {
+                var response = await _service.AddProductCostDeatialVersion(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
+        [Route("GetProductCostDetailVersion")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Stock.Product.ListProductCost.Response))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult GetProductCostDetailVersion(string stockNumber)
+        {
+            try
+            {
+                var response = _service.GetProductCostDetailVersion(stockNumber);
                 return Ok(response);
             }
             catch (HandleException ex)

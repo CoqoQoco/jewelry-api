@@ -96,5 +96,12 @@ public partial class TbtStockProduct
 
     public decimal? QtyRemaining { get; set; }
 
+    /// <summary>
+    /// ต้นทุนสินค้า
+    /// </summary>
+    public string? ProductCostDetail { get; set; }
+
+    public virtual ICollection<TbtStockCostVersion> TbtStockCostVersion { get; set; } = new List<TbtStockCostVersion>();
+
     public virtual ICollection<TbtStockProductMaterial> TbtStockProductMaterial { get; set; } = new List<TbtStockProductMaterial>();
 }

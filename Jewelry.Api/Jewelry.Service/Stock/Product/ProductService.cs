@@ -8,6 +8,7 @@ using Jewelry.Service.ProductionPlan;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.Identity.Client;
 using NetTopologySuite.Index.HPRtree;
 using NPOI.SS.Formula.Atp;
@@ -17,6 +18,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Transactions;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
@@ -46,6 +48,11 @@ namespace Jewelry.Service.Stock.Product
 
         public IQueryable<jewelry.Model.Stock.Product.List.Response> List(jewelry.Model.Stock.Product.List.Search request)
         {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
             var stock = (from item in _jewelryContext.TbtStockProduct
                          .Include(x => x.TbtStockProductMaterial)
                          where item.Status == "Available"
@@ -159,11 +166,39 @@ namespace Jewelry.Service.Stock.Product
                                                  Region = material.Region,
                                                  Price = material.Price
                                              }).ToList()
-                                             : new List<jewelry.Model.Stock.Product.List.Material>()
+                                             : new List<jewelry.Model.Stock.Product.List.Material>(),
+
+                               //PriceTransection = item.ProductCostDetail != null && !string.IsNullOrEmpty(item.ProductCostDetail) ?  JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.List.PriceTransection>>(item.ProductCostDetail, options) : null
                            };
 
             return response;
         }
+        public IQueryable<jewelry.Model.Stock.Product.List.PriceTransection> GetStockCostDetail(string stockNumber)
+        {
+
+            var stock = (from item in _jewelryContext.TbtStockProduct
+                         .Include(x => x.TbtStockProductMaterial)
+                         where item.StockNumber == stockNumber
+                         select item).FirstOrDefault();
+
+            if (stock == null)
+            {
+                return new List<jewelry.Model.Stock.Product.List.PriceTransection>().AsQueryable();
+            }
+
+            if (stock.ProductCostDetail == null || string.IsNullOrEmpty(stock.ProductCostDetail))
+            {
+                return new List<jewelry.Model.Stock.Product.List.PriceTransection>().AsQueryable();
+            }
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            return JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.List.PriceTransection>>(stock.ProductCostDetail, options)!.AsQueryable();
+        }
+
         public async Task<jewelry.Model.Stock.Product.Get.Response> Get(jewelry.Model.Stock.Product.Get.Request request)
         {
             if (string.IsNullOrEmpty(request.StockNumber)
@@ -244,11 +279,23 @@ namespace Jewelry.Service.Stock.Product
                                  Size = material.Size,
                                  Region = material.Region,
                                  Price = material.Price
-                             }).ToList()
+                             }).ToList(),
+
             };
 
 
-            if (!string.IsNullOrEmpty(response.Wo) && response.WoNumber.HasValue)
+            //get stock cost detail
+            if (stock.ProductCostDetail != null)
+            {
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                response.PriceTransactions = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.Get.PriceTransaction>>(stock.ProductCostDetail, options) ?? new List<jewelry.Model.Stock.Product.Get.PriceTransaction>();
+            }
+
+            //get plan cost detail
+            if (!string.IsNullOrEmpty(response.Wo) && response.WoNumber.HasValue && !response.PriceTransactions.Any())
             {
 
                 var plan = (from item in _jewelryContext.TbtProductionPlan
@@ -369,6 +416,90 @@ namespace Jewelry.Service.Stock.Product
             return "success";
         }
 
+        public async Task<string> AddProductCostDeatialVersion(jewelry.Model.Stock.Product.AddProductCost.Request request)
+        {
+
+            //CheckPermissionLevel("update_stock");
+
+            var stock = (from item in _jewelryContext.TbtStockProduct
+                         .Include(x => x.TbtStockProductMaterial)
+                         where item.StockNumber == request.StockNumber
+                         select item).FirstOrDefault();
+
+            if (stock == null)
+            {
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            var priceTransactionList = new Data.Models.Jewelry.TbtStockCostVersion()
+            {
+                Running = await _runningNumberService.GenerateRunningNumber("CV"),
+
+                StockNumber = request.StockNumber,
+                CreateBy = CurrentUsername,
+                CreateDate = DateTime.UtcNow,
+
+                CustomerCode = request.CustomerCode,
+                CustomerName = request.CustomerName,
+                CustomerAddress = request.CustomerAddress,
+                CustomerTel = request.CustomerTel,
+                CustomerEmail = request.CustomerEmail,
+                Remark = request.Remark,
+
+            };
+
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            priceTransactionList.ProductCostDetail = JsonSerializer.Serialize(request.Prictransection, options);
+
+            _jewelryContext.TbtStockCostVersion.Add(priceTransactionList);
+            if (request.IsOriginCost)
+            {
+                stock.ProductCostDetail = priceTransactionList.ProductCostDetail;
+                stock.ProductCost = request.Prictransection.Sum(x => x.TotalPrice);
+
+                stock.UpdateBy = CurrentUsername;
+                stock.UpdateDate = DateTime.UtcNow;
+                _jewelryContext.TbtStockProduct.Update(stock);
+            }
+
+            await _jewelryContext.SaveChangesAsync();
+            return "success";
+        }
+        public IQueryable<jewelry.Model.Stock.Product.ListProductCost.Response> GetProductCostDetailVersion(string stockNumber)
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var response = (from item in _jewelryContext.TbtStockCostVersion
+                            where item.StockNumber == stockNumber
+                            select new jewelry.Model.Stock.Product.ListProductCost.Response()
+                            {
+                                Running = item.Running,
+                                StockNumber = item.StockNumber,
+                                CustomerCode = item.CustomerCode,
+                                CustomerName = item.CustomerName,
+                                CustomerAddress = item.CustomerAddress,
+                                CustomerTel = item.CustomerTel,
+                                CustomerEmail = item.CustomerEmail,
+                                Remark = item.Remark,
+                                CreateBy = item.CreateBy,
+                                CreateDate = item.CreateDate,
+                                UpdateBy = item.UpdateBy,
+                                UpdateDate = item.UpdateDate,
+                                Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.ListProductCost.ResponseItem>>(item.ProductCostDetail, options)
+                            });
+
+            return response;
+        }
+
+
         public IQueryable<jewelry.Model.Stock.Product.ListName.Response> ListName(jewelry.Model.Stock.Product.ListName.Request request)
         {
             if (request.Mode == "TH")
@@ -399,6 +530,8 @@ namespace Jewelry.Service.Stock.Product
 
             throw new HandleException("Mode is Required");
         }
+
+
 
         #region Dashboard APIs
 

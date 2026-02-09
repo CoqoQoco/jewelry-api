@@ -88,8 +88,5 @@ namespace jewelry.Model.Stock.Product.Get
         public decimal QtyWeight { get; set; }
         public decimal QtyWeightPrice { get; set; }
         public decimal TotalPrice => Math.Round((Qty * QtyPrice) + (QtyWeight * QtyWeightPrice), 2);
-
-
-
     }
 }
