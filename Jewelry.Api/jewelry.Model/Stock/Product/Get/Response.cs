@@ -83,10 +83,10 @@ namespace jewelry.Model.Stock.Product.Get
         public string NameGroup { get; set; }
         public DateTimeOffset? Date { get; set; }
 
-        public decimal Qty { get; set; }
-        public decimal QtyPrice { get; set; }
-        public decimal QtyWeight { get; set; }
-        public decimal QtyWeightPrice { get; set; }
-        public decimal TotalPrice => Math.Round((Qty * QtyPrice) + (QtyWeight * QtyWeightPrice), 2);
+        public decimal? Qty { get; set; } = 0m;
+        public decimal? QtyPrice { get; set; } = 0m;
+        public decimal? QtyWeight { get; set; } = 0m;
+        public decimal? QtyWeightPrice { get; set; } = 0m;
+        public decimal? TotalPrice => Math.Round((Qty.Value * QtyPrice.Value) + (QtyWeight.Value * QtyWeightPrice.Value), 2);
     }
 }

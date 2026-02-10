@@ -1,4 +1,5 @@
 ﻿using jewelry.Model.Exceptions;
+using jewelry.Model.ProductionPlan.ProductionPlanGet;
 using jewelry.Model.Stock.Product.Dashboard;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -305,10 +306,10 @@ namespace Jewelry.Service.Stock.Product
                             select item).FirstOrDefault();
 
 
+                string[] nameGroupMatch = new[] { "Gold", "Gem" };
                 if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
                 {
                     response.PlanQty = plan.ProductQty;
-                    string[] nameGroupMatch = new[] { "Gold", "Gem" };
                     response.PriceTransactions = plan.TbtProductionPlanPrice.Select(x => new jewelry.Model.Stock.Product.Get.PriceTransaction()
                     {
                         No = x.No,
@@ -325,6 +326,30 @@ namespace Jewelry.Service.Stock.Product
 
                         //TotalPrice = Math.Round(x.TotalPrice / plan.ProductQty, 2),
                     }).ToList();
+                }
+                else
+                {
+                    //set price from stock material
+                    var materials = response.Materials.Where(x => x.Type == "Gold" || x.Type == "Gem" || x.Type == "Diamond").ToList();
+                    int no = 1;
+                    foreach (var mat in materials)
+                    {
+                        response.PriceTransactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
+                        {
+                            No = no,
+                            Name = mat.TypeName,
+                            NameDescription = mat.TypeCode,
+                            NameGroup = GetNameGroupGroup(mat.Type),
+
+                            Date = stock.CreateDate,
+                            Qty = mat.Qty,
+                            QtyPrice = 0m,
+                            QtyWeight = mat.Weight,
+                            QtyWeightPrice = mat.Price,
+                            //TotalPrice = Math.Round(mat.Price / response.Qty, 2),
+                        });
+                        no++;
+                    }
 
                 }
             }
@@ -873,5 +898,19 @@ namespace Jewelry.Service.Stock.Product
 
         #endregion
 
+        private string GetNameGroupGroup(string type)
+        {
+            switch (type)
+            {
+                case "Gold":
+                    return "Gold";
+                case "Gem":
+                case "Diamond":
+                    return "Gem";
+                default:
+                    return "Other";
+
+            }
+        }
     }
 }
