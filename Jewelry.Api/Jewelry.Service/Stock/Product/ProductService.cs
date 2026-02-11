@@ -1,4 +1,5 @@
-﻿using jewelry.Model.Exceptions;
+﻿using jewelry.Model.Constant;
+using jewelry.Model.Exceptions;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
 using jewelry.Model.Stock.Product.Dashboard;
 using Jewelry.Data.Context;
@@ -220,10 +221,12 @@ namespace Jewelry.Service.Stock.Product
             {
                 query = query.Where(x => x.StockNumber == request.StockNumber);
             }
+
             if (!string.IsNullOrEmpty(request.StockNumberOrigin))
             {
                 query = query.Where(x => x.ProductCode == request.StockNumberOrigin);
             }
+
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
                 query = query.Where(x => x.ProductNumber == request.ProductNumber);
@@ -441,6 +444,50 @@ namespace Jewelry.Service.Stock.Product
             return "success";
         }
 
+
+
+        public async Task<string> CreateProductCostDeatialPlan(jewelry.Model.Stock.Product.PlanPeoductCost.Request request)
+        {
+            var _running = await _runningNumberService.GenerateRunningNumber("CP");
+            var newPlan = new TbtStockCostPlan()
+            {
+                Running = _running,
+                StockNumber = request.StockNumber,
+                Remark = request.Remark,
+
+                StatusId = JobStatus.Pending,
+                StatusName = JobStatus.GetStatusNameEn(JobStatus.Pending),
+
+                CreateBy = CurrentUsername,
+                CreateDate = DateTime.UtcNow,
+            };
+
+            var myJob = new TbtMyJob()
+            {
+                JobTypeId = MyJobType.PlanStockCost,
+                JobTypeName = MyJobType.GetTypeNameEn(MyJobType.PlanStockCost),
+                JobRunning = _running,
+
+                StatusId = JobStatus.Pending,
+                StatusName = JobStatus.GetStatusNameEn(JobStatus.Pending),
+
+                CreateBy = CurrentUsername,
+                CreateDate = DateTime.UtcNow,
+            };
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            myJob.DataJob = JsonSerializer.Serialize(newPlan, options);
+
+            _jewelryContext.TbtStockCostPlan.Add(newPlan);
+            _jewelryContext.TbtMyJob.Add(myJob);
+
+            await _jewelryContext.SaveChangesAsync();
+            return _running;
+        }
         public async Task<string> AddProductCostDeatialVersion(jewelry.Model.Stock.Product.AddProductCost.Request request)
         {
 

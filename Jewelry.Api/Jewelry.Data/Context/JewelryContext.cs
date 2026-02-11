@@ -50,6 +50,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtMoldCheckOutList> TbtMoldCheckOutList { get; set; }
 
+    public virtual DbSet<TbtMyJob> TbtMyJob { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
 
     public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
@@ -105,6 +107,8 @@ public partial class JewelryContext : DbContext
     public virtual DbSet<TbtSaleOrderProduct> TbtSaleOrderProduct { get; set; }
 
     public virtual DbSet<TbtSaleQuotation> TbtSaleQuotation { get; set; }
+
+    public virtual DbSet<TbtStockCostPlan> TbtStockCostPlan { get; set; }
 
     public virtual DbSet<TbtStockCostVersion> TbtStockCostVersion { get; set; }
 
@@ -820,6 +824,41 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.MoldCode)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_mold_picking_list_fk");
+        });
+
+        modelBuilder.Entity<TbtMyJob>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_my_job_pk");
+
+            entity.ToTable("tbt_my_job");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.DataJob)
+                .HasColumnType("jsonb")
+                .HasColumnName("data_job");
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValueSql("true")
+                .HasColumnName("is_active");
+            entity.Property(e => e.JobRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("job_running");
+            entity.Property(e => e.JobTypeId).HasColumnName("job_type_id");
+            entity.Property(e => e.JobTypeName)
+                .HasColumnType("character varying")
+                .HasColumnName("job_type_name");
+            entity.Property(e => e.StatusId).HasColumnName("status_id");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         modelBuilder.Entity<TbtProductMold>(entity =>
@@ -2163,6 +2202,50 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtStockCostPlan>(entity =>
+        {
+            entity.HasKey(e => new { e.Running, e.StockNumber }).HasName("tbt_stock_cost_plan_pk");
+
+            entity.ToTable("tbt_stock_cost_plan");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValueSql("true")
+                .HasColumnName("is_active");
+            entity.Property(e => e.IsMobileActive)
+                .IsRequired()
+                .HasDefaultValueSql("true")
+                .HasColumnName("is_mobile_active");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.StatusId).HasColumnName("status_id");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.VersionRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("version_running");
+
+            entity.HasOne(d => d.TbtStockCostVersion).WithMany(p => p.TbtStockCostPlan)
+                .HasForeignKey(d => new { d.VersionRunning, d.StockNumber })
+                .HasConstraintName("tbt_stock_cost_plan_fk");
         });
 
         modelBuilder.Entity<TbtStockCostVersion>(entity =>

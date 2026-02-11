@@ -111,6 +111,25 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("CreateProductCostDeatialPlan")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CreateProductCostDeatialPlan([FromBody] jewelry.Model.Stock.Product.PlanPeoductCost.Request request)
+        {
+            try
+            {
+                var response = await _service.CreateProductCostDeatialPlan(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+
         [Route("AddProductCostDeatialVersion")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]

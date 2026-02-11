@@ -108,6 +108,17 @@ namespace Jewelry.Api.Controllers.User
             return Ok(response);
         }
 
+        [Route("ListMyJob")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.User.ListMyjob.Response>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListMyJob([FromBody] jewelry.Model.User.ListMyJob.Request request)
+        {
+            var response = _service.ListMyJob(request.Search);
+            return response.ToDataSource(request);
+        }
+
     }
 }
 

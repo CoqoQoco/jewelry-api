@@ -19,5 +19,7 @@ namespace Jewelry.Service.User
         Task<string> Inactive(jewelry.Model.User.Active.Request request);
 
         Task<string> ForceResetPassword(jewelry.Model.User.ForceResetPassword.Request request);
+
+        IQueryable<jewelry.Model.User.ListMyjob.Response> ListMyJob(jewelry.Model.User.ListMyJob.Search request);
     }
 }

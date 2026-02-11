@@ -15,6 +15,7 @@ namespace Jewelry.Service.Stock.Product
         Task<string> Update(jewelry.Model.Stock.Product.Update.Request request);
         IQueryable<jewelry.Model.Stock.Product.ListName.Response> ListName(jewelry.Model.Stock.Product.ListName.Request request);
 
+        Task<string> CreateProductCostDeatialPlan(jewelry.Model.Stock.Product.PlanPeoductCost.Request request);
         Task<string> AddProductCostDeatialVersion(jewelry.Model.Stock.Product.AddProductCost.Request request);
         IQueryable<jewelry.Model.Stock.Product.ListProductCost.Response> GetProductCostDetailVersion(string stockNumber);
 

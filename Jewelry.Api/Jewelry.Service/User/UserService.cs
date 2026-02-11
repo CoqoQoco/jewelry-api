@@ -554,7 +554,116 @@ namespace Jewelry.Service.User
             return $"เปลี่ยน Password ของ {request.TargetUsername} สำเร็จ";
         }
 
-       
+
         #endregion
+
+
+        #region list my job
+        public IQueryable<jewelry.Model.User.ListMyjob.Response> ListMyJob(jewelry.Model.User.ListMyJob.Search request)
+        {
+            var query = (from job in _jewelryContext.TbtMyJob
+                         select job);
+
+            // Filter by Id
+            if (request.Id != null && request.Id.Any())
+            {
+                query = query.Where(x => request.Id.Contains(x.Id));
+            }
+
+            // Filter by CreateBy (partial match with array)
+            if (request.CreateBy != null && request.CreateBy.Any())
+            {
+                query = query.Where(x => request.CreateBy.Any(cb => x.CreateBy.Contains(cb)));
+            }
+
+            // Filter by IsActive
+            if (request.IsActive.HasValue)
+            {
+                query = query.Where(x => x.IsActive == request.IsActive.Value);
+            }
+
+            // Filter by UpdateBy (partial match with array)
+            if (request.UpdateBy != null && request.UpdateBy.Any())
+            {
+                query = query.Where(x => x.UpdateBy != null && request.UpdateBy.Any(ub => x.UpdateBy.Contains(ub)));
+            }
+
+            // Filter by StatusId
+            if (request.StatusId != null && request.StatusId.Any())
+            {
+                query = query.Where(x => request.StatusId.Contains(x.StatusId));
+            }
+
+            // Filter by StatusName (partial match with array)
+            if (request.StatusName != null && request.StatusName.Any())
+            {
+                query = query.Where(x => request.StatusName.Any(sn => x.StatusName.Contains(sn)));
+            }
+
+            // Filter by DataJob (partial match with array)
+            if (request.DataJob != null && request.DataJob.Any())
+            {
+                query = query.Where(x => request.DataJob.Any(dj => x.DataJob.Contains(dj)));
+            }
+
+            // Filter by JobRunning (partial match with array)
+            if (request.JobRunning != null && request.JobRunning.Any())
+            {
+                query = query.Where(x => request.JobRunning.Any(jr => x.JobRunning.Contains(jr)));
+            }
+
+            // Filter by JobTypeName (partial match with array)
+            if (request.JobTypeName != null && request.JobTypeName.Any())
+            {
+                query = query.Where(x => request.JobTypeName.Any(jtn => x.JobTypeName.Contains(jtn)));
+            }
+
+            // Filter by JobTypeId
+            if (request.JobTypeId != null && request.JobTypeId.Any())
+            {
+                query = query.Where(x => request.JobTypeId.Contains(x.JobTypeId));
+            }
+
+            // Filter by CreateDate range
+            if (request.CreateDateFrom.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.CreateDateFrom.Value);
+            }
+            if (request.CreateDateTo.HasValue)
+            {
+                query = query.Where(x => x.CreateDate <= request.CreateDateTo.Value);
+            }
+
+            // Filter by UpdateDate range
+            if (request.UpdateDateFrom.HasValue)
+            {
+                query = query.Where(x => x.UpdateDate.HasValue && x.UpdateDate.Value >= request.UpdateDateFrom.Value);
+            }
+            if (request.UpdateDateTo.HasValue)
+            {
+                query = query.Where(x => x.UpdateDate.HasValue && x.UpdateDate.Value <= request.UpdateDateTo.Value);
+            }
+
+            var response = from job in query
+                           select new jewelry.Model.User.ListMyjob.Response()
+                           {
+                               Id = job.Id,
+                               CreateBy = job.CreateBy,
+                               CreateDate = job.CreateDate,
+                               IsActive = job.IsActive,
+                               UpdateBy = job.UpdateBy,
+                               UpdateDate = job.UpdateDate,
+                               StatusId = job.StatusId,
+                               StatusName = job.StatusName,
+                               DataJob = job.DataJob,
+                               JobRunning = job.JobRunning,
+                               JobTypeName = job.JobTypeName,
+                               JobTypeId = job.JobTypeId
+                           };
+
+            return response;
+        }
+        #endregion
+
     }
 }
