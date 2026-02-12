@@ -2279,6 +2279,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CustomerTel)
                 .HasColumnType("character varying")
                 .HasColumnName("customer_tel");
+            entity.Property(e => e.JobRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("job_running");
             entity.Property(e => e.ProductCostDetail)
                 .HasColumnType("jsonb")
                 .HasColumnName("product_cost_detail");

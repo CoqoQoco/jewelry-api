@@ -167,6 +167,42 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("GetCostVersion")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Stock.Product.GetCostVersion.Response))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult GetCostVersion([FromBody] jewelry.Model.Stock.Product.GetCostVersion.Request request)
+        {
+            try
+            {
+                var response = _service.GetCostVersion(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListStockCostPlan")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.ListStockCostPlan.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListStockCostPlan([FromBody] jewelry.Model.Stock.Product.ListStockCostPlan.Request request)
+        {
+            try
+            {
+                var response = _service.ListStockCostPlan(request.Search);
+                return response.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
         [Route("PlanReceiptList")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.Plan.Receipt.List.Response>))]

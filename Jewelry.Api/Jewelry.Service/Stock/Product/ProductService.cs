@@ -506,6 +506,7 @@ namespace Jewelry.Service.Stock.Product
             var priceTransactionList = new Data.Models.Jewelry.TbtStockCostVersion()
             {
                 Running = await _runningNumberService.GenerateRunningNumber("CV"),
+                JobRunning = request.PlanRunning,
 
                 StockNumber = request.StockNumber,
                 CreateBy = CurrentUsername,
@@ -529,6 +530,7 @@ namespace Jewelry.Service.Stock.Product
             priceTransactionList.ProductCostDetail = JsonSerializer.Serialize(request.Prictransection, options);
 
             _jewelryContext.TbtStockCostVersion.Add(priceTransactionList);
+
             if (request.IsOriginCost)
             {
                 stock.ProductCostDetail = priceTransactionList.ProductCostDetail;
@@ -537,6 +539,38 @@ namespace Jewelry.Service.Stock.Product
                 stock.UpdateBy = CurrentUsername;
                 stock.UpdateDate = DateTime.UtcNow;
                 _jewelryContext.TbtStockProduct.Update(stock);
+            }
+
+            if (!string.IsNullOrEmpty(request.PlanRunning))
+            {
+                var query = (from item in _jewelryContext.TbtStockCostPlan
+                             where item.Running == request.PlanRunning
+                             select item).FirstOrDefault();
+
+                if (query != null)
+                {
+                    query.VersionRunning = priceTransactionList.Running;
+                    query.UpdateBy = CurrentUsername;
+                    query.UpdateDate = DateTime.UtcNow;
+
+                    query.StatusId = JobStatus.Completed;
+                    query.StatusName = JobStatus.GetStatusNameEn(JobStatus.Completed);
+
+                    _jewelryContext.TbtStockCostPlan.Update(query);
+                }
+
+                var myJob = (from job in _jewelryContext.TbtMyJob
+                             where job.JobRunning == request.PlanRunning
+                             select job).FirstOrDefault();
+                if (myJob != null )
+                { 
+                    myJob.StatusId = JobStatus.Completed;
+                    myJob.StatusName = JobStatus.GetStatusNameEn(JobStatus.Completed);
+                    myJob.UpdateBy = CurrentUsername;
+                    myJob.UpdateDate = DateTime.UtcNow;
+
+                    _jewelryContext.TbtMyJob.Update(myJob);
+                }
             }
 
             await _jewelryContext.SaveChangesAsync();
@@ -571,7 +605,114 @@ namespace Jewelry.Service.Stock.Product
             return response;
         }
 
+        public jewelry.Model.Stock.Product.GetCostVersion.Response GetCostVersion(jewelry.Model.Stock.Product.GetCostVersion.Request request)
+        {
+            if (string.IsNullOrEmpty(request.PlanRunning))
+            {
+                throw new HandleException("PlanRunning is Required");
+            }
 
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var costVersion = (from item in _jewelryContext.TbtStockCostVersion
+                               where item.JobRunning == request.PlanRunning
+                               select item).FirstOrDefault();
+
+            if (costVersion == null)
+            {
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            var response = new jewelry.Model.Stock.Product.GetCostVersion.Response()
+            {
+                Running = costVersion.Running,
+                JobRunning = costVersion.JobRunning,
+                StockNumber = costVersion.StockNumber,
+                CustomerCode = costVersion.CustomerCode,
+                CustomerName = costVersion.CustomerName,
+                CustomerAddress = costVersion.CustomerAddress,
+                CustomerTel = costVersion.CustomerTel,
+                CustomerEmail = costVersion.CustomerEmail,
+                Remark = costVersion.Remark,
+                CreateBy = costVersion.CreateBy,
+                CreateDate = costVersion.CreateDate,
+                UpdateBy = costVersion.UpdateBy,
+                UpdateDate = costVersion.UpdateDate,
+                Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.GetCostVersion.ResponseItem>>(costVersion.ProductCostDetail, options) ?? new List<jewelry.Model.Stock.Product.GetCostVersion.ResponseItem>()
+            };
+
+            return response;
+        }
+
+        public IQueryable<jewelry.Model.Stock.Product.ListStockCostPlan.Response> ListStockCostPlan(jewelry.Model.Stock.Product.ListStockCostPlan.Search request)
+        {
+            var query = (from item in _jewelryContext.TbtStockCostPlan
+                         select item);
+
+            // Apply filters
+            if (!string.IsNullOrEmpty(request.StockNumber))
+            {
+                query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
+            }
+
+            if (!string.IsNullOrEmpty(request.Running))
+            {
+                query = query.Where(x => x.Running.Contains(request.Running));
+            }
+
+            if (request.StatusId.HasValue)
+            {
+                query = query.Where(x => x.StatusId == request.StatusId.Value);
+            }
+
+            if (!string.IsNullOrEmpty(request.StatusName))
+            {
+                query = query.Where(x => x.StatusName.Contains(request.StatusName));
+            }
+
+            if (!string.IsNullOrEmpty(request.CreateBy))
+            {
+                query = query.Where(x => x.CreateBy.Contains(request.CreateBy));
+            }
+
+            if (request.CreateDateFrom.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.CreateDateFrom.Value);
+            }
+
+            if (request.CreateDateTo.HasValue)
+            {
+                var endDate = request.CreateDateTo.Value.AddDays(1);
+                query = query.Where(x => x.CreateDate < endDate);
+            }
+
+            if (request.IsActive.HasValue)
+            {
+                query = query.Where(x => x.IsActive == request.IsActive.Value);
+            }
+
+            var response = from item in query
+                           select new jewelry.Model.Stock.Product.ListStockCostPlan.Response()
+                           {
+                               Running = item.Running,
+                               StockNumber = item.StockNumber,
+                               Remark = item.Remark,
+                               StatusId = item.StatusId,
+                               StatusName = item.StatusName,
+                               VersionRunning = item.VersionRunning,
+                               IsMobileActive = item.IsMobileActive,
+                               IsActive = item.IsActive,
+                               CreateBy = item.CreateBy,
+                               CreateDate = item.CreateDate,
+                               UpdateBy = item.UpdateBy,
+                               UpdateDate = item.UpdateDate
+                           };
+
+            return response;
+        }
         public IQueryable<jewelry.Model.Stock.Product.ListName.Response> ListName(jewelry.Model.Stock.Product.ListName.Request request)
         {
             if (request.Mode == "TH")

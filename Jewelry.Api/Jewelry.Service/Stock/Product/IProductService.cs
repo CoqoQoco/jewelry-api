@@ -18,6 +18,8 @@ namespace Jewelry.Service.Stock.Product
         Task<string> CreateProductCostDeatialPlan(jewelry.Model.Stock.Product.PlanPeoductCost.Request request);
         Task<string> AddProductCostDeatialVersion(jewelry.Model.Stock.Product.AddProductCost.Request request);
         IQueryable<jewelry.Model.Stock.Product.ListProductCost.Response> GetProductCostDetailVersion(string stockNumber);
+        jewelry.Model.Stock.Product.GetCostVersion.Response GetCostVersion(jewelry.Model.Stock.Product.GetCostVersion.Request request);
+        IQueryable<jewelry.Model.Stock.Product.ListStockCostPlan.Response> ListStockCostPlan(jewelry.Model.Stock.Product.ListStockCostPlan.Search request);
 
         // Dashboard APIs
         Task<DashboardResponse> GetProductDashboard(DashboardRequest request);

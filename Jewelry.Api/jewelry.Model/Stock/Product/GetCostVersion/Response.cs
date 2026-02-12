@@ -1,16 +1,16 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace jewelry.Model.Stock.Product.AddProductCost
+namespace jewelry.Model.Stock.Product.GetCostVersion
 {
-    public class Request
+    public class Response
     {
+        public string Running { get; set; }
+        public string? JobRunning { get; set; }
         public string StockNumber { get; set; }
-        public string? PlanRunning { get; set; }
-
 
         public string? CustomerCode { get; set; }
         public string? CustomerName { get; set; }
@@ -19,12 +19,15 @@ namespace jewelry.Model.Stock.Product.AddProductCost
         public string? CustomerEmail { get; set; }
 
         public string? Remark { get; set; }
-        public List<RequestItem> Prictransection { get; set; } = new List<RequestItem>();
+        public List<ResponseItem> Prictransection { get; set; } = new List<ResponseItem>();
 
-        public bool IsOriginCost { get; set; } = false;
+        public DateTime CreateDate { get; set; }
+        public string CreateBy { get; set; }
+        public DateTime? UpdateDate { get; set; }
+        public string? UpdateBy { get; set; }
     }
 
-    public class RequestItem
+    public class ResponseItem
     {
         public int No { get; set; }
         public string Name { get; set; }
