@@ -107,7 +107,39 @@ namespace Jewelry.Service.User
 
             if (!string.IsNullOrEmpty(user.ImageUrl))
             {
-                response.Image = await _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
+                try
+                {
+                    // ตรวจสอบว่าเป็น blob path (User/filename.jpg) หรือ local path
+                    if (user.ImageUrl.Contains("/") || user.ImageUrl.Contains("\\"))
+                    {
+                        // Blob path format: "User/filename.jpg"
+                        var parts = user.ImageUrl.Split(new[] { '/', '\\' }, 2);
+                        if (parts.Length == 2)
+                        {
+                            var folderName = parts[0];
+                            var fileName = parts[1];
+
+                            // ดึงจาก Azure Blob Storage
+                            var stream = await _azureBlobService.DownloadImageAsync(folderName, fileName);
+                            using (var memoryStream = new MemoryStream())
+                            {
+                                await stream.CopyToAsync(memoryStream);
+                                byte[] imageBytes = memoryStream.ToArray();
+                                response.Image = Convert.ToBase64String(imageBytes);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Local path แบบเก่า (backwards compatibility)
+                        response.Image = await _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log error but don't throw - return profile without image
+                    Console.WriteLine($"Failed to load user image: {ex.Message}");
+                }
             }
 
             return response;
@@ -174,7 +206,39 @@ namespace Jewelry.Service.User
 
             if (!string.IsNullOrEmpty(user.ImageUrl))
             {
-                response.Image = await _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
+                try
+                {
+                    // ตรวจสอบว่าเป็น blob path (User/filename.jpg) หรือ local path
+                    if (user.ImageUrl.Contains("/") || user.ImageUrl.Contains("\\"))
+                    {
+                        // Blob path format: "User/filename.jpg"
+                        var parts = user.ImageUrl.Split(new[] { '/', '\\' }, 2);
+                        if (parts.Length == 2)
+                        {
+                            var folderName = parts[0];
+                            var fileName = parts[1];
+
+                            // ดึงจาก Azure Blob Storage
+                            var stream = await _azureBlobService.DownloadImageAsync(folderName, fileName);
+                            using (var memoryStream = new MemoryStream())
+                            {
+                                await stream.CopyToAsync(memoryStream);
+                                byte[] imageBytes = memoryStream.ToArray();
+                                response.Image = Convert.ToBase64String(imageBytes);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Local path แบบเก่า (backwards compatibility)
+                        response.Image = await _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log error but don't throw - return profile without image
+                    Console.WriteLine($"Failed to load user image: {ex.Message}");
+                }
             }
 
             return response;
