@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using NetTopologySuite.Index.HPRtree;
+using NPOI.HPSF;
 using NPOI.OpenXmlFormats.Spreadsheet;
 using NPOI.SS.Formula.Functions;
 using NPOI.SS.Formula.PTG;
@@ -28,17 +29,20 @@ namespace Jewelry.Service.User
         private IHostEnvironment _hostingEnvironment;
         private IFileExtension _fileService;
         private readonly IAzureBlobStorageService _azureBlobService;
+        private readonly Microsoft.Extensions.Logging.ILogger<UserService> _logger;
 
         public UserService(JewelryContext JewelryContext,
             IHostEnvironment hostingEnvironment,
             IFileExtension fileService,
             IAzureBlobStorageService azureBlobService,
+            Microsoft.Extensions.Logging.ILogger<UserService> logger,
             IHttpContextAccessor httpContextAccessor) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = hostingEnvironment;
             _fileService = fileService;
             _azureBlobService = azureBlobService;
+            _logger = logger;
         }
 
         #region --- get profile ---
@@ -79,19 +83,21 @@ namespace Jewelry.Service.User
                 CreatedBy = user.CreateBy,
                 UpdatedDate = user.UpdateDate,
                 UpdatedBy = user.UpdateBy,
+
+                ImageName = user.ImageUrl,
+                Image = null
             };
 
             if (user.TbtUserRole.Any())
             {
-                response.Role = from role in user.TbtUserRole
-
-                                select new jewelry.Model.User.Get.Role()
-                                {
-                                    Id = role.RoleNavigation.Id,
-                                    Name = role.RoleNavigation.Name,
-                                    Description = role.RoleNavigation.Description ?? string.Empty,
-                                    Level = role.RoleNavigation.Level,
-                                };
+                response.Role = (from role in user.TbtUserRole
+                                 select new jewelry.Model.User.Get.Role()
+                                 {
+                                     Id = role.RoleNavigation.Id,
+                                     Name = role.RoleNavigation.Name,
+                                     Description = role.RoleNavigation.Description ?? string.Empty,
+                                     Level = role.RoleNavigation.Level,
+                                 }).ToList(); // ⭐ Materialize query
             }
 
             if (masterUser.Any())
@@ -102,45 +108,14 @@ namespace Jewelry.Service.User
                                             Id = role.Id,
                                             Name = role.Name,
                                             Description = role.Description ?? string.Empty,
-                                        });
+                                        }).ToList(); // ⭐ Materialize query
             }
 
-            if (!string.IsNullOrEmpty(user.ImageUrl))
-            {
-                try
-                {
-                    // ตรวจสอบว่าเป็น blob path (User/filename.jpg) หรือ local path
-                    if (user.ImageUrl.Contains("/") || user.ImageUrl.Contains("\\"))
-                    {
-                        // Blob path format: "User/filename.jpg"
-                        var parts = user.ImageUrl.Split(new[] { '/', '\\' }, 2);
-                        if (parts.Length == 2)
-                        {
-                            var folderName = parts[0];
-                            var fileName = parts[1];
-
-                            // ดึงจาก Azure Blob Storage
-                            var stream = await _azureBlobService.DownloadImageAsync(folderName, fileName);
-                            using (var memoryStream = new MemoryStream())
-                            {
-                                await stream.CopyToAsync(memoryStream);
-                                byte[] imageBytes = memoryStream.ToArray();
-                                response.Image = Convert.ToBase64String(imageBytes);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Local path แบบเก่า (backwards compatibility)
-                        response.Image = await _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Log error but don't throw - return profile without image
-                    Console.WriteLine($"Failed to load user image: {ex.Message}");
-                }
-            }
+            // Load user image
+            //if (!string.IsNullOrEmpty(user.ImageUrl))
+            //{
+            //    response.Image = await LoadUserImageSafe(user.ImageUrl);
+            //}
 
             return response;
         }
@@ -184,13 +159,13 @@ namespace Jewelry.Service.User
 
             if (user.TbtUserRole.Any())
             {
-                response.Roles = from role in user.TbtUserRole
-                                 select new jewelry.Model.User.GetAccount.Role()
-                                 {
-                                     Id = role.RoleNavigation.Id,
-                                     Name = role.RoleNavigation.Name,
-                                     Description = role.RoleNavigation.Description ?? string.Empty,
-                                 };
+                response.Roles = (from role in user.TbtUserRole
+                                  select new jewelry.Model.User.GetAccount.Role()
+                                  {
+                                      Id = role.RoleNavigation.Id,
+                                      Name = role.RoleNavigation.Name,
+                                      Description = role.RoleNavigation.Description ?? string.Empty,
+                                  }).ToList(); // ⭐ Materialize query
             }
 
             if (masterUser.Any())
@@ -201,44 +176,13 @@ namespace Jewelry.Service.User
                                             Id = role.Id,
                                             Name = role.Name,
                                             Description = role.Description ?? string.Empty,
-                                        });
+                                        }).ToList(); // ⭐ Materialize query
             }
 
+            // Load user image
             if (!string.IsNullOrEmpty(user.ImageUrl))
             {
-                try
-                {
-                    // ตรวจสอบว่าเป็น blob path (User/filename.jpg) หรือ local path
-                    if (user.ImageUrl.Contains("/") || user.ImageUrl.Contains("\\"))
-                    {
-                        // Blob path format: "User/filename.jpg"
-                        var parts = user.ImageUrl.Split(new[] { '/', '\\' }, 2);
-                        if (parts.Length == 2)
-                        {
-                            var folderName = parts[0];
-                            var fileName = parts[1];
-
-                            // ดึงจาก Azure Blob Storage
-                            var stream = await _azureBlobService.DownloadImageAsync(folderName, fileName);
-                            using (var memoryStream = new MemoryStream())
-                            {
-                                await stream.CopyToAsync(memoryStream);
-                                byte[] imageBytes = memoryStream.ToArray();
-                                response.Image = Convert.ToBase64String(imageBytes);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Local path แบบเก่า (backwards compatibility)
-                        response.Image = await _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Log error but don't throw - return profile without image
-                    Console.WriteLine($"Failed to load user image: {ex.Message}");
-                }
+                response.Image = await LoadUserImageSafe(user.ImageUrl);
             }
 
             return response;
@@ -640,6 +584,78 @@ namespace Jewelry.Service.User
 
         #endregion
 
+        #region --- helper methods ---
+
+        /// <summary>
+        /// Load user image from Azure Blob Storage safely
+        /// Returns base64 string or null if failed
+        /// </summary>
+        private async Task<string?> LoadUserImageSafe(string imageUrl)
+        {
+            if (string.IsNullOrEmpty(imageUrl))
+            {
+                return null;
+            }
+
+            try
+            {
+                string folderName;
+                string fileName;
+
+                // Parse imageUrl to get folder and file name
+                if (imageUrl.Contains("/") || imageUrl.Contains("\\"))
+                {
+                    // Blob path format: "User/filename.jpg"
+                    var parts = imageUrl.Split(new[] { '/', '\\' }, 2);
+                    if (parts.Length == 2)
+                    {
+                        folderName = parts[0];
+                        fileName = parts[1];
+                    }
+                    else
+                    {
+                        // Invalid format
+                        return null;
+                    }
+                }
+                else
+                {
+                    // Just filename (old format) - assume User folder
+                    folderName = "User/Profile";
+                    fileName = imageUrl;
+                }
+
+                // Download from Azure Blob Storage
+                using (var blobStream = await _azureBlobService.DownloadImageAsync(folderName, fileName))
+                {
+                    if (blobStream == null)
+                    {
+                        return null;
+                    }
+
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        await blobStream.CopyToAsync(memoryStream);
+                        byte[] imageBytes = memoryStream.ToArray();
+
+                        if (imageBytes.Length == 0)
+                        {
+                            return null;
+                        }
+
+                        return Convert.ToBase64String(imageBytes);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't throw - return null
+                //_logger.LogError(ex, "Failed to load user image '{ImageUrl}'", imageUrl);
+                return null;
+            }
+        }
+
+        #endregion
 
         #region list my job
         public IQueryable<jewelry.Model.User.ListMyjob.Response> ListMyJob(jewelry.Model.User.ListMyJob.Search request)
@@ -747,7 +763,7 @@ namespace Jewelry.Service.User
             return response;
         }
 
-      
+
         #endregion
 
     }
