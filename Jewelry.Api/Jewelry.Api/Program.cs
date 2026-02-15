@@ -19,10 +19,8 @@ builder.Services.AddControllers()
         options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
         options.SerializerSettings.MaxDepth = 32; // จำกัดความลึกของ object graph
         options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
-        options.SerializerSettings.ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
-        {
-            NamingStrategy = null // ใช้ชื่อ property ตามเดิม
-        };
+        // ใช้ CamelCasePropertyNamesContractResolver เพื่อให้ได้ camelCase (tokenValue, userId, etc.)
+        options.SerializerSettings.ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver();
         // เพิ่ม error handling สำหรับ serialization
         options.SerializerSettings.Error = (sender, args) =>
         {
