@@ -34,7 +34,7 @@ namespace Jewelry.Api.Controllers.User
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public async Task<IActionResult> Get()
         {
-            var response = _service.Get();
+            var response = await _service.Get();
             return Ok(response);
         }
 
@@ -44,7 +44,7 @@ namespace Jewelry.Api.Controllers.User
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public async Task<IActionResult> GetAccount(int id)
         {
-            var response = _service.GetAccount(id);
+            var response = await _service.GetAccount(id);
             return Ok(response);
         }
 
