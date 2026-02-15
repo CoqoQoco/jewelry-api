@@ -32,11 +32,11 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult? GetPlanImage(string imageName)
+        public async Task<IActionResult?> GetPlanImage(string imageName)
         {
             try
             {
-                var response = _service.GetPlanImageBase64String(imageName);
+                var response = await _service.GetPlanImageBase64String(imageName);
                 return Ok(response);
                 //return Ok(new { Base64Image = response });
             }
@@ -51,11 +51,11 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult? GetMoldImage(string imageName)
+        public async Task<IActionResult?> GetMoldImage(string imageName)
         {
             try
             {
-                var response = _service.GetMoldImageBase64String(imageName);
+                var response = await _service.GetMoldImageBase64String(imageName);
                 return Ok(response);
                 //return Ok(new { Base64Image = response });
             }
@@ -70,11 +70,11 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult? GetPlanMoldImage(string imageName)
+        public async Task<IActionResult?> GetPlanMoldImage(string imageName)
         {
             try
             {
-                var response = _service.GetPlanMoldDesignImageBase64String(imageName);
+                var response = await _service.GetPlanMoldDesignImageBase64String(imageName);
                 return Ok(response);
             }
             catch (HandleException ex)
@@ -87,11 +87,11 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult? GetPlanMoldResinImage(string imageName)
+        public async Task<IActionResult?> GetPlanMoldResinImage(string imageName)
         {
             try
             {
-                var response = _service.GetPlanMoldResinImageBase64String(imageName);
+                var response = await _service.GetPlanMoldResinImageBase64String(imageName);
                 return Ok(response);
             }
             catch (HandleException ex)
@@ -105,11 +105,11 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult? GetImageBase64String(string imageName)
+        public async Task<IActionResult?> GetImageBase64String(string imageName)
         {
             try
             {
-                var response = _service.GetStockProductImageBase64String(imageName);
+                var response = await _service.GetStockProductImageBase64String(imageName);
                 return Ok(response);
             }
             catch (HandleException ex)
@@ -124,11 +124,11 @@ namespace Jewelry.Api.Controllers
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult? GetImageBase64String(string imageName, string path)
+        public async Task<IActionResult?> GetImageBase64String(string imageName, string path)
         {
             try
             {
-                var response = _service.GetImageBase64String(imageName, path);
+                var response = await _service.GetImageBase64String(imageName, path);
                 return Ok(response);
             }
             catch (HandleException ex)

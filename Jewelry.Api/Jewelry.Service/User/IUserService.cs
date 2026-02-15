@@ -8,8 +8,8 @@ namespace Jewelry.Service.User
 {
     public interface IUserService
     {
-        jewelry.Model.User.Get.Response Get();
-        jewelry.Model.User.GetAccount.Response GetAccount(int id);
+        Task<jewelry.Model.User.Get.Response> Get();
+        Task<jewelry.Model.User.GetAccount.Response> GetAccount(int id);
         Task<string> UpdateAccount(jewelry.Model.User.UpdateAccount.Request request);
 
         IQueryable<jewelry.Model.User.List.Response> List(jewelry.Model.User.List.Search request);

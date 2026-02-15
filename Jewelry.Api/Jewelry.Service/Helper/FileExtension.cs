@@ -11,156 +11,169 @@ namespace Jewelry.Service.Helper
 {
     public interface IFileExtension
     {
-        Stream? GetPlanImage(string imageName);
-        string GetPlanImageBase64String(string imageName);
-        string GetMoldImageBase64String(string imageName);
+        Task<Stream?> GetPlanImage(string imageName);
+        Task<string> GetPlanImageBase64String(string imageName);
+        Task<string> GetMoldImageBase64String(string imageName);
 
-        string GetImageBase64String(string imageName, string path);
+        Task<string> GetImageBase64String(string imageName, string path);
 
 
-        string GetPlanMoldDesignImageBase64String(string imageName);
-        string GetPlanMoldResinImageBase64String(string imageName);
+        Task<string> GetPlanMoldDesignImageBase64String(string imageName);
+        Task<string> GetPlanMoldResinImageBase64String(string imageName);
 
-        string GetStockProductImageBase64String(string imageName);
+        Task<string> GetStockProductImageBase64String(string imageName);
     }
     public class FileExtension : IFileExtension
     {
         private readonly string _admin = "@ADMIN";
         private readonly JewelryContext _jewelryContext;
-        private IHostEnvironment _hostingEnvironment;
+        private readonly IHostEnvironment _hostingEnvironment;
+        private readonly IAzureBlobStorageService _azureBlobService;
 
-        public FileExtension(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
+        public FileExtension(
+            JewelryContext jewelryContext,
+            IHostEnvironment hostingEnvironment,
+            IAzureBlobStorageService azureBlobService)
         {
-            _jewelryContext = JewelryContext;
-            _hostingEnvironment = HostingEnvironment;
+            _jewelryContext = jewelryContext;
+            _hostingEnvironment = hostingEnvironment;
+            _azureBlobService = azureBlobService;
         }
 
-        public Stream? GetPlanImage(string imageName)
+        public async Task<Stream?> GetPlanImage(string imageName)
         {
-            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
-            string imagePath = Path.Combine(folderPath, imageName);
-
-            if (System.IO.File.Exists(imagePath))
+            try
             {
-                // เปิด FileStream สำหรับไฟล์ภาพ
-                FileStream fileStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read);
-
-                // สร้าง FileStreamResult และส่งคืนไฟล์ภาพ
-                //return File(fileStream, "image/jpeg"); // เปลี่ยน "image/jpeg" เป็นประเภทของไฟล์ภาพตามที่คุณใช้งาน
-
-                return fileStream;
+                // Download from Azure Blob Storage - ProductionPlan folder
+                var stream = await _azureBlobService.DownloadImageAsync("ProductionPlan", imageName);
+                return stream;
             }
-            else
+            catch
             {
                 return null;
             }
         }
-        public string GetPlanImageBase64String(string imageName)
+        public async Task<string> GetPlanImageBase64String(string imageName)
         {
-            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/OrderPlan");
-            //string folderPath = Path.Combine("Images", "/OrderPlan");
-            string imagePath = Path.Combine(folderPath, imageName);
-
-            if (System.IO.File.Exists(imagePath))
+            try
             {
-                byte[] imageBytes = System.IO.File.ReadAllBytes(imagePath);
+                // Download from Azure Blob Storage - ProductionPlan folder
+                var stream = await _azureBlobService.DownloadImageAsync("ProductionPlan", imageName);
 
-                // แปลง byte array เป็น Base64 string
-                return Convert.ToBase64String(imageBytes);
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    byte[] imageBytes = memoryStream.ToArray();
+                    return Convert.ToBase64String(imageBytes);
+                }
             }
-            else
+            catch
             {
                 return null;
             }
         }
-        public string GetMoldImageBase64String(string imageName)
+        public async Task<string> GetMoldImageBase64String(string imageName)
         {
-            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
-            //string folderPath = Path.Combine("Images", "/OrderPlan");
-            string imagePath = Path.Combine(folderPath, imageName);
-
-            if (System.IO.File.Exists(imagePath))
+            try
             {
-                byte[] imageBytes = System.IO.File.ReadAllBytes(imagePath);
+                // Download from Azure Blob Storage - Mold folder
+                var stream = await _azureBlobService.DownloadImageAsync("Mold", imageName);
 
-                // แปลง byte array เป็น Base64 string
-                return Convert.ToBase64String(imageBytes);
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    byte[] imageBytes = memoryStream.ToArray();
+                    return Convert.ToBase64String(imageBytes);
+                }
             }
-            else
+            catch
             {
                 return null;
             }
         }
-        public string GetPlanMoldDesignImageBase64String(string imageName)
+        public async Task<string> GetPlanMoldDesignImageBase64String(string imageName)
         {
-            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanDesign");
-            //string folderPath = Path.Combine("Images", "/OrderPlan");
-            string imagePath = Path.Combine(folderPath, imageName);
-
-            if (System.IO.File.Exists(imagePath))
+            try
             {
-                byte[] imageBytes = System.IO.File.ReadAllBytes(imagePath);
+                // Download from Azure Blob Storage - MoldPlanDesign folder
+                var stream = await _azureBlobService.DownloadImageAsync("MoldPlanDesign", imageName);
 
-                // แปลง byte array เป็น Base64 string
-                return Convert.ToBase64String(imageBytes);
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    byte[] imageBytes = memoryStream.ToArray();
+                    return Convert.ToBase64String(imageBytes);
+                }
             }
-            else
+            catch
             {
                 return null;
             }
         }
-        public string GetPlanMoldResinImageBase64String(string imageName)
+        public async Task<string> GetPlanMoldResinImageBase64String(string imageName)
         {
-            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanResin");
-            //string folderPath = Path.Combine("Images", "/OrderPlan");
-            string imagePath = Path.Combine(folderPath, imageName);
-
-            if (System.IO.File.Exists(imagePath))
+            try
             {
-                byte[] imageBytes = System.IO.File.ReadAllBytes(imagePath);
+                // Download from Azure Blob Storage - MoldPlanResin folder
+                var stream = await _azureBlobService.DownloadImageAsync("MoldPlanResin", imageName);
 
-                // แปลง byte array เป็น Base64 string
-                return Convert.ToBase64String(imageBytes);
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    byte[] imageBytes = memoryStream.ToArray();
+                    return Convert.ToBase64String(imageBytes);
+                }
             }
-            else
-            {
-                return null;
-            }
-        }
-
-        public string GetStockProductImageBase64String(string imageName)
-        {
-            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Stock/Product");
-            //string folderPath = Path.Combine("Images", "/OrderPlan");
-            string imagePath = Path.Combine(folderPath, imageName);
-
-            if (System.IO.File.Exists(imagePath))
-            {
-                byte[] imageBytes = System.IO.File.ReadAllBytes(imagePath);
-
-                // แปลง byte array เป็น Base64 string
-                return Convert.ToBase64String(imageBytes);
-            }
-            else
+            catch
             {
                 return null;
             }
         }
 
-        public string GetImageBase64String(string imageName ,string path)
+        public async Task<string> GetStockProductImageBase64String(string imageName)
         {
-            string folderPath = Path.Combine(_hostingEnvironment.ContentRootPath, path);
-            //string folderPath = Path.Combine("Images", "/OrderPlan");
-            string imagePath = Path.Combine(folderPath, imageName);
-
-            if (System.IO.File.Exists(imagePath))
+            try
             {
-                byte[] imageBytes = System.IO.File.ReadAllBytes(imagePath);
+                // Download from Azure Blob Storage - Stock folder
+                var stream = await _azureBlobService.DownloadImageAsync("Stock", imageName);
 
-                // แปลง byte array เป็น Base64 string
-                return Convert.ToBase64String(imageBytes);
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    byte[] imageBytes = memoryStream.ToArray();
+                    return Convert.ToBase64String(imageBytes);
+                }
             }
-            else
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<string> GetImageBase64String(string imageName, string path)
+        {
+            try
+            {
+                // Map old local path to Azure Blob folder name
+                // Example: "Images/Mold" -> "Mold", "Images/OrderPlan" -> "ProductionPlan"
+                string folderName = path
+                    .Replace("Images/", "")
+                    .Replace("Images\\", "")
+                    .Replace("OrderPlan", "ProductionPlan")
+                    .Replace("Stock/Product", "Stock")
+                    .Replace("Stock\\Product", "Stock");
+
+                // Download from Azure Blob Storage
+                var stream = await _azureBlobService.DownloadImageAsync(folderName, imageName);
+
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    byte[] imageBytes = memoryStream.ToArray();
+                    return Convert.ToBase64String(imageBytes);
+                }
+            }
+            catch
             {
                 return null;
             }

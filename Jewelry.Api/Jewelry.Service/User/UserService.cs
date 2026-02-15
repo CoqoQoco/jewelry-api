@@ -27,19 +27,22 @@ namespace Jewelry.Service.User
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private IFileExtension _fileService;
+        private readonly IAzureBlobStorageService _azureBlobService;
 
         public UserService(JewelryContext JewelryContext,
             IHostEnvironment hostingEnvironment,
             IFileExtension fileService,
+            IAzureBlobStorageService azureBlobService,
             IHttpContextAccessor httpContextAccessor) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = hostingEnvironment;
             _fileService = fileService;
+            _azureBlobService = azureBlobService;
         }
 
         #region --- get profile ---
-        public jewelry.Model.User.Get.Response Get()
+        public async Task<jewelry.Model.User.Get.Response> Get()
         {
             var user = (from item in _jewelryContext.TbtUser
                         .Include(x => x.TbtUserRole)
@@ -104,14 +107,14 @@ namespace Jewelry.Service.User
 
             if (!string.IsNullOrEmpty(user.ImageUrl))
             {
-                response.Image = _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
+                response.Image = await _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
             }
 
             return response;
         }
         #endregion
         #region --- get account ---
-        public jewelry.Model.User.GetAccount.Response GetAccount(int id)
+        public async Task<jewelry.Model.User.GetAccount.Response> GetAccount(int id)
         {
             var user = (from item in _jewelryContext.TbtUser
                         .Include(x => x.TbtUserRole)
@@ -171,7 +174,7 @@ namespace Jewelry.Service.User
 
             if (!string.IsNullOrEmpty(user.ImageUrl))
             {
-                response.Image = _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
+                response.Image = await _fileService.GetImageBase64String(user.ImageUrl, "Images/User/Profile");
             }
 
             return response;
@@ -196,35 +199,51 @@ namespace Jewelry.Service.User
 
                 if (!string.IsNullOrEmpty(request.ImageAction) && request.ImageAction == "update")
                 {
-                    var namePath = $"{user.Username}-{user.Id}.png";
+                    var fileName = $"{user.Username}-{user.Id}.png";
                     try
                     {
-                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/User/Profile");
-                        if (!Directory.Exists(imagePath))
+                        // Upload to Azure Blob Storage (Single Container Architecture)
+                        using var stream = request.Image.OpenReadStream();
+                        var result = await _azureBlobService.UploadImageAsync(
+                            stream,
+                            "User",  // folder name in jewelry-images container
+                            fileName
+                        );
+
+                        if (!result.Success)
                         {
-                            Directory.CreateDirectory(imagePath);
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                         }
 
-                        string imagePathWithFileName = Path.Combine(imagePath, $"{namePath}");
-
-                        //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                        using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
-                        {
-                            request.Image.CopyTo(fileStream);
-                            fileStream.Close();
-                        }
+                        // เก็บ blob path: "User/filename.jpg"
+                        user.ImageUrl = result.BlobName;
                     }
                     catch (Exception ex)
                     {
-                        //_logger.LogError($"ไม่สามารถบันทึกรูปภาพได้: {ex.Message}", ex);
                         throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
                     }
-
-                    user.ImageUrl = namePath;
                 }
 
                 if (!string.IsNullOrEmpty(request.ImageAction) && request.ImageAction == "delete")
                 {
+                    // ลบรูปภาพจาก Azure Blob Storage ถ้ามี
+                    if (!string.IsNullOrEmpty(user.ImageUrl))
+                    {
+                        try
+                        {
+                            // Parse folder and filename from path like "User/username-id.png"
+                            var parts = user.ImageUrl.Split('/');
+                            if (parts.Length == 2)
+                            {
+                                await _azureBlobService.DeleteImageAsync(parts[0], parts[1]);
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            // ไม่ต้อง throw error ถ้าลบไม่สำเร็จ
+                        }
+                    }
+
                     user.ImageUrl = string.Empty;
                 }
 
@@ -663,6 +682,8 @@ namespace Jewelry.Service.User
 
             return response;
         }
+
+      
         #endregion
 
     }

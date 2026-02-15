@@ -20,14 +20,17 @@ namespace Jewelry.Service.Sale.Invoice
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
+        private readonly IAzureBlobStorageService _azureBlobService;
 
         public InvoiceService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor,
             IHostEnvironment hostingEnvironment,
-            IRunningNumber runningNumberService) : base(jewelryContext, httpContextAccessor)
+            IRunningNumber runningNumberService,
+            IAzureBlobStorageService azureBlobService) : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _hostingEnvironment = hostingEnvironment;
             _runningNumberService = runningNumberService;
+            _azureBlobService = azureBlobService;
         }
 
         public async Task<string> Create(jewelry.Model.Sale.Invoice.Create.Request request)
@@ -636,23 +639,25 @@ namespace Jewelry.Service.Sale.Invoice
             {
                 try
                 {
-                    string imageDirectory = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Payment");
-                    if (!Directory.Exists(imageDirectory))
-                    {
-                        Directory.CreateDirectory(imageDirectory);
-                    }
-
-                    // Generate unique filename
+                    // Generate unique filename with extension
                     string fileExtension = Path.GetExtension(request.ReceiptImage.FileName);
                     string fileName = $"{paymentRunning}{fileExtension}";
-                    string fullPath = Path.Combine(imageDirectory, fileName);
 
-                    using (Stream fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write))
+                    // Upload to Azure Blob Storage (Single Container Architecture)
+                    using var stream = request.ReceiptImage.OpenReadStream();
+                    var result = await _azureBlobService.UploadImageAsync(
+                        stream,
+                        "Payment",  // folder name in jewelry-images container
+                        fileName
+                    );
+
+                    if (!result.Success)
                     {
-                        await request.ReceiptImage.CopyToAsync(fileStream);
+                        throw new HandleException($"Failed to save receipt image: {result.ErrorMessage}");
                     }
 
-                    imagePath = fileName;
+                    // เก็บ blob path: "Payment/filename.jpg"
+                    imagePath = result.BlobName;
                 }
                 catch (Exception ex)
                 {

@@ -82,15 +82,18 @@ namespace Jewelry.Service.ProductionPlan
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
         private readonly IPlanService _planService;
+        private readonly IAzureBlobStorageService _azureBlobService;
         public ProductionPlanService(JewelryContext JewelryContext, IHttpContextAccessor httpContextAccessor,
             IHostEnvironment HostingEnvironment,
             IPlanService planService,
-            IRunningNumber runningNumberService) : base(JewelryContext, httpContextAccessor)
+            IRunningNumber runningNumberService,
+            IAzureBlobStorageService azureBlobService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
             _runningNumberService = runningNumberService;
             _planService = planService;
+            _azureBlobService = azureBlobService;
         }
 
         #region ----- Production Plan -----
@@ -307,24 +310,24 @@ namespace Jewelry.Service.ProductionPlan
             try
             {
                 var createImages = new List<TbtProductionPlanImage>();
+                int no = 1;
 
                 // เรียกใช้งาน request.Images เพื่อเข้าถึงรูปภาพแต่ละรูปใน List
                 foreach (var image in images)
                 {
-                    int no = 1;
+                    string fileName = $"{wo.ToUpper().Trim()}-{woNumber}-{no}.png";
 
-                    // ตรวจสอบว่าไดรฟ์ D: มีสิทธิ์ในการเขียนไฟล์หรือไม่
-                    string imageName = $"{wo.ToUpper().Trim()}-{woNumber}-{no}";
-                    string baseDirectory = "D:\\Jewelry\\Image\\ProductionPlan";
-                    string destinationPath = Path.Combine(baseDirectory, imageName);
-                    if (System.IO.File.Exists(destinationPath))
-                    {
-                        System.IO.File.Delete(destinationPath);
-                    }
+                    // Upload to Azure Blob Storage (Single Container Architecture)
+                    using var stream = image.OpenReadStream();
+                    var result = await _azureBlobService.UploadImageAsync(
+                        stream,
+                        "ProductionPlan",  // folder name in jewelry-images container
+                        fileName
+                    );
 
-                    using (FileStream fs = new FileStream(destinationPath, FileMode.CreateNew))
+                    if (!result.Success)
                     {
-                        image.CopyTo(fs);
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                     }
 
                     var createImage = new TbtProductionPlanImage()
@@ -332,7 +335,7 @@ namespace Jewelry.Service.ProductionPlan
                         ProductionPlanId = plan.Id,
                         Number = no,
 
-                        Path = imageName,
+                        Path = result.BlobName,  // "ProductionPlan/filename.png"
 
                         IsActive = true,
                         CreateDate = DateTime.UtcNow,

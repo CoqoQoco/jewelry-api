@@ -55,15 +55,18 @@ namespace Jewelry.Service.Mold
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
+        private readonly IAzureBlobStorageService _azureBlobService;
 
         public MoldPlanService(JewelryContext jewelryContext,
             IHostEnvironment hostingEnvironment,
             IRunningNumber runningNumberService,
+            IAzureBlobStorageService azureBlobService,
             IHttpContextAccessor httpContextAccessor) : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _hostingEnvironment = hostingEnvironment;
             _runningNumberService = runningNumberService;
+            _azureBlobService = azureBlobService;
         }
 
         public IQueryable<PlanListReponse> PlanList(PlanListRequestModel request)
@@ -443,25 +446,23 @@ namespace Jewelry.Service.Mold
                     {
                         try
                         {
-                            string imageName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Design.png";
-                            string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanDesign");
-                            if (!Directory.Exists(imagePath))
+                            string fileName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Design.png";
+
+                            // Upload to Azure Blob Storage (Single Container Architecture)
+                            using var stream = item.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(
+                                stream,
+                                "MoldPlanDesign",  // folder name in jewelry-images container
+                                fileName
+                            );
+
+                            if (!result.Success)
                             {
-                                Directory.CreateDirectory(imagePath);
-                            }
-                            string imagePathWithFileName = Path.Combine(imagePath, imageName);
-
-                            //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                            using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
-                            {
-                                item.CopyTo(fileStream);
-                                fileStream.Close();
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                             }
 
-                            //design.ImageUrl = imageName;
-
-                            //add image url to array
-                            imagesUrl.Add(imageName);
+                            //add blob name to array - "MoldPlanDesign/filename.png"
+                            imagesUrl.Add(result.BlobName);
 
                             count++;
                         }
@@ -588,23 +589,23 @@ namespace Jewelry.Service.Mold
                     {
                         try
                         {
-                            string imageName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Resin.png";
-                            string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanResin");
-                            if (!Directory.Exists(imagePath))
-                            {
-                                Directory.CreateDirectory(imagePath);
-                            }
-                            string imagePathWithFileName = Path.Combine(imagePath, imageName);
+                            string fileName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Resin.png";
 
-                            //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                            using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                            // Upload to Azure Blob Storage (Single Container Architecture)
+                            using var stream = item.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(
+                                stream,
+                                "MoldPlanResin",  // folder name in jewelry-images container
+                                fileName
+                            );
+
+                            if (!result.Success)
                             {
-                                item.CopyTo(fileStream);
-                                fileStream.Close();
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                             }
 
-                            //add image url to array
-                            imagesUrl.Add(imageName);
+                            //add blob name to array - "MoldPlanResin/filename.png"
+                            imagesUrl.Add(result.BlobName);
 
                             count++;
                         }
@@ -700,23 +701,23 @@ namespace Jewelry.Service.Mold
                     {
                         try
                         {
-                            string imageName = $"{request.MoldCode.ToUpper().Trim()}-{count}-CastingSilver.png";
-                            string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanCastingSilver");
-                            if (!Directory.Exists(imagePath))
-                            {
-                                Directory.CreateDirectory(imagePath);
-                            }
-                            string imagePathWithFileName = Path.Combine(imagePath, imageName);
+                            string fileName = $"{request.MoldCode.ToUpper().Trim()}-{count}-CastingSilver.png";
 
-                            //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                            using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                            // Upload to Azure Blob Storage (Single Container Architecture)
+                            using var stream = item.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(
+                                stream,
+                                "MoldPlanCastingSilver",  // folder name in jewelry-images container
+                                fileName
+                            );
+
+                            if (!result.Success)
                             {
-                                item.CopyTo(fileStream);
-                                fileStream.Close();
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                             }
 
-                            //add image url to array
-                            imagesUrl.Add(imageName);
+                            //add blob name to array - "MoldPlanCastingSilver/filename.png"
+                            imagesUrl.Add(result.BlobName);
 
                             count++;
                         }
@@ -812,23 +813,23 @@ namespace Jewelry.Service.Mold
                     {
                         try
                         {
-                            string imageName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Casting.png";
-                            string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanCasting");
-                            if (!Directory.Exists(imagePath))
-                            {
-                                Directory.CreateDirectory(imagePath);
-                            }
-                            string imagePathWithFileName = Path.Combine(imagePath, imageName);
+                            string fileName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Casting.png";
 
-                            //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                            using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                            // Upload to Azure Blob Storage (Single Container Architecture)
+                            using var stream = item.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(
+                                stream,
+                                "MoldPlanCasting",  // folder name in jewelry-images container
+                                fileName
+                            );
+
+                            if (!result.Success)
                             {
-                                item.CopyTo(fileStream);
-                                fileStream.Close();
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                             }
 
-                            //add image url to array
-                            imagesUrl.Add(imageName);
+                            //add blob name to array - "MoldPlanCasting/filename.png"
+                            imagesUrl.Add(result.BlobName);
 
                             count++;
                         }
@@ -941,23 +942,23 @@ namespace Jewelry.Service.Mold
                     {
                         try
                         {
-                            string imageName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Cutting.png";
-                            string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanCutting");
-                            if (!Directory.Exists(imagePath))
-                            {
-                                Directory.CreateDirectory(imagePath);
-                            }
-                            string imagePathWithFileName = Path.Combine(imagePath, imageName);
+                            string fileName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Cutting.png";
 
-                            //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                            using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                            // Upload to Azure Blob Storage (Single Container Architecture)
+                            using var stream = item.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(
+                                stream,
+                                "MoldPlanCutting",  // folder name in jewelry-images container
+                                fileName
+                            );
+
+                            if (!result.Success)
                             {
-                                item.CopyTo(fileStream);
-                                fileStream.Close();
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                             }
 
-                            //add image url to array
-                            imagesUrl.Add(imageName);
+                            //add blob name to array - "MoldPlanCutting/filename.png"
+                            imagesUrl.Add(result.BlobName);
 
                             count++;
                         }
@@ -1083,22 +1084,22 @@ namespace Jewelry.Service.Mold
                     var img = request.Images[0];
                     try
                     {
-                        string imageName = $"{request.Code.ToUpper().Trim()}-Mold.png";
-                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
-                        if (!Directory.Exists(imagePath))
-                        {
-                            Directory.CreateDirectory(imagePath);
-                        }
-                        string imagePathWithFileName = Path.Combine(imagePath, imageName);
+                        string fileName = $"{request.Code.ToUpper().Trim()}-Mold.png";
 
-                        //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                        using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                        // Upload to Azure Blob Storage (Single Container Architecture)
+                        using var stream = img.OpenReadStream();
+                        var result = await _azureBlobService.UploadImageAsync(
+                            stream,
+                            "Mold",  // folder name in jewelry-images container
+                            fileName
+                        );
+
+                        if (!result.Success)
                         {
-                            img.CopyTo(fileStream);
-                            fileStream.Close();
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                         }
 
-                        store.ImageUrl = imageName;
+                        store.ImageUrl = result.BlobName;  // "Mold/filename.png"
                     }
                     catch (Exception ex)
                     {
@@ -1170,22 +1171,22 @@ namespace Jewelry.Service.Mold
                     var img = request.Images[0];
                     try
                     {
-                        string imageName = $"{request.Code.ToUpper().Trim()}-Mold.png";
-                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
-                        if (!Directory.Exists(imagePath))
-                        {
-                            Directory.CreateDirectory(imagePath);
-                        }
-                        string imagePathWithFileName = Path.Combine(imagePath, imageName);
+                        string fileName = $"{request.Code.ToUpper().Trim()}-Mold.png";
 
-                        //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                        using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                        // Upload to Azure Blob Storage (Single Container Architecture)
+                        using var stream = img.OpenReadStream();
+                        var result = await _azureBlobService.UploadImageAsync(
+                            stream,
+                            "Mold",  // folder name in jewelry-images container
+                            fileName
+                        );
+
+                        if (!result.Success)
                         {
-                            img.CopyTo(fileStream);
-                            fileStream.Close();
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                         }
 
-                        addMold.Image = imageName;
+                        addMold.Image = result.BlobName;  // "Mold/filename.png"
                     }
                     catch (Exception ex)
                     {
@@ -1274,25 +1275,23 @@ namespace Jewelry.Service.Mold
                     {
                         try
                         {
-                            string imageName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Design.png";
-                            string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/MoldPlanDesign");
-                            if (!Directory.Exists(imagePath))
+                            string fileName = $"{request.MoldCode.ToUpper().Trim()}-{count}-Design.png";
+
+                            // Upload to Azure Blob Storage (Single Container Architecture)
+                            using var stream = item.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(
+                                stream,
+                                "MoldPlanDesign",  // folder name in jewelry-images container
+                                fileName
+                            );
+
+                            if (!result.Success)
                             {
-                                Directory.CreateDirectory(imagePath);
-                            }
-                            string imagePathWithFileName = Path.Combine(imagePath, imageName);
-
-                            //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                            using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
-                            {
-                                item.CopyTo(fileStream);
-                                fileStream.Close();
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                             }
 
-                            //design.ImageUrl = imageName;
-
-                            //add image url to array
-                            imagesUrl.Add(imageName);
+                            //add blob name to array - "MoldPlanDesign/filename.png"
+                            imagesUrl.Add(result.BlobName);
 
                             count++;
                         }
@@ -1471,22 +1470,22 @@ namespace Jewelry.Service.Mold
                     var img = request.Images[0];
                     try
                     {
-                        string imageName = $"{request.Code.ToUpper().Trim()}-Mold.png";
-                        string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
-                        if (!Directory.Exists(imagePath))
-                        {
-                            Directory.CreateDirectory(imagePath);
-                        }
-                        string imagePathWithFileName = Path.Combine(imagePath, imageName);
+                        string fileName = $"{request.Code.ToUpper().Trim()}-Mold.png";
 
-                        //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                        using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
+                        // Upload to Azure Blob Storage (Single Container Architecture)
+                        using var stream = img.OpenReadStream();
+                        var result = await _azureBlobService.UploadImageAsync(
+                            stream,
+                            "Mold",  // folder name in jewelry-images container
+                            fileName
+                        );
+
+                        if (!result.Success)
                         {
-                            img.CopyTo(fileStream);
-                            fileStream.Close();
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                         }
 
-                        store.ImageUrl = imageName;
+                        store.ImageUrl = result.BlobName;  // "Mold/filename.png"
                     }
                     catch (Exception ex)
                     {

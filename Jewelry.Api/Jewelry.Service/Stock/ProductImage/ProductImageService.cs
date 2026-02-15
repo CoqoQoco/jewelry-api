@@ -21,14 +21,17 @@ namespace Jewelry.Service.Stock.ProductImage
 
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
-        public ProductImageService(JewelryContext JewelryContext, 
-            IHostEnvironment HostingEnvironment, 
-            IRunningNumber runningNumberService, 
+        private readonly IAzureBlobStorageService _azureBlobService;
+        public ProductImageService(JewelryContext JewelryContext,
+            IHostEnvironment HostingEnvironment,
+            IRunningNumber runningNumberService,
+            IAzureBlobStorageService azureBlobService,
             IHttpContextAccessor httpContextAccessor) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
             _runningNumberService = runningNumberService;
+            _azureBlobService = azureBlobService;
         }
 
         public async Task<string> Create(jewelry.Model.Stock.Product.Image.Create.Request request)
@@ -66,25 +69,24 @@ namespace Jewelry.Service.Stock.ProductImage
 
                 try
                 {
+                    // Upload to Azure Blob Storage (Single Container Architecture)
+                    using var stream = request.Image.OpenReadStream();
+                    var result = await _azureBlobService.UploadImageAsync(
+                        stream,
+                        "Stock",  // folder name in jewelry-images container
+                        namePath
+                    );
 
-                    string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Stock/Product");
-                    if (!Directory.Exists(imagePath))
+                    if (!result.Success)
                     {
-                        Directory.CreateDirectory(imagePath);
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                     }
 
-                    string imagePathWithFileName = Path.Combine(imagePath, $"{namePath}");
-
-                    //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                    using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
-                    {
-                        request.Image.CopyTo(fileStream);
-                        fileStream.Close();
-                    }
+                    // บันทึก blob path: "Stock/filename.jpg"
+                    newImage.NamePath = result.BlobName;
                 }
                 catch (Exception ex)
                 {
-                    //_logger.LogError($"ไม่สามารถบันทึกรูปภาพได้: {ex.Message}", ex);
                     throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
                 }
 

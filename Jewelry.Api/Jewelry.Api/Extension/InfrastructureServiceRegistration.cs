@@ -1,4 +1,5 @@
-﻿using Jewelry.Data.Context;
+﻿using jewelry.Model.Azure;
+using Jewelry.Data.Context;
 using Jewelry.Service.Authentication.Login;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
@@ -35,6 +36,15 @@ namespace Jewelry.Api.Extension
             //Register DB
             services.AddDbContext<JewelryContext>(options =>
                 options.UseNpgsql(SQLServerConnectionString));
+
+            // Configure Azure Storage
+            services.Configure<AzureStorageConfig>(
+                configuration.GetSection("AzureStorage")
+            );
+
+            // Register Azure Blob Storage Service as Singleton
+            // (Singleton เพราะ BlobServiceClient เป็น thread-safe และ reusable)
+            services.AddSingleton<IAzureBlobStorageService, AzureBlobStorageService>();
 
             //Register Service
             services.AddScoped<IReadExcelProduct, ReadExcelProduct>();

@@ -27,13 +27,16 @@ namespace Jewelry.Service.Stock
     {
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
+        private readonly IAzureBlobStorageService _azureBlobService;
 
         public MoldService(JewelryContext JewelryContext,
              IHostEnvironment HostingEnvironment,
+             IAzureBlobStorageService azureBlobService,
              IHttpContextAccessor httpContextAccessor) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
+            _azureBlobService = azureBlobService;
         }
         public async Task<string> CreateMold(CreateMoldRequest request)
         {
@@ -68,20 +71,23 @@ namespace Jewelry.Service.Stock
 
                 try
                 {
+                    // Upload to Azure Blob Storage (Single Container Architecture)
+                    using var stream = request.Images.OpenReadStream();
+                    var result = await _azureBlobService.UploadImageAsync(
+                        stream,
+                        "Mold",  // folder name in jewelry-images container
+                        addMold.Image
+                    );
 
-                    string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold");
-                    if (!Directory.Exists(imagePath))
+                    if (!result.Success)
                     {
-                        Directory.CreateDirectory(imagePath);
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                     }
-                    string imagePathWithFileName = Path.Combine(imagePath, addMold.Image);
 
-                    //https://www.thecodebuzz.com/how-to-save-iformfile-to-disk/
-                    using (Stream fileStream = new FileStream(imagePathWithFileName, FileMode.Create, FileAccess.Write))
-                    {
-                        request.Images.CopyTo(fileStream);
-                        fileStream.Close();
-                    }
+                    // อัพเดท Image path: "Mold/filename.jpg"
+                    addMold.Image = result.BlobName;
+                    _jewelryContext.TbtProductMold.Update(addMold);
+                    await _jewelryContext.SaveChangesAsync();
                 }
                 catch (Exception ex)
                 {
@@ -106,22 +112,41 @@ namespace Jewelry.Service.Stock
             {
                 if (request.ImagesMain != null)
                 {
-                    string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold", $"{request.Code.ToUpper().Trim()}-Mold.png");
-                    // ไม่ต้องตรวจสอบหรือลบไฟล์เดิม FileMode.Create จะทับไฟล์เดิมโดยอัตโนมัติ
-                    using (Stream fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write))
+                    var fileName = $"{request.Code.ToUpper().Trim()}-Mold.png";
+
+                    // Upload to Azure Blob Storage (Single Container Architecture)
+                    using var stream = request.ImagesMain.OpenReadStream();
+                    var result = await _azureBlobService.UploadImageAsync(
+                        stream,
+                        "Mold",  // folder name in jewelry-images container
+                        fileName
+                    );
+
+                    if (!result.Success)
                     {
-                        await request.ImagesMain.CopyToAsync(fileStream);
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                     }
+
+                    mold.Image = result.BlobName;
                 }
                 if (request.ImagesSub != null)
                 {
-                    string imagePath = Path.Combine(_hostingEnvironment.ContentRootPath, "Images/Mold", $"{request.Code.ToUpper().Trim()}-Sub-Mold.png");
-                    // ไม่ต้องตรวจสอบหรือลบไฟล์เดิม FileMode.Create จะทับไฟล์เดิมโดยอัตโนมัติ
-                    using (Stream fileStream = new FileStream(imagePath, FileMode.Create, FileAccess.Write))
+                    var fileName = $"{request.Code.ToUpper().Trim()}-Sub-Mold.png";
+
+                    // Upload to Azure Blob Storage (Single Container Architecture)
+                    using var stream = request.ImagesSub.OpenReadStream();
+                    var result = await _azureBlobService.UploadImageAsync(
+                        stream,
+                        "Mold",  // folder name in jewelry-images container
+                        fileName
+                    );
+
+                    if (!result.Success)
                     {
-                        await request.ImagesSub.CopyToAsync(fileStream);
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                     }
-                    mold.ImageDraft1 = $"{request.Code.ToUpper().Trim()}-Sub-Mold.png";
+
+                    mold.ImageDraft1 = result.BlobName;
                 }
                 mold.Category = request.Category;
                 mold.CategoryCode = request.CategoryCode;
