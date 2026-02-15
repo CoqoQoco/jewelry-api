@@ -21,6 +21,9 @@ jobs:
         with:
           dotnet-version: '8.x'
 
+      - name: Clean
+        run: dotnet clean ./Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj --configuration Release
+
       - name: Restore dependencies
         run: dotnet restore ./Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj
 
@@ -28,7 +31,10 @@ jobs:
         run: dotnet build ./Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj --configuration Release --no-restore
 
       - name: Publish
-        run: dotnet publish ./Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj --configuration Release --no-build --output ${{github.workspace}}/publish
+        run: dotnet publish ./Jewelry.Api/Jewelry.Api/Jewelry.Api.csproj --configuration Release --no-build --output ${{github.workspace}}/publish --no-self-contained
+
+      - name: Remove debug symbols
+        run: find ${{github.workspace}}/publish -name "*.pdb" -type f -delete
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4

@@ -8,6 +8,21 @@
 	  <UserSecretsId>af92da24-7085-48e8-aea0-7fbabc764bcb</UserSecretsId>
   </PropertyGroup>
 
+  <!-- Release Configuration - Fix "Bad IL range" error -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Optimize>true</Optimize>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Debug Configuration -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Remove=".github\**" />
     <Content Remove=".github\**" />
