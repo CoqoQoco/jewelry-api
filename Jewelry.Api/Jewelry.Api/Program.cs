@@ -22,12 +22,12 @@ builder.Services.AddControllers()
         // ใช้ CamelCasePropertyNamesContractResolver เพื่อให้ได้ camelCase (tokenValue, userId, etc.)
         options.SerializerSettings.ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver();
         // เพิ่ม error handling สำหรับ serialization
-        options.SerializerSettings.Error = (sender, args) =>
-        {
-            Console.WriteLine($"JSON Serialization Error: {args.ErrorContext.Error.Message}");
-            Console.WriteLine($"Path: {args.ErrorContext.Path}");
-            args.ErrorContext.Handled = true; // ข้ามไปต่อแทนที่จะ throw
-        };
+        //options.SerializerSettings.Error = (sender, args) =>
+        //{
+        //    Console.WriteLine($"JSON Serialization Error: {args.ErrorContext.Error.Message}");
+        //    Console.WriteLine($"Path: {args.ErrorContext.Path}");
+        //    args.ErrorContext.Handled = true; // ข้ามไปต่อแทนที่จะ throw
+        //};
     });
 
 // JWT Configuration - with null check
