@@ -96,6 +96,8 @@ public partial class TbtStockProduct
 
     public decimal? QtyRemaining { get; set; }
 
+    public decimal? TagPriceMultiplier { get; set; }
+
     /// <summary>
     /// ต้นทุนสินค้า
     /// </summary>

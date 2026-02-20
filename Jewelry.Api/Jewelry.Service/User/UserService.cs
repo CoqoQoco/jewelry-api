@@ -661,7 +661,10 @@ namespace Jewelry.Service.User
         public IQueryable<jewelry.Model.User.ListMyjob.Response> ListMyJob(jewelry.Model.User.ListMyJob.Search request)
         {
             var query = (from job in _jewelryContext.TbtMyJob
+                         where job.CreateBy == CurrentUsername
                          select job);
+
+            var tst = query.ToList();
 
             // Filter by Id
             if (request.Id != null && request.Id.Any())

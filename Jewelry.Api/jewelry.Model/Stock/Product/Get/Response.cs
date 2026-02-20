@@ -49,6 +49,7 @@ namespace jewelry.Model.Stock.Product.Get
         public string? UpdateBy { get; set; }
 
         public int? PlanQty { get; set; }
+        public decimal TagPriceMultiplier { get; set; } = 1;
 
         public List<Material> Materials { get; set; } = new List<Material>();
         public List<PriceTransaction> PriceTransactions { get; set; } = new List<PriceTransaction>();

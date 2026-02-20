@@ -18,6 +18,7 @@ namespace jewelry.Model.Stock.Product.ListProductCost
         public string? CustomerEmail { get; set; }
 
         public string? Remark { get; set; }
+        public decimal TagPriceMultiplier { get; set; } = 1;
         public List<ResponseItem> Prictransection { get; set; } = new List<ResponseItem>();
 
         public DateTime CreateDate { get; set; }

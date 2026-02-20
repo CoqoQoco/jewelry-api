@@ -71,26 +71,18 @@ namespace Jewelry.Api.Controllers.Sale
             }
         }
 
-        [HttpPost("List")]
-        public IActionResult List(jewelry.Model.Sale.Invoice.List.Request request)
+        [Route("List")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult List([FromBody] jewelry.Model.Sale.Invoice.List.Request request)
         {
             try
             {
                 var query = _service.List(request);
-                
-                var result = query.Skip(request.Skip)
-                                 .Take(request.Take)
-                                 .ToList();
-                
-                var total = query.Count();
-
-                return Ok(new 
-                { 
-                    data = result, 
-                    total = total,
-                    skip = request.Skip,
-                    take = request.Take
-                });
+                var response = query.ToDataSourceResult(request);
+                return Ok(response);
             }
             catch (HandleException ex)
             {
@@ -100,7 +92,7 @@ namespace Jewelry.Api.Controllers.Sale
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error listing invoices");
-                return StatusCode((int)HttpStatusCode.InternalServerError, 
+                return StatusCode((int)HttpStatusCode.InternalServerError,
                     new { message = "An error occurred while listing invoices" });
             }
         }

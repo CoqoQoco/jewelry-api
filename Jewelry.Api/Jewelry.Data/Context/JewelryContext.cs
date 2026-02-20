@@ -2242,6 +2242,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.VersionRunning)
                 .HasColumnType("character varying")
                 .HasColumnName("version_running");
+            entity.Property(e => e.StockNumberOrigin)
+           .HasColumnType("character varying")
+           .HasColumnName("stock_number_origin");
 
             entity.HasOne(d => d.TbtStockCostVersion).WithMany(p => p.TbtStockCostPlan)
                 .HasForeignKey(d => new { d.VersionRunning, d.StockNumber })
@@ -2292,6 +2295,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.TagPriceMultiplier).HasColumnName("tag_price_multiplier");
 
             entity.HasOne(d => d.StockNumberNavigation).WithMany(p => p.TbtStockCostVersion)
                 .HasForeignKey(d => d.StockNumber)
@@ -2508,6 +2512,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("product_code");
             entity.Property(e => e.ProductCost).HasColumnName("product_cost");
+            entity.Property(e => e.TagPriceMultiplier).HasColumnName("tag_price_multiplier");
             entity.Property(e => e.ProductCostDetail)
                 .HasComment("ต้นทุนสินค้า")
                 .HasColumnType("jsonb")

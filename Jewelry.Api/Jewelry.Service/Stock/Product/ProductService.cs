@@ -152,6 +152,8 @@ namespace Jewelry.Service.Stock.Product
                                CreateBy = item.CreateBy,
                                CreateDate = item.CreateDate,
 
+                               TagPriceMultiplier = item.TagPriceMultiplier ?? 1,
+
                                Materials = item.TbtStockProductMaterial.Any() ?
                                             (from material in item.TbtStockProductMaterial
                                              select new jewelry.Model.Stock.Product.List.Material()
@@ -269,6 +271,7 @@ namespace Jewelry.Service.Stock.Product
                 CreateDate = stock.CreateDate,
                 UpdateBy = stock.UpdateBy,
                 UpdateDate = stock.UpdateDate,
+                TagPriceMultiplier = stock.TagPriceMultiplier ?? 1,
                 Materials = (from material in stock.TbtStockProductMaterial
                              select new jewelry.Model.Stock.Product.Get.Material()
                              {
@@ -449,10 +452,24 @@ namespace Jewelry.Service.Stock.Product
         public async Task<string> CreateProductCostDeatialPlan(jewelry.Model.Stock.Product.PlanPeoductCost.Request request)
         {
             var _running = await _runningNumberService.GenerateRunningNumber("CP");
+
+
+            var stock = (from item in _jewelryContext.TbtStockProduct
+                        .Include(x => x.TbtStockProductMaterial)
+                         where item.Status == "Available" && item.StockNumber == request.StockNumber   
+                         select item).FirstOrDefault();
+
+            if (stock == null)
+            { 
+                throw new HandleException(ErrorMessage.NotFound);   
+            }
+
             var newPlan = new TbtStockCostPlan()
             {
                 Running = _running,
                 StockNumber = request.StockNumber,
+                StockNumberOrigin = stock.ProductCode,
+
                 Remark = request.Remark,
 
                 StatusId = JobStatus.Pending,
@@ -518,6 +535,7 @@ namespace Jewelry.Service.Stock.Product
                 CustomerTel = request.CustomerTel,
                 CustomerEmail = request.CustomerEmail,
                 Remark = request.Remark,
+                TagPriceMultiplier = request.TagPriceMultiplier,
 
             };
 
@@ -535,6 +553,7 @@ namespace Jewelry.Service.Stock.Product
             {
                 stock.ProductCostDetail = priceTransactionList.ProductCostDetail;
                 stock.ProductCost = request.Prictransection.Sum(x => x.TotalPrice);
+                stock.TagPriceMultiplier = request.TagPriceMultiplier;
 
                 stock.UpdateBy = CurrentUsername;
                 stock.UpdateDate = DateTime.UtcNow;
@@ -595,6 +614,7 @@ namespace Jewelry.Service.Stock.Product
                                 CustomerTel = item.CustomerTel,
                                 CustomerEmail = item.CustomerEmail,
                                 Remark = item.Remark,
+                                TagPriceMultiplier = item.TagPriceMultiplier ?? 1,
                                 CreateBy = item.CreateBy,
                                 CreateDate = item.CreateDate,
                                 UpdateBy = item.UpdateBy,
@@ -637,6 +657,7 @@ namespace Jewelry.Service.Stock.Product
                 CustomerTel = costVersion.CustomerTel,
                 CustomerEmail = costVersion.CustomerEmail,
                 Remark = costVersion.Remark,
+                TagPriceMultiplier = costVersion.TagPriceMultiplier ?? 1,
                 CreateBy = costVersion.CreateBy,
                 CreateDate = costVersion.CreateDate,
                 UpdateBy = costVersion.UpdateBy,

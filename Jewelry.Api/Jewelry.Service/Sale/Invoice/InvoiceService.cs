@@ -273,8 +273,10 @@ namespace Jewelry.Service.Sale.Invoice
             return response;
         }
 
-        public IQueryable<jewelry.Model.Sale.Invoice.List.Response> List(jewelry.Model.Sale.Invoice.List.Request request)
+        public IQueryable<jewelry.Model.Sale.Invoice.List.Response> List(jewelry.Model.Sale.Invoice.List.Request _request)
         {
+            var request = _request.Search;
+
             var query = from invoice in _jewelryContext.TbtSaleInvoiceHeader
                         where invoice.IsDelete == false
                         select new jewelry.Model.Sale.Invoice.List.Response
@@ -307,8 +309,8 @@ namespace Jewelry.Service.Sale.Invoice
                             RefQuotation = invoice.RefQuotation,
                             Remark = invoice.Remark,
 
-                            //Status = invoice.Status,
-                            //StatusName = invoice.StatusName,
+                            Status = invoice.Status,
+                            StatusName = invoice.StatusName,
 
                             ItemCount = _jewelryContext.TbtSaleOrderProduct.Count(x => x.Invoice == invoice.Running),
                             //TotalAmount = _jewelryContext.TbtSaleOrderProduct
@@ -320,6 +322,11 @@ namespace Jewelry.Service.Sale.Invoice
             if (!string.IsNullOrEmpty(request.InvoiceNumber))
             {
                 query = query.Where(x => x.InvoiceNumber.Contains(request.InvoiceNumber));
+            }
+
+            if (!string.IsNullOrEmpty(request.DKInvoiceNumber))
+            {
+                query = query.Where(x => x.DKInvoiceNumber.Contains(request.DKInvoiceNumber));
             }
 
             if (!string.IsNullOrEmpty(request.CustomerName))
@@ -337,86 +344,29 @@ namespace Jewelry.Service.Sale.Invoice
                 query = query.Where(x => x.Status == request.Status.Value);
             }
 
-            if (request.CreateDateFrom.HasValue)
-            {
-                query = query.Where(x => x.CreateDate >= request.CreateDateFrom.Value);
-            }
-
-            if (request.CreateDateTo.HasValue)
-            {
-                query = query.Where(x => x.CreateDate <= request.CreateDateTo.Value);
-            }
-
-            if (request.DeliveryDateFrom.HasValue)
-            {
-                query = query.Where(x => x.DeliveryDate >= request.DeliveryDateFrom.Value);
-            }
-
-            if (request.DeliveryDateTo.HasValue)
-            {
-                query = query.Where(x => x.DeliveryDate <= request.DeliveryDateTo.Value);
-            }
-
             if (!string.IsNullOrEmpty(request.CreateBy))
             {
                 query = query.Where(x => x.CreateBy.Contains(request.CreateBy));
             }
 
-            // Apply ordering
-            if (!string.IsNullOrEmpty(request.OrderBy))
+            if (request.CreateDateFrom.HasValue)
             {
-                if (request.OrderDirection?.ToUpper() == "ASC")
-                {
-                    switch (request.OrderBy.ToLower())
-                    {
-                        case "invoicenumber":
-                            query = query.OrderBy(x => x.InvoiceNumber);
-                            break;
-                        case "customername":
-                            query = query.OrderBy(x => x.CustomerName);
-                            break;
-                        case "createdate":
-                            query = query.OrderBy(x => x.CreateDate);
-                            break;
-                        case "deliverydate":
-                            query = query.OrderBy(x => x.DeliveryDate);
-                            break;
-                        case "totalamount":
-                            query = query.OrderBy(x => x.TotalAmount);
-                            break;
-                        default:
-                            query = query.OrderBy(x => x.CreateDate);
-                            break;
-                    }
-                }
-                else
-                {
-                    switch (request.OrderBy.ToLower())
-                    {
-                        case "invoicenumber":
-                            query = query.OrderByDescending(x => x.InvoiceNumber);
-                            break;
-                        case "customername":
-                            query = query.OrderByDescending(x => x.CustomerName);
-                            break;
-                        case "createdate":
-                            query = query.OrderByDescending(x => x.CreateDate);
-                            break;
-                        case "deliverydate":
-                            query = query.OrderByDescending(x => x.DeliveryDate);
-                            break;
-                        case "totalamount":
-                            query = query.OrderByDescending(x => x.TotalAmount);
-                            break;
-                        default:
-                            query = query.OrderByDescending(x => x.CreateDate);
-                            break;
-                    }
-                }
+                query = query.Where(x => x.CreateDate >= request.CreateDateFrom.Value.StartOfDayUtc());
             }
-            else
+
+            if (request.CreateDateTo.HasValue)
             {
-                query = query.OrderByDescending(x => x.CreateDate);
+                query = query.Where(x => x.CreateDate <= request.CreateDateTo.Value.EndOfDayUtc());
+            }
+
+            if (request.DeliveryDateFrom.HasValue)
+            {
+                query = query.Where(x => x.DeliveryDate.HasValue && x.DeliveryDate.Value >= request.DeliveryDateFrom.Value.StartOfDayUtc());
+            }
+
+            if (request.DeliveryDateTo.HasValue)
+            {
+                query = query.Where(x => x.DeliveryDate.HasValue && x.DeliveryDate.Value <= request.DeliveryDateTo.Value.EndOfDayUtc());
             }
 
             return query;

@@ -33,6 +33,8 @@ public partial class TbtStockCostVersion
 
     public string? JobRunning { get; set; }
 
+    public decimal? TagPriceMultiplier { get; set; }
+
     public virtual TbtStockProduct StockNumberNavigation { get; set; } = null!;
 
     public virtual ICollection<TbtStockCostPlan> TbtStockCostPlan { get; set; } = new List<TbtStockCostPlan>();

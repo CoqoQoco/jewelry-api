@@ -48,6 +48,8 @@ namespace jewelry.Model.Stock.Product.List
         public DateTime? UpdateDate { get; set; }
         public string? UpdateBy { get; set; }
 
+        public decimal TagPriceMultiplier { get; set; } = 1;
+
         public List<Material> Materials { get; set; } = new List<Material>();
         //public List<PriceTransection>? PriceTransection { get; set; } = new List<PriceTransection>();
     }

@@ -14,6 +14,7 @@ public partial class TbtStockCostPlan
     public string Running { get; set; } = null!;
 
     public string StockNumber { get; set; } = null!;
+    public string? StockNumberOrigin { get; set; } 
 
     public string? UpdateBy { get; set; }
 
