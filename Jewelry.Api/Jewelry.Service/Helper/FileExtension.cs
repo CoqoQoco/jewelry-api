@@ -135,7 +135,7 @@ namespace Jewelry.Service.Helper
             try
             {
                 // Download from Azure Blob Storage - Stock folder
-                var stream = await _azureBlobService.DownloadImageAsync("Stock", imageName);
+                var stream = await _azureBlobService.DownloadImageAsync("Stock/Product", imageName);
 
                 using (var memoryStream = new MemoryStream())
                 {
