@@ -316,22 +316,62 @@ namespace Jewelry.Service.Stock.Product
                 if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
                 {
                     response.PlanQty = plan.ProductQty;
-                    response.PriceTransactions = plan.TbtProductionPlanPrice.Select(x => new jewelry.Model.Stock.Product.Get.PriceTransaction()
+
+                    // Gold: sum รวมเป็นรายการเดียว
+                    var goldItems = plan.TbtProductionPlanPrice.Where(x => x.NameGroup == "Gold").ToList();
+                    var nonGoldItems = plan.TbtProductionPlanPrice.Where(x => x.NameGroup != "Gold").ToList();
+
+                    var transactions = new List<jewelry.Model.Stock.Product.Get.PriceTransaction>();
+
+                    var getGoldCalWeight = goldItems.Where(x => x.NameDescription == "น้ำหนักทองรวมหลังหักเพชรพลอย").FirstOrDefault();
+                    if (getGoldCalWeight != null)
+                    { 
+                      //add get goal cal weight as gold item
+                        transactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
+                        {
+                            No = getGoldCalWeight.No,
+                            Name = getGoldCalWeight.Name,
+                            NameDescription = getGoldCalWeight.NameDescription,
+                            NameGroup = getGoldCalWeight.NameGroup,
+                            Date = getGoldCalWeight.Date,
+                            Qty = Math.Round(getGoldCalWeight.Qty / plan.ProductQty, 2),
+                            QtyPrice = Math.Round(getGoldCalWeight.QtyPrice, 2),
+                            QtyWeight = Math.Round(getGoldCalWeight.QtyWeight / plan.ProductQty, 2),
+                            QtyWeightPrice = Math.Round(getGoldCalWeight.QtyWeightPrice, 2),
+                        });
+                    }
+                    //if (goldItems.Any())
+                    //{
+                    //    var firstGold = goldItems.First();
+                    //    transactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
+                    //    {
+                    //        No = firstGold.No,
+                    //        Name = string.Join(", ", goldItems.Select(x => x.Name).Distinct()),
+                    //        NameDescription = string.Join(", ", goldItems.Select(x => x.NameDescription).Distinct()),
+                    //        NameGroup = firstGold.NameGroup,
+                    //        Date = firstGold.Date,
+                    //        Qty = Math.Round(goldItems.Sum(x => x.Qty) / plan.ProductQty, 2),
+                    //        QtyPrice = Math.Round(goldItems.Average(x => x.QtyPrice), 2),
+                    //        QtyWeight = Math.Round(goldItems.Sum(x => x.QtyWeight) / plan.ProductQty, 2),
+                    //        QtyWeightPrice = Math.Round(goldItems.Average(x => x.QtyWeightPrice), 2),
+                    //    });
+                    //}
+
+                    // Non-Gold: คงเดิม
+                    transactions.AddRange(nonGoldItems.Select(x => new jewelry.Model.Stock.Product.Get.PriceTransaction()
                     {
                         No = x.No,
                         Name = x.Name,
                         NameDescription = x.NameDescription,
                         NameGroup = x.NameGroup,
-
                         Date = x.Date,
-
                         Qty = Math.Round(x.Qty / plan.ProductQty, 2),
                         QtyPrice = Math.Round(x.QtyPrice, 2),
                         QtyWeight = Math.Round(x.QtyWeight / plan.ProductQty, 2),
                         QtyWeightPrice = Math.Round(x.QtyWeightPrice, 2),
+                    }));
 
-                        //TotalPrice = Math.Round(x.TotalPrice / plan.ProductQty, 2),
-                    }).ToList();
+                    response.PriceTransactions = transactions;
                 }
                 else
                 {
@@ -361,34 +401,35 @@ namespace Jewelry.Service.Stock.Product
             }
             else
             {
-                //set price from stock material
-                var materials = response.Materials.Where(x => x.Type == "Gold" || x.Type == "Gem" || x.Type == "Diamond").ToList();
-                int no = 1;
-                foreach (var mat in materials)
+                if (!response.PriceTransactions.Any())
                 {
-                    response.PriceTransactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
+                    //set price from stock material
+                    var materials = response.Materials.Where(x => x.Type == "Gold" || x.Type == "Gem" || x.Type == "Diamond").ToList();
+                    int no = 1;
+                    foreach (var mat in materials)
                     {
-                        No = no,
-                        Name = mat.TypeName,
-                        NameDescription = mat.TypeCode,
-                        NameGroup = GetNameGroupGroup(mat.Type),
+                        response.PriceTransactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
+                        {
+                            No = no,
+                            Name = mat.TypeName,
+                            NameDescription = mat.TypeCode,
+                            NameGroup = GetNameGroupGroup(mat.Type),
 
-                        Date = stock.CreateDate,
-                        Qty = mat.Qty,
-                        QtyPrice = 0m,
-                        QtyWeight = mat.Weight,
-                        QtyWeightPrice = mat.Price,
-                        //TotalPrice = Math.Round(mat.Price / response.Qty, 2),
-                    });
-                    no++;
+                            Date = stock.CreateDate,
+                            Qty = mat.Qty,
+                            QtyPrice = 0m,
+                            QtyWeight = mat.Weight,
+                            QtyWeightPrice = mat.Price,
+                            //TotalPrice = Math.Round(mat.Price / response.Qty, 2),
+                        });
+                        no++;
+                    }
                 }
 
             }
 
             return response;
         }
-
-
         public async Task<string> Update(jewelry.Model.Stock.Product.Update.Request request)
         {
             CheckPermissionLevel("update_stock");

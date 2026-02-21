@@ -534,6 +534,8 @@ namespace Jewelry.Service.Receipt.Production
 
                 var _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
 
+                //เเก้ตรงนี้ต้อง prefix ต้อง 18K ,9K
+
                 var newProduct = match.MapNewStockProduction(query.receipt, query.plan, stock, _stockRunning, CurrentUsername);
                 var newProductResponse = newProduct.MapResponseNewStockProduction();
                 newStocks.Add(newProduct);
