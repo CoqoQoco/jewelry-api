@@ -359,6 +359,31 @@ namespace Jewelry.Service.Stock.Product
 
                 }
             }
+            else
+            {
+                //set price from stock material
+                var materials = response.Materials.Where(x => x.Type == "Gold" || x.Type == "Gem" || x.Type == "Diamond").ToList();
+                int no = 1;
+                foreach (var mat in materials)
+                {
+                    response.PriceTransactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
+                    {
+                        No = no,
+                        Name = mat.TypeName,
+                        NameDescription = mat.TypeCode,
+                        NameGroup = GetNameGroupGroup(mat.Type),
+
+                        Date = stock.CreateDate,
+                        Qty = mat.Qty,
+                        QtyPrice = 0m,
+                        QtyWeight = mat.Weight,
+                        QtyWeightPrice = mat.Price,
+                        //TotalPrice = Math.Round(mat.Price / response.Qty, 2),
+                    });
+                    no++;
+                }
+
+            }
 
             return response;
         }
