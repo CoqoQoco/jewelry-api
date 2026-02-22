@@ -40,6 +40,9 @@ namespace jewelry.Model.Sale.SaleOrder.Get
         public decimal CurrencyRate { get; set; }
         public decimal? Markup { get; set; }
         public decimal? GoldRate { get; set; }
+        public decimal? SpecialDiscount { get; set; }
+        public decimal? SpecialAddition { get; set; }
+        public decimal? Vat { get; set; }
 
         public string? Remark { get; set; }
 

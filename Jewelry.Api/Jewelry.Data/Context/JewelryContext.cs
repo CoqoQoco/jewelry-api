@@ -2105,6 +2105,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.SpecialDiscount).HasColumnName("special_discount");
+            entity.Property(e => e.SpecialAddition).HasColumnName("special_addition");
+            entity.Property(e => e.Vat).HasColumnName("vat");
         });
 
         modelBuilder.Entity<TbtSaleOrderProduct>(entity =>

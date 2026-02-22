@@ -52,4 +52,10 @@ public partial class TbtSaleOrder
     public decimal? GoldRate { get; set; }
 
     public decimal? MarkUp { get; set; }
+
+    public decimal? SpecialDiscount { get; set; }
+
+    public decimal? SpecialAddition { get; set; }
+
+    public decimal? Vat { get; set; }
 }

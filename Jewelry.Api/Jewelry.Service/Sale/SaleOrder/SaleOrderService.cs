@@ -92,6 +92,10 @@ namespace Jewelry.Service.Sale.SaleOrder
                     MarkUp = request.Markup,
                     GoldRate = request.GoldRate,
 
+                    SpecialDiscount = request.SpecialDiscount,
+                    SpecialAddition = request.SpecialAddition,
+                    Vat = request.Vat,
+
                     Remark = request.Remark,
 
                     CreateDate = DateTime.UtcNow,
@@ -136,6 +140,10 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                 saleOrder.MarkUp = request.Markup;
                 saleOrder.GoldRate = request.GoldRate;
+
+                saleOrder.SpecialDiscount = request.SpecialDiscount;
+                saleOrder.SpecialAddition = request.SpecialAddition;
+                saleOrder.Vat = request.Vat;
 
                 saleOrder.Remark = request.Remark;
 
@@ -200,6 +208,10 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                 Markup = saleOrder.MarkUp,
                 GoldRate = saleOrder.GoldRate,
+
+                SpecialDiscount = saleOrder.SpecialDiscount,
+                SpecialAddition = saleOrder.SpecialAddition,
+                Vat = saleOrder.Vat,
 
                 Remark = saleOrder.Remark
             };
@@ -328,7 +340,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                             if (matchStock.QtyRemaining <= 0)
                             {
                                 stock.IsRemainProduct = false;
-                                stock.Message = stock.IsConfirm || stock.IsInvoice ? null : "ÊÔ¹¤éÒËÁ´ÊµçÍ¡";
+                                stock.Message = stock.IsConfirm || stock.IsInvoice ? null : "ï¿½Ô¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½Í¡";
                             }
                         }
                     }
