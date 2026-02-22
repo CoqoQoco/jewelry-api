@@ -139,7 +139,7 @@ namespace Jewelry.Service.Stock.Product
 
                                Wo = item.Wo,
                                WoNumber = item.WoNumber,
-                               WoText = $"{item.Wo}{item.WoNumber.ToString()}",
+                               WoText = string.IsNullOrEmpty(item.Wo) ? null : $"{item.Wo}{item.WoNumber.ToString()}",
 
                                ProductionDate = item.CreateDate,
                                ProductionType = item.ProductionType,

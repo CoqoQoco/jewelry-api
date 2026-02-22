@@ -724,146 +724,181 @@ namespace Jewelry.Service.TransferStock
         #region *** 2025-11-25 TranferStock 18K ***
         public async Task<string> TransferStock18K(jewelry.Model.Stock.OldStock._9K.Request request)
         {
-            var get9kStock = (from item in _jewelryContext.Stock18k
+            const int batchSize = 500;
+
+            // 1. Query ครั้งเดียว → ToListAsync เก็บ memory
+            var get18kStock = await (from item in _jewelryContext.Stock18k
                               join stock in _jewelryContext.Stock
                               on item.NoProduct equals stock.Noproduct
-                              //on new
-                              //{
-                              //    Product = item.NoProduct,
-                              //    //Style = item.StyleNo
-                              //} equals new
-                              //{
-                              //    Product = stock.Noproduct,
-                              //    //Style = stock.Styleno
-                              //}
                               into _stock
                               from stocks in _stock.DefaultIfEmpty()
                               where item.IsTransfer == false
-                              select new { item, stocks }).Take(request.Take);
+                              select new { item, stocks }).Take(request.Take).ToListAsync();
 
-            if (!get9kStock.Any())
+            if (!get18kStock.Any())
             {
-                throw new HandleException("No 9K stock to transfer.");
+                throw new HandleException("No 18K stock to transfer.");
             }
 
             var masterProductType = await _jewelryContext.TbmProductType.ToListAsync();
             var masterGold = await _jewelryContext.TbmGold.ToListAsync();
             var masterGoldSize = await _jewelryContext.TbmGoldSize.ToListAsync();
 
-            // Pre-generate running numbers in batch to avoid multiple DB calls
+            // 2. เช็ค existing ก่อน เพื่อรู้จำนวนที่ต้อง insert จริง
+            var validItems = get18kStock.Where(x => x.stocks != null && !string.IsNullOrEmpty(x.stocks.NoCode)).ToList();
+            var productCodes = validItems.Select(x => x.stocks.Noproduct).Distinct().ToList();
+
+            // แบ่ง batch สำหรับ IN query (ป้องกัน parameter limit)
+            var existingStockDict = new Dictionary<string, TbtStockProduct>();
+            foreach (var codeBatch in productCodes.Chunk(500))
+            {
+                var batch = await _jewelryContext.TbtStockProduct
+                    .Where(x => codeBatch.Contains(x.ProductCode))
+                    .ToListAsync();
+                foreach (var item in batch)
+                {
+                    if (item.ProductCode != null && !existingStockDict.ContainsKey(item.ProductCode))
+                        existingStockDict[item.ProductCode] = item;
+                }
+            }
+
+            // 3. นับจำนวนที่ต้อง insert จริง แล้วค่อย generate running number
+            var itemsToInsert = validItems.Where(x => !existingStockDict.ContainsKey(x.stocks.Noproduct ?? "")).ToList();
             var _receiptRunning = await _runningNumberService.GenerateRunningNumber("DK18K");
+
             var stockRunningNumbers = new List<string>();
-            for (int i = 0; i < get9kStock.Count(); i++)
+            for (int i = 0; i < itemsToInsert.Count; i++)
             {
                 stockRunningNumbers.Add(await _runningNumberService.GenerateRunningNumberForStockProductHash("DK-18K"));
             }
 
-
+            // 4. แยก insert / update
             var newProducts = new List<TbtStockProduct>();
             var newProductMaterials = new List<TbtStockProductMaterial>();
             var stock18kUpdates = new List<Stock18k>();
 
-            int add = 0;
+            int addCount = 0;
+            int updateCount = 0;
             int runningIndex = 0;
 
-            foreach (var _stock in get9kStock)
+            foreach (var _stock in get18kStock)
             {
                 var stock = _stock.stocks;
-                var stock9kUpdate = _stock.item;
+                var stock18kItem = _stock.item;
 
-                if (stock == null)
+                if (stock == null || string.IsNullOrEmpty(stock.NoCode))
                 {
+                    stock18kItem.IsTransfer = true;
+                    stock18kUpdates.Add(stock18kItem);
                     continue;
                 }
 
-                if (string.IsNullOrEmpty(stock.NoCode))
+                // เช็คว่า stock มีอยู่แล้วหรือไม่ (ทั้ง DB + ที่เพิ่ง insert ใน loop นี้)
+                var productCode = stock.Noproduct ?? "";
+                existingStockDict.TryGetValue(productCode, out var existingProduct);
+
+                if (existingProduct != null)
                 {
-                    continue;
+                    // มีอยู่แล้ว → update เฉพาะ Wo, ProductPrice, UpdateDate, UpdateBy
+                    existingProduct.WoOrigin = stock.Jobno;
+                    existingProduct.Wo = GetWO(stock.Jobno);
+                    existingProduct.WoNumber = GetWONumber(stock.Jobno);
+                    existingProduct.ProductPrice = stock.Pricesale ?? 0;
+                    existingProduct.UpdateDate = DateTime.UtcNow;
+                    existingProduct.UpdateBy = CurrentUsername ?? "system";
+                    updateCount++;
                 }
-
-                var _stockRunning = stockRunningNumbers[runningIndex++];
-                add++;
-
-                var newProduct = new TbtStockProduct
+                else
                 {
-                    StockNumber = _stockRunning,
-                    Status = StockProductStatus.Available,
+                    // ไม่มี → insert ใหม่
+                    var _stockRunning = stockRunningNumbers[runningIndex++];
+                    addCount++;
 
-                    ReceiptNumber = _receiptRunning,
-                    ReceiptDate = DateTime.UtcNow,
-                    ReceiptType = "transfer",
-
-                    Mold = stock.NoCode,
-                    MoldDesign = stock.NoCode,
-
-                    Qty = stock.Quantity ?? 1,
-                    ProductPrice = stock.Pricesale ?? 0,
-
-                    ProductCost = string.IsNullOrEmpty(stock.Pricecost) ? 0 :
-                        decimal.TryParse(stock.Pricecost, out var cost) ? cost : 0,
-                    ProductCode = stock.Noproduct,
-                    ProductNumber = stock.Codeproduct,
-                    ProductNameTh = stock.Productname ?? "DK",
-                    ProductNameEn = stock.Productname ?? "DK",
-
-                    ImageName = stock.NoCode,
-                    ImagePath = $"{stock.NoCode}.jpg",
-
-                    Size = stock.Ringsize,
-                    Remark = stock.Remark,
-
-                    CreateBy = CurrentUsername ?? "system",
-                    CreateDate = DateTime.UtcNow
-                };
-
-                // Optimize product type assignment
-                if (!string.IsNullOrEmpty(stock.Typep))
-                {
-                    var productType = GetProductType(masterProductType, stock.Typep);
-                    newProduct.ProductType = productType.Code;
-                    newProduct.ProductTypeName = productType.NameTh;
-                }
-
-                newProduct.ProductionDate = GetProductionDate(stock.Dateproduct);
-                newProduct.ProductionType = ProducttionType(masterGold, stock.Typeg);
-                newProduct.ProductionTypeSize = ProducttionTypeSize(masterGoldSize, stock.Productname);
-                newProduct.WoOrigin = stock.Jobno;
-                newProduct.Wo = GetWO(stock.Jobno);
-                newProduct.WoNumber = GetWONumber(stock.Jobno);
-
-                newProducts.Add(newProduct);
-
-                // Process materials more efficiently
-                var materialTypes = new[]
-                {
-                    //type gold
-                    new { Type = stock.Typeg, TypeCode = stock.Typed1, Qty = stock.Qtyg, Weight = stock.Wg, Unit = stock.Unit1, Price = stock.Priceg, Size = (string)null },
-
-                    new { Type = stock.Typed, TypeCode = stock.Typed1, Qty = stock.Qtyd, Weight = stock.Wd, Unit = stock.Unit2, Price = stock.Priced, Size = (string)null },
-                    new { Type = stock.Typer, TypeCode = stock.Typed1, Qty = stock.Qtyr, Weight = stock.Wr, Unit = stock.Unit3, Price = stock.Pricer, Size = stock.Sizer },
-                    new { Type = stock.TypeS, TypeCode = stock.Typed1, Qty = stock.Qtys, Weight = stock.Ws, Unit = stock.Unit4, Price = stock.Prices, Size = stock.Sizes },
-                    new { Type = stock.Typee, TypeCode = stock.Typed1, Qty = stock.Qtye, Weight = stock.We, Unit = stock.Unit5, Price = stock.Pricee, Size = stock.Sizee },
-                    new { Type = stock.Typem, TypeCode = stock.Typed1, Qty = stock.Qtym, Weight = stock.Wm, Unit = stock.Unit6, Price = stock.Pricem, Size = stock.Sizem }
-                };
-
-                foreach (var mat in materialTypes)
-                {
-                    if (!string.IsNullOrEmpty(mat.Type))
+                    var newProduct = new TbtStockProduct
                     {
-                        var newMaterial = GetMaterial(_stockRunning, mat.Type.ToUpper().Trim(),
-                            mat.Type, mat.TypeCode, mat.Qty, mat.Weight, mat.Unit, mat.Price, mat.Size);
+                        StockNumber = _stockRunning,
+                        Status = StockProductStatus.Available,
 
-                        if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                        ReceiptNumber = _receiptRunning,
+                        ReceiptDate = DateTime.UtcNow,
+                        ReceiptType = "transfer",
+
+                        Mold = stock.NoCode,
+                        MoldDesign = stock.NoCode,
+
+                        Qty = stock.Quantity ?? 1,
+                        ProductPrice = stock.Pricesale ?? 0,
+
+                        ProductCost = string.IsNullOrEmpty(stock.Pricecost) ? 0 :
+                            decimal.TryParse(stock.Pricecost, out var cost) ? cost : 0,
+                        ProductCode = stock.Noproduct,
+                        ProductNumber = stock.Codeproduct,
+                        ProductNameTh = stock.Productname ?? "DK",
+                        ProductNameEn = stock.Productname ?? "DK",
+
+                        ImageName = stock.NoCode,
+                        ImagePath = $"{stock.NoCode}.jpg",
+
+                        Size = stock.Ringsize,
+                        Remark = stock.Remark,
+                        TagPriceMultiplier = 1,
+
+                        CreateBy = CurrentUsername ?? "system",
+                        CreateDate = DateTime.UtcNow
+                    };
+
+                    if (!string.IsNullOrEmpty(stock.Typep))
+                    {
+                        var productType = GetProductType(masterProductType, stock.Typep);
+                        newProduct.ProductType = productType.Code;
+                        newProduct.ProductTypeName = productType.NameTh;
+                    }
+
+                    newProduct.ProductionDate = GetProductionDate(stock.Dateproduct);
+                    newProduct.ProductionType = ProducttionType(masterGold, stock.Typeg);
+                    newProduct.ProductionTypeSize = ProducttionTypeSize(masterGoldSize, stock.Productname);
+                    newProduct.WoOrigin = stock.Jobno;
+                    newProduct.Wo = GetWO(stock.Jobno);
+                    newProduct.WoNumber = GetWONumber(stock.Jobno);
+
+                    newProducts.Add(newProduct);
+
+                    // track ไว้ใน dict ป้องกัน insert ซ้ำถ้า Noproduct เดียวกันมาอีกรอบ
+                    if (!string.IsNullOrEmpty(productCode))
+                    {
+                        existingStockDict[productCode] = newProduct;
+                    }
+
+                    var materialTypes = new[]
+                    {
+                        new { Type = stock.Typeg, TypeCode = stock.Typed1, Qty = stock.Qtyg, Weight = stock.Wg, Unit = stock.Unit1, Price = stock.Priceg, Size = (string)null },
+                        new { Type = stock.Typed, TypeCode = stock.Typed1, Qty = stock.Qtyd, Weight = stock.Wd, Unit = stock.Unit2, Price = stock.Priced, Size = (string)null },
+                        new { Type = stock.Typer, TypeCode = stock.Typed1, Qty = stock.Qtyr, Weight = stock.Wr, Unit = stock.Unit3, Price = stock.Pricer, Size = stock.Sizer },
+                        new { Type = stock.TypeS, TypeCode = stock.Typed1, Qty = stock.Qtys, Weight = stock.Ws, Unit = stock.Unit4, Price = stock.Prices, Size = stock.Sizes },
+                        new { Type = stock.Typee, TypeCode = stock.Typed1, Qty = stock.Qtye, Weight = stock.We, Unit = stock.Unit5, Price = stock.Pricee, Size = stock.Sizee },
+                        new { Type = stock.Typem, TypeCode = stock.Typed1, Qty = stock.Qtym, Weight = stock.Wm, Unit = stock.Unit6, Price = stock.Pricem, Size = stock.Sizem }
+                    };
+
+                    foreach (var mat in materialTypes)
+                    {
+                        if (!string.IsNullOrEmpty(mat.Type))
                         {
-                            newProductMaterials.Add(newMaterial);
+                            var newMaterial = GetMaterial(_stockRunning, mat.Type.ToUpper().Trim(),
+                                mat.Type, mat.TypeCode, mat.Qty, mat.Weight, mat.Unit, mat.Price, mat.Size);
+
+                            if (CheckTypeOrigin(newMaterial.TypeOrigin))
+                            {
+                                newProductMaterials.Add(newMaterial);
+                            }
                         }
                     }
                 }
 
-                stock9kUpdate.IsTransfer = true;
-                stock18kUpdates.Add(stock9kUpdate);
+                stock18kItem.IsTransfer = true;
+                stock18kUpdates.Add(stock18kItem);
             }
 
+            // 5. Save แบบ batch (ทีละ 500)
             using var scope = new TransactionScope(
                TransactionScopeOption.Required,
                new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
@@ -871,23 +906,26 @@ namespace Jewelry.Service.TransferStock
 
             try
             {
-                // Batch insert operations
-                if (newProducts.Any())
+                // Insert new products แบบ batch
+                foreach (var batch in newProducts.Chunk(batchSize))
                 {
-                    _jewelryContext.TbtStockProduct.AddRange(newProducts);
+                    _jewelryContext.TbtStockProduct.AddRange(batch);
+                    await _jewelryContext.SaveChangesAsync();
                 }
 
-                if (newProductMaterials.Any())
+                foreach (var batch in newProductMaterials.Chunk(batchSize))
                 {
-                    _jewelryContext.TbtStockProductMaterial.AddRange(newProductMaterials);
+                    _jewelryContext.TbtStockProductMaterial.AddRange(batch);
+                    await _jewelryContext.SaveChangesAsync();
                 }
 
-                if (stock18kUpdates.Any())
+                // Update existing products (tracked by EF) + Stock18k
+                foreach (var batch in stock18kUpdates.Chunk(batchSize))
                 {
-                    _jewelryContext.Stock18k.UpdateRange(stock18kUpdates);
+                    _jewelryContext.Stock18k.UpdateRange(batch);
+                    await _jewelryContext.SaveChangesAsync();
                 }
 
-                await _jewelryContext.SaveChangesAsync();
                 scope.Complete();
             }
             catch
@@ -896,7 +934,7 @@ namespace Jewelry.Service.TransferStock
                 throw;
             }
 
-            return $"success {add} item";
+            return $"success add {addCount}, update {updateCount} item";
         }
         #endregion
 
