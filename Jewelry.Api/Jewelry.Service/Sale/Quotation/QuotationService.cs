@@ -67,6 +67,10 @@ namespace Jewelry.Service.Sale.Quotation
                     CreateBy = CurrentUsername,
 
                     Freight = request.Freight,
+                    SpecialDiscount = request.SpecialDiscount,
+                    SpecialAddition = request.SpecialAddition,
+                    Vat = request.Vat,
+                    GoldPerOz = request.GoldPerOz,
                     Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow
                 };
 
@@ -89,10 +93,16 @@ namespace Jewelry.Service.Sale.Quotation
 
             quotation.Remark = request.Remark;
             quotation.Freight = request.Freight;
+            quotation.SpecialDiscount = request.SpecialDiscount;
+            quotation.SpecialAddition = request.SpecialAddition;
+            quotation.Vat = request.Vat;
+            quotation.GoldPerOz = request.GoldPerOz;
 
             quotation.Data = request.Data;
             quotation.Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow;
 
+            quotation.UpdateDate = DateTime.UtcNow;
+            quotation.UpdateBy = CurrentUsername;
 
             _jewelryContext.TbtSaleQuotation.Update(quotation);
             await _jewelryContext.SaveChangesAsync();
@@ -134,6 +144,10 @@ namespace Jewelry.Service.Sale.Quotation
                 Data = quotation.Data,
 
                 Freight = quotation.Freight.HasValue ? quotation.Freight.Value : null,
+                SpecialDiscount = quotation.SpecialDiscount,
+                SpecialAddition = quotation.SpecialAddition,
+                Vat = quotation.Vat,
+                GoldPerOz = quotation.GoldPerOz,
                 Date = quotation.Date.HasValue ? quotation.Date.Value : null
             };
         }
@@ -155,6 +169,10 @@ namespace Jewelry.Service.Sale.Quotation
                             MarkUp = quotation.MarkUp ?? 0,
                             Discount = quotation.Discount ?? 0,
                             Freight = quotation.Freight,
+                            SpecialDiscount = quotation.SpecialDiscount,
+                            SpecialAddition = quotation.SpecialAddition,
+                            Vat = quotation.Vat,
+                            GoldPerOz = quotation.GoldPerOz,
                             Remark = quotation.Remark ?? string.Empty,
                             Date = quotation.Date,
                             CreateDate = quotation.CreateDate,

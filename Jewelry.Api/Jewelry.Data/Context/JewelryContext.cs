@@ -2108,6 +2108,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.SpecialDiscount).HasColumnName("special_discount");
             entity.Property(e => e.SpecialAddition).HasColumnName("special_addition");
             entity.Property(e => e.Vat).HasColumnName("vat");
+            entity.Property(e => e.Freight).HasColumnName("freight");
         });
 
         modelBuilder.Entity<TbtSaleOrderProduct>(entity =>
@@ -2197,6 +2198,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Date).HasColumnName("date");
             entity.Property(e => e.Discount).HasColumnName("discount");
             entity.Property(e => e.Freight).HasColumnName("freight");
+            entity.Property(e => e.SpecialDiscount).HasColumnName("special_discount");
+            entity.Property(e => e.SpecialAddition).HasColumnName("special_addition");
+            entity.Property(e => e.Vat).HasColumnName("vat");
+            entity.Property(e => e.GoldPerOz).HasColumnName("gold_per_oz");
             entity.Property(e => e.MarkUp).HasColumnName("mark_up");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")

@@ -58,4 +58,6 @@ public partial class TbtSaleOrder
     public decimal? SpecialAddition { get; set; }
 
     public decimal? Vat { get; set; }
+
+    public decimal? Freight { get; set; }
 }

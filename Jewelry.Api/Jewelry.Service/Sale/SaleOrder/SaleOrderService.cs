@@ -95,6 +95,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                     SpecialDiscount = request.SpecialDiscount,
                     SpecialAddition = request.SpecialAddition,
                     Vat = request.Vat,
+                    Freight = request.Freight,
 
                     Remark = request.Remark,
 
@@ -144,6 +145,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                 saleOrder.SpecialDiscount = request.SpecialDiscount;
                 saleOrder.SpecialAddition = request.SpecialAddition;
                 saleOrder.Vat = request.Vat;
+                saleOrder.Freight = request.Freight;
 
                 saleOrder.Remark = request.Remark;
 
@@ -212,6 +214,9 @@ namespace Jewelry.Service.Sale.SaleOrder
                 SpecialDiscount = saleOrder.SpecialDiscount,
                 SpecialAddition = saleOrder.SpecialAddition,
                 Vat = saleOrder.Vat,
+                Freight = saleOrder.Freight,
+
+                SoDate = saleOrder.SoDate,
 
                 Remark = saleOrder.Remark
             };
@@ -384,7 +389,9 @@ namespace Jewelry.Service.Sale.SaleOrder
                             CurrencyUnit = saleOrder.CurrencyUnit ?? string.Empty,
                             CurrencyRate = saleOrder.CurrencyRate,
                             Markup = saleOrder.MarkUp,
-                            GoldRate = saleOrder.GoldRate
+                            GoldRate = saleOrder.GoldRate,
+                            Freight = saleOrder.Freight,
+                            SoDate = saleOrder.SoDate
                         };
 
             // Apply filters

@@ -15,6 +15,10 @@ namespace jewelry.Model.Sale.Quotation.List
         public decimal MarkUp { get; set; }
         public decimal Discount { get; set; }
         public decimal? Freight { get; set; }
+        public decimal? SpecialDiscount { get; set; }
+        public decimal? SpecialAddition { get; set; }
+        public decimal? Vat { get; set; }
+        public decimal? GoldPerOz { get; set; }
         public string Remark { get; set; } = string.Empty;
         public DateTime? Date { get; set; }
         public DateTime CreateDate { get; set; }

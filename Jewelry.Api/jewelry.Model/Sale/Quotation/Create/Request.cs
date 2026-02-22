@@ -22,6 +22,10 @@ namespace jewelry.Model.Sale.Quotation.Create
         public decimal? Discount { get; set; }
 
         public decimal? Freight { get; set; }
+        public decimal? SpecialDiscount { get; set; }
+        public decimal? SpecialAddition { get; set; }
+        public decimal? Vat { get; set; }
+        public decimal? GoldPerOz { get; set; }
 
         public string? Remark { get; set; }
         public string Data { get; set; }

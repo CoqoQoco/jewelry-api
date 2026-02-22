@@ -36,5 +36,7 @@ namespace jewelry.Model.Sale.SaleOrder.List
         public decimal CurrencyRate { get; set; }
         public decimal? Markup { get; set; }
         public decimal? GoldRate { get; set; }
+        public decimal? Freight { get; set; }
+        public DateTime? SoDate { get; set; }
     }
 }

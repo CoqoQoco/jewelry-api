@@ -43,6 +43,9 @@ namespace jewelry.Model.Sale.SaleOrder.Get
         public decimal? SpecialDiscount { get; set; }
         public decimal? SpecialAddition { get; set; }
         public decimal? Vat { get; set; }
+        public decimal? Freight { get; set; }
+
+        public DateTime? SoDate { get; set; }
 
         public string? Remark { get; set; }
 

@@ -40,4 +40,12 @@ public partial class TbtSaleQuotation
     public string? CustomerAddress { get; set; }
 
     public decimal? Freight { get; set; }
+
+    public decimal? SpecialDiscount { get; set; }
+
+    public decimal? SpecialAddition { get; set; }
+
+    public decimal? Vat { get; set; }
+
+    public decimal? GoldPerOz { get; set; }
 }
