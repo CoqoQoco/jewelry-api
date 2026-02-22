@@ -2296,6 +2296,10 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
             entity.Property(e => e.TagPriceMultiplier).HasColumnName("tag_price_multiplier");
+            entity.Property(e => e.CurrencyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("currency_unit");
+            entity.Property(e => e.CurrencyRate).HasColumnName("currency_rate");
 
             entity.HasOne(d => d.StockNumberNavigation).WithMany(p => p.TbtStockCostVersion)
                 .HasForeignKey(d => d.StockNumber)

@@ -203,6 +203,24 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("ListCostVersion")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.ListCostVersion.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public DataSourceResult ListCostVersion([FromBody] jewelry.Model.Stock.Product.ListCostVersion.Request request)
+        {
+            try
+            {
+                var response = _service.ListCostVersion(request.Search);
+                return response.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
         [Route("PlanReceiptList")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.Plan.Receipt.List.Response>))]

@@ -20,6 +20,7 @@ namespace Jewelry.Service.Stock.Product
         IQueryable<jewelry.Model.Stock.Product.ListProductCost.Response> GetProductCostDetailVersion(string stockNumber);
         jewelry.Model.Stock.Product.GetCostVersion.Response GetCostVersion(jewelry.Model.Stock.Product.GetCostVersion.Request request);
         IQueryable<jewelry.Model.Stock.Product.ListStockCostPlan.Response> ListStockCostPlan(jewelry.Model.Stock.Product.ListStockCostPlan.Search request);
+        IQueryable<jewelry.Model.Stock.Product.ListCostVersion.Response> ListCostVersion(jewelry.Model.Stock.Product.ListCostVersion.Search request);
 
         // Dashboard APIs
         Task<DashboardResponse> GetProductDashboard(DashboardRequest request);

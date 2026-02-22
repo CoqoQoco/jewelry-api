@@ -20,6 +20,10 @@ namespace jewelry.Model.Stock.Product.AddProductCost
 
         public string? Remark { get; set; }
         public decimal TagPriceMultiplier { get; set; } = 1;
+
+        public string? CurrencyUnit { get; set; }
+        public decimal? CurrencyRate { get; set; }
+
         public List<RequestItem> Prictransection { get; set; } = new List<RequestItem>();
 
         public bool IsOriginCost { get; set; } = false;

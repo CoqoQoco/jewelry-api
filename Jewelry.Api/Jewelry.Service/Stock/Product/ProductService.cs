@@ -602,6 +602,8 @@ namespace Jewelry.Service.Stock.Product
                 CustomerEmail = request.CustomerEmail,
                 Remark = request.Remark,
                 TagPriceMultiplier = request.TagPriceMultiplier,
+                CurrencyUnit = request.CurrencyUnit,
+                CurrencyRate = request.CurrencyRate,
 
             };
 
@@ -681,6 +683,8 @@ namespace Jewelry.Service.Stock.Product
                                 CustomerEmail = item.CustomerEmail,
                                 Remark = item.Remark,
                                 TagPriceMultiplier = item.TagPriceMultiplier ?? 1,
+                                CurrencyUnit = item.CurrencyUnit,
+                                CurrencyRate = item.CurrencyRate,
                                 CreateBy = item.CreateBy,
                                 CreateDate = item.CreateDate,
                                 UpdateBy = item.UpdateBy,
@@ -724,6 +728,8 @@ namespace Jewelry.Service.Stock.Product
                 CustomerEmail = costVersion.CustomerEmail,
                 Remark = costVersion.Remark,
                 TagPriceMultiplier = costVersion.TagPriceMultiplier ?? 1,
+                CurrencyUnit = costVersion.CurrencyUnit,
+                CurrencyRate = costVersion.CurrencyRate,
                 CreateBy = costVersion.CreateBy,
                 CreateDate = costVersion.CreateDate,
                 UpdateBy = costVersion.UpdateBy,
@@ -800,6 +806,66 @@ namespace Jewelry.Service.Stock.Product
 
             return response;
         }
+        public IQueryable<jewelry.Model.Stock.Product.ListCostVersion.Response> ListCostVersion(jewelry.Model.Stock.Product.ListCostVersion.Search request)
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var query = (from item in _jewelryContext.TbtStockCostVersion
+                         select item);
+
+            if (!string.IsNullOrEmpty(request.StockNumber))
+            {
+                query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
+            }
+
+            if (!string.IsNullOrEmpty(request.Running))
+            {
+                query = query.Where(x => x.Running.Contains(request.Running));
+            }
+
+            if (!string.IsNullOrEmpty(request.CreateBy))
+            {
+                query = query.Where(x => x.CreateBy.Contains(request.CreateBy));
+            }
+
+            if (request.CreateDateFrom.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.CreateDateFrom.Value);
+            }
+
+            if (request.CreateDateTo.HasValue)
+            {
+                var endDate = request.CreateDateTo.Value.AddDays(1);
+                query = query.Where(x => x.CreateDate < endDate);
+            }
+
+            var response = from item in query
+                           select new jewelry.Model.Stock.Product.ListCostVersion.Response()
+                           {
+                               Running = item.Running,
+                               StockNumber = item.StockNumber,
+                               CustomerCode = item.CustomerCode,
+                               CustomerName = item.CustomerName,
+                               CustomerAddress = item.CustomerAddress,
+                               CustomerTel = item.CustomerTel,
+                               CustomerEmail = item.CustomerEmail,
+                               Remark = item.Remark,
+                               TagPriceMultiplier = item.TagPriceMultiplier ?? 1,
+                               CurrencyUnit = item.CurrencyUnit,
+                               CurrencyRate = item.CurrencyRate,
+                               CreateBy = item.CreateBy,
+                               CreateDate = item.CreateDate,
+                               UpdateBy = item.UpdateBy,
+                               UpdateDate = item.UpdateDate,
+                               Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.ListCostVersion.ResponseItem>>(item.ProductCostDetail, options)
+                           };
+
+            return response;
+        }
+
         public IQueryable<jewelry.Model.Stock.Product.ListName.Response> ListName(jewelry.Model.Stock.Product.ListName.Request request)
         {
             if (request.Mode == "TH")
