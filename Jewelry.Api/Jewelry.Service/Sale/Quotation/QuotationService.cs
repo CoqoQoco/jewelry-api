@@ -186,22 +186,22 @@ namespace Jewelry.Service.Sale.Quotation
 
             if (request.CreateDateStart.HasValue)
             {
-                query = query.Where(x => x.CreateDate >= request.CreateDateStart.Value);
+                query = query.Where(x => x.CreateDate >= request.CreateDateStart.Value.StartOfDayUtc());
             }
 
             if (request.CreateDateEnd.HasValue)
             {
-                query = query.Where(x => x.CreateDate <= request.CreateDateEnd.Value.AddDays(1));
+                query = query.Where(x => x.CreateDate <= request.CreateDateEnd.Value.EndOfDayUtc());
             }
 
             if (request.QuotationDateStart.HasValue)
             {
-                query = query.Where(x => x.Date.HasValue && x.Date.Value >= request.QuotationDateStart.Value);
+                query = query.Where(x => x.Date.HasValue && x.Date.Value >= request.QuotationDateStart.Value.StartOfDayUtc());
             }
 
             if (request.QuotationDateEnd.HasValue)
             {
-                query = query.Where(x => x.Date.HasValue && x.Date.Value <= request.QuotationDateEnd.Value.AddDays(1));
+                query = query.Where(x => x.Date.HasValue && x.Date.Value <= request.QuotationDateEnd.Value.EndOfDayUtc());
             }
 
             return query;
