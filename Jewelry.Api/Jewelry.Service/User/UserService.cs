@@ -657,6 +657,31 @@ namespace Jewelry.Service.User
 
         #endregion
 
+        #region inactive my job
+        public async Task<string> InactiveMyJob(jewelry.Model.User.InactiveMyJob.Request request)
+        {
+            var job = (from item in _jewelryContext.TbtMyJob
+                       where item.Id == request.Id
+                       && item.JobRunning == request.JobRunning
+                       && item.CreateBy == CurrentUsername
+                       select item).FirstOrDefault();
+
+            if (job == null)
+            {
+                throw new KeyNotFoundException(ErrorMessage.NotFound);
+            }
+
+            job.IsActive = false;
+            job.UpdateBy = CurrentUsername;
+            job.UpdateDate = DateTime.UtcNow;
+
+            _jewelryContext.TbtMyJob.Update(job);
+            await _jewelryContext.SaveChangesAsync();
+
+            return "success";
+        }
+        #endregion
+
         #region list my job
         public IQueryable<jewelry.Model.User.ListMyjob.Response> ListMyJob(jewelry.Model.User.ListMyJob.Search request)
         {

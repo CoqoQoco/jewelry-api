@@ -108,6 +108,16 @@ namespace Jewelry.Api.Controllers.User
             return Ok(response);
         }
 
+        [Route("InactiveMyJob")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> InactiveMyJob([FromBody] jewelry.Model.User.InactiveMyJob.Request request)
+        {
+            var response = await _service.InactiveMyJob(request);
+            return Ok(response);
+        }
+
         [Route("ListMyJob")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.User.ListMyjob.Response>))]
