@@ -587,6 +587,9 @@ namespace Jewelry.Service.Stock.Product
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
             priceTransactionList.ProductCostDetail = JsonSerializer.Serialize(request.Prictransection, options);
+            priceTransactionList.CustomStockInfo = request.CustomStockInfo != null && request.CustomStockInfo.Any()
+                ? JsonSerializer.Serialize(request.CustomStockInfo, options)
+                : null;
 
             _jewelryContext.TbtStockCostVersion.Add(priceTransactionList);
 
@@ -662,7 +665,10 @@ namespace Jewelry.Service.Stock.Product
                                 CreateDate = item.CreateDate,
                                 UpdateBy = item.UpdateBy,
                                 UpdateDate = item.UpdateDate,
-                                Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.ListProductCost.ResponseItem>>(item.ProductCostDetail, options)
+                                Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.ListProductCost.ResponseItem>>(item.ProductCostDetail, options),
+                                CustomStockInfo = !string.IsNullOrEmpty(item.CustomStockInfo)
+                                    ? JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.ListProductCost.CustomStockInfoItem>>(item.CustomStockInfo, options)
+                                    : null
                             });
 
             return response;
@@ -707,7 +713,10 @@ namespace Jewelry.Service.Stock.Product
                 CreateDate = costVersion.CreateDate,
                 UpdateBy = costVersion.UpdateBy,
                 UpdateDate = costVersion.UpdateDate,
-                Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.GetCostVersion.ResponseItem>>(costVersion.ProductCostDetail, options) ?? new List<jewelry.Model.Stock.Product.GetCostVersion.ResponseItem>()
+                Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.GetCostVersion.ResponseItem>>(costVersion.ProductCostDetail, options) ?? new List<jewelry.Model.Stock.Product.GetCostVersion.ResponseItem>(),
+                CustomStockInfo = !string.IsNullOrEmpty(costVersion.CustomStockInfo)
+                    ? JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.GetCostVersion.CustomStockInfoItem>>(costVersion.CustomStockInfo, options)
+                    : null
             };
 
             return response;
@@ -833,7 +842,10 @@ namespace Jewelry.Service.Stock.Product
                                CreateDate = item.CreateDate,
                                UpdateBy = item.UpdateBy,
                                UpdateDate = item.UpdateDate,
-                               Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.ListCostVersion.ResponseItem>>(item.ProductCostDetail, options)
+                               Prictransection = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.ListCostVersion.ResponseItem>>(item.ProductCostDetail, options),
+                               CustomStockInfo = !string.IsNullOrEmpty(item.CustomStockInfo)
+                                   ? JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.ListCostVersion.CustomStockInfoItem>>(item.CustomStockInfo, options)
+                                   : null
                            };
 
             return response;

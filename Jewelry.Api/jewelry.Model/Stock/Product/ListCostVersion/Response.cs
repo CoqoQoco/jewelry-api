@@ -25,6 +25,8 @@ namespace jewelry.Model.Stock.Product.ListCostVersion
 
         public List<ResponseItem> Prictransection { get; set; } = new List<ResponseItem>();
 
+        public List<CustomStockInfoItem>? CustomStockInfo { get; set; }
+
         public string CreateBy { get; set; }
         public DateTime CreateDate { get; set; }
         public string? UpdateBy { get; set; }
@@ -44,5 +46,11 @@ namespace jewelry.Model.Stock.Product.ListCostVersion
         public decimal QtyWeight { get; set; }
         public decimal QtyWeightPrice { get; set; }
         public decimal TotalPrice => Math.Round((Qty * QtyPrice) + (QtyWeight * QtyWeightPrice), 2);
+    }
+
+    public class CustomStockInfoItem
+    {
+        public string Label { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
     }
 }

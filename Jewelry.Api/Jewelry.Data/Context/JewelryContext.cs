@@ -2308,6 +2308,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("currency_unit");
             entity.Property(e => e.CurrencyRate).HasColumnName("currency_rate");
+            entity.Property(e => e.CustomStockInfo)
+                .HasColumnType("text")
+                .HasColumnName("custom_stock_info");
 
             entity.HasOne(d => d.StockNumberNavigation).WithMany(p => p.TbtStockCostVersion)
                 .HasForeignKey(d => d.StockNumber)

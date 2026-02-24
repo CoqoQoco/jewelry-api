@@ -39,6 +39,8 @@ public partial class TbtStockCostVersion
 
     public decimal? CurrencyRate { get; set; }
 
+    public string? CustomStockInfo { get; set; }
+
     public virtual TbtStockProduct StockNumberNavigation { get; set; } = null!;
 
     public virtual ICollection<TbtStockCostPlan> TbtStockCostPlan { get; set; } = new List<TbtStockCostPlan>();

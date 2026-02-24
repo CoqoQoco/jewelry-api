@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -26,6 +26,8 @@ namespace jewelry.Model.Stock.Product.AddProductCost
 
         public List<RequestItem> Prictransection { get; set; } = new List<RequestItem>();
 
+        public List<CustomStockInfoItem>? CustomStockInfo { get; set; }
+
         public bool IsOriginCost { get; set; } = false;
     }
 
@@ -42,5 +44,11 @@ namespace jewelry.Model.Stock.Product.AddProductCost
         public decimal QtyWeight { get; set; }
         public decimal QtyWeightPrice { get; set; }
         public decimal TotalPrice => Math.Round((Qty * QtyPrice) + (QtyWeight * QtyWeightPrice), 2);
+    }
+
+    public class CustomStockInfoItem
+    {
+        public string Label { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
     }
 }
