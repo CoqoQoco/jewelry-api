@@ -291,7 +291,19 @@ namespace Jewelry.Service.Stock.Product
             };
 
 
-            //get stock cost detail
+            // Step A: Query plan once (ถ้ามี Wo+WoNumber) — ใช้สำหรับทั้ง PriceTransactions fallback และ PlanPriceItems
+            TbtProductionPlan plan = null;
+            if (!string.IsNullOrEmpty(response.Wo) && response.WoNumber.HasValue)
+            {
+                plan = (from item in _jewelryContext.TbtProductionPlan
+                             .Include(x => x.TbtProductionPlanPrice)
+                        where item.Wo == response.Wo
+                        && item.WoNumber == response.WoNumber.Value
+                        select item).FirstOrDefault();
+            }
+
+            // Step B: PriceTransactions — priority: ProductCostDetail JSON → plan fallback → materials
+            // ขั้น 1: จาก ProductCostDetail JSON
             if (stock.ProductCostDetail != null)
             {
                 var options = new JsonSerializerOptions
@@ -301,33 +313,20 @@ namespace Jewelry.Service.Stock.Product
                 response.PriceTransactions = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.Get.PriceTransaction>>(stock.ProductCostDetail, options) ?? new List<jewelry.Model.Stock.Product.Get.PriceTransaction>();
             }
 
-            //get plan cost detail
-            if (!string.IsNullOrEmpty(response.Wo) && response.WoNumber.HasValue && !response.PriceTransactions.Any())
+            // ขั้น 2: fallback จาก plan (ถ้า PriceTransactions ยังว่าง)
+            if (!response.PriceTransactions.Any())
             {
-
-                var plan = (from item in _jewelryContext.TbtProductionPlan
-                             .Include(x => x.TbtProductionPlanPrice)
-                            where item.Wo == response.Wo
-                            && item.WoNumber == response.WoNumber.Value
-                            select item).FirstOrDefault();
-
-
-                string[] nameGroupMatch = new[] { "Gold", "Gem" };
                 if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
                 {
                     response.PlanQty = plan.ProductQty;
 
-                    // Gold: sum รวมเป็นรายการเดียว
                     var goldItems = plan.TbtProductionPlanPrice.Where(x => x.NameGroup == "Gold").ToList();
-                    
                     var nonGoldItems = plan.TbtProductionPlanPrice.Where(x => x.NameGroup != "Gold").ToList();
-
                     var transactions = new List<jewelry.Model.Stock.Product.Get.PriceTransaction>();
 
                     var getGoldCalWeight = goldItems.Where(x => x.NameDescription == "น้ำหนักทองรวมหลังหักเพชรพลอย").FirstOrDefault();
                     if (getGoldCalWeight != null)
-                    { 
-                      //add get goal cal weight as gold item
+                    {
                         transactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
                         {
                             No = getGoldCalWeight.No,
@@ -341,26 +340,7 @@ namespace Jewelry.Service.Stock.Product
                             QtyWeightPrice = Math.Round(getGoldCalWeight.QtyWeightPrice, 2),
                         });
                     }
-                    //if (goldItems.Any())
-                    //{
-                    //    var firstGold = goldItems.First();
-                    //    transactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
-                    //    {
-                    //        No = firstGold.No,
-                    //        Name = string.Join(", ", goldItems.Select(x => x.Name).Distinct()),
-                    //        NameDescription = string.Join(", ", goldItems.Select(x => x.NameDescription).Distinct()),
-                    //        NameGroup = firstGold.NameGroup,
-                    //        Date = firstGold.Date,
-                    //        Qty = Math.Round(goldItems.Sum(x => x.Qty) / plan.ProductQty, 2),
-                    //        QtyPrice = Math.Round(goldItems.Average(x => x.QtyPrice), 2),
-                    //        QtyWeight = Math.Round(goldItems.Sum(x => x.QtyWeight) / plan.ProductQty, 2),
-                    //        QtyWeightPrice = Math.Round(goldItems.Average(x => x.QtyWeightPrice), 2),
-                    //    });
-                    //}
 
-
-
-                    // Non-Gold: คงเดิม
                     transactions.AddRange(nonGoldItems.Select(x => new jewelry.Model.Stock.Product.Get.PriceTransaction()
                     {
                         No = x.No,
@@ -368,13 +348,9 @@ namespace Jewelry.Service.Stock.Product
                         NameDescription = x.NameDescription,
                         NameGroup = x.NameGroup,
                         Date = x.Date,
-
                         Qty = Math.Round(x.Qty, 2),
-                        //Qty = Math.Round(x.Qty / plan.ProductQty, 2),
-
                         QtyPrice = Math.Round(x.QtyPrice, 2),
                         QtyWeight = Math.Round(x.QtyWeight, 2),
-                        //QtyWeight = Math.Round(x.QtyWeight / plan.ProductQty, 2),
                         QtyWeightPrice = Math.Round(x.QtyWeightPrice, 2),
                     }));
 
@@ -382,7 +358,7 @@ namespace Jewelry.Service.Stock.Product
                 }
                 else
                 {
-                    //set price from stock material
+                    // ขั้น 3: fallback จาก materials
                     var materials = response.Materials.Where(x => x.Type == "Gold" || x.Type == "Gem" || x.Type == "Diamond").ToList();
                     int no = 1;
                     foreach (var mat in materials)
@@ -393,46 +369,36 @@ namespace Jewelry.Service.Stock.Product
                             Name = mat.TypeName,
                             NameDescription = mat.TypeCode,
                             NameGroup = GetNameGroupGroup(mat.Type),
-
                             Date = stock.CreateDate,
                             Qty = mat.Qty,
                             QtyPrice = 0m,
                             QtyWeight = mat.Weight,
                             QtyWeightPrice = mat.Price,
-                            //TotalPrice = Math.Round(mat.Price / response.Qty, 2),
                         });
                         no++;
                     }
-
                 }
             }
-            else
+
+            // Step C: PlanPriceItems — ใส่เสมอถ้า plan มีข้อมูล (แสดงเป็น reference section)
+            if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
             {
-                if (!response.PriceTransactions.Any())
-                {
-                    //set price from stock material
-                    var materials = response.Materials.Where(x => x.Type == "Gold" || x.Type == "Gem" || x.Type == "Diamond").ToList();
-                    int no = 1;
-                    foreach (var mat in materials)
+                response.PlanQty = plan.ProductQty;
+                response.PlanPriceItems = plan.TbtProductionPlanPrice
+                    .OrderBy(x => x.No)
+                    .Select(x => new jewelry.Model.Stock.Product.Get.PlanPriceItem
                     {
-                        response.PriceTransactions.Add(new jewelry.Model.Stock.Product.Get.PriceTransaction()
-                        {
-                            No = no,
-                            Name = mat.TypeName,
-                            NameDescription = mat.TypeCode,
-                            NameGroup = GetNameGroupGroup(mat.Type),
-
-                            Date = stock.CreateDate,
-                            Qty = mat.Qty,
-                            QtyPrice = 0m,
-                            QtyWeight = mat.Weight,
-                            QtyWeightPrice = mat.Price,
-                            //TotalPrice = Math.Round(mat.Price / response.Qty, 2),
-                        });
-                        no++;
-                    }
-                }
-
+                        No = x.No,
+                        Name = x.Name,
+                        NameDescription = x.NameDescription,
+                        NameGroup = x.NameGroup,
+                        Date = x.Date,
+                        Qty = x.Qty,
+                        QtyPrice = x.QtyPrice,
+                        QtyWeight = x.QtyWeight,
+                        QtyWeightPrice = x.QtyWeightPrice,
+                        TotalPrice = x.TotalPrice
+                    }).ToList();
             }
 
             return response;

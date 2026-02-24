@@ -53,6 +53,7 @@ namespace jewelry.Model.Stock.Product.Get
 
         public List<Material> Materials { get; set; } = new List<Material>();
         public List<PriceTransaction> PriceTransactions { get; set; } = new List<PriceTransaction>();
+        public List<PlanPriceItem> PlanPriceItems { get; set; } = new List<PlanPriceItem>();
     }
 
     public class Material
@@ -74,6 +75,20 @@ namespace jewelry.Model.Stock.Product.Get
         public string TextGold => $"{TypeCode} {Weight} {WeightUnit}";
         public string TextGem => $"{Qty}{TypeCode} {Weight} {WeightUnit}";
         public string TextDiamond => $"{Qty}{Type} {Weight} {WeightUnit} {TypeCode}";
+    }
+
+    public class PlanPriceItem
+    {
+        public int No { get; set; }
+        public string Name { get; set; }
+        public string NameDescription { get; set; }
+        public string NameGroup { get; set; }
+        public DateTime? Date { get; set; }
+        public decimal Qty { get; set; }
+        public decimal QtyPrice { get; set; }
+        public decimal QtyWeight { get; set; }
+        public decimal QtyWeightPrice { get; set; }
+        public decimal TotalPrice { get; set; }
     }
 
     public class PriceTransaction
