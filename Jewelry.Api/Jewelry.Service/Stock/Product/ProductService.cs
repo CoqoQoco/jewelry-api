@@ -319,6 +319,7 @@ namespace Jewelry.Service.Stock.Product
 
                     // Gold: sum รวมเป็นรายการเดียว
                     var goldItems = plan.TbtProductionPlanPrice.Where(x => x.NameGroup == "Gold").ToList();
+                    
                     var nonGoldItems = plan.TbtProductionPlanPrice.Where(x => x.NameGroup != "Gold").ToList();
 
                     var transactions = new List<jewelry.Model.Stock.Product.Get.PriceTransaction>();
@@ -357,6 +358,8 @@ namespace Jewelry.Service.Stock.Product
                     //    });
                     //}
 
+
+
                     // Non-Gold: คงเดิม
                     transactions.AddRange(nonGoldItems.Select(x => new jewelry.Model.Stock.Product.Get.PriceTransaction()
                     {
@@ -365,9 +368,13 @@ namespace Jewelry.Service.Stock.Product
                         NameDescription = x.NameDescription,
                         NameGroup = x.NameGroup,
                         Date = x.Date,
-                        Qty = Math.Round(x.Qty / plan.ProductQty, 2),
+
+                        Qty = Math.Round(x.Qty, 2),
+                        //Qty = Math.Round(x.Qty / plan.ProductQty, 2),
+
                         QtyPrice = Math.Round(x.QtyPrice, 2),
-                        QtyWeight = Math.Round(x.QtyWeight / plan.ProductQty, 2),
+                        QtyWeight = Math.Round(x.QtyWeight, 2),
+                        //QtyWeight = Math.Round(x.QtyWeight / plan.ProductQty, 2),
                         QtyWeightPrice = Math.Round(x.QtyWeightPrice, 2),
                     }));
 
