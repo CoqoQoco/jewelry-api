@@ -123,6 +123,23 @@ namespace Jewelry.Api.Controllers.Sale
             }
         }
 
+        [Route("Inactive")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(bool))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Inactive([FromBody] jewelry.Model.Sale.SaleOrder.Inactive.Request request)
+        {
+            try
+            {
+                var response = await _service.Inactive(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("UnconfirmStockItems")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Sale.SaleOrder.UnconfirmStock.Response))]

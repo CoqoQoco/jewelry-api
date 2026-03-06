@@ -360,6 +360,7 @@ namespace Jewelry.Service.Sale.SaleOrder
         {
             var request = _request.Search;
             var query = from saleOrder in _jewelryContext.TbtSaleOrder
+                        where saleOrder.Status > 0
                         select new jewelry.Model.Sale.SaleOrder.List.Response
                         {
                             Running = saleOrder.Running ?? string.Empty,
@@ -615,6 +616,58 @@ namespace Jewelry.Service.Sale.SaleOrder
             {
                 await transaction.RollbackAsync();
                 throw new HandleException($"Error confirming stock items: {ex.Message}");
+            }
+        }
+
+        public async Task<bool> Inactive(jewelry.Model.Sale.SaleOrder.Inactive.Request request)
+        {
+            var saleOrder = await _jewelryContext.TbtSaleOrder
+                .FirstOrDefaultAsync(x => x.SoNumber == request.SoNumber);
+
+            if (saleOrder == null)
+                throw new HandleException($"Sale Order {request.SoNumber} not found.");
+
+            var hasInvoicedItems = await _jewelryContext.TbtSaleOrderProduct
+                .AnyAsync(x => x.SoNumber == request.SoNumber && !string.IsNullOrEmpty(x.Invoice));
+            if (hasInvoicedItems)
+                throw new HandleException($"ไม่สามารถยกเลิกใบสั่งขาย {request.SoNumber} ได้ เนื่องจากมีสินค้าที่ออก Invoice แล้ว");
+
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
+            {
+                var now = DateTime.UtcNow;
+
+                var confirmedProducts = await _jewelryContext.TbtSaleOrderProduct
+                    .Where(x => x.SoNumber == request.SoNumber && string.IsNullOrEmpty(x.Invoice))
+                    .ToListAsync();
+
+                foreach (var product in confirmedProducts)
+                {
+                    var stockProduct = await _jewelryContext.TbtStockProduct
+                        .FirstOrDefaultAsync(s => s.StockNumber == product.StockNumber);
+                    if (stockProduct != null)
+                    {
+                        stockProduct.QtySale -= product.Qty;
+                        stockProduct.UpdateDate = now;
+                        stockProduct.UpdateBy = CurrentUsername;
+                        _jewelryContext.TbtStockProduct.Update(stockProduct);
+                    }
+                    _jewelryContext.TbtSaleOrderProduct.Remove(product);
+                }
+
+                saleOrder.Status = 0;
+                saleOrder.StatusName = "Inactive";
+                saleOrder.UpdateDate = now;
+                saleOrder.UpdateBy = CurrentUsername;
+
+                await _jewelryContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"Error inactivating sale order: {ex.Message}");
             }
         }
 

@@ -14,5 +14,6 @@ namespace Jewelry.Service.Sale.SaleOrder
         Task<string> GenerateRunningNumber();
         Task<jewelry.Model.Sale.SaleOrder.ConfirmStock.Response> ConfirmStockItems(jewelry.Model.Sale.SaleOrder.ConfirmStock.Request request);
         Task<jewelry.Model.Sale.SaleOrder.UnconfirmStock.Response> UnconfirmStockItems(jewelry.Model.Sale.SaleOrder.UnconfirmStock.Request request);
+        Task<bool> Inactive(jewelry.Model.Sale.SaleOrder.Inactive.Request request);
     }
 }
