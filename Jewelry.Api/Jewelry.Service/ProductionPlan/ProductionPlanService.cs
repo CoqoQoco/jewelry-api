@@ -1546,6 +1546,20 @@ namespace Jewelry.Service.ProductionPlan
             switch (status)
             {
                 case ProductionPlanStatusEnum.Casting:
+                    await HandleProductionWoker(header, request, addStatusItems);
+                    if (request.Gems?.Any() == true)
+                    {
+                        var existingGems = header.TbtProductionPlanStatusDetailGem.ToList();
+                        if (existingGems.Any())
+                        {
+                            _jewelryContext.TbtProductionPlanStatusDetailGem.RemoveRange(existingGems);
+                            await _jewelryContext.SaveChangesAsync();
+                            header.TbtProductionPlanStatusDetailGem.Clear();
+                        }
+                        await HandleGemDetails(header, request, addStatusItemGems, updateStatusItemGems);
+                    }
+                    break;
+
                 case ProductionPlanStatusEnum.Scrub:
                 case ProductionPlanStatusEnum.Embed:
                 case ProductionPlanStatusEnum.Plated:
