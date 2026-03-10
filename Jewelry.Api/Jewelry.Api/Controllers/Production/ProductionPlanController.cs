@@ -2,6 +2,7 @@
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanDelete;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
+using jewelry.Model.ProductionPlan.GoldLossUpdate;
 using jewelry.Model.ProductionPlan.ProductionPlanPrice.CreatePrice;
 using jewelry.Model.ProductionPlan.ProductionPlanPrice.Transection;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
@@ -409,6 +410,23 @@ namespace Jewelry.Api.Controllers.Production
                 var result = await _IProductionPlanService.CreatePrice(request);
                 return Ok(result);
 
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GoldLossUpdate")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldLossUpdate([FromBody] GoldLossUpdateRequest request)
+        {
+            try
+            {
+                await _IProductionPlanService.GoldLossUpdate(request);
+                return Ok();
             }
             catch (HandleException ex)
             {

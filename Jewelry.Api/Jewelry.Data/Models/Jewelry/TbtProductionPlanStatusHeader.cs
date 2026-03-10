@@ -31,6 +31,8 @@ public partial class TbtProductionPlanStatusHeader
 
     public string? WorkerName { get; set; }
 
+    public decimal? GoldLossPrice { get; set; }
+
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 
     public virtual TbmProductionPlanStatus StatusNavigation { get; set; } = null!;

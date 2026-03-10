@@ -39,5 +39,9 @@ public partial class TbtProductionPlanStatusDetail
 
     public DateTime? RequestDate { get; set; }
 
+    public decimal? LossPercent { get; set; }
+
+    public string? LossRemark { get; set; }
+
     public virtual TbtProductionPlanStatusHeader Header { get; set; } = null!;
 }

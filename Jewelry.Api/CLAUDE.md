@@ -107,10 +107,44 @@ Production worker assignments and wage calculations.
 - Use migrations for schema changes in development
 - Database-first approach with scaffold commands
 
+### DateTime — PostgreSQL `timestamptz` Rule
+**ALWAYS use `DateTime.UtcNow`** เมื่อ set timestamp fields — ห้ามใช้ `DateTime.Now` (Kind=Local)
+
+PostgreSQL column ประเภท `timestamp with time zone` รับเฉพาะ UTC เท่านั้น:
+```csharp
+// ❌ Bad — throws DbUpdateException (Kind=Local)
+header.UpdateDate = DateTime.Now;
+header.CreateDate = DateTime.Now;
+
+// ✅ Good
+header.UpdateDate = DateTime.UtcNow;
+header.CreateDate = DateTime.UtcNow;
+```
+
 ### API Patterns
 - Request/Response DTOs in `jewelry.Model`
 - Service layer for business logic
 - Repository pattern through Entity Framework
+
+### EF Core — Update Pattern (ป้องกัน save ไม่ได้)
+เมื่อ update entity ที่ load มาด้วย `Include` ต้องเรียก `Update` / `UpdateRange` อย่างชัดเจนก่อน `SaveChangesAsync`:
+```csharp
+// ✅ Header
+_jewelryContext.TbtProductionPlanStatusHeader.Update(header);
+
+// ✅ Detail collection
+var updatedDetails = new List<TbtProductionPlanStatusDetail>();
+foreach (var item in request.Items)
+{
+    var detail = header.TbtProductionPlanStatusDetail.FirstOrDefault(d => d.ItemNo == item.ItemNo);
+    if (detail == null) continue;
+    detail.SomeField = item.SomeField;
+    updatedDetails.Add(detail);
+}
+_jewelryContext.TbtProductionPlanStatusDetail.UpdateRange(updatedDetails);
+
+await _jewelryContext.SaveChangesAsync();
+```
 
 ### File Storage
 Images stored in `Images/` subdirectories organized by feature (Mold, Stock, etc.)

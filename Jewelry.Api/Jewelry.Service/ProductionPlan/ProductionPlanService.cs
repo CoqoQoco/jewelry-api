@@ -12,6 +12,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanStatus.Transfer;
 using jewelry.Model.ProductionPlan.ProductionPlanStatusList;
 using jewelry.Model.ProductionPlan.ProductionPlanTracking;
 using jewelry.Model.ProductionPlan.ProductionPlanUpdate;
+using jewelry.Model.ProductionPlan.GoldLossUpdate;
 using jewelry.Model.ProductionPlanCost.GoldCostItem;
 using jewelry.Model.Receipt.Production.PlanGet;
 using jewelry.Model.Worker.TrackingWorker;
@@ -74,6 +75,8 @@ namespace Jewelry.Service.ProductionPlan
 
         Task<TransectionResponse> GetAllTransectionPrice(string wo, int woNumber);
         Task<string> CreatePrice(CreatePriceRequest request);
+
+        Task GoldLossUpdate(GoldLossUpdateRequest request);
     }
     public class ProductionPlanService : BaseService, IProductionPlanService
     {
@@ -503,9 +506,9 @@ namespace Jewelry.Service.ProductionPlan
         public IQueryable<ProductionPlanTrackingResponse> ProductionPlanSearchByProductionPlanId(ProductionPlanTracking request)
         {
             var query = (from item in _jewelryContext.TbtProductionPlan
-                             //.Include(x => x.TbtProductionPlanImage)
-                             //.Include(x => x.TbtProductionPlanMaterial)
-                             //.Include(x => x.StatusNavigation)
+                         //.Include(x => x.TbtProductionPlanImage)
+                         //.Include(x => x.TbtProductionPlanMaterial)
+                         //.Include(x => x.StatusNavigation)
                          where item.IsActive == true
                          select new ProductionPlanTrackingResponse()
                          {
@@ -549,7 +552,7 @@ namespace Jewelry.Service.ProductionPlan
             if (!string.IsNullOrEmpty(request.WoText))
             {
                 query = (from item in query
-                             //where item.Wo.Contains(request.Text.ToUpper())
+                         //where item.Wo.Contains(request.Text.ToUpper())
                          where item.WoText == request.Text
                          //|| item.Mold.Contains(request.Text)
                          //|| item.ProductNumber.Contains(request.Text)
@@ -699,6 +702,7 @@ namespace Jewelry.Service.ProductionPlan
                                                      Remark1 = item.Remark1,
                                                      Remark2 = item.Remark2,
                                                      WagesTotal = item.WagesTotal,
+                                                     GoldLossPrice = item.GoldLossPrice,
 
                                                      TbtProductionPlanStatusDetail = (from detail in item.TbtProductionPlanStatusDetail
                                                                                       select new StatusDetailDetail()
@@ -734,6 +738,9 @@ namespace Jewelry.Service.ProductionPlan
 
                                                                                           Wages = detail.Wages,
                                                                                           TotalWages = detail.TotalWages,
+
+                                                                                          LossPercent = detail.LossPercent,
+                                                                                          LossRemark = detail.LossRemark,
                                                                                       }).ToList(),
 
                                                      TbtProductionPlanStatusGem = (from gem in item.TbtProductionPlanStatusDetailGem
@@ -882,7 +889,7 @@ namespace Jewelry.Service.ProductionPlan
             var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                          .Include(x => x.Header)
                          .ThenInclude(x => x.ProductionPlan)
-                             //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                         //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
                          join _worker in _jewelryContext.TbmWorker on item.Worker equals _worker.Code into _workerJpined
                          from worker in _workerJpined.DefaultIfEmpty()
 
@@ -1593,6 +1600,7 @@ namespace Jewelry.Service.ProductionPlan
             header.WorkerCode = request.WorkerCode;
             header.Remark1 = request.Remark1;
             header.Remark2 = request.Remark2;
+            header.GoldLossPrice = request.GoldLossPrice;
             header.UpdateDate = DateTime.UtcNow;
             header.UpdateBy = CurrentUsername;
 
@@ -1708,7 +1716,10 @@ namespace Jewelry.Service.ProductionPlan
                 WorkerSub = gold.WorkerSub,
                 Description = gold.Description,
                 Wages = gold.Wages ?? 0,
-                TotalWages = gold.TotalWages ?? 0
+                TotalWages = gold.TotalWages ?? 0,
+
+                LossPercent = gold.LossPercent ?? null,
+                LossRemark = gold.LossRemark ?? null
             };
 
             if (gold.GoldWeightSend.HasValue && gold.GoldWeightCheck.HasValue)
@@ -2230,6 +2241,7 @@ namespace Jewelry.Service.ProductionPlan
                             checkStatus.Remark1 = request.Remark1;
                             checkStatus.Remark2 = request.Remark2;
                             checkStatus.WagesTotal = request.Golds.Any() ? request.Golds.Sum(x => x.TotalWages) : 0;
+                            checkStatus.GoldLossPrice = request.GoldLossPrice;
                             checkStatus.UpdateDate = DateTime.UtcNow;
                             checkStatus.UpdateBy = CurrentUsername;
 
@@ -2264,6 +2276,8 @@ namespace Jewelry.Service.ProductionPlan
                                     Wages = item.Wages ?? 0,
                                     TotalWages = item.TotalWages ?? 0,
 
+                                    LossPercent = item.LossPercent,
+                                    LossRemark = item.LossRemark,
                                 };
 
                                 if (item.GoldWeightSend.HasValue && item.GoldWeightCheck.HasValue)
@@ -2696,7 +2710,7 @@ namespace Jewelry.Service.ProductionPlan
                                      .ThenInclude(x => x.ProductionPlan)
                                      .ThenInclude(x => x.StatusNavigation)
 
-                                      //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                                  //join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
                                   join gem in _jewelryContext.TbtStockGem on item.GemCode equals gem.Code
                                   where item.Header.ProductionPlan.Wo == wo
                                   && item.Header.ProductionPlan.WoNumber == woNumber
@@ -2729,7 +2743,7 @@ namespace Jewelry.Service.ProductionPlan
                 foreach (var item in transectionGem)
                 {
                     if (item.Length.HasValue && item.Length.Value > 0)
-                    { 
+                    {
                         item.NameDescription = $"{item.NameDescription} [ความยาว {item.Length} {item.LengthUnit}]";
                     }
                 }
@@ -2949,5 +2963,38 @@ namespace Jewelry.Service.ProductionPlan
         //            return 0;
         //    }
         //}
+
+        public async Task GoldLossUpdate(GoldLossUpdateRequest request)
+        {
+            var header = _jewelryContext.TbtProductionPlanStatusHeader
+                .Include(x => x.TbtProductionPlanStatusDetail)
+                .Where(x => x.Id == request.HeaderId && x.IsActive == true)
+                .FirstOrDefault();
+
+            if (header == null)
+                throw new HandleException("ไม่พบข้อมูล กรุณาลองใหม่อีกครั้ง");
+
+            header.GoldLossPrice = request.GoldLossPrice;
+            header.UpdateDate = DateTime.UtcNow;
+            header.UpdateBy = CurrentUsername;
+
+            var updatedDetails = new List<TbtProductionPlanStatusDetail>();
+
+            foreach (var item in request.Items)
+            {
+                var detail = header.TbtProductionPlanStatusDetail
+                    .FirstOrDefault(d => d.ItemNo == item.ItemNo);
+                if (detail == null) continue;
+
+                detail.LossPercent = item.LossPercent;
+                detail.LossRemark = item.LossRemark;
+                updatedDetails.Add(detail);
+            }
+
+            _jewelryContext.TbtProductionPlanStatusHeader.Update(header);
+            _jewelryContext.TbtProductionPlanStatusDetail.UpdateRange(updatedDetails);
+
+            await _jewelryContext.SaveChangesAsync();
+        }
     }
 }

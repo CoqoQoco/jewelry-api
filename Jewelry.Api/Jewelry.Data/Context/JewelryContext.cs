@@ -1714,6 +1714,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.WorkerSub)
                 .HasColumnType("character varying")
                 .HasColumnName("worker_sub");
+            entity.Property(e => e.LossPercent).HasColumnName("loss_percent");
+            entity.Property(e => e.LossRemark)
+                .HasColumnType("character varying")
+                .HasColumnName("loss_remark");
 
             entity.HasOne(d => d.Header).WithMany(p => p.TbtProductionPlanStatusDetail)
                 .HasForeignKey(d => d.HeaderId)
@@ -1799,6 +1803,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.WorkerName)
                 .HasColumnType("character varying")
                 .HasColumnName("worker_name");
+            entity.Property(e => e.GoldLossPrice).HasColumnName("gold_loss_price");
 
             entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanStatusHeader)
                 .HasForeignKey(d => d.ProductionPlanId)

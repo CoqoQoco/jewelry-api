@@ -74,10 +74,12 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
         public bool IsActive { get; set; }
         public decimal? WagesTotal { get; set; }
 
+        public decimal? GoldLossPrice { get; set; }
+
         public List<StatusDetailDetail>? TbtProductionPlanStatusDetail { get; set; }
         public List<StatusDetailGem>? TbtProductionPlanStatusGem { get; set; }
     }
-    public class StatusDetailDetail 
+    public class StatusDetailDetail
     {
         public int ProductionPlanId { get; set; }
         public string ItemNo { get; set; }
@@ -103,6 +105,9 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
 
         public decimal? Wages { get; set; }
         public decimal? TotalWages { get; set; }
+
+        public decimal? LossPercent { get; set; }
+        public string? LossRemark { get; set; }
     }
     public class StatusDetailGem
     {

@@ -30,6 +30,7 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
 
     public class GoldItem
     {
+        public string? ItemNo { get; set; }
         public DateTimeOffset? RequestDate { get; set; }
         public string? Gold { get; set; }
         public decimal? GoldWeightSend { get; set; }
@@ -41,6 +42,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanStatus
         public decimal? Wages { get; set; }
         public decimal? TotalWages { get; set; }
         public string? Description { get; set; }
+        public decimal? LossPercent { get; set; }
+        public string? LossRemark { get; set; }
     }
 
     public class GemItem
