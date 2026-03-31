@@ -106,6 +106,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleOrderProduct> TbtSaleOrderProduct { get; set; }
 
+    public virtual DbSet<TbtSaleDocument> TbtSaleDocument { get; set; }
+
     public virtual DbSet<TbtSaleQuotation> TbtSaleQuotation { get; set; }
 
     public virtual DbSet<TbtStockCostPlan> TbtStockCostPlan { get; set; }
