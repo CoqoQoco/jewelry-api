@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -113,6 +114,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             };
         }
     });
+
+// Permission authorization
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, Jewelry.Api.Extension.PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, Jewelry.Api.Extension.PermissionAuthorizationHandler>();
 
 // CORS - Update for production
 builder.Services.AddCors(c =>

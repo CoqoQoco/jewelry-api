@@ -1356,5 +1356,210 @@ namespace Jewelry.Service.Production.Plan
             };
         }
         #endregion
+
+        #region --- gold loss monthly report ---
+        public async Task<jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchResponse> GetGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchRequest request)
+        {
+            // 1. คำนวณช่วงวันที่ของเดือนที่เลือก
+            var startDate = new DateTimeOffset(new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc));
+            var endDate = startDate.AddMonths(1).AddSeconds(-1);
+
+            // 2. Aggregate live data: ดึง status detail ของแผนกที่เลือก group by gold type
+            var liveData = await (from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                                  join header in _jewelryContext.TbtProductionPlanStatusHeader
+                                      on detail.HeaderId equals header.Id
+                                  where header.Status == request.Status
+                                      && header.IsActive == true
+                                      && detail.IsActive == true
+                                      && header.CreateDate >= startDate
+                                      && header.CreateDate <= endDate
+                                      && !string.IsNullOrEmpty(detail.Gold)
+                                  group detail by detail.Gold into g
+                                  select new
+                                  {
+                                      GoldType = g.Key,
+                                      SumGoldWeightSend = g.Sum(x => x.GoldWeightSend ?? 0),
+                                      SumGoldWeightCheck = g.Sum(x => x.GoldWeightCheck ?? 0),
+                                  }).ToListAsync();
+
+            // 3. ดึง saved data ของเดือนที่เลือก
+            var savedData = await _jewelryContext.TbtGoldLossMonthlyReport
+                .Where(x => x.Year == request.Year
+                    && x.Month == request.Month
+                    && x.Status == request.Status
+                    && x.IsActive == true)
+                .ToListAsync();
+
+            var hasSavedData = savedData.Any();
+
+            // 4. ถ้ายังไม่เคยบันทึก → ดึง default จากเดือนก่อนหน้า
+            var previousDefaults = new List<Jewelry.Data.Models.Jewelry.TbtGoldLossMonthlyReport>();
+            if (!hasSavedData)
+            {
+                var prevMonth = request.Month == 1 ? 12 : request.Month - 1;
+                var prevYear = request.Month == 1 ? request.Year - 1 : request.Year;
+
+                previousDefaults = await _jewelryContext.TbtGoldLossMonthlyReport
+                    .Where(x => x.Year == prevYear
+                        && x.Month == prevMonth
+                        && x.Status == request.Status
+                        && x.IsActive == true)
+                    .ToListAsync();
+            }
+
+            // 5. ดึง master gold เพื่อ map ชื่อทอง
+            var goldMaster = await _jewelryContext.TbmGold
+                .Where(x => x.IsActive)
+                .ToListAsync();
+
+            // 6. สร้าง rows
+            var rows = liveData.Select(item =>
+            {
+                var saved = savedData.FirstOrDefault(s => s.GoldType == item.GoldType);
+                var prevDefault = previousDefaults.FirstOrDefault(p => p.GoldType == item.GoldType);
+                var master = goldMaster.FirstOrDefault(m => m.Code == item.GoldType);
+
+                var lossPercent = saved?.LossPercent ?? prevDefault?.LossPercent ?? 0m;
+                var goldLossPrice = saved?.GoldLossPrice ?? prevDefault?.GoldLossPrice ?? 0m;
+                var lossRemark = saved?.LossRemark ?? prevDefault?.LossRemark;
+
+                var sumSend = item.SumGoldWeightSend;
+                var sumCheck = item.SumGoldWeightCheck;
+                var rawLoss = sumSend - sumCheck;
+                var weightLossAllowed = sumSend * (lossPercent / 100);
+                var weightLossActual = weightLossAllowed - rawLoss;
+                var moneyDiff = weightLossActual * goldLossPrice;
+
+                return new jewelry.Model.Production.Plan.GoldLossMonthlyReport.GoldLossMonthlyRow
+                {
+                    GoldType = item.GoldType ?? string.Empty,
+                    GoldTypeName = master?.NameTh ?? item.GoldType ?? string.Empty,
+                    SumGoldWeightSend = sumSend,
+                    SumGoldWeightCheck = sumCheck,
+                    RawLoss = rawLoss,
+                    LossPercent = lossPercent,
+                    GoldLossPrice = goldLossPrice,
+                    WeightLossAllowed = weightLossAllowed,
+                    WeightLossActual = weightLossActual,
+                    MoneyDiff = moneyDiff,
+                    LossRemark = lossRemark
+                };
+            }).OrderBy(x => x.GoldType).ToList();
+
+            return new jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchResponse
+            {
+                Year = request.Year,
+                Month = request.Month,
+                Status = request.Status,
+                HasSavedData = hasSavedData,
+                TotalMoneyDiff = rows.Sum(r => r.MoneyDiff),
+                Rows = rows
+            };
+        }
+
+        public async Task<string> SaveGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SaveRequest request)
+        {
+            // 1. คำนวณช่วงวันที่ของเดือนที่เลือก
+            var startDate = new DateTimeOffset(new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc));
+            var endDate = startDate.AddMonths(1).AddSeconds(-1);
+
+            // 2. Re-aggregate live data
+            var liveData = await (from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                                  join header in _jewelryContext.TbtProductionPlanStatusHeader
+                                      on detail.HeaderId equals header.Id
+                                  where header.Status == request.Status
+                                      && header.IsActive == true
+                                      && detail.IsActive == true
+                                      && header.CreateDate >= startDate
+                                      && header.CreateDate <= endDate
+                                      && !string.IsNullOrEmpty(detail.Gold)
+                                  group detail by detail.Gold into g
+                                  select new
+                                  {
+                                      GoldType = g.Key,
+                                      SumGoldWeightSend = g.Sum(x => x.GoldWeightSend ?? 0),
+                                      SumGoldWeightCheck = g.Sum(x => x.GoldWeightCheck ?? 0),
+                                  }).ToListAsync();
+
+            // 3. ดึง existing saved records
+            var existingRecords = await _jewelryContext.TbtGoldLossMonthlyReport
+                .Where(x => x.Year == request.Year
+                    && x.Month == request.Month
+                    && x.Status == request.Status
+                    && x.IsActive == true)
+                .ToListAsync();
+
+            var now = DateTime.UtcNow;
+            var currentUser = CurrentUsername;
+            var newRecords = new List<Jewelry.Data.Models.Jewelry.TbtGoldLossMonthlyReport>();
+            var updatedRecords = new List<Jewelry.Data.Models.Jewelry.TbtGoldLossMonthlyReport>();
+
+            foreach (var item in request.Items)
+            {
+                var live = liveData.FirstOrDefault(l => l.GoldType == item.GoldType);
+                var sumSend = live?.SumGoldWeightSend ?? 0;
+                var sumCheck = live?.SumGoldWeightCheck ?? 0;
+                var lossPercent = item.LossPercent ?? 0;
+                var goldLossPrice = item.GoldLossPrice ?? 0;
+
+                var rawLoss = sumSend - sumCheck;
+                var weightLossAllowed = sumSend * (lossPercent / 100);
+                var weightLossActual = weightLossAllowed - rawLoss;
+                var moneyDiff = weightLossActual * goldLossPrice;
+
+                var existing = existingRecords.FirstOrDefault(e => e.GoldType == item.GoldType);
+
+                if (existing != null)
+                {
+                    existing.SumGoldWeightSend = sumSend;
+                    existing.SumGoldWeightCheck = sumCheck;
+                    existing.LossPercent = lossPercent;
+                    existing.GoldLossPrice = goldLossPrice;
+                    existing.RawLoss = rawLoss;
+                    existing.WeightLossAllowed = weightLossAllowed;
+                    existing.WeightLossActual = weightLossActual;
+                    existing.MoneyDiff = moneyDiff;
+                    existing.LossRemark = item.LossRemark;
+                    existing.UpdateDate = now;
+                    existing.UpdateBy = currentUser;
+                    updatedRecords.Add(existing);
+                }
+                else
+                {
+                    newRecords.Add(new Jewelry.Data.Models.Jewelry.TbtGoldLossMonthlyReport
+                    {
+                        Year = request.Year,
+                        Month = request.Month,
+                        GoldType = item.GoldType,
+                        Status = request.Status,
+                        SumGoldWeightSend = sumSend,
+                        SumGoldWeightCheck = sumCheck,
+                        LossPercent = lossPercent,
+                        GoldLossPrice = goldLossPrice,
+                        RawLoss = rawLoss,
+                        WeightLossAllowed = weightLossAllowed,
+                        WeightLossActual = weightLossActual,
+                        MoneyDiff = moneyDiff,
+                        LossRemark = item.LossRemark,
+                        IsActive = true,
+                        CreateDate = now,
+                        CreateBy = currentUser
+                    });
+                }
+            }
+
+            if (updatedRecords.Any())
+            {
+                _jewelryContext.TbtGoldLossMonthlyReport.UpdateRange(updatedRecords);
+            }
+            if (newRecords.Any())
+            {
+                await _jewelryContext.TbtGoldLossMonthlyReport.AddRangeAsync(newRecords);
+            }
+
+            await _jewelryContext.SaveChangesAsync();
+            return "success";
+        }
+        #endregion
     }
 }

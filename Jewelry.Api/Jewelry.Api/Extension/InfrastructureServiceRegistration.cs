@@ -19,6 +19,7 @@ using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
 using Jewelry.Service.Stock.ProductImage;
 using Jewelry.Service.TransferStock;
+using Jewelry.Service.Permission;
 using Jewelry.Service.User;
 using Jewelry.Service.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -72,6 +73,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IReceiptProductionService, ReceiptProductionService>();
 
             services.AddScoped<ILoginService, LoginService>();
+            services.AddScoped<IPermissionService, Jewelry.Service.Permission.PermissionService>();
             services.AddScoped<IQuotationService, QuotationService>();
             services.AddScoped<ISaleOrderService, SaleOrderService>();
             services.AddScoped<IInvoiceService, InvoiceService>();

@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS tbt_gold_loss_monthly_report (
+    id SERIAL,
+    year INT NOT NULL,
+    month INT NOT NULL,
+    gold_type CHARACTER VARYING NOT NULL,
+    status INT NOT NULL DEFAULT 50,
+    sum_gold_weight_send NUMERIC(18,4),
+    sum_gold_weight_check NUMERIC(18,4),
+    loss_percent NUMERIC(10,4),
+    gold_loss_price NUMERIC(18,4),
+    raw_loss NUMERIC(18,4),
+    weight_loss_allowed NUMERIC(18,4),
+    weight_loss_actual NUMERIC(18,4),
+    money_diff NUMERIC(18,4),
+    loss_remark CHARACTER VARYING,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    create_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    create_by CHARACTER VARYING NOT NULL,
+    update_date TIMESTAMPTZ,
+    update_by CHARACTER VARYING,
+    CONSTRAINT tbt_gold_loss_monthly_report_pk PRIMARY KEY (id),
+    CONSTRAINT uq_gold_loss_monthly UNIQUE (year, month, gold_type, status)
+);

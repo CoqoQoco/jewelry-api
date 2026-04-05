@@ -90,6 +90,12 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPlanStatusHeader> TbtProductionPlanStatusHeader { get; set; }
 
+    public virtual DbSet<TbtGoldLossMonthlyReport> TbtGoldLossMonthlyReport { get; set; }
+
+    public virtual DbSet<TbmPermission> TbmPermission { get; set; }
+
+    public virtual DbSet<TbtRolePermission> TbtRolePermission { get; set; }
+
     public virtual DbSet<TbtProductionPlanTransferStatus> TbtProductionPlanTransferStatus { get; set; }
 
     public virtual DbSet<TbtReceiptStockCreate> TbtReceiptStockCreate { get; set; }
@@ -2881,6 +2887,106 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => new { d.UserId, d.Username })
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_user_role_user_fk");
+        });
+
+        modelBuilder.Entity<TbmPermission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbm_permission_pk");
+
+            entity.ToTable("tbm_permission");
+
+            entity.HasIndex(e => e.Code).IsUnique().HasDatabaseName("tbm_permission_code_uq");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.Name)
+                .HasColumnType("character varying")
+                .HasColumnName("name");
+            entity.Property(e => e.GroupName)
+                .HasColumnType("character varying")
+                .HasColumnName("group_name");
+            entity.Property(e => e.Description)
+                .HasColumnType("character varying")
+                .HasColumnName("description");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+        });
+
+        modelBuilder.Entity<TbtRolePermission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_role_permission_pk");
+
+            entity.ToTable("tbt_role_permission");
+
+            entity.HasIndex(e => new { e.RoleId, e.PermissionId })
+                .IsUnique()
+                .HasDatabaseName("tbt_role_permission_uq");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.RoleId).HasColumnName("role_id");
+            entity.Property(e => e.PermissionId).HasColumnName("permission_id");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.TbtRolePermission)
+                .HasForeignKey(d => d.RoleId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_role_permission_role_fk");
+
+            entity.HasOne(d => d.Permission).WithMany(p => p.TbtRolePermission)
+                .HasForeignKey(d => d.PermissionId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_role_permission_permission_fk");
+        });
+
+        modelBuilder.Entity<TbtGoldLossMonthlyReport>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_gold_loss_monthly_report_pk");
+
+            entity.ToTable("tbt_gold_loss_monthly_report");
+
+            entity.HasIndex(e => new { e.Year, e.Month, e.GoldType, e.Status })
+                .IsUnique()
+                .HasDatabaseName("uq_gold_loss_monthly");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Year).HasColumnName("year");
+            entity.Property(e => e.Month).HasColumnName("month");
+            entity.Property(e => e.GoldType)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_type");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.SumGoldWeightSend).HasColumnName("sum_gold_weight_send");
+            entity.Property(e => e.SumGoldWeightCheck).HasColumnName("sum_gold_weight_check");
+            entity.Property(e => e.LossPercent).HasColumnName("loss_percent");
+            entity.Property(e => e.GoldLossPrice).HasColumnName("gold_loss_price");
+            entity.Property(e => e.RawLoss).HasColumnName("raw_loss");
+            entity.Property(e => e.WeightLossAllowed).HasColumnName("weight_loss_allowed");
+            entity.Property(e => e.WeightLossActual).HasColumnName("weight_loss_actual");
+            entity.Property(e => e.MoneyDiff).HasColumnName("money_diff");
+            entity.Property(e => e.LossRemark)
+                .HasColumnType("character varying")
+                .HasColumnName("loss_remark");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -15,5 +15,8 @@ namespace Jewelry.Service.Production.Plan
         Task<jewelry.Model.Production.Plan.DailyPlan.Response> GetDailyReport(jewelry.Model.Production.Plan.DailyPlan.Criteria request);
         Task<jewelry.Model.Production.Plan.MonthlyReport.Response> GetPlanSuccessMonthlyReport(jewelry.Model.Production.Plan.MonthlyReport.Criteria request);
         IQueryable<jewelry.Model.Production.Plan.ListComplete.Response> PlanCompleted(jewelry.Model.Production.Plan.ListComplete.Search request);
+
+        Task<jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchResponse> GetGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchRequest request);
+        Task<string> SaveGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SaveRequest request);
     }
 }

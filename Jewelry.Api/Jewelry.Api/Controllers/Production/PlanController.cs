@@ -138,5 +138,41 @@ namespace Jewelry.Api.Controllers.Production
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("GoldLossMonthlyReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetGoldLossMonthlyReport([FromBody] jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchRequest request)
+        {
+            try
+            {
+                var response = await _planService.GetGoldLossMonthlyReport(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GoldLossMonthlyReportSave")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> SaveGoldLossMonthlyReport([FromBody] jewelry.Model.Production.Plan.GoldLossMonthlyReport.SaveRequest request)
+        {
+            try
+            {
+                var response = await _planService.SaveGoldLossMonthlyReport(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }
