@@ -1,0 +1,1 @@
+ALTER TABLE tbm_gold_size ADD COLUMN IF NOT EXISTS gold_percent DECIMAL(10,4) DEFAULT 0;

@@ -50,6 +50,7 @@ namespace Jewelry.Service.Sale.Quotation
                     Running = await _runningNumberService.GenerateRunningNumberForGold("QUO"),
 
                     CustomerName = request.CustomerName,
+                    CustomerCode = request.CustomerCode,
                     CustomerEmail = request.CustomerEmail,
                     CustomerPhone = request.CustomerPhone,
                     CustomerAddress = request.CustomerAddress,
@@ -81,6 +82,7 @@ namespace Jewelry.Service.Sale.Quotation
             }
 
             quotation.CustomerName = request.CustomerName;
+            quotation.CustomerCode = request.CustomerCode;
             quotation.CustomerEmail = request.CustomerEmail;
             quotation.CustomerPhone = request.CustomerPhone;
             quotation.CustomerAddress = request.CustomerAddress;
@@ -131,6 +133,7 @@ namespace Jewelry.Service.Sale.Quotation
                 Running = quotation.Running,
 
                 CustomerName = quotation.CustomerName,
+                CustomerCode = quotation.CustomerCode,
                 CustomerPhone = quotation.CustomerPhone,
                 CustomerEmail = quotation.CustomerEmail,
                 CustomerAddress = quotation.CustomerAddress,
@@ -161,6 +164,7 @@ namespace Jewelry.Service.Sale.Quotation
                             Number = quotation.Number ?? string.Empty,
                             Running = quotation.Running ?? string.Empty,
                             CustomerName = quotation.CustomerName ?? string.Empty,
+                            CustomerCode = quotation.CustomerCode,
                             CustomerPhone = quotation.CustomerPhone ?? string.Empty,
                             CustomerEmail = quotation.CustomerEmail ?? string.Empty,
                             CustomerAddress = quotation.CustomerAddress ?? string.Empty,
@@ -223,6 +227,11 @@ namespace Jewelry.Service.Sale.Quotation
             }
 
             return query;
+        }
+
+        public async Task<string> GenerateNumber()
+        {
+            return await _runningNumberService.GenerateQuotationNumber();
         }
     }
 }

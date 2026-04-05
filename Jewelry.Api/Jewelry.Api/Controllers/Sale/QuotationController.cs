@@ -88,5 +88,22 @@ namespace Jewelry.Api.Controllers.Sale
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("GenerateNumber")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GenerateNumber()
+        {
+            try
+            {
+                return Ok(await _service.GenerateNumber());
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new { ex.Message });
+            }
+        }
     }
 }

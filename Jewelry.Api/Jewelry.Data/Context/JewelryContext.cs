@@ -608,6 +608,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Id)
                 .ValueGeneratedOnAdd()
                 .HasColumnName("id");
+            entity.Property(e => e.GoldPercent).HasColumnName("gold_percent");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")
@@ -2227,6 +2228,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.CustomerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_code");
         });
 
         modelBuilder.Entity<TbtStockCostPlan>(entity =>

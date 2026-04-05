@@ -16,6 +16,7 @@ namespace Jewelry.Service.Helper
         Task<string> GenerateRunningNumberForGold(string key);
         //Task<string> GenerateRunningNumberForStockProduct(string key);
         Task<string> GenerateRunningNumberForStockProductHash(string key);
+        Task<string> GenerateQuotationNumber();
     }
     public class RunningNumber : IRunningNumber
     {
@@ -86,6 +87,14 @@ namespace Jewelry.Service.Helper
 
             // แสดงค่า Base36 ใน response
             return $"{key}-{encodedMonth}-{monthlyRunning:000}"; // return แบบที่ไม่สามารถเดาได้ง่าย
+        }
+
+        public async Task<string> GenerateQuotationNumber()
+        {
+            var dateStr = DateTime.UtcNow.ToString("yyMMdd");
+            var key = $"QT{dateStr}";
+            var jobRunning = await Next(key);
+            return $"QT-{dateStr}-{jobRunning.ToString("000")}";
         }
 
         private string ToBase36(int number)

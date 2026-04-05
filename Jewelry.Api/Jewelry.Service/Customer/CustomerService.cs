@@ -23,6 +23,7 @@ namespace Jewelry.Service.Customer
         IQueryable<SearchCustomerResponse> Search(SearchCustomer request);
         IQueryable<SearchCustomerResponse> SearchCustomer(SearchCustomer request);
         Task<string> CreateCustomer(CreateCustomerRequest request);
+        Task<string> UpdateCustomer(UpdateCustomerRequest request);
     }
     public class CustomerService : BaseService, ICustomerService
     {
@@ -146,6 +147,35 @@ namespace Jewelry.Service.Customer
             await _jewelryContext.SaveChangesAsync();
 
             return $"{request.Code} - {request.NameTH}";
+        }
+
+        public async Task<string> UpdateCustomer(UpdateCustomerRequest request)
+        {
+            var customer = (from item in _jewelryContext.TbmCustomer
+                            where item.Code == request.Code.ToUpper()
+                            select item).FirstOrDefault();
+
+            if (customer == null)
+            {
+                throw new HandleException($"ไม่พบรหัสลูกค้า {request.Code} ในระบบ");
+            }
+
+            if (request.NameTH != null) customer.NameTh = request.NameTH;
+            if (request.NameEN != null) customer.NameEn = request.NameEN;
+            if (request.Address != null) customer.Address = request.Address;
+            if (request.Tel1 != null) customer.Telephone1 = request.Tel1;
+            if (request.Tel2 != null) customer.Telephone2 = request.Tel2;
+            if (request.Email != null) customer.Email = request.Email;
+            if (request.ContactName != null) customer.ContactName = request.ContactName;
+            if (request.Remark != null) customer.Remark = request.Remark;
+
+            customer.UpdateDate = DateTime.UtcNow;
+            customer.UpdateBy = CurrentUsername;
+
+            _jewelryContext.TbmCustomer.Update(customer);
+            await _jewelryContext.SaveChangesAsync();
+
+            return $"{customer.Code} - {customer.NameTh}";
         }
     }
 }

@@ -68,7 +68,8 @@ namespace Jewelry.Service.Master
                                 NameEn = item.NameEn,
                                 NameTh = item.NameTh,
                                 Code = item.Code,
-                                Description = item.NameEn
+                                Description = item.NameEn,
+                                GoldPercent = item.GoldPercent
                             });
 
             return response.OrderBy(x => x.NameEn);

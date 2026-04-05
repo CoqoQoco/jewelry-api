@@ -23,4 +23,17 @@ namespace jewelry.Model.Customer
         public string? ContactName { get; set; }
         public string? Remark { get; set; }
     }
+
+    public class UpdateCustomerRequest
+    {
+        public string Code { get; set; }
+        public string? NameTH { get; set; }
+        public string? NameEN { get; set; }
+        public string? Address { get; set; }
+        public string? Tel1 { get; set; }
+        public string? Tel2 { get; set; }
+        public string? Email { get; set; }
+        public string? ContactName { get; set; }
+        public string? Remark { get; set; }
+    }
 }

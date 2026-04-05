@@ -7,6 +7,7 @@ namespace jewelry.Model.Sale.Quotation.List
         public string Number { get; set; } = string.Empty;
         public string Running { get; set; } = string.Empty;
         public string CustomerName { get; set; } = string.Empty;
+        public string? CustomerCode { get; set; }
         public string CustomerPhone { get; set; } = string.Empty;
         public string CustomerEmail { get; set; } = string.Empty;
         public string CustomerAddress { get; set; } = string.Empty;

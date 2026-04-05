@@ -48,4 +48,6 @@ public partial class TbtSaleQuotation
     public decimal? Vat { get; set; }
 
     public decimal? GoldPerOz { get; set; }
+
+    public string? CustomerCode { get; set; }
 }

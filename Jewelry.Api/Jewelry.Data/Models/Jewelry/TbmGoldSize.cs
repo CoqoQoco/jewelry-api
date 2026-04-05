@@ -19,6 +19,8 @@ public partial class TbmGoldSize
 
     public string CreateBy { get; set; } = null!;
 
+    public decimal GoldPercent { get; set; }
+
     public virtual ICollection<TbmZill> TbmZill { get; set; } = new List<TbmZill>();
 
     public virtual ICollection<TbtProductionPlanCostGold> TbtProductionPlanCostGold { get; set; } = new List<TbtProductionPlanCostGold>();
