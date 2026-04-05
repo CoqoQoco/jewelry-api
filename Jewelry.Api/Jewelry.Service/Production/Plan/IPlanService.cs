@@ -18,5 +18,12 @@ namespace Jewelry.Service.Production.Plan
 
         Task<jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchResponse> GetGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchRequest request);
         Task<string> SaveGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SaveRequest request);
+
+        Task<jewelry.Model.Production.Plan.GoldLossTangReport.SearchResponse> GetGoldLossTangReport(jewelry.Model.Production.Plan.GoldLossTangReport.SearchRequest request);
+        Task<string> SaveGoldLossTangReport(jewelry.Model.Production.Plan.GoldLossTangReport.SaveRequest request);
+        Task<string> CreateGoldLossJob(jewelry.Model.Production.Plan.GoldLossTangReport.CreateJobRequest request);
+        Task<List<jewelry.Model.Production.Plan.GoldLossTangReport.JobListRow>> GetGoldLossJobList(jewelry.Model.Production.Plan.GoldLossTangReport.JobListRequest request);
+        Task<jewelry.Model.Production.Plan.GoldLossTangReport.JobDetailResponse> GetGoldLossJobById(int jobId);
+        Task<string> UpdateGoldLossJob(jewelry.Model.Production.Plan.GoldLossTangReport.UpdateJobRequest request);
     }
 }

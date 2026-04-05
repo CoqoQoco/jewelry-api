@@ -1561,5 +1561,471 @@ namespace Jewelry.Service.Production.Plan
             return "success";
         }
         #endregion
+
+        #region --- gold loss tang report ---
+        public async Task<jewelry.Model.Production.Plan.GoldLossTangReport.SearchResponse> GetGoldLossTangReport(jewelry.Model.Production.Plan.GoldLossTangReport.SearchRequest request)
+        {
+            var query = from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                        join header in _jewelryContext.TbtProductionPlanStatusHeader
+                            on detail.HeaderId equals header.Id
+                        join plan in _jewelryContext.TbtProductionPlan
+                            on header.ProductionPlanId equals plan.Id
+                        where header.Status == request.Status
+                            && header.IsActive == true
+                            && detail.IsActive == true
+                            && !string.IsNullOrEmpty(detail.Gold)
+                        select new { detail, header, plan };
+
+            // Filter by date range (based on header.CreateDate)
+            if (request.StartDate.HasValue)
+            {
+                query = query.Where(x => x.header.CreateDate >= request.StartDate.Value.StartOfDayUtc());
+            }
+            if (request.EndDate.HasValue)
+            {
+                query = query.Where(x => x.header.CreateDate <= request.EndDate.Value.EndOfDayUtc());
+            }
+
+            // Filter by WO
+            if (!string.IsNullOrEmpty(request.Wo))
+            {
+                query = query.Where(x => x.plan.Wo == request.Wo);
+            }
+
+            // Filter by worker code
+            if (!string.IsNullOrEmpty(request.WorkerCode))
+            {
+                query = query.Where(x => x.header.WorkerCode == request.WorkerCode);
+            }
+
+            // Filter by gold code
+            if (!string.IsNullOrEmpty(request.GoldCode))
+            {
+                query = query.Where(x => x.detail.Gold == request.GoldCode);
+            }
+
+            var data = await query.ToListAsync();
+
+            // Map gold master for names
+            var goldCodes = data.Select(x => x.detail.Gold).Distinct().ToList();
+            var goldMaster = await _jewelryContext.TbmGold
+                .Where(x => x.IsActive && goldCodes.Contains(x.Code))
+                .ToListAsync();
+
+            // Check if any detail has saved loss data
+            var hasSavedData = data.Any(x => x.detail.LossPercent.HasValue || !string.IsNullOrEmpty(x.detail.LossRemark));
+
+            var rows = data.Select(x =>
+            {
+                var master = goldMaster.FirstOrDefault(m => m.Code == x.detail.Gold);
+
+                return new jewelry.Model.Production.Plan.GoldLossTangReport.GoldLossTangDetailRow
+                {
+                    ProductionPlanId = x.detail.ProductionPlanId,
+                    ItemNo = x.detail.ItemNo,
+
+                    Wo = x.plan.Wo,
+                    WoNumber = x.plan.WoNumber,
+                    WoText = x.plan.WoText,
+
+                    WorkerCode = x.header.WorkerCode ?? string.Empty,
+                    WorkerName = x.header.WorkerName ?? string.Empty,
+                    GoldType = x.detail.Gold ?? string.Empty,
+                    GoldTypeName = master?.NameTh ?? x.detail.Gold ?? string.Empty,
+                    RequestDate = x.detail.RequestDate,
+                    GoldQtySend = x.detail.GoldQtySend ?? 0,
+                    GoldWeightSend = x.detail.GoldWeightSend ?? 0,
+                    GoldQtyCheck = x.detail.GoldQtyCheck ?? 0,
+                    GoldWeightCheck = x.detail.GoldWeightCheck ?? 0,
+                    LossPercent = x.detail.LossPercent ?? 0,
+                    GoldLossPrice = x.header.GoldLossPrice ?? 0,
+                    LossRemark = x.detail.LossRemark
+                };
+            }).OrderBy(x => x.Wo).ThenBy(x => x.ItemNo).ToList();
+
+            return new jewelry.Model.Production.Plan.GoldLossTangReport.SearchResponse
+            {
+                HasSavedData = hasSavedData,
+                Rows = rows
+            };
+        }
+
+        public async Task<string> SaveGoldLossTangReport(jewelry.Model.Production.Plan.GoldLossTangReport.SaveRequest request)
+        {
+            if (request.Items == null || !request.Items.Any())
+            {
+                throw new HandleException("No items to save.");
+            }
+
+            // Load detail records by composite keys
+            var keys = request.Items.Select(x => new { x.ProductionPlanId, x.ItemNo }).ToList();
+
+            var details = await _jewelryContext.TbtProductionPlanStatusDetail
+                .Where(d => d.IsActive && keys.Select(k => k.ProductionPlanId).Contains(d.ProductionPlanId))
+                .ToListAsync();
+
+            var updatedDetails = new List<TbtProductionPlanStatusDetail>();
+
+            foreach (var item in request.Items)
+            {
+                var detail = details.FirstOrDefault(d => d.ProductionPlanId == item.ProductionPlanId && d.ItemNo == item.ItemNo);
+                if (detail == null) continue;
+
+                detail.LossPercent = item.LossPercent;
+                detail.LossRemark = item.LossRemark;
+                updatedDetails.Add(detail);
+            }
+
+            if (updatedDetails.Any())
+            {
+                _jewelryContext.TbtProductionPlanStatusDetail.UpdateRange(updatedDetails);
+            }
+
+            // Also update GoldLossPrice on headers if provided
+            var headerIds = details
+                .Where(d => updatedDetails.Contains(d))
+                .Select(d => d.HeaderId)
+                .Distinct()
+                .ToList();
+
+            var headers = await _jewelryContext.TbtProductionPlanStatusHeader
+                .Where(h => headerIds.Contains(h.Id))
+                .ToListAsync();
+
+            var updatedHeaders = new List<TbtProductionPlanStatusHeader>();
+            foreach (var header in headers)
+            {
+                var itemForHeader = request.Items
+                    .FirstOrDefault(i => updatedDetails
+                        .Any(d => d.HeaderId == header.Id && d.ProductionPlanId == i.ProductionPlanId && d.ItemNo == i.ItemNo));
+
+                if (itemForHeader != null && itemForHeader.GoldLossPrice.HasValue)
+                {
+                    header.GoldLossPrice = itemForHeader.GoldLossPrice;
+                    header.UpdateDate = DateTime.UtcNow;
+                    header.UpdateBy = CurrentUsername;
+                    updatedHeaders.Add(header);
+                }
+            }
+
+            if (updatedHeaders.Any())
+            {
+                _jewelryContext.TbtProductionPlanStatusHeader.UpdateRange(updatedHeaders);
+            }
+
+            await _jewelryContext.SaveChangesAsync();
+            return "success";
+        }
+
+        public async Task<string> CreateGoldLossJob(jewelry.Model.Production.Plan.GoldLossTangReport.CreateJobRequest request)
+        {
+            if (request.Items == null || !request.Items.Any())
+            {
+                throw new HandleException("No items to save.");
+            }
+
+            // Auto-gen document_no: GL-YYYYMM-NNN
+            var now = DateTime.UtcNow;
+            var prefix = $"GL-{now:yyyyMM}-";
+
+            var maxDocNo = await _jewelryContext.TbtGoldLossHeader
+                .Where(h => h.DocumentNo != null && h.DocumentNo.StartsWith(prefix))
+                .OrderByDescending(h => h.DocumentNo)
+                .Select(h => h.DocumentNo)
+                .FirstOrDefaultAsync();
+
+            int nextSeq = 1;
+            if (maxDocNo != null)
+            {
+                var seqPart = maxDocNo.Substring(prefix.Length);
+                if (int.TryParse(seqPart, out int parsed))
+                {
+                    nextSeq = parsed + 1;
+                }
+            }
+            var documentNo = $"{prefix}{nextSeq:D3}";
+
+            // Create header
+            var header = new TbtGoldLossHeader
+            {
+                DocumentNo = documentNo,
+                StartDate = request.StartDate.HasValue ? request.StartDate.Value.UtcDateTime : null,
+                EndDate = request.EndDate.HasValue ? request.EndDate.Value.UtcDateTime : null,
+                Status = 50,
+                Remark = request.Remark,
+                IsActive = true,
+                CreateDate = DateTime.UtcNow,
+                CreateBy = CurrentUsername,
+            };
+
+            _jewelryContext.TbtGoldLossHeader.Add(header);
+            await _jewelryContext.SaveChangesAsync(); // get header.Id
+
+            // Create items
+            var items = request.Items.Select(item => new TbtGoldLossItem
+            {
+                HeaderId = header.Id,
+                ProductionPlanId = item.ProductionPlanId,
+                ItemNo = item.ItemNo,
+                Wo = item.Wo,
+                WoNumber = item.WoNumber,
+                WoText = item.WoText,
+                WorkerCode = item.WorkerCode,
+                WorkerName = item.WorkerName,
+                Gold = item.Gold,
+                GoldQtySend = item.GoldQtySend,
+                GoldWeightSend = item.GoldWeightSend,
+                GoldQtyCheck = item.GoldQtyCheck,
+                GoldWeightCheck = item.GoldWeightCheck,
+                LossPercent = item.LossPercent,
+                GoldLossPrice = item.GoldLossPrice,
+                WeightLossAllowed = item.WeightLossAllowed,
+                WeightLossActual = item.WeightLossActual,
+                MoneyDiff = item.MoneyDiff,
+                LossRemark = item.LossRemark,
+                RequestDate = item.RequestDate.HasValue ? DateTime.SpecifyKind(item.RequestDate.Value, DateTimeKind.Utc) : null,
+                IsActive = true,
+                CreateDate = DateTime.UtcNow,
+                CreateBy = CurrentUsername,
+            }).ToList();
+
+            _jewelryContext.TbtGoldLossItem.AddRange(items);
+
+            // Update OLD tables (same logic as SaveGoldLossTangReport)
+            var keys = request.Items.Select(x => new { x.ProductionPlanId, x.ItemNo }).ToList();
+
+            var details = await _jewelryContext.TbtProductionPlanStatusDetail
+                .Where(d => d.IsActive && keys.Select(k => k.ProductionPlanId).Contains(d.ProductionPlanId))
+                .ToListAsync();
+
+            var updatedDetails = new List<TbtProductionPlanStatusDetail>();
+
+            foreach (var item in request.Items)
+            {
+                var detail = details.FirstOrDefault(d => d.ProductionPlanId == item.ProductionPlanId && d.ItemNo == item.ItemNo);
+                if (detail == null) continue;
+
+                detail.LossPercent = item.LossPercent;
+                detail.LossRemark = item.LossRemark;
+                updatedDetails.Add(detail);
+            }
+
+            if (updatedDetails.Any())
+            {
+                _jewelryContext.TbtProductionPlanStatusDetail.UpdateRange(updatedDetails);
+            }
+
+            // Update GoldLossPrice on headers
+            var headerIds = details
+                .Where(d => updatedDetails.Contains(d))
+                .Select(d => d.HeaderId)
+                .Distinct()
+                .ToList();
+
+            var statusHeaders = await _jewelryContext.TbtProductionPlanStatusHeader
+                .Where(h => headerIds.Contains(h.Id))
+                .ToListAsync();
+
+            var updatedHeaders = new List<TbtProductionPlanStatusHeader>();
+            foreach (var statusHeader in statusHeaders)
+            {
+                var itemForHeader = request.Items
+                    .FirstOrDefault(i => updatedDetails
+                        .Any(d => d.HeaderId == statusHeader.Id && d.ProductionPlanId == i.ProductionPlanId && d.ItemNo == i.ItemNo));
+
+                if (itemForHeader != null)
+                {
+                    statusHeader.GoldLossPrice = itemForHeader.GoldLossPrice;
+                    statusHeader.UpdateDate = DateTime.UtcNow;
+                    statusHeader.UpdateBy = CurrentUsername;
+                    updatedHeaders.Add(statusHeader);
+                }
+            }
+
+            if (updatedHeaders.Any())
+            {
+                _jewelryContext.TbtProductionPlanStatusHeader.UpdateRange(updatedHeaders);
+            }
+
+            await _jewelryContext.SaveChangesAsync();
+            return documentNo;
+        }
+
+        public async Task<List<jewelry.Model.Production.Plan.GoldLossTangReport.JobListRow>> GetGoldLossJobList(jewelry.Model.Production.Plan.GoldLossTangReport.JobListRequest request)
+        {
+            var query = _jewelryContext.TbtGoldLossHeader
+                .Where(h => h.IsActive)
+                .AsQueryable();
+
+            if (request.StartDate.HasValue)
+                query = query.Where(h => h.CreateDate >= request.StartDate.Value.StartOfDayUtc());
+            if (request.EndDate.HasValue)
+                query = query.Where(h => h.CreateDate <= request.EndDate.Value.EndOfDayUtc());
+            if (!string.IsNullOrEmpty(request.DocumentNo))
+                query = query.Where(h => h.DocumentNo != null && h.DocumentNo.Contains(request.DocumentNo));
+
+            var headers = await query.OrderByDescending(h => h.CreateDate).ToListAsync();
+            var headerIds = headers.Select(h => h.Id).ToList();
+
+            var itemStats = await _jewelryContext.TbtGoldLossItem
+                .Where(i => headerIds.Contains(i.HeaderId) && i.IsActive)
+                .GroupBy(i => i.HeaderId)
+                .Select(g => new { HeaderId = g.Key, Count = g.Count(), TotalMoneyDiff = g.Sum(x => x.MoneyDiff ?? 0) })
+                .ToListAsync();
+
+            return headers.Select(h =>
+            {
+                var stats = itemStats.FirstOrDefault(s => s.HeaderId == h.Id);
+                return new jewelry.Model.Production.Plan.GoldLossTangReport.JobListRow
+                {
+                    Id = h.Id,
+                    DocumentNo = h.DocumentNo ?? string.Empty,
+                    StartDate = h.StartDate,
+                    EndDate = h.EndDate,
+                    Status = h.Status,
+                    Remark = h.Remark,
+                    ItemCount = stats?.Count ?? 0,
+                    TotalMoneyDiff = stats?.TotalMoneyDiff ?? 0,
+                    CreateDate = h.CreateDate,
+                    CreateBy = h.CreateBy
+                };
+            }).ToList();
+        }
+
+        public async Task<jewelry.Model.Production.Plan.GoldLossTangReport.JobDetailResponse> GetGoldLossJobById(int jobId)
+        {
+            var header = await _jewelryContext.TbtGoldLossHeader
+                .Include(h => h.TbtGoldLossItem)
+                .FirstOrDefaultAsync(h => h.Id == jobId && h.IsActive);
+
+            if (header == null)
+                throw new HandleException("ไม่พบใบงาน");
+
+            // Get gold master for names
+            var goldCodes = header.TbtGoldLossItem.Where(i => i.IsActive).Select(i => i.Gold).Distinct().ToList();
+            var goldMaster = await _jewelryContext.TbmGold
+                .Where(g => g.IsActive && goldCodes.Contains(g.Code))
+                .ToListAsync();
+
+            var items = header.TbtGoldLossItem.Where(i => i.IsActive).Select(item =>
+            {
+                var master = goldMaster.FirstOrDefault(m => m.Code == item.Gold);
+                return new jewelry.Model.Production.Plan.GoldLossTangReport.GoldLossTangDetailRow
+                {
+                    ProductionPlanId = item.ProductionPlanId,
+                    ItemNo = item.ItemNo,
+                    Wo = item.Wo ?? string.Empty,
+                    WoNumber = item.WoNumber ?? 0,
+                    WoText = item.WoText ?? string.Empty,
+                    WorkerCode = item.WorkerCode ?? string.Empty,
+                    WorkerName = item.WorkerName ?? string.Empty,
+                    GoldType = item.Gold ?? string.Empty,
+                    GoldTypeName = master?.NameTh ?? item.Gold ?? string.Empty,
+                    RequestDate = item.RequestDate,
+                    GoldQtySend = item.GoldQtySend ?? 0,
+                    GoldWeightSend = item.GoldWeightSend ?? 0,
+                    GoldQtyCheck = item.GoldQtyCheck ?? 0,
+                    GoldWeightCheck = item.GoldWeightCheck ?? 0,
+                    LossPercent = item.LossPercent ?? 0,
+                    GoldLossPrice = item.GoldLossPrice ?? 0,
+                    LossRemark = item.LossRemark
+                };
+            }).OrderBy(x => x.Wo).ThenBy(x => x.ItemNo).ToList();
+
+            return new jewelry.Model.Production.Plan.GoldLossTangReport.JobDetailResponse
+            {
+                Id = header.Id,
+                DocumentNo = header.DocumentNo ?? string.Empty,
+                StartDate = header.StartDate,
+                EndDate = header.EndDate,
+                Status = header.Status,
+                Remark = header.Remark,
+                CreateBy = header.CreateBy,
+                CreateDate = header.CreateDate,
+                Items = items
+            };
+        }
+
+        public async Task<string> UpdateGoldLossJob(jewelry.Model.Production.Plan.GoldLossTangReport.UpdateJobRequest request)
+        {
+            var header = await _jewelryContext.TbtGoldLossHeader
+                .Include(h => h.TbtGoldLossItem)
+                .FirstOrDefaultAsync(h => h.Id == request.JobId && h.IsActive);
+
+            if (header == null)
+                throw new HandleException("ไม่พบใบงาน");
+
+            header.Remark = request.Remark;
+            header.UpdateDate = DateTime.UtcNow;
+            header.UpdateBy = CurrentUsername;
+            _jewelryContext.TbtGoldLossHeader.Update(header);
+
+            // Update items
+            var updatedItems = new List<TbtGoldLossItem>();
+            foreach (var reqItem in request.Items)
+            {
+                var item = header.TbtGoldLossItem.FirstOrDefault(i =>
+                    i.ProductionPlanId == reqItem.ProductionPlanId && i.ItemNo == reqItem.ItemNo && i.IsActive);
+                if (item == null) continue;
+
+                item.LossPercent = reqItem.LossPercent;
+                item.GoldLossPrice = reqItem.GoldLossPrice;
+                item.WeightLossAllowed = reqItem.WeightLossAllowed;
+                item.WeightLossActual = reqItem.WeightLossActual;
+                item.MoneyDiff = reqItem.MoneyDiff;
+                item.LossRemark = reqItem.LossRemark;
+                item.UpdateDate = DateTime.UtcNow;
+                item.UpdateBy = CurrentUsername;
+                updatedItems.Add(item);
+            }
+            _jewelryContext.TbtGoldLossItem.UpdateRange(updatedItems);
+
+            // Also update old tables (same pattern as SaveGoldLossTangReport)
+            var detailKeys = request.Items.Select(x => new { x.ProductionPlanId, x.ItemNo }).ToList();
+            var statusDetails = await _jewelryContext.TbtProductionPlanStatusDetail
+                .Where(d => d.IsActive && detailKeys.Select(k => k.ProductionPlanId).Contains(d.ProductionPlanId))
+                .ToListAsync();
+
+            var updatedStatusDetails = new List<TbtProductionPlanStatusDetail>();
+            var headerIdsToUpdate = new HashSet<int>();
+
+            foreach (var reqItem in request.Items)
+            {
+                var detail = statusDetails.FirstOrDefault(d => d.ProductionPlanId == reqItem.ProductionPlanId && d.ItemNo == reqItem.ItemNo);
+                if (detail == null) continue;
+
+                detail.LossPercent = reqItem.LossPercent;
+                detail.LossRemark = reqItem.LossRemark;
+                updatedStatusDetails.Add(detail);
+                headerIdsToUpdate.Add(detail.HeaderId);
+            }
+            if (updatedStatusDetails.Any())
+                _jewelryContext.TbtProductionPlanStatusDetail.UpdateRange(updatedStatusDetails);
+
+            // Update GoldLossPrice on status headers
+            if (headerIdsToUpdate.Any())
+            {
+                var statusHeaders = await _jewelryContext.TbtProductionPlanStatusHeader
+                    .Where(h => headerIdsToUpdate.Contains(h.Id))
+                    .ToListAsync();
+
+                foreach (var sh in statusHeaders)
+                {
+                    var matchingItem = request.Items.FirstOrDefault(i =>
+                        statusDetails.Any(d => d.HeaderId == sh.Id && d.ProductionPlanId == i.ProductionPlanId));
+                    if (matchingItem != null)
+                    {
+                        sh.GoldLossPrice = matchingItem.GoldLossPrice;
+                        sh.UpdateDate = DateTime.UtcNow;
+                        sh.UpdateBy = CurrentUsername;
+                    }
+                }
+                _jewelryContext.TbtProductionPlanStatusHeader.UpdateRange(statusHeaders);
+            }
+
+            await _jewelryContext.SaveChangesAsync();
+            return header.DocumentNo ?? "success";
+        }
+        #endregion
     }
 }

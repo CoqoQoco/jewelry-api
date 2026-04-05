@@ -110,8 +110,10 @@ Images stored in `Images/` subdirectories organized by feature (Mold, Stock, etc
 
 ---
 
-## Skills Reference
+## Skills & Agents Reference
 
-| Skill | ใช้เมื่อ |
+| Resource | ใช้เมื่อ |
 |---|---|
 | @.claude/skills/md-instruction/SKILL.md | เขียน/แก้ไขไฟล์ .md |
+| @.claude/skills/datetime-handling/SKILL.md | DateTimeOffset, UTC filter, บันทึกวันที่ |
+| @.claude/agents/api-implementer.md | implement API ตาม plan ที่ confirm แล้ว |

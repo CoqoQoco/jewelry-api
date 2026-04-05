@@ -174,5 +174,113 @@ namespace Jewelry.Api.Controllers.Production
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("GoldLossTangReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.GoldLossTangReport.SearchResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetGoldLossTangReport([FromBody] jewelry.Model.Production.Plan.GoldLossTangReport.SearchRequest request)
+        {
+            try
+            {
+                var response = await _planService.GetGoldLossTangReport(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GoldLossTangReportSave")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> SaveGoldLossTangReport([FromBody] jewelry.Model.Production.Plan.GoldLossTangReport.SaveRequest request)
+        {
+            try
+            {
+                var response = await _planService.SaveGoldLossTangReport(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GoldLossTangCreateJob")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldLossTangCreateJob([FromBody] jewelry.Model.Production.Plan.GoldLossTangReport.CreateJobRequest request)
+        {
+            try
+            {
+                var response = await _planService.CreateGoldLossJob(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GoldLossTangJobList")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Production.Plan.GoldLossTangReport.JobListRow>))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldLossTangJobList([FromBody] jewelry.Model.Production.Plan.GoldLossTangReport.JobListRequest request)
+        {
+            try
+            {
+                var response = await _planService.GetGoldLossJobList(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GoldLossTangJobDetail")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.GoldLossTangReport.JobDetailResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldLossTangJobDetail([FromBody] jewelry.Model.Production.Plan.GoldLossTangReport.JobDetailRequest request)
+        {
+            try
+            {
+                var response = await _planService.GetGoldLossJobById(request.JobId);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GoldLossTangUpdateJob")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldLossTangUpdateJob([FromBody] jewelry.Model.Production.Plan.GoldLossTangReport.UpdateJobRequest request)
+        {
+            try
+            {
+                var response = await _planService.UpdateGoldLossJob(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }
