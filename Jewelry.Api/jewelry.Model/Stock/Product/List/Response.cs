@@ -51,7 +51,7 @@ namespace jewelry.Model.Stock.Product.List
         public decimal TagPriceMultiplier { get; set; } = 1;
 
         public List<Material> Materials { get; set; } = new List<Material>();
-        //public List<PriceTransection>? PriceTransection { get; set; } = new List<PriceTransection>();
+        public List<PriceTransection>? PriceTransection { get; set; } = new List<PriceTransection>();
     }
 
     public class Material

@@ -172,7 +172,13 @@ namespace Jewelry.Service.Stock.Product
                                              }).ToList()
                                              : new List<jewelry.Model.Stock.Product.List.Material>(),
 
-                               //PriceTransection = item.ProductCostDetail != null && !string.IsNullOrEmpty(item.ProductCostDetail) ?  JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.List.PriceTransection>>(item.ProductCostDetail, options) : null
+                               //PriceTransection = new Func<List<jewelry.Model.Stock.Product.List.PriceTransection>?>(() => {
+                               //    try {
+                               //        return !string.IsNullOrEmpty(item.ProductCostDetail)
+                               //            ? JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.List.PriceTransection>>(item.ProductCostDetail, options)
+                               //            : null;
+                               //    } catch { return null; }
+                               //})()
                            };
 
             return response;
