@@ -1426,7 +1426,7 @@ namespace Jewelry.Service.Production.Plan
                 var sumSend = item.SumGoldWeightSend;
                 var sumCheck = item.SumGoldWeightCheck;
                 var rawLoss = sumSend - sumCheck;
-                var weightLossAllowed = sumSend * (lossPercent / 100);
+                var weightLossAllowed = sumCheck * (lossPercent / 100);
                 var weightLossActual = Math.Round(weightLossAllowed - rawLoss, 4);
                 var moneyDiff = Math.Round(weightLossActual, 2) * goldLossPrice;
 
@@ -1503,7 +1503,7 @@ namespace Jewelry.Service.Production.Plan
                 var goldLossPrice = item.GoldLossPrice ?? 0;
 
                 var rawLoss = sumSend - sumCheck;
-                var weightLossAllowed = sumSend * (lossPercent / 100);
+                var weightLossAllowed = sumCheck * (lossPercent / 100);
                 var weightLossActual = Math.Round(weightLossAllowed - rawLoss, 4);
                 var moneyDiff = Math.Round(weightLossActual, 2) * goldLossPrice;
 
