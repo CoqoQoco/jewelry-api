@@ -120,6 +120,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleQuotation> TbtSaleQuotation { get; set; }
 
+    public virtual DbSet<TbtStockBasket> TbtStockBasket { get; set; }
+
+    public virtual DbSet<TbtStockBasketItem> TbtStockBasketItem { get; set; }
+
     public virtual DbSet<TbtStockCostPlan> TbtStockCostPlan { get; set; }
 
     public virtual DbSet<TbtStockCostVersion> TbtStockCostVersion { get; set; }
@@ -2176,6 +2180,87 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtStockBasket>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_stock_basket_pk");
+
+            entity.ToTable("tbt_stock_basket");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.BasketNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("basket_number");
+            entity.Property(e => e.BasketName)
+                .HasColumnType("character varying")
+                .HasColumnName("basket_name");
+            entity.Property(e => e.EventDate).HasColumnName("event_date");
+            entity.Property(e => e.Responsible)
+                .HasColumnType("character varying")
+                .HasColumnName("responsible");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.CheckoutDate).HasColumnName("checkout_date");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasMany(e => e.TbtStockBasketItem)
+                .WithOne(e => e.BasketRunningNavigation)
+                .HasForeignKey(e => e.BasketRunning)
+                .HasConstraintName("tbt_stock_basket_item_basket_fk");
+        });
+
+        modelBuilder.Entity<TbtStockBasketItem>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_basket_item_pk");
+
+            entity.ToTable("tbt_stock_basket_item");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.BasketRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("basket_running");
+            entity.Property(e => e.BasketNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("basket_number");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.Status)
+                .HasColumnType("character varying")
+                .HasColumnName("status");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(e => e.BasketRunningNavigation)
+                .WithMany(e => e.TbtStockBasketItem)
+                .HasForeignKey(e => e.BasketRunning)
+                .HasConstraintName("tbt_stock_basket_item_basket_fk");
         });
 
         modelBuilder.Entity<TbtSaleQuotation>(entity =>

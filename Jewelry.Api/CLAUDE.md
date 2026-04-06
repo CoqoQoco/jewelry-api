@@ -52,9 +52,8 @@ dotnet build Jewelry.Api.sln
 cd Jewelry.Api
 docker-compose down && docker-compose build && docker-compose up -d
 
-# Scaffold DB models จาก PostgreSQL
-cd Jewelry.Data
-dotnet ef dbcontext scaffold 'Server=localhost;Port=5432;Database=postgres;User Id=postgres;Password=winsun24;Trust Server Certificate=true;' Npgsql.EntityFrameworkCore.PostgreSQL -o Models/Jewelry --context-dir Context/ --context JewelryContext -f --no-pluralize --no-onconfiguring
+# DB Migration — ดูรายละเอียดที่ @.claude/skills/migration/SKILL.md
+# สร้าง SQL ใน Jewelry.Data/Migrations/ แล้วผู้ดูแลระบบ run เอง + สร้าง entity เอง
 ```
 
 ---
@@ -116,4 +115,5 @@ Images stored in `Images/` subdirectories organized by feature (Mold, Stock, etc
 |---|---|
 | @.claude/skills/md-instruction/SKILL.md | เขียน/แก้ไขไฟล์ .md |
 | @.claude/skills/datetime-handling/SKILL.md | DateTimeOffset, UTC filter, บันทึกวันที่ |
+| @.claude/skills/migration/SKILL.md | สร้าง DB migration SQL, naming convention, scaffold |
 | @.claude/agents/api-implementer.md | implement API ตาม plan ที่ confirm แล้ว |

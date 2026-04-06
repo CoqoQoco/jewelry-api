@@ -14,6 +14,7 @@ using Jewelry.Service.Sale.Quotation;
 using Jewelry.Service.Sale.SaleDocument;
 using Jewelry.Service.Sale.SaleOrder;
 using Jewelry.Service.Sale.Invoice;
+using Jewelry.Service.Sale.StockBasket;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
@@ -79,6 +80,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IInvoiceService, InvoiceService>();
             services.AddScoped<ISaleDocumentService, SaleDocumentService>();
             services.AddScoped<IOldStockService, OldStockService>();
+            services.AddScoped<IStockBasketService, StockBasketService>();
 
             return services;
         }
