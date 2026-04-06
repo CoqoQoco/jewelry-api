@@ -1427,8 +1427,8 @@ namespace Jewelry.Service.Production.Plan
                 var sumCheck = item.SumGoldWeightCheck;
                 var rawLoss = sumSend - sumCheck;
                 var weightLossAllowed = sumSend * (lossPercent / 100);
-                var weightLossActual = weightLossAllowed - rawLoss;
-                var moneyDiff = weightLossActual * goldLossPrice;
+                var weightLossActual = Math.Round(weightLossAllowed - rawLoss, 4);
+                var moneyDiff = Math.Round(weightLossActual, 2) * goldLossPrice;
 
                 return new jewelry.Model.Production.Plan.GoldLossMonthlyReport.GoldLossMonthlyRow
                 {
@@ -1504,8 +1504,8 @@ namespace Jewelry.Service.Production.Plan
 
                 var rawLoss = sumSend - sumCheck;
                 var weightLossAllowed = sumSend * (lossPercent / 100);
-                var weightLossActual = weightLossAllowed - rawLoss;
-                var moneyDiff = weightLossActual * goldLossPrice;
+                var weightLossActual = Math.Round(weightLossAllowed - rawLoss, 4);
+                var moneyDiff = Math.Round(weightLossActual, 2) * goldLossPrice;
 
                 var existing = existingRecords.FirstOrDefault(e => e.GoldType == item.GoldType);
 
