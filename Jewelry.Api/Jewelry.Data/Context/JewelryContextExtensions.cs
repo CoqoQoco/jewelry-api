@@ -7,9 +7,9 @@ public partial class JewelryContext
 {
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
-        // Override ProductCostDetail จาก "jsonb" → "text"
-        // เพื่อให้ Npgsql อ่านเป็น plain string แทนการ validate JSON
-        // รองรับแถวที่มี invalid JSON โดย C# จัดการ deserialization เอง
+        // No-op guard: ensure ProductCostDetail stays mapped as "text" even if
+        // JewelryContext is re-scaffolded from a (future) jsonb column. DB column
+        // is natively "text" after migration alter_product_cost_detail_to_text.sql.
         modelBuilder.Entity<TbtStockProduct>()
             .Property(e => e.ProductCostDetail)
             .HasColumnType("text");

@@ -2400,7 +2400,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("job_running");
             entity.Property(e => e.ProductCostDetail)
-                .HasColumnType("jsonb")
+                .HasColumnType("text")
                 .HasColumnName("product_cost_detail");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
@@ -2636,7 +2636,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.TagPriceMultiplier).HasColumnName("tag_price_multiplier");
             entity.Property(e => e.ProductCostDetail)
                 .HasComment("ต้นทุนสินค้า")
-                .HasColumnType("jsonb")
+                .HasColumnType("text")
                 .HasColumnName("product_cost_detail");
             entity.Property(e => e.ProductNameEn)
                 .HasColumnType("character varying")
