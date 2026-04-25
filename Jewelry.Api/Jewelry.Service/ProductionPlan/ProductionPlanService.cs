@@ -2838,7 +2838,53 @@ namespace Jewelry.Service.ProductionPlan
                 response.Items.AddRange(transactonEtc);
             }
 
+            // Auto-add default ETC items on first time (no manual price row exists yet)
+            var productionPlan = _jewelryContext.TbtProductionPlan
+                .AsNoTracking()
+                .FirstOrDefault(x => x.Wo == wo && x.WoNumber == woNumber);
+
+            if (productionPlan != null)
+            {
+                var hasManualPrice = _jewelryContext.TbtProductionPlanPrice
+                    .Any(x => x.Wo == wo && x.WoNumber == woNumber);
+
+                if (!hasManualPrice)
+                {
+                    var defaults = new List<TransectionItem>
+                    {
+                        BuildDefaultEtc("ค่าแม่พิมพ์"),
+                        BuildDefaultEtc("ค่าชุบ"),
+                        BuildDefaultEtc("ค่าเลเซอร์"),
+                    };
+
+                    // ProductType "ES" = ต่างหูมีแป้น (Earring Stud)
+                    if (productionPlan.ProductType == "ES")
+                    {
+                        defaults.Add(BuildDefaultEtc("ค่าแป้น"));
+                    }
+
+                    response.Items.AddRange(defaults);
+                }
+            }
+
             return response;
+        }
+
+        private TransectionItem BuildDefaultEtc(string name)
+        {
+            return new TransectionItem
+            {
+                Name = name,
+                NameDescription = name,
+                NameGroup = TypeofPrice.ETC,
+                IsAdd = true,
+                Qty = 1,
+                QtyPrice = null,
+                QtyWeight = null,
+                QtyWeightPrice = null,
+                Date = DateTime.UtcNow,
+                Status = null
+            };
         }
 
         public async Task<string> CreatePrice(CreatePriceRequest request)
