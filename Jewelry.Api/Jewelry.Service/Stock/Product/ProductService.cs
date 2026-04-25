@@ -110,6 +110,17 @@ namespace Jewelry.Service.Stock.Product
             {
                 stock = stock.Where(x => x.Size.Contains(request.Size));
             }
+            if (request.HasCostDetail.HasValue)
+            {
+                if (request.HasCostDetail.Value)
+                {
+                    stock = stock.Where(x => x.ProductCostDetail != null && x.ProductCostDetail != "");
+                }
+                else
+                {
+                    stock = stock.Where(x => x.ProductCostDetail == null || x.ProductCostDetail == "");
+                }
+            }
 
             var response = from item in stock
                            select new jewelry.Model.Stock.Product.List.Response()
