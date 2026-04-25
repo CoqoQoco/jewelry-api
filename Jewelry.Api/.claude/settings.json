@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read:*",
+      "Bash:git:*",
+      "Write:**/*.cs",
+      "Write:**/*.json",
+      "Write:**/*.md",
+      "Write:.claude/**"
+    ],
+    "deny": []
+  }
+}
