@@ -332,6 +332,8 @@ namespace Jewelry.Service.Worker
                              StatusDescription = status.Description,
 
                              Gold = item.Gold,
+                             GoldSize = item.Header.ProductionPlan.TypeSize,
+                             Mold = item.Header.ProductionPlan.Mold,
 
                              GoldQtySend = item.GoldQtySend,
                              GoldWeightSend = item.GoldWeightSend,
@@ -361,6 +363,30 @@ namespace Jewelry.Service.Worker
                 query = (from item in query
                          where item.WoText.Contains(request.WoText.ToString())
                          select item);
+            }
+            if (!string.IsNullOrEmpty(request.WorkerCode))
+            {
+                query = query.Where(x => x.WorkerCode == request.WorkerCode);
+            }
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber != null && x.ProductNumber.Contains(request.ProductNumber));
+            }
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => x.Gold != null && request.Gold.Any(g => x.Gold.Contains(g)));
+            }
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => x.GoldSize != null && request.GoldSize.Any(g => x.GoldSize.Contains(g)));
+            }
+            if (request.Status != null && request.Status.Any())
+            {
+                query = query.Where(x => request.Status.Contains(x.Status));
+            }
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.Mold != null && x.Mold.Contains(request.Mold));
             }
 
 
@@ -465,6 +491,8 @@ namespace Jewelry.Service.Worker
                              StatusDescription = status.Description,
 
                              Gold = item.Gold,
+                             GoldSize = item.Header.ProductionPlan.TypeSize,
+                             Mold = item.Header.ProductionPlan.Mold,
 
                              GoldQtySend = item.GoldQtySend,
                              GoldWeightSend = item.GoldWeightSend,
@@ -494,6 +522,30 @@ namespace Jewelry.Service.Worker
                 query = (from item in query
                          where item.WoText.Contains(request.WoText.ToString())
                          select item);
+            }
+            if (!string.IsNullOrEmpty(request.WorkerCode))
+            {
+                query = query.Where(x => x.WorkerCode == request.WorkerCode);
+            }
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                query = query.Where(x => x.ProductNumber != null && x.ProductNumber.Contains(request.ProductNumber));
+            }
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => x.Gold != null && request.Gold.Any(g => x.Gold.Contains(g)));
+            }
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => x.GoldSize != null && request.GoldSize.Any(g => x.GoldSize.Contains(g)));
+            }
+            if (request.Status != null && request.Status.Any())
+            {
+                query = query.Where(x => request.Status.Contains(x.Status));
+            }
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                query = query.Where(x => x.Mold != null && x.Mold.Contains(request.Mold));
             }
 
            return new ReportWorkerSummeryResponse()

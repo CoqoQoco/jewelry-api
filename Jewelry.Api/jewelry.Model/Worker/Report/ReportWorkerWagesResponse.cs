@@ -24,6 +24,8 @@ namespace jewelry.Model.Worker.Report
         public string? StatusDescription { get; set; }
 
         public string? Gold { get; set; }
+        public string? GoldSize { get; set; }
+        public string? Mold { get; set; }
 
         public decimal? GoldQtySend { get; set; }
         public decimal? GoldWeightSend { get; set; }

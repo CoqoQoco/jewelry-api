@@ -19,5 +19,11 @@ namespace jewelry.Model.Worker.Report
         public DateTimeOffset CreateEnd { get; set; }
         public string? WoText { get; set; }
         public string? Text { get; set; }
+        public List<string>? Gold { get; set; }
+        public List<string>? GoldSize { get; set; }
+        public List<int>? Status { get; set; }
+        public string? WorkerCode { get; set; }
+        public string? ProductNumber { get; set; }
+        public string? Mold { get; set; }
     }
 }
