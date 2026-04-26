@@ -2852,15 +2852,15 @@ namespace Jewelry.Service.ProductionPlan
                 {
                     var defaults = new List<TransectionItem>
                     {
-                        BuildDefaultEtc("ค่าแม่พิมพ์"),
-                        BuildDefaultEtc("ค่าชุบ"),
-                        BuildDefaultEtc("ค่าเลเซอร์"),
+                        BuildDefaultWorker("ค่าแม่พิมพ์", productionPlan.ProductQty),
+                        BuildDefaultWorker("ค่าชุบ", productionPlan.ProductQty),
+                        BuildDefaultWorker("ค่าเลเซอร์", productionPlan.ProductQty),
                     };
 
                     // ProductType "ES" = ต่างหูมีแป้น (Earring Stud)
                     if (productionPlan.ProductType == "ES")
                     {
-                        defaults.Add(BuildDefaultEtc("ค่าแป้น"));
+                        defaults.Add(BuildDefaultWorker("ค่าแป้น", productionPlan.ProductQty));
                     }
 
                     response.Items.AddRange(defaults);
@@ -2870,15 +2870,15 @@ namespace Jewelry.Service.ProductionPlan
             return response;
         }
 
-        private TransectionItem BuildDefaultEtc(string name)
+        private TransectionItem BuildDefaultWorker(string name, int qty)
         {
             return new TransectionItem
             {
                 Name = name,
                 NameDescription = name,
-                NameGroup = TypeofPrice.ETC,
+                NameGroup = TypeofPrice.Worker,
                 IsAdd = true,
-                Qty = 1,
+                Qty = qty > 0 ? qty : 1,
                 QtyPrice = null,
                 QtyWeight = null,
                 QtyWeightPrice = null,
