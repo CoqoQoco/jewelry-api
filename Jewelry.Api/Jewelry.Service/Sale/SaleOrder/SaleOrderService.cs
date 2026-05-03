@@ -401,6 +401,38 @@ namespace Jewelry.Service.Sale.SaleOrder
                 query = query.Where(x => x.SoNumber.Contains(request.SoNumber.ToUpper()));
             }
 
+            if (!string.IsNullOrWhiteSpace(request.StockNumber))
+            {
+                var keyword = request.StockNumber.Trim();
+                query = query.Where(x =>
+                    _jewelryContext.TbtSaleOrderProduct
+                        .Any(p => p.SoNumber == x.SoNumber
+                               && EF.Functions.ILike(p.StockNumber, $"%{keyword}%")));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ProductNumber))
+            {
+                var keyword = request.ProductNumber.Trim();
+                query = query.Where(x =>
+                    (from p in _jewelryContext.TbtSaleOrderProduct
+                     join s in _jewelryContext.TbtStockProduct on p.StockNumber equals s.StockNumber
+                     where p.SoNumber == x.SoNumber
+                        && EF.Functions.ILike(s.ProductNumber, $"%{keyword}%")
+                     select 1).Any());
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.MoldNumber))
+            {
+                var keyword = request.MoldNumber.Trim();
+                query = query.Where(x =>
+                    (from p in _jewelryContext.TbtSaleOrderProduct
+                     join s in _jewelryContext.TbtStockProduct on p.StockNumber equals s.StockNumber
+                     where p.SoNumber == x.SoNumber
+                        && s.MoldDesign != null
+                        && EF.Functions.ILike(s.MoldDesign, $"%{keyword}%")
+                     select 1).Any());
+            }
+
             if (!string.IsNullOrEmpty(request.CustomerName))
             {
                 query = query.Where(x => x.CustomerName.Contains(request.CustomerName));

@@ -15,6 +15,9 @@ namespace jewelry.Model.Sale.SaleOrder.List
     public class Search
     {
         public string? SoNumber { get; set; }
+        public string? StockNumber { get; set; }
+        public string? ProductNumber { get; set; }
+        public string? MoldNumber { get; set; }
         public string? CustomerName { get; set; }
         public string? RefQuotation { get; set; }
         public string? CurrencyUnit { get; set; }
