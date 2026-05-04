@@ -120,6 +120,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleQuotation> TbtSaleQuotation { get; set; }
 
+    public virtual DbSet<TbtProductionPrePlan> TbtProductionPrePlan { get; set; }
+
+    public virtual DbSet<TbtProductionPrePlanMaterial> TbtProductionPrePlanMaterial { get; set; }
+
     public virtual DbSet<TbtStockBasket> TbtStockBasket { get; set; }
 
     public virtual DbSet<TbtStockBasketItem> TbtStockBasketItem { get; set; }
@@ -3190,6 +3194,138 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.HeaderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_gold_loss_item_header_fk");
+        });
+
+        modelBuilder.Entity<TbtProductionPrePlan>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_production_pre_plan_pk");
+
+            entity.ToTable("tbt_production_pre_plan");
+
+            entity.HasIndex(e => e.Status).HasDatabaseName("idx_tbt_production_pre_plan_status");
+            entity.HasIndex(e => e.MoldCode).HasDatabaseName("idx_tbt_production_pre_plan_mold_code");
+            entity.HasIndex(e => e.LinkedProductionPlanId).HasDatabaseName("idx_tbt_production_pre_plan_linked_production_plan_id");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.OrderNo)
+                .HasMaxLength(50)
+                .HasColumnName("order_no");
+            entity.Property(e => e.JobLocation)
+                .HasMaxLength(20)
+                .HasColumnName("job_location");
+            entity.Property(e => e.JobType)
+                .HasMaxLength(30)
+                .HasColumnName("job_type");
+            entity.Property(e => e.ProductionRound)
+                .HasDefaultValue(1)
+                .HasColumnName("production_round");
+            entity.Property(e => e.MoldCode)
+                .HasMaxLength(50)
+                .HasColumnName("mold_code");
+            entity.Property(e => e.ProductType)
+                .HasMaxLength(100)
+                .HasColumnName("product_type");
+            entity.Property(e => e.GoldType)
+                .HasMaxLength(10)
+                .HasColumnName("gold_type");
+            entity.Property(e => e.MoldDetail).HasColumnName("mold_detail");
+            entity.Property(e => e.Remark).HasColumnName("remark");
+            entity.Property(e => e.OrderDate).HasColumnName("order_date");
+            entity.Property(e => e.DeliveryDate).HasColumnName("delivery_date");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'Draft'")
+                .HasColumnName("status");
+            entity.Property(e => e.ProductQty).HasColumnName("product_qty");
+            entity.Property(e => e.RejectReason).HasColumnName("reject_reason");
+            entity.Property(e => e.LinkedProductionPlanId).HasColumnName("linked_production_plan_id");
+            entity.Property(e => e.CreateBy)
+                .HasMaxLength(100)
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("create_date");
+            entity.Property(e => e.SubmitBy)
+                .HasMaxLength(100)
+                .HasColumnName("submit_by");
+            entity.Property(e => e.SubmitDate).HasColumnName("submit_date");
+            entity.Property(e => e.ApproveBy)
+                .HasMaxLength(100)
+                .HasColumnName("approve_by");
+            entity.Property(e => e.ApproveDate).HasColumnName("approve_date");
+            entity.Property(e => e.UpdateBy)
+                .HasMaxLength(100)
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasMany(e => e.TbtProductionPrePlanMaterial)
+                .WithOne(e => e.PrePlan)
+                .HasForeignKey(e => e.PrePlanId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("tbt_production_pre_plan_material_pre_plan_fk");
+        });
+
+        modelBuilder.Entity<TbtProductionPrePlanMaterial>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_production_pre_plan_material_pk");
+
+            entity.ToTable("tbt_production_pre_plan_material");
+
+            entity.HasIndex(e => e.PrePlanId).HasDatabaseName("idx_tbt_production_pre_plan_material_pre_plan_id");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.PrePlanId).HasColumnName("pre_plan_id");
+            entity.Property(e => e.MaterialType)
+                .HasMaxLength(20)
+                .HasColumnName("material_type");
+            entity.Property(e => e.MasterId).HasColumnName("master_id");
+            entity.Property(e => e.MaterialCode)
+                .HasMaxLength(100)
+                .HasColumnName("material_code");
+            entity.Property(e => e.ShapeCode)
+                .HasMaxLength(50)
+                .HasColumnName("shape_code");
+            entity.Property(e => e.Size)
+                .HasMaxLength(50)
+                .HasColumnName("size");
+            entity.Property(e => e.Qty)
+                .HasDefaultValue(0)
+                .HasColumnName("qty");
+            entity.Property(e => e.Color)
+                .HasMaxLength(50)
+                .HasColumnName("color");
+            entity.Property(e => e.Weight)
+                .HasColumnType("decimal(10,4)")
+                .HasColumnName("weight");
+            entity.Property(e => e.WeightUnit)
+                .HasMaxLength(20)
+                .HasColumnName("weight_unit");
+            entity.Property(e => e.IsLocked)
+                .HasDefaultValue(false)
+                .HasColumnName("is_locked");
+            entity.Property(e => e.Remark)
+                .HasMaxLength(200)
+                .HasColumnName("remark");
+            entity.Property(e => e.CreateBy)
+                .HasMaxLength(100)
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate)
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasMaxLength(100)
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.PrePlan)
+                .WithMany(p => p.TbtProductionPrePlanMaterial)
+                .HasForeignKey(d => d.PrePlanId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("tbt_production_pre_plan_material_pre_plan_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);
