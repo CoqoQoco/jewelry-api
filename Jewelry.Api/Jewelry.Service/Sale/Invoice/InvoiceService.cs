@@ -277,8 +277,82 @@ namespace Jewelry.Service.Sale.Invoice
         {
             var request = _request.Search;
 
-            var query = from invoice in _jewelryContext.TbtSaleInvoiceHeader
-                        where invoice.IsDelete == false
+            var entityQuery = _jewelryContext.TbtSaleInvoiceHeader.Where(invoice => invoice.IsDelete == false);
+
+            // Apply entity-level filters (before projection)
+            if (!string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                entityQuery = entityQuery.Where(x => x.Running.Contains(request.InvoiceNumber));
+            }
+
+            if (!string.IsNullOrEmpty(request.DKInvoiceNumber))
+            {
+                entityQuery = entityQuery.Where(x => x.DkInvoiceNumber != null && x.DkInvoiceNumber.Contains(request.DKInvoiceNumber));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerName))
+            {
+                entityQuery = entityQuery.Where(x => x.CustomerName.Contains(request.CustomerName));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                entityQuery = entityQuery.Where(x => x.CustomerCode.Contains(request.CustomerCode));
+            }
+
+            if (request.Status.HasValue)
+            {
+                entityQuery = entityQuery.Where(x => x.Status == request.Status.Value);
+            }
+
+            if (!string.IsNullOrEmpty(request.CreateBy))
+            {
+                entityQuery = entityQuery.Where(x => x.CreateBy.Contains(request.CreateBy));
+            }
+
+            if (request.CreateDateFrom.HasValue)
+            {
+                entityQuery = entityQuery.Where(x => x.CreateDate >= request.CreateDateFrom.Value.StartOfDayUtc());
+            }
+
+            if (request.CreateDateTo.HasValue)
+            {
+                entityQuery = entityQuery.Where(x => x.CreateDate <= request.CreateDateTo.Value.EndOfDayUtc());
+            }
+
+            if (request.DeliveryDateFrom.HasValue)
+            {
+                entityQuery = entityQuery.Where(x => x.DeliveryDate.HasValue && x.DeliveryDate.Value >= request.DeliveryDateFrom.Value.StartOfDayUtc());
+            }
+
+            if (request.DeliveryDateTo.HasValue)
+            {
+                entityQuery = entityQuery.Where(x => x.DeliveryDate.HasValue && x.DeliveryDate.Value <= request.DeliveryDateTo.Value.EndOfDayUtc());
+            }
+
+            if (!string.IsNullOrEmpty(request.StockNumber))
+            {
+                entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
+                    .Any(p => p.Invoice == x.Running && p.StockNumber.Contains(request.StockNumber)));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
+                    .Any(p => p.Invoice == x.Running
+                        && _jewelryContext.TbtStockProduct
+                            .Any(s => s.StockNumber == p.StockNumber && s.ProductNumber.Contains(request.ProductNumber))));
+            }
+
+            if (!string.IsNullOrEmpty(request.MoldNumber))
+            {
+                entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
+                    .Any(p => p.Invoice == x.Running
+                        && _jewelryContext.TbtStockProduct
+                            .Any(s => s.StockNumber == p.StockNumber && s.Mold != null && s.Mold.Contains(request.MoldNumber))));
+            }
+
+            var query = from invoice in entityQuery
                         select new jewelry.Model.Sale.Invoice.List.Response
                         {
                             InvoiceNumber = invoice.Running,
@@ -317,57 +391,6 @@ namespace Jewelry.Service.Sale.Invoice
                             //    .Where(x => x.Invoice == invoice.Running)
                             //    .Sum(x => x.PriceAfterCurrecyRate * x.Qty)
                         };
-
-            // Apply filters
-            if (!string.IsNullOrEmpty(request.InvoiceNumber))
-            {
-                query = query.Where(x => x.InvoiceNumber.Contains(request.InvoiceNumber));
-            }
-
-            if (!string.IsNullOrEmpty(request.DKInvoiceNumber))
-            {
-                query = query.Where(x => x.DKInvoiceNumber.Contains(request.DKInvoiceNumber));
-            }
-
-            if (!string.IsNullOrEmpty(request.CustomerName))
-            {
-                query = query.Where(x => x.CustomerName.Contains(request.CustomerName));
-            }
-
-            if (!string.IsNullOrEmpty(request.CustomerCode))
-            {
-                query = query.Where(x => x.CustomerCode.Contains(request.CustomerCode));
-            }
-
-            if (request.Status.HasValue)
-            {
-                query = query.Where(x => x.Status == request.Status.Value);
-            }
-
-            if (!string.IsNullOrEmpty(request.CreateBy))
-            {
-                query = query.Where(x => x.CreateBy.Contains(request.CreateBy));
-            }
-
-            if (request.CreateDateFrom.HasValue)
-            {
-                query = query.Where(x => x.CreateDate >= request.CreateDateFrom.Value.StartOfDayUtc());
-            }
-
-            if (request.CreateDateTo.HasValue)
-            {
-                query = query.Where(x => x.CreateDate <= request.CreateDateTo.Value.EndOfDayUtc());
-            }
-
-            if (request.DeliveryDateFrom.HasValue)
-            {
-                query = query.Where(x => x.DeliveryDate.HasValue && x.DeliveryDate.Value >= request.DeliveryDateFrom.Value.StartOfDayUtc());
-            }
-
-            if (request.DeliveryDateTo.HasValue)
-            {
-                query = query.Where(x => x.DeliveryDate.HasValue && x.DeliveryDate.Value <= request.DeliveryDateTo.Value.EndOfDayUtc());
-            }
 
             return query;
         }

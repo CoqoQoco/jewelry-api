@@ -21,5 +21,9 @@ namespace jewelry.Model.Sale.Invoice.List
 
         public DateTimeOffset? DeliveryDateFrom { get; set; }
         public DateTimeOffset? DeliveryDateTo { get; set; }
+
+        public string? StockNumber { get; set; }
+        public string? ProductNumber { get; set; }
+        public string? MoldNumber { get; set; }
     }
 }
