@@ -4,6 +4,7 @@ using Jewelry.Service.Authentication.Login;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
+using Jewelry.Service.Master.Bank;
 using Jewelry.Service.Mold;
 using Jewelry.Service.Production.Plan;
 using Jewelry.Service.Production.PlanBOM;
@@ -56,6 +57,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionPlanService, ProductionPlanService>();
             services.AddScoped<IFileExtension, FileExtension>();
             services.AddScoped<IMasterService, MasterService>();
+            services.AddScoped<IMasterBankService, MasterBankService>();
             services.AddScoped<IMoldService, MoldService>();
             services.AddScoped<IRunningNumber, RunningNumber>();
             services.AddScoped<ICustomerService, CustomerService>();

@@ -18,6 +18,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<Stock9k> Stock9k { get; set; }
 
+    public virtual DbSet<TbmBank> TbmBank { get; set; }
+
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
 
     public virtual DbSet<TbmCustomer> TbmCustomer { get; set; }
@@ -598,6 +600,32 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.NameTh)
                 .HasColumnType("character varying")
                 .HasColumnName("name_th");
+        });
+
+        modelBuilder.Entity<TbmBank>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbm_bank_pk");
+
+            entity.ToTable("tbm_bank");
+
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         modelBuilder.Entity<TbmGoldSize>(entity =>
@@ -2030,6 +2058,12 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.BankCode)
+                .HasColumnType("character varying")
+                .HasColumnName("bank_code");
+            entity.Property(e => e.BankBranch)
+                .HasColumnType("character varying")
+                .HasColumnName("bank_branch");
 
             entity.HasOne(d => d.TbtSaleInvoiceHeader).WithMany(p => p.TbtSaleInvoicePaymentItem)
                 .HasForeignKey(d => new { d.InvoiceRunning, d.SoRunning })

@@ -571,6 +571,37 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException("Payment Method is Required.");
             }
 
+            // Validate bank fields based on payment method
+            if (request.Payment == 2) // Transfer
+            {
+                if (string.IsNullOrEmpty(request.BankCode))
+                {
+                    throw new HandleException("Bank is required for Transfer payment.");
+                }
+            }
+            else if (request.Payment == 3) // Cheque
+            {
+                if (string.IsNullOrEmpty(request.BankCode))
+                {
+                    throw new HandleException("Bank is required for Cheque payment.");
+                }
+                if (string.IsNullOrEmpty(request.BankBranch))
+                {
+                    throw new HandleException("Bank Branch is required for Cheque payment.");
+                }
+            }
+
+            // Validate BankCode exists in master
+            if (!string.IsNullOrEmpty(request.BankCode))
+            {
+                var bankExists = await _jewelryContext.TbmBank
+                    .AnyAsync(x => x.Code == request.BankCode && x.IsActive == true);
+                if (!bankExists)
+                {
+                    throw new HandleException($"Bank code '{request.BankCode}' is invalid.");
+                }
+            }
+
             // Check if invoice exists
             var invoice = await _jewelryContext.TbtSaleInvoiceHeader
                 .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber && x.IsDelete == false);
@@ -634,6 +665,9 @@ namespace Jewelry.Service.Sale.Invoice
                 Remark = request.Remark,
                 ImagePath = imagePath,
 
+                BankCode = request.BankCode,
+                BankBranch = request.BankBranch,
+
                 CreateBy = CurrentUsername,
                 CreateDate = DateTime.UtcNow
             };
@@ -652,6 +686,9 @@ namespace Jewelry.Service.Sale.Invoice
             }
 
             var query = from payment in _jewelryContext.TbtSaleInvoicePaymentItem
+                        join bank in _jewelryContext.TbmBank
+                            on payment.BankCode equals bank.Code into bankJoin
+                        from bank in bankJoin.DefaultIfEmpty()
                         where payment.InvoiceRunning == request.InvoiceNumber
                            && payment.IsDelete == false
                         select new jewelry.Model.Sale.InvoicePayment.List.Response
@@ -668,6 +705,10 @@ namespace Jewelry.Service.Sale.Invoice
                             ReferenceNumber = payment.ReferenceNumber1,
                             Remark = payment.Remark,
                             ImagePath = payment.ImagePath,
+
+                            BankCode = payment.BankCode,
+                            BankName = bank != null ? bank.NameTh : null,
+                            BankBranch = payment.BankBranch,
 
                             CreateBy = payment.CreateBy,
                             CreateDate = payment.CreateDate,

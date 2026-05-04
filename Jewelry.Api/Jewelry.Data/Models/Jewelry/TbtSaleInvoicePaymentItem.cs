@@ -37,5 +37,9 @@ public partial class TbtSaleInvoicePaymentItem
 
     public int Payment { get; set; }
 
+    public string? BankCode { get; set; }
+
+    public string? BankBranch { get; set; }
+
     public virtual TbtSaleInvoiceHeader TbtSaleInvoiceHeader { get; set; } = null!;
 }

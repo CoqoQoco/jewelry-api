@@ -17,6 +17,10 @@ namespace jewelry.Model.Sale.InvoicePayment.List
         public string? Remark { get; set; }
         public string ImagePath { get; set; } = null!;
 
+        public string? BankCode { get; set; }
+        public string? BankName { get; set; }
+        public string? BankBranch { get; set; }
+
         public string CreateBy { get; set; } = null!;
         public DateTime CreateDate { get; set; }
         public string? UpdateBy { get; set; }

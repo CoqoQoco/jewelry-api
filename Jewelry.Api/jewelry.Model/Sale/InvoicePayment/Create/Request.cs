@@ -16,5 +16,8 @@ namespace jewelry.Model.Sale.InvoicePayment.Create
         public string? Remark { get; set; }
 
         public IFormFile? ReceiptImage { get; set; }
+
+        public string? BankCode { get; set; }
+        public string? BankBranch { get; set; }
     }
 }
