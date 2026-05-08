@@ -10,64 +10,72 @@ public class SearchPrePlanRequest
     public string? Status { get; set; }
     public DateTimeOffset? OrderDateFrom { get; set; }
     public DateTimeOffset? OrderDateTo { get; set; }
+    public int Take { get; set; } = 50;
+    public int Skip { get; set; } = 0;
+    public string? Sort { get; set; }
 }
 
 public class CreatePrePlanRequest
 {
-    [Required]
-    public string OrderNo { get; set; } = null!;
-
-    [Required]
-    public string JobLocation { get; set; } = null!;
-
-    [Required]
-    public string JobType { get; set; } = null!;
+    public string? OrderNo { get; set; }
 
     public int ProductionRound { get; set; } = 1;
 
+    public string? JobType { get; set; }
+
+    public string? JobLocation { get; set; }
+
+    public string? GoldType { get; set; }
+
     [Required]
-    public string MoldCode { get; set; } = null!;
-
-    public string? ProductType { get; set; }
+    public DateTimeOffset OrderDate { get; set; }
 
     [Required]
-    public string GoldType { get; set; } = null!;
-
-    public string? MoldDetail { get; set; }
+    public DateTimeOffset DeliveryDate { get; set; }
 
     public string? Remark { get; set; }
 
-    public DateTimeOffset OrderDate { get; set; }
+    public List<CreatePrePlanItemRequest> Items { get; set; } = new List<CreatePrePlanItemRequest>();
+}
 
-    public DateTimeOffset DeliveryDate { get; set; }
+public class CreatePrePlanItemRequest
+{
+    [Required]
+    public string MoldCode { get; set; } = null!;
 
-    public IList<CreatePrePlanMaterialRequest> Materials { get; set; } = new List<CreatePrePlanMaterialRequest>();
+    public string? MoldDetail { get; set; }
+
+    public string? ProductType { get; set; }
+
+    public int? ProductQty { get; set; }
+
+    public string? ProductQtyUnit { get; set; }
+
+    public string? ProductDetail { get; set; }
+
+    public string? ProductImagePath { get; set; }
+
+    public List<CreatePrePlanMaterialRequest> Materials { get; set; } = new List<CreatePrePlanMaterialRequest>();
 }
 
 public class CreatePrePlanMaterialRequest
 {
-    [Required]
-    public string MaterialType { get; set; } = null!;
-
-    public int? MasterId { get; set; }
-
-    public string? MaterialCode { get; set; }
-
-    public string? ShapeCode { get; set; }
-
-    public string? Size { get; set; }
-
-    public int Qty { get; set; }
-
-    public string? Color { get; set; }
-
-    public decimal? Weight { get; set; }
-
-    public string? WeightUnit { get; set; }
-
-    public bool IsLocked { get; set; }
-
-    public string? Remark { get; set; }
+    public string? Gold { get; set; }
+    public string? GoldSize { get; set; }
+    public decimal? GoldQty { get; set; }
+    public string? Gem { get; set; }
+    public string? GemShape { get; set; }
+    public decimal? GemQty { get; set; }
+    public string? GemUnit { get; set; }
+    public string? GemSize { get; set; }
+    public decimal? GemWeight { get; set; }
+    public string? GemWeightUnit { get; set; }
+    public decimal? DiamondQty { get; set; }
+    public string? DiamondUnit { get; set; }
+    public string? DiamondSize { get; set; }
+    public decimal? DiamondWeight { get; set; }
+    public string? DiamondWeightUnit { get; set; }
+    public string? DiamondQuality { get; set; }
 }
 
 public class UpdatePrePlanRequest : CreatePrePlanRequest
@@ -76,6 +84,23 @@ public class UpdatePrePlanRequest : CreatePrePlanRequest
 }
 
 public class SubmitPrePlanRequest
+{
+    public int Id { get; set; }
+}
+
+public class ApprovePrePlanRequest
+{
+    public int Id { get; set; }
+    public string? Remark { get; set; }
+}
+
+public class RejectPrePlanRequest
+{
+    public int Id { get; set; }
+    public string? RejectReason { get; set; }
+}
+
+public class ConsumePrePlanRequest
 {
     public int Id { get; set; }
 }

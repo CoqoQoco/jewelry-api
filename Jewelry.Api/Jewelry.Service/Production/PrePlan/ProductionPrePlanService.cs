@@ -25,10 +25,12 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
 
     public async Task<IList<SearchPrePlanResponse>> Search(SearchPrePlanRequest request)
     {
-        var query = _jewelryContext.TbtProductionPrePlan.AsQueryable();
+        var query = _jewelryContext.TbtProductionPrePlan
+            .Include(x => x.Items)
+            .AsQueryable();
 
         if (!string.IsNullOrEmpty(request.MoldCode))
-            query = query.Where(x => x.MoldCode == request.MoldCode);
+            query = query.Where(x => x.Items.Any(i => i.MoldCode == request.MoldCode));
 
         if (!string.IsNullOrEmpty(request.Status))
             query = query.Where(x => x.Status == request.Status);
@@ -39,26 +41,26 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         if (request.OrderDateTo.HasValue)
             query = query.Where(x => x.OrderDate <= request.OrderDateTo.Value.EndOfDayUtc());
 
-        var result = await query
+        var list = await query
             .OrderByDescending(x => x.CreateDate)
-            .Select(x => new SearchPrePlanResponse
-            {
-                Id = x.Id,
-                OrderNo = x.OrderNo,
-                JobLocation = x.JobLocation,
-                JobType = x.JobType,
-                ProductionRound = x.ProductionRound,
-                MoldCode = x.MoldCode,
-                ProductType = x.ProductType,
-                GoldType = x.GoldType,
-                Status = x.Status,
-                ProductQty = x.ProductQty,
-                OrderDate = x.OrderDate,
-                DeliveryDate = x.DeliveryDate,
-                CreateBy = x.CreateBy,
-                CreateDate = x.CreateDate,
-            })
             .ToListAsync();
+
+        var result = list.Select(x => new SearchPrePlanResponse
+        {
+            Id = x.Id,
+            OrderNo = x.OrderNo,
+            ProductionRound = x.ProductionRound,
+            JobType = x.JobType,
+            JobLocation = x.JobLocation,
+            GoldType = x.GoldType,
+            Status = x.Status,
+            OrderDate = x.OrderDate,
+            DeliveryDate = x.DeliveryDate,
+            CreateBy = x.CreateBy,
+            CreateDate = x.CreateDate,
+            ItemCount = x.Items.Count,
+            PrimaryMoldCode = x.Items.OrderBy(i => i.ItemNo).FirstOrDefault()?.MoldCode,
+        }).ToList();
 
         return result;
     }
@@ -66,7 +68,8 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
     public async Task<GetPrePlanResponse> Get(int id)
     {
         var entity = await _jewelryContext.TbtProductionPrePlan
-            .Include(x => x.TbtProductionPrePlanMaterial)
+            .Include(x => x.Items)
+                .ThenInclude(i => i.Materials)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
@@ -76,50 +79,64 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         {
             Id = entity.Id,
             OrderNo = entity.OrderNo,
-            JobLocation = entity.JobLocation,
-            JobType = entity.JobType,
             ProductionRound = entity.ProductionRound,
-            MoldCode = entity.MoldCode,
-            ProductType = entity.ProductType,
+            JobType = entity.JobType,
+            JobLocation = entity.JobLocation,
             GoldType = entity.GoldType,
-            MoldDetail = entity.MoldDetail,
-            Remark = entity.Remark,
             OrderDate = entity.OrderDate,
             DeliveryDate = entity.DeliveryDate,
+            Remark = entity.Remark,
             Status = entity.Status,
-            ProductQty = entity.ProductQty,
             RejectReason = entity.RejectReason,
-            LinkedProductionPlanId = entity.LinkedProductionPlanId,
             CreateBy = entity.CreateBy,
             CreateDate = entity.CreateDate,
+            UpdateBy = entity.UpdateBy,
+            UpdateDate = entity.UpdateDate,
             SubmitBy = entity.SubmitBy,
             SubmitDate = entity.SubmitDate,
             ApproveBy = entity.ApproveBy,
             ApproveDate = entity.ApproveDate,
-            UpdateBy = entity.UpdateBy,
-            UpdateDate = entity.UpdateDate,
-            Materials = entity.TbtProductionPrePlanMaterial
-                .Select(m => new GetPrePlanMaterialResponse
+            Items = entity.Items.OrderBy(i => i.ItemNo).Select(i => new GetPrePlanItemResponse
+            {
+                Id = i.Id,
+                PrePlanId = i.PrePlanId,
+                ItemNo = i.ItemNo,
+                MoldCode = i.MoldCode,
+                MoldDetail = i.MoldDetail,
+                ProductType = i.ProductType,
+                ProductQty = i.ProductQty,
+                ProductQtyUnit = i.ProductQtyUnit,
+                ProductDetail = i.ProductDetail,
+                ProductImagePath = i.ProductImagePath,
+                LinkedProductionPlanId = i.LinkedProductionPlanId,
+                CreateBy = i.CreateBy,
+                CreateDate = i.CreateDate,
+                UpdateBy = i.UpdateBy,
+                UpdateDate = i.UpdateDate,
+                Materials = i.Materials.Select(m => new GetPrePlanMaterialResponse
                 {
                     Id = m.Id,
-                    PrePlanId = m.PrePlanId,
-                    MaterialType = m.MaterialType,
-                    MasterId = m.MasterId,
-                    MaterialCode = m.MaterialCode,
-                    ShapeCode = m.ShapeCode,
-                    Size = m.Size,
-                    Qty = m.Qty,
-                    Color = m.Color,
-                    Weight = m.Weight,
-                    WeightUnit = m.WeightUnit,
-                    IsLocked = m.IsLocked,
-                    Remark = m.Remark,
+                    PrePlanItemId = m.PrePlanItemId,
+                    Gold = m.Gold,
+                    GoldSize = m.GoldSize,
+                    GoldQty = m.GoldQty,
+                    Gem = m.Gem,
+                    GemShape = m.GemShape,
+                    GemQty = m.GemQty,
+                    GemUnit = m.GemUnit,
+                    GemSize = m.GemSize,
+                    GemWeight = m.GemWeight,
+                    GemWeightUnit = m.GemWeightUnit,
+                    DiamondQty = m.DiamondQty,
+                    DiamondUnit = m.DiamondUnit,
+                    DiamondSize = m.DiamondSize,
+                    DiamondWeight = m.DiamondWeight,
+                    DiamondWeightUnit = m.DiamondWeightUnit,
+                    DiamondQuality = m.DiamondQuality,
                     CreateBy = m.CreateBy,
                     CreateDate = m.CreateDate,
-                    UpdateBy = m.UpdateBy,
-                    UpdateDate = m.UpdateDate,
-                })
-                .ToList(),
+                }).ToList(),
+            }).ToList(),
         };
 
         return response;
@@ -130,39 +147,62 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         var entity = new TbtProductionPrePlan
         {
             OrderNo = request.OrderNo,
-            JobLocation = request.JobLocation,
-            JobType = request.JobType,
             ProductionRound = request.ProductionRound,
-            MoldCode = request.MoldCode,
-            ProductType = request.ProductType,
+            JobType = request.JobType,
+            JobLocation = request.JobLocation,
             GoldType = request.GoldType,
-            MoldDetail = request.MoldDetail,
-            Remark = request.Remark,
             OrderDate = request.OrderDate.UtcDateTime,
             DeliveryDate = request.DeliveryDate.UtcDateTime,
+            Remark = request.Remark,
             Status = "Draft",
             CreateBy = CurrentUsername,
             CreateDate = DateTime.UtcNow,
         };
 
-        foreach (var m in request.Materials)
+        int itemIdx = 0;
+        foreach (var itemReq in request.Items)
         {
-            entity.TbtProductionPrePlanMaterial.Add(new TbtProductionPrePlanMaterial
+            var item = new TbtProductionPrePlanItem
             {
-                MaterialType = m.MaterialType,
-                MasterId = m.MasterId,
-                MaterialCode = m.MaterialCode,
-                ShapeCode = m.ShapeCode,
-                Size = m.Size,
-                Qty = m.Qty,
-                Color = m.Color,
-                Weight = m.Weight,
-                WeightUnit = m.WeightUnit,
-                IsLocked = m.IsLocked,
-                Remark = m.Remark,
+                ItemNo = itemIdx + 1,
+                MoldCode = itemReq.MoldCode,
+                MoldDetail = itemReq.MoldDetail,
+                ProductType = itemReq.ProductType,
+                ProductQty = itemReq.ProductQty,
+                ProductQtyUnit = itemReq.ProductQtyUnit,
+                ProductDetail = itemReq.ProductDetail,
+                ProductImagePath = itemReq.ProductImagePath,
                 CreateBy = CurrentUsername,
                 CreateDate = DateTime.UtcNow,
-            });
+            };
+
+            foreach (var matReq in itemReq.Materials)
+            {
+                item.Materials.Add(new TbtProductionPrePlanMaterial
+                {
+                    Gold = matReq.Gold,
+                    GoldSize = matReq.GoldSize,
+                    GoldQty = matReq.GoldQty,
+                    Gem = matReq.Gem,
+                    GemShape = matReq.GemShape,
+                    GemQty = matReq.GemQty,
+                    GemUnit = matReq.GemUnit,
+                    GemSize = matReq.GemSize,
+                    GemWeight = matReq.GemWeight,
+                    GemWeightUnit = matReq.GemWeightUnit,
+                    DiamondQty = matReq.DiamondQty,
+                    DiamondUnit = matReq.DiamondUnit,
+                    DiamondSize = matReq.DiamondSize,
+                    DiamondWeight = matReq.DiamondWeight,
+                    DiamondWeightUnit = matReq.DiamondWeightUnit,
+                    DiamondQuality = matReq.DiamondQuality,
+                    CreateBy = CurrentUsername,
+                    CreateDate = DateTime.UtcNow,
+                });
+            }
+
+            entity.Items.Add(item);
+            itemIdx++;
         }
 
         await _jewelryContext.TbtProductionPrePlan.AddAsync(entity);
@@ -174,7 +214,8 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
     public async Task<string> Update(int id, UpdatePrePlanRequest request)
     {
         var entity = await _jewelryContext.TbtProductionPrePlan
-            .Include(x => x.TbtProductionPrePlanMaterial)
+            .Include(x => x.Items)
+                .ThenInclude(i => i.Materials)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
@@ -184,41 +225,68 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             throw new Exception($"ไม่สามารถแก้ไขได้ เนื่องจากสถานะปัจจุบันคือ '{entity.Status}' (แก้ไขได้เฉพาะสถานะ Draft)");
 
         entity.OrderNo = request.OrderNo;
-        entity.JobLocation = request.JobLocation;
-        entity.JobType = request.JobType;
         entity.ProductionRound = request.ProductionRound;
-        entity.MoldCode = request.MoldCode;
-        entity.ProductType = request.ProductType;
+        entity.JobType = request.JobType;
+        entity.JobLocation = request.JobLocation;
         entity.GoldType = request.GoldType;
-        entity.MoldDetail = request.MoldDetail;
-        entity.Remark = request.Remark;
         entity.OrderDate = request.OrderDate.UtcDateTime;
         entity.DeliveryDate = request.DeliveryDate.UtcDateTime;
+        entity.Remark = request.Remark;
         entity.UpdateBy = CurrentUsername;
         entity.UpdateDate = DateTime.UtcNow;
 
-        _jewelryContext.TbtProductionPrePlanMaterial.RemoveRange(entity.TbtProductionPrePlanMaterial);
+        _jewelryContext.TbtProductionPrePlanItem.RemoveRange(entity.Items);
 
-        var newMaterials = request.Materials.Select(m => new TbtProductionPrePlanMaterial
-        {
-            PrePlanId = id,
-            MaterialType = m.MaterialType,
-            MasterId = m.MasterId,
-            MaterialCode = m.MaterialCode,
-            ShapeCode = m.ShapeCode,
-            Size = m.Size,
-            Qty = m.Qty,
-            Color = m.Color,
-            Weight = m.Weight,
-            WeightUnit = m.WeightUnit,
-            IsLocked = m.IsLocked,
-            Remark = m.Remark,
-            CreateBy = CurrentUsername,
-            CreateDate = DateTime.UtcNow,
-        }).ToList();
-
-        await _jewelryContext.TbtProductionPrePlanMaterial.AddRangeAsync(newMaterials);
         _jewelryContext.TbtProductionPrePlan.Update(entity);
+        await _jewelryContext.SaveChangesAsync();
+
+        int itemIdx = 0;
+        foreach (var itemReq in request.Items)
+        {
+            var item = new TbtProductionPrePlanItem
+            {
+                PrePlanId = id,
+                ItemNo = itemIdx + 1,
+                MoldCode = itemReq.MoldCode,
+                MoldDetail = itemReq.MoldDetail,
+                ProductType = itemReq.ProductType,
+                ProductQty = itemReq.ProductQty,
+                ProductQtyUnit = itemReq.ProductQtyUnit,
+                ProductDetail = itemReq.ProductDetail,
+                ProductImagePath = itemReq.ProductImagePath,
+                CreateBy = CurrentUsername,
+                CreateDate = DateTime.UtcNow,
+            };
+
+            foreach (var matReq in itemReq.Materials)
+            {
+                item.Materials.Add(new TbtProductionPrePlanMaterial
+                {
+                    Gold = matReq.Gold,
+                    GoldSize = matReq.GoldSize,
+                    GoldQty = matReq.GoldQty,
+                    Gem = matReq.Gem,
+                    GemShape = matReq.GemShape,
+                    GemQty = matReq.GemQty,
+                    GemUnit = matReq.GemUnit,
+                    GemSize = matReq.GemSize,
+                    GemWeight = matReq.GemWeight,
+                    GemWeightUnit = matReq.GemWeightUnit,
+                    DiamondQty = matReq.DiamondQty,
+                    DiamondUnit = matReq.DiamondUnit,
+                    DiamondSize = matReq.DiamondSize,
+                    DiamondWeight = matReq.DiamondWeight,
+                    DiamondWeightUnit = matReq.DiamondWeightUnit,
+                    DiamondQuality = matReq.DiamondQuality,
+                    CreateBy = CurrentUsername,
+                    CreateDate = DateTime.UtcNow,
+                });
+            }
+
+            await _jewelryContext.TbtProductionPrePlanItem.AddAsync(item);
+            itemIdx++;
+        }
+
         await _jewelryContext.SaveChangesAsync();
 
         return id.ToString();
@@ -243,5 +311,66 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         await _jewelryContext.SaveChangesAsync();
 
         return id.ToString();
+    }
+
+    public async Task<string> Approve(int id, ApprovePrePlanRequest request)
+    {
+        var entity = await _jewelryContext.TbtProductionPrePlan
+            .FirstOrDefaultAsync(x => x.Id == id)
+            ?? throw new Exception("ไม่พบใบสั่งผลิต");
+
+        if (entity.Status != "Submitted")
+            throw new Exception("ใบสั่งผลิตต้องอยู่ในสถานะรออนุมัติเท่านั้น");
+
+        entity.Status = "Approved";
+        entity.ApproveBy = CurrentUsername;
+        entity.ApproveDate = DateTime.UtcNow;
+
+        _jewelryContext.TbtProductionPrePlan.Update(entity);
+        await _jewelryContext.SaveChangesAsync();
+
+        return "อนุมัติสำเร็จ";
+    }
+
+    public async Task<string> Reject(int id, RejectPrePlanRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.RejectReason))
+            throw new Exception("กรุณาระบุเหตุผลการปฏิเสธ");
+
+        var entity = await _jewelryContext.TbtProductionPrePlan
+            .FirstOrDefaultAsync(x => x.Id == id)
+            ?? throw new Exception("ไม่พบใบสั่งผลิต");
+
+        if (entity.Status != "Submitted")
+            throw new Exception("ใบสั่งผลิตต้องอยู่ในสถานะรออนุมัติเท่านั้น");
+
+        entity.Status = "Rejected";
+        entity.RejectReason = request.RejectReason;
+        entity.ApproveBy = CurrentUsername;
+        entity.ApproveDate = DateTime.UtcNow;
+
+        _jewelryContext.TbtProductionPrePlan.Update(entity);
+        await _jewelryContext.SaveChangesAsync();
+
+        return "ปฏิเสธสำเร็จ";
+    }
+
+    public async Task<string> Consume(int id, ConsumePrePlanRequest request)
+    {
+        var entity = await _jewelryContext.TbtProductionPrePlan
+            .FirstOrDefaultAsync(x => x.Id == id)
+            ?? throw new Exception("ไม่พบใบสั่งผลิต");
+
+        if (entity.Status != "Approved")
+            throw new Exception("ใบสั่งผลิตต้องอนุมัติก่อนส่งเข้าผลิต");
+
+        entity.Status = "Consumed";
+        entity.UpdateBy = CurrentUsername;
+        entity.UpdateDate = DateTime.UtcNow;
+
+        _jewelryContext.TbtProductionPrePlan.Update(entity);
+        await _jewelryContext.SaveChangesAsync();
+
+        return "ส่งเข้าผลิตสำเร็จ";
     }
 }

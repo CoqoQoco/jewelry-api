@@ -110,4 +110,101 @@ public class ProductionPrePlanController : ApiControllerBase
             return StatusCode(500, ex.Message);
         }
     }
+
+    [Route("Approve/{id}")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> Approve([FromRoute] int id, [FromBody] ApprovePrePlanRequest request)
+    {
+        try
+        {
+            var response = await _service.Approve(id, request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
+    [Route("Reject/{id}")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> Reject([FromRoute] int id, [FromBody] RejectPrePlanRequest request)
+    {
+        try
+        {
+            var response = await _service.Reject(id, request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
+    [Route("Consume/{id}")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> Consume([FromRoute] int id, [FromBody] ConsumePrePlanRequest request)
+    {
+        try
+        {
+            var response = await _service.Consume(id, request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
+    [Route("MasterJobType")]
+    [HttpGet]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public IActionResult MasterJobType()
+    {
+        var list = new[]
+        {
+            new { Code = "NewDesign", Description = "งานแบบใหม่" },
+            new { Code = "Sale", Description = "งานขาย" },
+            new { Code = "CustomCustomer", Description = "งานสั่งมีชื่อลูกค้า" },
+        };
+        return Ok(list);
+    }
+
+    [Route("MasterJobLocation")]
+    [HttpGet]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public IActionResult MasterJobLocation()
+    {
+        var list = new[]
+        {
+            new { Code = "Domestic", Description = "งานในประเทศ" },
+            new { Code = "Overseas", Description = "งานต่างประเทศ" },
+        };
+        return Ok(list);
+    }
+
+    [Route("MasterPrePlanStatus")]
+    [HttpGet]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public IActionResult MasterPrePlanStatus()
+    {
+        var list = new[]
+        {
+            new { Code = "Draft", Description = "ร่าง" },
+            new { Code = "Submitted", Description = "รออนุมัติ" },
+            new { Code = "Approved", Description = "อนุมัติแล้ว" },
+            new { Code = "Rejected", Description = "ปฏิเสธ" },
+            new { Code = "Consumed", Description = "ส่งผลิตแล้ว" },
+        };
+        return Ok(list);
+    }
 }

@@ -6,37 +6,43 @@ public partial class TbtProductionPrePlanMaterial
 {
     public int Id { get; set; }
 
-    public int PrePlanId { get; set; }
+    public int PrePlanItemId { get; set; }
 
-    public string MaterialType { get; set; } = null!;
+    public string? Gold { get; set; }
 
-    public int? MasterId { get; set; }
+    public string? GoldSize { get; set; }
 
-    public string? MaterialCode { get; set; }
+    public decimal? GoldQty { get; set; }
 
-    public string? ShapeCode { get; set; }
+    public string? Gem { get; set; }
 
-    public string? Size { get; set; }
+    public string? GemShape { get; set; }
 
-    public int Qty { get; set; }
+    public decimal? GemQty { get; set; }
 
-    public string? Color { get; set; }
+    public string? GemUnit { get; set; }
 
-    public decimal? Weight { get; set; }
+    public string? GemSize { get; set; }
 
-    public string? WeightUnit { get; set; }
+    public decimal? GemWeight { get; set; }
 
-    public bool IsLocked { get; set; }
+    public string? GemWeightUnit { get; set; }
 
-    public string? Remark { get; set; }
+    public decimal? DiamondQty { get; set; }
 
-    public string CreateBy { get; set; } = null!;
+    public string? DiamondUnit { get; set; }
 
-    public DateTime CreateDate { get; set; }
+    public string? DiamondSize { get; set; }
 
-    public string? UpdateBy { get; set; }
+    public decimal? DiamondWeight { get; set; }
 
-    public DateTime? UpdateDate { get; set; }
+    public string? DiamondWeightUnit { get; set; }
 
-    public virtual TbtProductionPrePlan PrePlan { get; set; } = null!;
+    public string? DiamondQuality { get; set; }
+
+    public string? CreateBy { get; set; }
+
+    public DateTime? CreateDate { get; set; }
+
+    public virtual TbtProductionPrePlanItem Item { get; set; } = null!;
 }

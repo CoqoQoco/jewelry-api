@@ -6,68 +6,86 @@ namespace jewelry.Model.Production.PrePlan;
 public class SearchPrePlanResponse
 {
     public int Id { get; set; }
-    public string OrderNo { get; set; } = null!;
-    public string JobLocation { get; set; } = null!;
-    public string JobType { get; set; } = null!;
-    public int ProductionRound { get; set; }
-    public string MoldCode { get; set; } = null!;
-    public string? ProductType { get; set; }
-    public string GoldType { get; set; } = null!;
+    public string? OrderNo { get; set; }
+    public int? ProductionRound { get; set; }
+    public string? JobType { get; set; }
+    public string? JobLocation { get; set; }
+    public string? GoldType { get; set; }
     public string Status { get; set; } = null!;
-    public int? ProductQty { get; set; }
     public DateTime OrderDate { get; set; }
     public DateTime DeliveryDate { get; set; }
-    public string CreateBy { get; set; } = null!;
-    public DateTime CreateDate { get; set; }
+    public string? CreateBy { get; set; }
+    public DateTime? CreateDate { get; set; }
+    public int ItemCount { get; set; }
+    public string? PrimaryMoldCode { get; set; }
 }
 
 public class GetPrePlanResponse
 {
     public int Id { get; set; }
-    public string OrderNo { get; set; } = null!;
-    public string JobLocation { get; set; } = null!;
-    public string JobType { get; set; } = null!;
-    public int ProductionRound { get; set; }
-    public string MoldCode { get; set; } = null!;
-    public string? ProductType { get; set; }
-    public string GoldType { get; set; } = null!;
-    public string? MoldDetail { get; set; }
-    public string? Remark { get; set; }
+    public string? OrderNo { get; set; }
+    public int? ProductionRound { get; set; }
+    public string? JobType { get; set; }
+    public string? JobLocation { get; set; }
+    public string? GoldType { get; set; }
     public DateTime OrderDate { get; set; }
     public DateTime DeliveryDate { get; set; }
+    public string? Remark { get; set; }
     public string Status { get; set; } = null!;
-    public int? ProductQty { get; set; }
     public string? RejectReason { get; set; }
-    public int? LinkedProductionPlanId { get; set; }
-    public string CreateBy { get; set; } = null!;
-    public DateTime CreateDate { get; set; }
+    public string? CreateBy { get; set; }
+    public DateTime? CreateDate { get; set; }
+    public string? UpdateBy { get; set; }
+    public DateTime? UpdateDate { get; set; }
     public string? SubmitBy { get; set; }
     public DateTime? SubmitDate { get; set; }
     public string? ApproveBy { get; set; }
     public DateTime? ApproveDate { get; set; }
+
+    public List<GetPrePlanItemResponse> Items { get; set; } = new List<GetPrePlanItemResponse>();
+}
+
+public class GetPrePlanItemResponse
+{
+    public int Id { get; set; }
+    public int PrePlanId { get; set; }
+    public int ItemNo { get; set; }
+    public string MoldCode { get; set; } = null!;
+    public string? MoldDetail { get; set; }
+    public string? ProductType { get; set; }
+    public int? ProductQty { get; set; }
+    public string? ProductQtyUnit { get; set; }
+    public string? ProductDetail { get; set; }
+    public string? ProductImagePath { get; set; }
+    public int? LinkedProductionPlanId { get; set; }
+    public string? CreateBy { get; set; }
+    public DateTime? CreateDate { get; set; }
     public string? UpdateBy { get; set; }
     public DateTime? UpdateDate { get; set; }
 
-    public IList<GetPrePlanMaterialResponse> Materials { get; set; } = new List<GetPrePlanMaterialResponse>();
+    public List<GetPrePlanMaterialResponse> Materials { get; set; } = new List<GetPrePlanMaterialResponse>();
 }
 
 public class GetPrePlanMaterialResponse
 {
     public int Id { get; set; }
-    public int PrePlanId { get; set; }
-    public string MaterialType { get; set; } = null!;
-    public int? MasterId { get; set; }
-    public string? MaterialCode { get; set; }
-    public string? ShapeCode { get; set; }
-    public string? Size { get; set; }
-    public int Qty { get; set; }
-    public string? Color { get; set; }
-    public decimal? Weight { get; set; }
-    public string? WeightUnit { get; set; }
-    public bool IsLocked { get; set; }
-    public string? Remark { get; set; }
-    public string CreateBy { get; set; } = null!;
-    public DateTime CreateDate { get; set; }
-    public string? UpdateBy { get; set; }
-    public DateTime? UpdateDate { get; set; }
+    public int PrePlanItemId { get; set; }
+    public string? Gold { get; set; }
+    public string? GoldSize { get; set; }
+    public decimal? GoldQty { get; set; }
+    public string? Gem { get; set; }
+    public string? GemShape { get; set; }
+    public decimal? GemQty { get; set; }
+    public string? GemUnit { get; set; }
+    public string? GemSize { get; set; }
+    public decimal? GemWeight { get; set; }
+    public string? GemWeightUnit { get; set; }
+    public decimal? DiamondQty { get; set; }
+    public string? DiamondUnit { get; set; }
+    public string? DiamondSize { get; set; }
+    public decimal? DiamondWeight { get; set; }
+    public string? DiamondWeightUnit { get; set; }
+    public string? DiamondQuality { get; set; }
+    public string? CreateBy { get; set; }
+    public DateTime? CreateDate { get; set; }
 }
