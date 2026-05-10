@@ -145,15 +145,15 @@ public class ProductionPrePlanController : ApiControllerBase
         }
     }
 
-    [Route("Consume/{id}")]
-    [HttpPost]
+    [Route("AvailableForPlan")]
+    [HttpGet]
     [ProducesResponseType((int)HttpStatusCode.OK)]
     [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-    public async Task<IActionResult> Consume([FromRoute] int id, [FromBody] ConsumePrePlanRequest request)
+    public async Task<IActionResult> AvailableForPlan([FromQuery] string? moldCode)
     {
         try
         {
-            var response = await _service.Consume(id, request);
+            var response = await _service.GetAvailableForPlan(moldCode);
             return Ok(response);
         }
         catch (Exception ex)
@@ -202,8 +202,9 @@ public class ProductionPrePlanController : ApiControllerBase
             new { Code = "Draft", Description = "ร่าง" },
             new { Code = "Submitted", Description = "รออนุมัติ" },
             new { Code = "Approved", Description = "อนุมัติแล้ว" },
+            new { Code = "PartiallyConsumed", Description = "สร้างแผนบางส่วน" },
+            new { Code = "Consumed", Description = "สร้างแผนครบ" },
             new { Code = "Rejected", Description = "ปฏิเสธ" },
-            new { Code = "Consumed", Description = "ส่งผลิตแล้ว" },
         };
         return Ok(list);
     }

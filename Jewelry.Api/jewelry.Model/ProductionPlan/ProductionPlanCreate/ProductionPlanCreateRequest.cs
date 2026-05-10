@@ -35,6 +35,8 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanCreate
 
         public bool IsModifyPlan { get; set; } = false;
 
+        public int? PrePlanItemId { get; set; }
+
         public string Material { get; set; }
 
         //public List<ProductionPlanMaterialCreateRequest> Material { get; set; }

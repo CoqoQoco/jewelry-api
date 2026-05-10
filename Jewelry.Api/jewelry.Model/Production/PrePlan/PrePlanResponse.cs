@@ -18,6 +18,33 @@ public class SearchPrePlanResponse
     public DateTime? CreateDate { get; set; }
     public int ItemCount { get; set; }
     public string? PrimaryMoldCode { get; set; }
+    public int LinkedItemCount { get; set; }
+    public List<SearchPrePlanItemResponse> Items { get; set; } = new();
+}
+
+public class SearchPrePlanItemResponse
+{
+    public int Id { get; set; }
+    public int ItemNo { get; set; }
+    public string MoldCode { get; set; } = null!;
+    public string? ProductType { get; set; }
+    public int? ProductQty { get; set; }
+    public string? ProductQtyUnit { get; set; }
+    public string? Wo { get; set; }
+    public int? WoNumber { get; set; }
+    public string? WoText { get; set; }
+    public int? LinkedProductionPlanId { get; set; }
+    public string? PlanStatus { get; set; }
+    public List<SearchPrePlanMaterialBrief> Materials { get; set; } = new();
+}
+
+public class SearchPrePlanMaterialBrief
+{
+    public string? Gold { get; set; }
+    public decimal? GoldQty { get; set; }
+    public string? Gem { get; set; }
+    public string? GemShape { get; set; }
+    public decimal? GemQty { get; set; }
 }
 
 public class GetPrePlanResponse
@@ -58,11 +85,33 @@ public class GetPrePlanItemResponse
     public string? ProductDetail { get; set; }
     public string? ProductImagePath { get; set; }
     public int? LinkedProductionPlanId { get; set; }
+    public string? Wo { get; set; }
+    public int? WoNumber { get; set; }
+    public string? WoText { get; set; }
     public string? CreateBy { get; set; }
     public DateTime? CreateDate { get; set; }
     public string? UpdateBy { get; set; }
     public DateTime? UpdateDate { get; set; }
 
+    public List<GetPrePlanMaterialResponse> Materials { get; set; } = new List<GetPrePlanMaterialResponse>();
+}
+
+public class AvailableForPlanResponse
+{
+    public int PrePlanId { get; set; }
+    public string? OrderNo { get; set; }
+    public string? GoldType { get; set; }
+    public string? JobType { get; set; }
+    public string? JobLocation { get; set; }
+    public DateTime DeliveryDate { get; set; }
+    public int ItemId { get; set; }
+    public int ItemNo { get; set; }
+    public string MoldCode { get; set; } = null!;
+    public string? MoldDetail { get; set; }
+    public string? ProductType { get; set; }
+    public int? ProductQty { get; set; }
+    public string? ProductQtyUnit { get; set; }
+    public string? ProductDetail { get; set; }
     public List<GetPrePlanMaterialResponse> Materials { get; set; } = new List<GetPrePlanMaterialResponse>();
 }
 

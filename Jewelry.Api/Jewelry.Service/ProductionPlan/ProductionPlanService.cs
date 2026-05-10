@@ -21,6 +21,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Production.Plan;
+using Jewelry.Service.Production.PrePlan;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -86,17 +87,20 @@ namespace Jewelry.Service.ProductionPlan
         private readonly IRunningNumber _runningNumberService;
         private readonly IPlanService _planService;
         private readonly IAzureBlobStorageService _azureBlobService;
+        private readonly IProductionPrePlanService _prePlanService;
         public ProductionPlanService(JewelryContext JewelryContext, IHttpContextAccessor httpContextAccessor,
             IHostEnvironment HostingEnvironment,
             IPlanService planService,
             IRunningNumber runningNumberService,
-            IAzureBlobStorageService azureBlobService) : base(JewelryContext, httpContextAccessor)
+            IAzureBlobStorageService azureBlobService,
+            IProductionPrePlanService prePlanService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
             _runningNumberService = runningNumberService;
             _planService = planService;
             _azureBlobService = azureBlobService;
+            _prePlanService = prePlanService;
         }
 
         #region ----- Production Plan -----
@@ -219,6 +223,11 @@ namespace Jewelry.Service.ProductionPlan
                     }
                     _jewelryContext.TbtProductionPlanMaterial.AddRange(createMaterials);
                     await _jewelryContext.SaveChangesAsync();
+
+                    if (request.PrePlanItemId.HasValue)
+                    {
+                        await _prePlanService.LinkProductionPlan(request.PrePlanItemId.Value, createPlan);
+                    }
 
                     //if (request.Images == null)
                     //{

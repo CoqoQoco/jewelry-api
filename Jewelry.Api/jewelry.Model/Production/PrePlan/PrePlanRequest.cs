@@ -13,6 +13,7 @@ public class SearchPrePlanRequest
     public int Take { get; set; } = 50;
     public int Skip { get; set; } = 0;
     public string? Sort { get; set; }
+    public bool IncludeCompleted { get; set; } = false;
 }
 
 public class CreatePrePlanRequest
@@ -100,7 +101,3 @@ public class RejectPrePlanRequest
     public string? RejectReason { get; set; }
 }
 
-public class ConsumePrePlanRequest
-{
-    public int Id { get; set; }
-}

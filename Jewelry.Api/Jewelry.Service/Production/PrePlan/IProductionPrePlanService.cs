@@ -1,4 +1,5 @@
 using jewelry.Model.Production.PrePlan;
+using Jewelry.Data.Models.Jewelry;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -13,5 +14,6 @@ public interface IProductionPrePlanService
     Task<string> Submit(int id);
     Task<string> Approve(int id, ApprovePrePlanRequest request);
     Task<string> Reject(int id, RejectPrePlanRequest request);
-    Task<string> Consume(int id, ConsumePrePlanRequest request);
+    Task<List<AvailableForPlanResponse>> GetAvailableForPlan(string? moldCode);
+    Task LinkProductionPlan(int prePlanItemId, TbtProductionPlan plan);
 }

@@ -27,6 +27,12 @@ public partial class TbtProductionPrePlanItem
 
     public int? LinkedProductionPlanId { get; set; }
 
+    public string? Wo { get; set; }
+
+    public int? WoNumber { get; set; }
+
+    public string? WoText { get; set; }
+
     public string? CreateBy { get; set; }
 
     public DateTime? CreateDate { get; set; }
