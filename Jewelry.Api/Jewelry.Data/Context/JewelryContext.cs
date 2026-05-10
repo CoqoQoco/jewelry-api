@@ -3234,50 +3234,50 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbtProductionPrePlan>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("TbtProductionPrePlan_pkey");
+            entity.HasKey(e => e.Id).HasName("tbt_production_pre_plan_pk");
 
-            entity.ToTable("TbtProductionPrePlan");
+            entity.ToTable("tbt_production_pre_plan");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedOnAdd()
-                .HasColumnName("Id");
+                .HasColumnName("id");
             entity.Property(e => e.OrderNo)
-                .HasMaxLength(50)
-                .HasColumnName("OrderNo");
-            entity.Property(e => e.ProductionRound).HasColumnName("ProductionRound");
+                .HasColumnType("character varying")
+                .HasColumnName("order_no");
+            entity.Property(e => e.ProductionRound).HasColumnName("production_round");
             entity.Property(e => e.JobType)
-                .HasMaxLength(50)
-                .HasColumnName("JobType");
+                .HasColumnType("character varying")
+                .HasColumnName("job_type");
             entity.Property(e => e.JobLocation)
-                .HasMaxLength(50)
-                .HasColumnName("JobLocation");
+                .HasColumnType("character varying")
+                .HasColumnName("job_location");
             entity.Property(e => e.GoldType)
-                .HasMaxLength(20)
-                .HasColumnName("GoldType");
-            entity.Property(e => e.OrderDate).HasColumnName("OrderDate");
-            entity.Property(e => e.DeliveryDate).HasColumnName("DeliveryDate");
-            entity.Property(e => e.Remark).HasColumnName("Remark");
+                .HasColumnType("character varying")
+                .HasColumnName("gold_type");
+            entity.Property(e => e.OrderDate).HasColumnName("order_date");
+            entity.Property(e => e.DeliveryDate).HasColumnName("delivery_date");
+            entity.Property(e => e.Remark).HasColumnName("remark");
             entity.Property(e => e.Status)
-                .HasMaxLength(20)
+                .HasColumnType("character varying")
                 .HasDefaultValueSql("'Draft'")
-                .HasColumnName("Status");
-            entity.Property(e => e.RejectReason).HasColumnName("RejectReason");
+                .HasColumnName("status");
+            entity.Property(e => e.RejectReason).HasColumnName("reject_reason");
             entity.Property(e => e.CreateBy)
-                .HasMaxLength(50)
-                .HasColumnName("CreateBy");
-            entity.Property(e => e.CreateDate).HasColumnName("CreateDate");
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.UpdateBy)
-                .HasMaxLength(50)
-                .HasColumnName("UpdateBy");
-            entity.Property(e => e.UpdateDate).HasColumnName("UpdateDate");
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
             entity.Property(e => e.SubmitBy)
-                .HasMaxLength(50)
-                .HasColumnName("SubmitBy");
-            entity.Property(e => e.SubmitDate).HasColumnName("SubmitDate");
+                .HasColumnType("character varying")
+                .HasColumnName("submit_by");
+            entity.Property(e => e.SubmitDate).HasColumnName("submit_date");
             entity.Property(e => e.ApproveBy)
-                .HasMaxLength(50)
-                .HasColumnName("ApproveBy");
-            entity.Property(e => e.ApproveDate).HasColumnName("ApproveDate");
+                .HasColumnType("character varying")
+                .HasColumnName("approve_by");
+            entity.Property(e => e.ApproveDate).HasColumnName("approve_date");
 
             entity.HasMany(e => e.Items)
                 .WithOne(e => e.PrePlan)
@@ -3288,41 +3288,41 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbtProductionPrePlanItem>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("TbtProductionPrePlanItem_pkey");
+            entity.HasKey(e => e.Id).HasName("tbt_production_pre_plan_item_pk");
 
-            entity.ToTable("TbtProductionPrePlanItem");
+            entity.ToTable("tbt_production_pre_plan_item");
 
-            entity.HasIndex(e => e.PrePlanId).HasDatabaseName("IX_PrePlanItem_PrePlanId");
+            entity.HasIndex(e => e.PrePlanId).HasDatabaseName("idx_tbt_production_pre_plan_item_pre_plan_id");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedOnAdd()
-                .HasColumnName("Id");
-            entity.Property(e => e.PrePlanId).HasColumnName("PrePlanId");
-            entity.Property(e => e.ItemNo).HasColumnName("ItemNo");
+                .HasColumnName("id");
+            entity.Property(e => e.PrePlanId).HasColumnName("pre_plan_id");
+            entity.Property(e => e.ItemNo).HasColumnName("item_no");
             entity.Property(e => e.MoldCode)
-                .HasMaxLength(50)
-                .HasColumnName("MoldCode");
-            entity.Property(e => e.MoldDetail).HasColumnName("MoldDetail");
+                .HasColumnType("character varying")
+                .HasColumnName("mold_code");
+            entity.Property(e => e.MoldDetail).HasColumnName("mold_detail");
             entity.Property(e => e.ProductType)
-                .HasMaxLength(100)
-                .HasColumnName("ProductType");
-            entity.Property(e => e.ProductQty).HasColumnName("ProductQty");
+                .HasColumnType("character varying")
+                .HasColumnName("product_type");
+            entity.Property(e => e.ProductQty).HasColumnName("product_qty");
             entity.Property(e => e.ProductQtyUnit)
-                .HasMaxLength(20)
-                .HasColumnName("ProductQtyUnit");
-            entity.Property(e => e.ProductDetail).HasColumnName("ProductDetail");
+                .HasColumnType("character varying")
+                .HasColumnName("product_qty_unit");
+            entity.Property(e => e.ProductDetail).HasColumnName("product_detail");
             entity.Property(e => e.ProductImagePath)
-                .HasMaxLength(500)
-                .HasColumnName("ProductImagePath");
-            entity.Property(e => e.LinkedProductionPlanId).HasColumnName("LinkedProductionPlanId");
+                .HasColumnType("character varying")
+                .HasColumnName("product_image_path");
+            entity.Property(e => e.LinkedProductionPlanId).HasColumnName("linked_production_plan_id");
             entity.Property(e => e.CreateBy)
-                .HasMaxLength(50)
-                .HasColumnName("CreateBy");
-            entity.Property(e => e.CreateDate).HasColumnName("CreateDate");
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.UpdateBy)
-                .HasMaxLength(50)
-                .HasColumnName("UpdateBy");
-            entity.Property(e => e.UpdateDate).HasColumnName("UpdateDate");
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
 
             entity.HasOne(d => d.PrePlan)
                 .WithMany(p => p.Items)
@@ -3339,68 +3339,68 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbtProductionPrePlanMaterial>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("TbtProductionPrePlanMaterial_pkey");
+            entity.HasKey(e => e.Id).HasName("tbt_production_pre_plan_material_pk");
 
-            entity.ToTable("TbtProductionPrePlanMaterial");
+            entity.ToTable("tbt_production_pre_plan_material");
 
-            entity.HasIndex(e => e.PrePlanItemId).HasDatabaseName("IX_PrePlanMaterial_PrePlanItemId");
+            entity.HasIndex(e => e.PrePlanItemId).HasDatabaseName("idx_tbt_production_pre_plan_material_item_id");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedOnAdd()
-                .HasColumnName("Id");
-            entity.Property(e => e.PrePlanItemId).HasColumnName("PrePlanItemId");
+                .HasColumnName("id");
+            entity.Property(e => e.PrePlanItemId).HasColumnName("pre_plan_item_id");
             entity.Property(e => e.Gold)
-                .HasMaxLength(50)
-                .HasColumnName("Gold");
+                .HasColumnType("character varying")
+                .HasColumnName("gold");
             entity.Property(e => e.GoldSize)
-                .HasMaxLength(50)
-                .HasColumnName("GoldSize");
+                .HasColumnType("character varying")
+                .HasColumnName("gold_size");
             entity.Property(e => e.GoldQty)
                 .HasColumnType("decimal(18,3)")
-                .HasColumnName("GoldQty");
+                .HasColumnName("gold_qty");
             entity.Property(e => e.Gem)
-                .HasMaxLength(50)
-                .HasColumnName("Gem");
+                .HasColumnType("character varying")
+                .HasColumnName("gem");
             entity.Property(e => e.GemShape)
-                .HasMaxLength(50)
-                .HasColumnName("GemShape");
+                .HasColumnType("character varying")
+                .HasColumnName("gem_shape");
             entity.Property(e => e.GemQty)
                 .HasColumnType("decimal(18,3)")
-                .HasColumnName("GemQty");
+                .HasColumnName("gem_qty");
             entity.Property(e => e.GemUnit)
-                .HasMaxLength(20)
-                .HasColumnName("GemUnit");
+                .HasColumnType("character varying")
+                .HasColumnName("gem_unit");
             entity.Property(e => e.GemSize)
-                .HasMaxLength(50)
-                .HasColumnName("GemSize");
+                .HasColumnType("character varying")
+                .HasColumnName("gem_size");
             entity.Property(e => e.GemWeight)
                 .HasColumnType("decimal(18,3)")
-                .HasColumnName("GemWeight");
+                .HasColumnName("gem_weight");
             entity.Property(e => e.GemWeightUnit)
-                .HasMaxLength(20)
-                .HasColumnName("GemWeightUnit");
+                .HasColumnType("character varying")
+                .HasColumnName("gem_weight_unit");
             entity.Property(e => e.DiamondQty)
                 .HasColumnType("decimal(18,3)")
-                .HasColumnName("DiamondQty");
+                .HasColumnName("diamond_qty");
             entity.Property(e => e.DiamondUnit)
-                .HasMaxLength(20)
-                .HasColumnName("DiamondUnit");
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_unit");
             entity.Property(e => e.DiamondSize)
-                .HasMaxLength(50)
-                .HasColumnName("DiamondSize");
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_size");
             entity.Property(e => e.DiamondWeight)
                 .HasColumnType("decimal(18,3)")
-                .HasColumnName("DiamondWeight");
+                .HasColumnName("diamond_weight");
             entity.Property(e => e.DiamondWeightUnit)
-                .HasMaxLength(20)
-                .HasColumnName("DiamondWeightUnit");
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_weight_unit");
             entity.Property(e => e.DiamondQuality)
-                .HasMaxLength(50)
-                .HasColumnName("DiamondQuality");
+                .HasColumnType("character varying")
+                .HasColumnName("diamond_quality");
             entity.Property(e => e.CreateBy)
-                .HasMaxLength(50)
-                .HasColumnName("CreateBy");
-            entity.Property(e => e.CreateDate).HasColumnName("CreateDate");
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
 
             entity.HasOne(d => d.Item)
                 .WithMany(p => p.Materials)

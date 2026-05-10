@@ -15,12 +15,15 @@ namespace Jewelry.Service.Production.PrePlan;
 public class ProductionPrePlanService : BaseService, IProductionPrePlanService
 {
     private readonly JewelryContext _jewelryContext;
+    private readonly IRunningNumber _runningNumber;
 
     public ProductionPrePlanService(JewelryContext jewelryContext,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        IRunningNumber runningNumber)
         : base(jewelryContext, httpContextAccessor)
     {
         _jewelryContext = jewelryContext;
+        _runningNumber = runningNumber;
     }
 
     public async Task<IList<SearchPrePlanResponse>> Search(SearchPrePlanRequest request)
@@ -144,9 +147,11 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
 
     public async Task<string> Create(CreatePrePlanRequest request)
     {
+        var orderNo = await _runningNumber.GeneratePrePlanNumber();
+
         var entity = new TbtProductionPrePlan
         {
-            OrderNo = request.OrderNo,
+            OrderNo = orderNo,
             ProductionRound = request.ProductionRound,
             JobType = request.JobType,
             JobLocation = request.JobLocation,
@@ -224,7 +229,6 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         if (entity.Status != "Draft")
             throw new Exception($"ไม่สามารถแก้ไขได้ เนื่องจากสถานะปัจจุบันคือ '{entity.Status}' (แก้ไขได้เฉพาะสถานะ Draft)");
 
-        entity.OrderNo = request.OrderNo;
         entity.ProductionRound = request.ProductionRound;
         entity.JobType = request.JobType;
         entity.JobLocation = request.JobLocation;
