@@ -23,6 +23,7 @@ using Jewelry.Service.Stock.Product;
 using Jewelry.Service.Stock.ProductImage;
 using Jewelry.Service.TransferStock;
 using Jewelry.Service.Permission;
+using Jewelry.Service.Setting.PrintLayout;
 using Jewelry.Service.User;
 using Jewelry.Service.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -85,6 +86,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<ISaleDocumentService, SaleDocumentService>();
             services.AddScoped<IOldStockService, OldStockService>();
             services.AddScoped<IStockBasketService, StockBasketService>();
+            services.AddScoped<IPrintLayoutService, PrintLayoutService>();
 
             return services;
         }

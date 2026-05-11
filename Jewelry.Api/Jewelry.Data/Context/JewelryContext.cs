@@ -20,6 +20,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmBank> TbmBank { get; set; }
 
+    public virtual DbSet<TbmPrintLayout> TbmPrintLayout { get; set; }
+
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
 
     public virtual DbSet<TbmCustomer> TbmCustomer { get; set; }
@@ -3414,6 +3416,26 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.PrePlanItemId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("tbt_production_pre_plan_material_item_fk");
+        });
+
+        modelBuilder.Entity<TbmPrintLayout>(entity =>
+        {
+            entity.HasKey(e => e.LayoutKey).HasName("tbm_print_layout_pk");
+
+            entity.ToTable("tbm_print_layout");
+
+            entity.Property(e => e.LayoutKey)
+                .HasColumnType("character varying")
+                .HasColumnName("layout_key");
+            entity.Property(e => e.LayoutJson).HasColumnName("layout_json");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         OnModelCreatingPartial(modelBuilder);
