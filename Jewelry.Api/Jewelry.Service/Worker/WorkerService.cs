@@ -222,61 +222,78 @@ namespace Jewelry.Service.Worker
 
                          }).ToList();
 
-            var goldLossRows = _jewelryContext.TbtProductionPlanStatusDetail
-                .Include(x => x.Header)
-                .ThenInclude(x => x.ProductionPlan)
-                .Where(x => x.IsActive && x.Header.IsActive)
-                .Where(x => x.Header.Status == 80)
-                .Where(x => x.Header.WorkerCode == request.Code.ToUpper()
-                         || x.Worker == request.Code.ToUpper()
-                         || x.WorkerSub == request.Code.ToUpper())
-                .Where(x => x.RequestDate >= startUtc && x.RequestDate <= endUtc)
-                .Where(x => x.LossPercent != null && x.Header.GoldLossPrice != null)
-                .Select(x => new
-                {
-                    x.Header.ProductionPlan.Wo,
-                    x.Header.ProductionPlan.WoNumber,
-                    x.Header.ProductionPlan.WoText,
-                    x.RequestDate,
-                    x.Gold,
-                    x.GoldQtySend,
-                    x.GoldWeightSend,
-                    x.GoldQtyCheck,
-                    x.GoldWeightCheck,
-                    x.LossPercent,
-                    x.LossRemark,
-                    GoldLossPrice = x.Header.GoldLossPrice,
-                })
-                .ToList()
-                .Select(x =>
-                {
-                    var weightDiff = (x.GoldWeightSend ?? 0) - (x.GoldWeightCheck ?? 0);
-                    var weightLossAllowed = (x.GoldWeightSend ?? 0) * (x.LossPercent ?? 0) / 100m;
-                    var weightLossActual = weightLossAllowed - weightDiff;
-                    var moneyDiff = weightLossActual * (x.GoldLossPrice ?? 0);
+            var goldLossRows = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+                                    .Include(x => x.Header)
+                                    .ThenInclude(x => x.ProductionPlan)
+                                    .ThenInclude(x => x.StatusNavigation)
+                                join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                                where item.IsActive
+                                   && item.Header.IsActive
+                                   && item.Header.Status == 80
+                                   && (item.Header.WorkerCode == request.Code.ToUpper()
+                                       || item.Worker == request.Code.ToUpper()
+                                       || item.WorkerSub == request.Code.ToUpper())
+                                   && item.RequestDate >= startUtc
+                                   && item.RequestDate <= endUtc
+                                   && item.LossPercent != null
+                                select new
+                                {
+                                    item.Header.ProductionPlan.Wo,
+                                    item.Header.ProductionPlan.WoNumber,
+                                    item.Header.ProductionPlan.WoText,
+                                    item.Header.ProductionPlan.ProductNumber,
+                                    item.Header.ProductionPlan.ProductName,
+                                    StatusActive = item.Header.ProductionPlan.Status,
+                                    StatusActiveName = item.Header.ProductionPlan.StatusNavigation.NameTh,
+                                    StatusDescription = status.Description,
+                                    GoldSize = item.Header.ProductionPlan.TypeSize,
+                                    item.RequestDate,
+                                    item.Gold,
+                                    item.GoldQtySend,
+                                    item.GoldWeightSend,
+                                    item.GoldQtyCheck,
+                                    item.GoldWeightCheck,
+                                    item.Description,
+                                    item.LossPercent,
+                                    item.LossRemark,
+                                    GoldLossPrice = item.Header.GoldLossPrice,
+                                })
+                                .ToList()
+                                .Select(x =>
+                                {
+                                    var weightDiff = (x.GoldWeightSend ?? 0) - (x.GoldWeightCheck ?? 0);
+                                    var weightLossAllowed = (x.GoldWeightSend ?? 0) * (x.LossPercent ?? 0) / 100m;
+                                    var weightLossActual = weightLossAllowed - weightDiff;
+                                    var moneyDiff = weightLossActual * (x.GoldLossPrice ?? 0);
 
-                    return new SearchWorkerWages
-                    {
-                        Wo = x.Wo,
-                        WoNumber = x.WoNumber,
-                        WoText = x.WoText,
-                        JobDate = x.RequestDate,
-                        Gold = x.Gold,
-                        GoldQtySend = x.GoldQtySend,
-                        GoldWeightSend = x.GoldWeightSend,
-                        GoldQtyCheck = x.GoldQtyCheck,
-                        GoldWeightCheck = x.GoldWeightCheck,
-                        StatusName = "Gold Loss",
-                        StatusActiveName = "Gold Loss (งานฝัง)",
-                        Status = 80,
-                        Wages = null,
-                        TotalWages = moneyDiff,
-                        IsGoldLoss = true,
-                        LossPercent = x.LossPercent,
-                        LossRemark = x.LossRemark,
-                    };
-                })
-                .ToList();
+                                    return new SearchWorkerWages
+                                    {
+                                        Wo = x.Wo,
+                                        WoNumber = x.WoNumber,
+                                        WoText = x.WoText,
+                                        ProductNumber = x.ProductNumber,
+                                        ProductName = x.ProductName,
+                                        GoldSize = x.GoldSize,
+                                        StatusActive = x.StatusActive,
+                                        StatusActiveName = x.StatusActiveName,
+                                        StatusDescription = x.StatusDescription,
+                                        JobDate = x.RequestDate,
+                                        Gold = x.Gold,
+                                        GoldQtySend = x.GoldQtySend,
+                                        GoldWeightSend = x.GoldWeightSend,
+                                        GoldQtyCheck = x.GoldQtyCheck,
+                                        GoldWeightCheck = x.GoldWeightCheck,
+                                        Description = x.Description,
+                                        StatusName = "Gold Loss",
+                                        Status = 80,
+                                        Wages = null,
+                                        TotalWages = moneyDiff,
+                                        IsGoldLoss = true,
+                                        LossPercent = x.LossPercent,
+                                        LossRemark = x.LossRemark,
+                                    };
+                                })
+                                .ToList();
 
             allItems.AddRange(goldLossRows);
 
