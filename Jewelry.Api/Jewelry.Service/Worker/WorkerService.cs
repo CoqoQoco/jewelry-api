@@ -175,16 +175,18 @@ namespace Jewelry.Service.Worker
         }
         public SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request)
         {
-            var requestDate = request.RequestDateStart.StartOfDayUtc();
-            var query = (from item in _jewelryContext.TbtProductionPlanStatusDetail
+            var startUtc = request.RequestDateStart.StartOfDayUtc();
+            var endUtc = request.RequestDateEnd.EndOfDayUtc();
+
+            var allItems = (from item in _jewelryContext.TbtProductionPlanStatusDetail
                             .Include(x => x.Header)
                             .ThenInclude(x => x.ProductionPlan)
                             .ThenInclude(x => x.StatusNavigation)
                          join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
 
                          where (item.Worker == request.Code.ToUpper() || item.WorkerSub == request.Code.ToUpper())
-                         && item.RequestDate >= request.RequestDateStart.StartOfDayUtc()
-                         && item.RequestDate <= request.RequestDateEnd.EndOfDayUtc()
+                         && item.RequestDate >= startUtc
+                         && item.RequestDate <= endUtc
                          && item.IsActive == true
                          && item.Header.IsActive == true
 
@@ -218,26 +220,87 @@ namespace Jewelry.Service.Worker
                              JobDate = item.RequestDate,
                              ItemNo = item.ItemNo
 
-                         }).ToList() // ดึงข้อมูลมาก่อน
-                        .GroupBy(x => x.WoText)
-                        .OrderBy(g => g.Min(x => x.JobDate))
-                        .ThenBy(x => x.Key)
-                        .SelectMany(g => g.OrderBy(x => x.JobDate)
-                        .ThenByDescending(x => x.Gold)
-                        .ThenBy(x => x.ItemNo));
+                         }).ToList();
+
+            var goldLossRows = _jewelryContext.TbtProductionPlanStatusDetail
+                .Include(x => x.Header)
+                .ThenInclude(x => x.ProductionPlan)
+                .Where(x => x.IsActive && x.Header.IsActive)
+                .Where(x => x.Header.Status == 80)
+                .Where(x => x.Header.WorkerCode == request.Code.ToUpper()
+                         || x.Worker == request.Code.ToUpper()
+                         || x.WorkerSub == request.Code.ToUpper())
+                .Where(x => x.RequestDate >= startUtc && x.RequestDate <= endUtc)
+                .Where(x => x.LossPercent != null && x.Header.GoldLossPrice != null)
+                .Select(x => new
+                {
+                    x.Header.ProductionPlan.Wo,
+                    x.Header.ProductionPlan.WoNumber,
+                    x.Header.ProductionPlan.WoText,
+                    x.RequestDate,
+                    x.Gold,
+                    x.GoldQtySend,
+                    x.GoldWeightSend,
+                    x.GoldQtyCheck,
+                    x.GoldWeightCheck,
+                    x.LossPercent,
+                    x.LossRemark,
+                    GoldLossPrice = x.Header.GoldLossPrice,
+                })
+                .ToList()
+                .Select(x =>
+                {
+                    var weightDiff = (x.GoldWeightSend ?? 0) - (x.GoldWeightCheck ?? 0);
+                    var weightLossAllowed = (x.GoldWeightSend ?? 0) * (x.LossPercent ?? 0) / 100m;
+                    var weightLossActual = weightLossAllowed - weightDiff;
+                    var moneyDiff = weightLossActual * (x.GoldLossPrice ?? 0);
+
+                    return new SearchWorkerWages
+                    {
+                        Wo = x.Wo,
+                        WoNumber = x.WoNumber,
+                        WoText = x.WoText,
+                        JobDate = x.RequestDate,
+                        Gold = x.Gold,
+                        GoldQtySend = x.GoldQtySend,
+                        GoldWeightSend = x.GoldWeightSend,
+                        GoldQtyCheck = x.GoldQtyCheck,
+                        GoldWeightCheck = x.GoldWeightCheck,
+                        StatusName = "Gold Loss",
+                        StatusActiveName = "Gold Loss (งานฝัง)",
+                        Status = 80,
+                        Wages = null,
+                        TotalWages = moneyDiff,
+                        IsGoldLoss = true,
+                        LossPercent = x.LossPercent,
+                        LossRemark = x.LossRemark,
+                    };
+                })
+                .ToList();
+
+            allItems.AddRange(goldLossRows);
+
+            var sorted = allItems
+                .GroupBy(x => x.WoText)
+                .OrderBy(g => g.Min(x => x.JobDate))
+                .ThenBy(x => x.Key)
+                .SelectMany(g => g.OrderBy(x => x.JobDate)
+                    .ThenByDescending(x => x.Gold)
+                    .ThenBy(x => x.ItemNo))
+                .ToList();
 
             var response = new SearchWorkerWagesResponse()
             {
                 WagesDateStart = request.RequestDateStart.UtcDateTime,
                 WagesDateEnd = request.RequestDateEnd.UtcDateTime,
 
-                TotalGoldQtySend = query.Sum(x => x.GoldQtySend),
-                TotalGoldWeightSend = query.Sum(x => x.GoldWeightSend),
-                TotalGoldQtyCheck = query.Sum(x => x.GoldQtyCheck),
-                TotalGoldWeightCheck = query.Sum(x => x.GoldWeightCheck),
+                TotalGoldQtySend = sorted.Sum(x => x.GoldQtySend),
+                TotalGoldWeightSend = sorted.Sum(x => x.GoldWeightSend),
+                TotalGoldQtyCheck = sorted.Sum(x => x.GoldQtyCheck),
+                TotalGoldWeightCheck = sorted.Sum(x => x.GoldWeightCheck),
 
-                TotalWages = query.Sum(x => x.TotalWages),
-                Items = query.ToList(),
+                TotalWages = sorted.Sum(x => x.TotalWages),
+                Items = sorted,
             };
 
             return response;

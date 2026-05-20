@@ -50,5 +50,9 @@ namespace jewelry.Model.Worker.WorkerWages
 
         public DateTime? JobDate { get; set; }
         public string? ItemNo { get; set; }
+
+        public bool IsGoldLoss { get; set; }
+        public decimal? LossPercent { get; set; }
+        public string? LossRemark { get; set; }
     }
 }
