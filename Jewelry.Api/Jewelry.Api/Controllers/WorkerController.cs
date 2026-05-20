@@ -4,6 +4,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanGet;
 using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
+using jewelry.Model.Worker.GoldLossSlip;
 using jewelry.Model.Worker.List;
 using jewelry.Model.Worker.Report;
 using jewelry.Model.Worker.TrackingWorker;
@@ -27,14 +28,17 @@ namespace Jewelry.Api.Controllers
     {
         private readonly ILogger<MoldController> _logger;
         private readonly IWorkerService _service;
+        private readonly IWorkerGoldLossSlipService _goldLossSlipService;
 
         public WorkerController(ILogger<MoldController> logger,
             IWorkerService service,
+            IWorkerGoldLossSlipService goldLossSlipService,
             IOptions<ApiBehaviorOptions> apiBehaviorOptions)
             : base(apiBehaviorOptions)
         {
             _logger = logger;
             _service = service;
+            _goldLossSlipService = goldLossSlipService;
         }
 
         [Route("GetWorkerProductionType")]
@@ -200,6 +204,60 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
+        [Route("CreateGoldLossSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossSlipResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CreateGoldLossSlip([FromBody] CreateGoldLossSlipRequest request)
+        {
+            try
+            {
+                var response = await _goldLossSlipService.CreateSlip(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListGoldLossSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(List<GoldLossSlipSummaryResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult ListGoldLossSlip([FromBody] ListGoldLossSlipRequest request)
+        {
+            try
+            {
+                var response = _goldLossSlipService.ListSlips(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GetGoldLossSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossSlipResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult GetGoldLossSlip([FromBody] GetGoldLossSlipRequest request)
+        {
+            try
+            {
+                var response = _goldLossSlipService.GetSlip(request.Id);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
 

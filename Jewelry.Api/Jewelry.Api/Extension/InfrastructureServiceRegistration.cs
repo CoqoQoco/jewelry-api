@@ -63,6 +63,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IRunningNumber, RunningNumber>();
             services.AddScoped<ICustomerService, CustomerService>();
             services.AddScoped<IWorkerService, WorkerService>();
+            services.AddScoped<IWorkerGoldLossSlipService, WorkerGoldLossSlipService>();
             services.AddScoped<IProductionPlanCostService, ProductionPlanCostService>();
             services.AddScoped<IStockGemService, StockGemService>();
             services.AddScoped<IMoldPlanService, MoldPlanService>();

@@ -23,6 +23,7 @@ namespace jewelry.Model.Worker.WorkerWages
     }
     public class SearchWorkerWages
     {
+        public int Id { get; set; }
         public string Wo { get; set; }
         public int WoNumber { get; set; }
         public string WoText { get; set; }
@@ -54,5 +55,8 @@ namespace jewelry.Model.Worker.WorkerWages
         public bool IsGoldLoss { get; set; }
         public decimal? LossPercent { get; set; }
         public string? LossRemark { get; set; }
+
+        public long? WorkerGoldLossSlipId { get; set; }
+        public string? WorkerGoldLossSlipDocumentNo { get; set; }
     }
 }

@@ -227,6 +227,8 @@ namespace Jewelry.Service.Worker
                                     .ThenInclude(x => x.ProductionPlan)
                                     .ThenInclude(x => x.StatusNavigation)
                                 join status in _jewelryContext.TbmProductionPlanStatus on item.Header.Status equals status.Id
+                                join slip in _jewelryContext.TbtWorkerGoldLossSlip on item.WorkerGoldLossSlipId equals slip.Id into slipJoined
+                                from slipJ in slipJoined.DefaultIfEmpty()
                                 where item.IsActive
                                    && item.Header.IsActive
                                    && item.Header.Status == 80
@@ -238,6 +240,8 @@ namespace Jewelry.Service.Worker
                                    && item.LossPercent != null
                                 select new
                                 {
+                                    ItemId = item.ProductionPlanId,
+                                    item.ItemNo,
                                     item.Header.ProductionPlan.Wo,
                                     item.Header.ProductionPlan.WoNumber,
                                     item.Header.ProductionPlan.WoText,
@@ -257,6 +261,8 @@ namespace Jewelry.Service.Worker
                                     item.LossPercent,
                                     item.LossRemark,
                                     GoldLossPrice = item.Header.GoldLossPrice,
+                                    item.WorkerGoldLossSlipId,
+                                    WorkerGoldLossSlipDocumentNo = slipJ != null ? slipJ.DocumentNo : null,
                                 })
                                 .ToList()
                                 .Select(x =>
@@ -268,6 +274,7 @@ namespace Jewelry.Service.Worker
 
                                     return new SearchWorkerWages
                                     {
+                                        Id = x.ItemId,
                                         Wo = x.Wo,
                                         WoNumber = x.WoNumber,
                                         WoText = x.WoText,
@@ -291,6 +298,9 @@ namespace Jewelry.Service.Worker
                                         IsGoldLoss = true,
                                         LossPercent = x.LossPercent,
                                         LossRemark = x.LossRemark,
+                                        ItemNo = x.ItemNo,
+                                        WorkerGoldLossSlipId = x.WorkerGoldLossSlipId,
+                                        WorkerGoldLossSlipDocumentNo = x.WorkerGoldLossSlipDocumentNo,
                                     };
                                 })
                                 .ToList();
