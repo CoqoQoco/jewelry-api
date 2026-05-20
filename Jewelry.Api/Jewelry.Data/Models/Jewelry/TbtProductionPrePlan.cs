@@ -43,5 +43,9 @@ public partial class TbtProductionPrePlan
 
     public DateTime? ApproveDate { get; set; }
 
+    public string? SalesBy { get; set; }
+
+    public string? ApprovedBy { get; set; }
+
     public virtual ICollection<TbtProductionPrePlanItem> Items { get; set; } = new List<TbtProductionPrePlanItem>();
 }

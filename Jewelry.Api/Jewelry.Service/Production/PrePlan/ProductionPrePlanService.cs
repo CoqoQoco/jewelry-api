@@ -142,6 +142,8 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             SubmitDate = entity.SubmitDate,
             ApproveBy = entity.ApproveBy,
             ApproveDate = entity.ApproveDate,
+            SalesBy = entity.SalesBy,
+            ApprovedBy = entity.ApprovedBy,
             Items = entity.Items.OrderBy(i => i.ItemNo).Select(i => new GetPrePlanItemResponse
             {
                 Id = i.Id,
@@ -205,6 +207,8 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             OrderDate = request.OrderDate.UtcDateTime,
             DeliveryDate = request.DeliveryDate.UtcDateTime,
             Remark = request.Remark,
+            SalesBy = request.SalesBy,
+            ApprovedBy = request.ApprovedBy,
             Status = "Draft",
             CreateBy = CurrentUsername,
             CreateDate = DateTime.UtcNow,
@@ -282,6 +286,8 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         entity.OrderDate = request.OrderDate.UtcDateTime;
         entity.DeliveryDate = request.DeliveryDate.UtcDateTime;
         entity.Remark = request.Remark;
+        entity.SalesBy = request.SalesBy;
+        entity.ApprovedBy = request.ApprovedBy;
         entity.UpdateBy = CurrentUsername;
         entity.UpdateDate = DateTime.UtcNow;
 

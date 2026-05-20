@@ -68,6 +68,8 @@ public class GetPrePlanResponse
     public DateTime? SubmitDate { get; set; }
     public string? ApproveBy { get; set; }
     public DateTime? ApproveDate { get; set; }
+    public string? SalesBy { get; set; }
+    public string? ApprovedBy { get; set; }
 
     public List<GetPrePlanItemResponse> Items { get; set; } = new List<GetPrePlanItemResponse>();
 }

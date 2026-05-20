@@ -36,6 +36,10 @@ public class CreatePrePlanRequest
 
     public string? Remark { get; set; }
 
+    public string? SalesBy { get; set; }
+
+    public string? ApprovedBy { get; set; }
+
     public List<CreatePrePlanItemRequest> Items { get; set; } = new List<CreatePrePlanItemRequest>();
 }
 

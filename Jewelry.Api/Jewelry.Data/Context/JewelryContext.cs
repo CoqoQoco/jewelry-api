@@ -3280,6 +3280,12 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("approve_by");
             entity.Property(e => e.ApproveDate).HasColumnName("approve_date");
+            entity.Property(e => e.SalesBy)
+                .HasColumnType("character varying")
+                .HasColumnName("sales_by");
+            entity.Property(e => e.ApprovedBy)
+                .HasColumnType("character varying")
+                .HasColumnName("approved_by");
 
             entity.HasMany(e => e.Items)
                 .WithOne(e => e.PrePlan)
