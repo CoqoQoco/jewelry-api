@@ -509,6 +509,15 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         return result.BlobName;
     }
 
+    public async Task<int> GetWaitingCount()
+    {
+        return await (from h in _jewelryContext.TbtProductionPrePlan
+                      join i in _jewelryContext.TbtProductionPrePlanItem on h.Id equals i.PrePlanId
+                      where (h.Status == "Approved" || h.Status == "PartiallyConsumed")
+                            && i.LinkedProductionPlanId == null
+                      select i.Id).CountAsync();
+    }
+
     public async Task LinkProductionPlan(int prePlanItemId, TbtProductionPlan plan)
     {
         var item = await _jewelryContext.TbtProductionPrePlanItem

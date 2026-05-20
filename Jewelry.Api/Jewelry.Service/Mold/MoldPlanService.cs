@@ -109,6 +109,9 @@ namespace Jewelry.Service.Mold
                                 ? plan.TbtProductMoldPlanCutting.First().ImageUrl ?? string.Empty : string.Empty,
                              ImgStore = plan.TbtProductMoldPlanStore.Any()
                                 ? plan.TbtProductMoldPlanStore.First().ImageUrl ?? string.Empty : string.Empty,
+
+                             ProductionCount = _jewelryContext.TbtProductionPlan
+                                .Count(p => p.Mold == (plan.TbtProductMoldPlanCutting.Any() ? plan.TbtProductMoldPlanCutting.First().Code : string.Empty)),
                          });
 
             if (!string.IsNullOrEmpty(request.MoldCode))

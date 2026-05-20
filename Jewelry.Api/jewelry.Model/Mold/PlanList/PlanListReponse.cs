@@ -32,5 +32,7 @@ namespace jewelry.Model.Mold.PlanList
         public string ImgCasting { get; set; }
         public string ImgCutting { get; set; }
         public string ImgStore { get; set; }
+
+        public int ProductionCount { get; set; }
     }
 }

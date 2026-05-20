@@ -18,4 +18,5 @@ public interface IProductionPrePlanService
     Task<List<AvailableForPlanResponse>> GetAvailableForPlan(string? moldCode);
     Task LinkProductionPlan(int prePlanItemId, TbtProductionPlan plan);
     Task<string> UploadApproveDocument(IFormFile file);
+    Task<int> GetWaitingCount();
 }

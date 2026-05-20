@@ -47,6 +47,16 @@ namespace Jewelry.Api.Controllers
             _servicePlan = servicePlan;
         }
 
+        [Route("ProductionCount/{moldCode}")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductionCount([FromRoute] string moldCode)
+        {
+            var count = await _service.GetProductionCount(moldCode);
+            return Ok(new { count });
+        }
+
         [Route("CreateMold")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]

@@ -23,6 +23,7 @@ namespace Jewelry.Service.Stock
         Task<string> CreateMold(CreateMoldRequest request);
         Task<string> UpdateMold(UpdateMoldRequest request);
         IQueryable<SearchMoldResponse> SearchMold(SearchMold request);
+        Task<int> GetProductionCount(string moldCode);
     }
     public class MoldService : BaseService, IMoldService
     {
@@ -161,6 +162,13 @@ namespace Jewelry.Service.Stock
             }
             return "success";
         }
+        public async Task<int> GetProductionCount(string moldCode)
+        {
+            return await _jewelryContext.TbtProductionPlan
+                .Where(p => p.Mold == moldCode)
+                .CountAsync();
+        }
+
         public IQueryable<SearchMoldResponse> SearchMold(SearchMold request)
         {
             var mold = _jewelryContext.TbtProductMold

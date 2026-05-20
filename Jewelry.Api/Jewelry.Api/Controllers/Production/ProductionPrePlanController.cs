@@ -181,6 +181,16 @@ public class ProductionPrePlanController : ApiControllerBase
         }
     }
 
+    [Route("WaitingCount")]
+    [HttpGet]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> WaitingCount()
+    {
+        var count = await _service.GetWaitingCount();
+        return Ok(new { count });
+    }
+
     [Route("MasterJobType")]
     [HttpGet]
     [ProducesResponseType((int)HttpStatusCode.OK)]
