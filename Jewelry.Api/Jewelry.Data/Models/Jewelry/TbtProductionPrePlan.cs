@@ -47,5 +47,7 @@ public partial class TbtProductionPrePlan
 
     public string? ApprovedBy { get; set; }
 
+    public string? ApprovedDocumentPath { get; set; }
+
     public virtual ICollection<TbtProductionPrePlanItem> Items { get; set; } = new List<TbtProductionPrePlanItem>();
 }

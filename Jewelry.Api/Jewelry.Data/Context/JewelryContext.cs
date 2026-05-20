@@ -3286,6 +3286,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ApprovedBy)
                 .HasColumnType("character varying")
                 .HasColumnName("approved_by");
+            entity.Property(e => e.ApprovedDocumentPath)
+                .HasColumnType("character varying")
+                .HasColumnName("approved_document_path");
 
             entity.HasMany(e => e.Items)
                 .WithOne(e => e.PrePlan)

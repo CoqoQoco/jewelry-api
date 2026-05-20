@@ -97,6 +97,7 @@ public class ApprovePrePlanRequest
 {
     public int Id { get; set; }
     public string? Remark { get; set; }
+    public string? ApprovedDocumentPath { get; set; }
 }
 
 public class RejectPrePlanRequest

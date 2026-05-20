@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Transactions;
@@ -17,14 +18,21 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
 {
     private readonly JewelryContext _jewelryContext;
     private readonly IRunningNumber _runningNumber;
+    private readonly IAzureBlobStorageService _blobStorage;
+
+    private const string ApproveDocFolder = "PrePlanApproveDoc";
+    private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png" };
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
     public ProductionPrePlanService(JewelryContext jewelryContext,
         IHttpContextAccessor httpContextAccessor,
-        IRunningNumber runningNumber)
+        IRunningNumber runningNumber,
+        IAzureBlobStorageService blobStorage)
         : base(jewelryContext, httpContextAccessor)
     {
         _jewelryContext = jewelryContext;
         _runningNumber = runningNumber;
+        _blobStorage = blobStorage;
     }
 
     public async Task<IList<SearchPrePlanResponse>> Search(SearchPrePlanRequest request)
@@ -82,6 +90,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             ItemCount = x.Items.Count,
             PrimaryMoldCode = x.Items.OrderBy(i => i.ItemNo).FirstOrDefault()?.MoldCode,
             LinkedItemCount = x.Items.Count(i => i.LinkedProductionPlanId.HasValue),
+            ApprovedDocumentPath = x.ApprovedDocumentPath,
             Items = x.Items.OrderBy(i => i.ItemNo).Select(i => new SearchPrePlanItemResponse
             {
                 Id = i.Id,
@@ -144,6 +153,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             ApproveDate = entity.ApproveDate,
             SalesBy = entity.SalesBy,
             ApprovedBy = entity.ApprovedBy,
+            ApprovedDocumentPath = entity.ApprovedDocumentPath,
             Items = entity.Items.OrderBy(i => i.ItemNo).Select(i => new GetPrePlanItemResponse
             {
                 Id = i.Id,
@@ -371,6 +381,9 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
 
     public async Task<string> Approve(int id, ApprovePrePlanRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.ApprovedDocumentPath))
+            throw new Exception("ต้องแนบเอกสารอนุมัติ");
+
         var entity = await _jewelryContext.TbtProductionPrePlan
             .FirstOrDefaultAsync(x => x.Id == id)
             ?? throw new Exception("ไม่พบใบสั่งผลิต");
@@ -381,6 +394,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         entity.Status = "Approved";
         entity.ApproveBy = CurrentUsername;
         entity.ApproveDate = DateTime.UtcNow;
+        entity.ApprovedDocumentPath = request.ApprovedDocumentPath;
 
         _jewelryContext.TbtProductionPrePlan.Update(entity);
         await _jewelryContext.SaveChangesAsync();
@@ -470,6 +484,29 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                 }).ToList();
 
         return items;
+    }
+
+    public async Task<string> UploadApproveDocument(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            throw new Exception("ไม่พบไฟล์ที่อัปโหลด");
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!AllowedImageExtensions.Contains(ext))
+            throw new Exception("รองรับเฉพาะไฟล์ JPG และ PNG เท่านั้น");
+
+        if (file.Length > MaxFileSizeBytes)
+            throw new Exception("ขนาดไฟล์ต้องไม่เกิน 10 MB");
+
+        var fileName = $"{Guid.NewGuid()}{ext}";
+
+        using var stream = file.OpenReadStream();
+        var result = await _blobStorage.UploadImageAsync(stream, ApproveDocFolder, fileName);
+
+        if (!result.Success)
+            throw new Exception(result.ErrorMessage ?? "อัปโหลดไฟล์ไม่สำเร็จ");
+
+        return result.BlobName;
     }
 
     public async Task LinkProductionPlan(int prePlanItemId, TbtProductionPlan plan)

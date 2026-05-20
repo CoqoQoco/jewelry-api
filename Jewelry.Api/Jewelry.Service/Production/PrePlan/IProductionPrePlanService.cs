@@ -1,5 +1,6 @@
 using jewelry.Model.Production.PrePlan;
 using Jewelry.Data.Models.Jewelry;
+using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -16,4 +17,5 @@ public interface IProductionPrePlanService
     Task<string> Reject(int id, RejectPrePlanRequest request);
     Task<List<AvailableForPlanResponse>> GetAvailableForPlan(string? moldCode);
     Task LinkProductionPlan(int prePlanItemId, TbtProductionPlan plan);
+    Task<string> UploadApproveDocument(IFormFile file);
 }

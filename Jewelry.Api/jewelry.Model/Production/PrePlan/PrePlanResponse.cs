@@ -19,6 +19,7 @@ public class SearchPrePlanResponse
     public int ItemCount { get; set; }
     public string? PrimaryMoldCode { get; set; }
     public int LinkedItemCount { get; set; }
+    public string? ApprovedDocumentPath { get; set; }
     public List<SearchPrePlanItemResponse> Items { get; set; } = new();
 }
 
@@ -70,6 +71,7 @@ public class GetPrePlanResponse
     public DateTime? ApproveDate { get; set; }
     public string? SalesBy { get; set; }
     public string? ApprovedBy { get; set; }
+    public string? ApprovedDocumentPath { get; set; }
 
     public List<GetPrePlanItemResponse> Items { get; set; } = new List<GetPrePlanItemResponse>();
 }
@@ -115,6 +117,11 @@ public class AvailableForPlanResponse
     public string? ProductQtyUnit { get; set; }
     public string? ProductDetail { get; set; }
     public List<GetPrePlanMaterialResponse> Materials { get; set; } = new List<GetPrePlanMaterialResponse>();
+}
+
+public class UploadApproveDocumentResponse
+{
+    public string Path { get; set; } = null!;
 }
 
 public class GetPrePlanMaterialResponse

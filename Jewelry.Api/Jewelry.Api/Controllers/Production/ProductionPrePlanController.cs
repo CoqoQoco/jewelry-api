@@ -2,6 +2,7 @@ using jewelry.Model.Production.PrePlan;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Production.PrePlan;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -145,6 +146,24 @@ public class ProductionPrePlanController : ApiControllerBase
         }
     }
 
+    [Route("UploadApproveDocument")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(UploadApproveDocumentResponse))]
+    [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> UploadApproveDocument([FromForm] IFormFile file)
+    {
+        try
+        {
+            var path = await _service.UploadApproveDocument(file);
+            return Ok(new UploadApproveDocumentResponse { Path = path });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [Route("AvailableForPlan")]
     [HttpGet]
     [ProducesResponseType((int)HttpStatusCode.OK)]
@@ -172,7 +191,8 @@ public class ProductionPrePlanController : ApiControllerBase
         {
             new { Code = "NewDesign", Description = "งานแบบใหม่" },
             new { Code = "Sale", Description = "งานขาย" },
-            new { Code = "CustomCustomer", Description = "งานสั่งมีชื่อลูกค้า" },
+            //new { Code = "CustomCustomer", Description = "งานสั่งมีชื่อลูกค้า" },
+            new { Code = "means", Description = "งานแปลว" },
         };
         return Ok(list);
     }
