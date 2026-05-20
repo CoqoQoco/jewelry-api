@@ -85,7 +85,7 @@ namespace Jewelry.Api.Controllers
 
         [Route("SearchMold")]
         [HttpPost]
-        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<MasterModel>))]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<SearchMoldResponse>))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
         public DataSourceResult SearchMold([FromBody] SearchMoldRequest request)

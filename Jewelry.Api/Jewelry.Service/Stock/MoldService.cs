@@ -5,6 +5,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NPOI.SS.Formula.Functions;
 using System;
@@ -21,7 +22,7 @@ namespace Jewelry.Service.Stock
     {
         Task<string> CreateMold(CreateMoldRequest request);
         Task<string> UpdateMold(UpdateMoldRequest request);
-        IQueryable<TbtProductMold> SearchMold(SearchMold request);
+        IQueryable<SearchMoldResponse> SearchMold(SearchMold request);
     }
     public class MoldService : BaseService, IMoldService
     {
@@ -160,20 +161,18 @@ namespace Jewelry.Service.Stock
             }
             return "success";
         }
-        public IQueryable<TbtProductMold> SearchMold(SearchMold request)
+        public IQueryable<SearchMoldResponse> SearchMold(SearchMold request)
         {
-            var mold = (from item in _jewelryContext.TbtProductMold
-                        where item.IsActive == true
-                        select item);
+            var mold = _jewelryContext.TbtProductMold
+                .Where(x => x.IsActive == true);
 
             if (!string.IsNullOrEmpty(request.Text))
             {
-                mold = (from item in mold
-                        where item.Code.Contains(request.Text.ToUpper())
-                        || item.Category.Contains(request.Text)
-                        || item.Description.Contains(request.Text)
-                        || item.MoldBy.Contains(request.Text)
-                        select item);
+                mold = mold.Where(x =>
+                    x.Code.Contains(request.Text.ToUpper())
+                    || x.Category.Contains(request.Text)
+                    || x.Description.Contains(request.Text)
+                    || x.MoldBy.Contains(request.Text));
             }
 
             if (request.UpdateStart.HasValue)
@@ -185,7 +184,42 @@ namespace Jewelry.Service.Stock
                 mold = mold.Where(x => x.UpdateDate <= request.UpdateEnd.Value.EndOfDayUtc());
             }
 
-            return mold;
+            var result = from item in mold
+                         join plan in _jewelryContext.TbtProductMoldPlan
+                             on item.PlanId equals plan.Id into planGroup
+                         from plan in planGroup.DefaultIfEmpty()
+                         join design in _jewelryContext.TbtProductMoldPlanDesign
+                             on plan.Id equals design.PlanId into designGroup
+                         from design in designGroup.DefaultIfEmpty()
+                         join productType in _jewelryContext.TbmProductType
+                             on design.CategoryCode equals productType.Code into ptGroup
+                         from productType in ptGroup.DefaultIfEmpty()
+                         select new SearchMoldResponse
+                         {
+                             Code = item.Code,
+                             Description = item.Description,
+                             Image = item.Image,
+                             ImageDraft1 = item.ImageDraft1,
+                             ImageDraft2 = item.ImageDraft2,
+                             ImageDraft3 = item.ImageDraft3,
+                             Category = item.Category,
+                             CategoryCode = item.CategoryCode,
+                             MoldBy = item.MoldBy,
+                             CodeDraft = item.CodeDraft,
+                             ReModelMold = item.ReModelMold,
+                             PlanId = item.PlanId,
+                             Status = item.Status,
+                             IsActive = item.IsActive,
+                             CreateDate = item.CreateDate,
+                             CreateBy = item.CreateBy,
+                             UpdateDate = item.UpdateDate,
+                             UpdateBy = item.UpdateBy,
+                             DesignImage = design != null ? design.ImageUrl : null,
+                             ProductTypeCode = productType != null ? productType.Code : null,
+                             ProductTypeDescription = productType != null ? productType.NameTh : null,
+                         };
+
+            return result;
         }
     }
 
