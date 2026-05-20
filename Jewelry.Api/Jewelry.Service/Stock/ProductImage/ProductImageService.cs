@@ -38,7 +38,7 @@ namespace Jewelry.Service.Stock.ProductImage
         {
             var year = DateTime.UtcNow.Year;
             var name = request.Name.ToUpper();
-            var namePath = $"{name}.png";
+            var namePath = $"{name}.jpg";
 
             var image = (from item in _jewelryContext.TbtStockProductImage
                          where item.Name == name 
@@ -73,7 +73,7 @@ namespace Jewelry.Service.Stock.ProductImage
                     using var stream = request.Image.OpenReadStream();
                     var result = await _azureBlobService.UploadImageAsync(
                         stream,
-                        "Stock",  // folder name in jewelry-images container
+                        "Stock/Product",  // folder name in jewelry-images container
                         namePath
                     );
 
@@ -82,8 +82,8 @@ namespace Jewelry.Service.Stock.ProductImage
                         throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
                     }
 
-                    // บันทึก blob path: "Stock/filename.jpg"
-                    newImage.NamePath = result.BlobName;
+                    // บันทึก filename only: "{NAME}.jpg" — frontend ImagePreview ต่อ Stock/Product/ prefix ให้
+                    newImage.NamePath = namePath;
                 }
                 catch (Exception ex)
                 {
