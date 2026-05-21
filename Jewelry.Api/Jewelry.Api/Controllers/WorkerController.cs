@@ -261,5 +261,23 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("CancelGoldLossSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CancelGoldLossSlip([FromBody] CancelGoldLossSlipRequest request)
+        {
+            try
+            {
+                await _goldLossSlipService.CancelSlip(request.Id);
+                return Ok();
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
     }
 }

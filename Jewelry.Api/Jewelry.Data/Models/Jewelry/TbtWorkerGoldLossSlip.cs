@@ -25,6 +25,8 @@ public partial class TbtWorkerGoldLossSlip
 
     public decimal? TotalMoneyDiff { get; set; }
 
+    public decimal? TotalGoldReturnAmount { get; set; }
+
     public string? Remark { get; set; }
 
     public bool IsActive { get; set; }
@@ -38,4 +40,6 @@ public partial class TbtWorkerGoldLossSlip
     public string? UpdateBy { get; set; }
 
     public virtual ICollection<TbtWorkerGoldLossSlipItem> TbtWorkerGoldLossSlipItem { get; set; } = new List<TbtWorkerGoldLossSlipItem>();
+
+    public virtual ICollection<TbtWorkerGoldLossSlipReturn> TbtWorkerGoldLossSlipReturn { get; set; } = new List<TbtWorkerGoldLossSlipReturn>();
 }

@@ -9,9 +9,16 @@ namespace jewelry.Model.Worker.GoldLossSlip
         public string WorkerName { get; set; }
         public DateTimeOffset RequestDateStart { get; set; }
         public DateTimeOffset RequestDateEnd { get; set; }
-        public decimal GoldReturn { get; set; }
         public string? Remark { get; set; }
         public List<CreateGoldLossSlipItem> Items { get; set; }
+        public List<GoldReturnItem> GoldReturnItems { get; set; } = new List<GoldReturnItem>();
+    }
+
+    public class GoldReturnItem
+    {
+        public string GoldSize { get; set; }
+        public decimal Weight { get; set; }
+        public decimal PricePerGram { get; set; }
     }
 
     public class CreateGoldLossSlipItem

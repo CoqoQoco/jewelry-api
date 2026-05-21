@@ -162,6 +162,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtWorkerGoldLossSlipItem> TbtWorkerGoldLossSlipItem { get; set; }
 
+    public virtual DbSet<TbtWorkerGoldLossSlipReturn> TbtWorkerGoldLossSlipReturn { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -3476,6 +3478,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.TotalWeightLoss).HasColumnName("total_weight_loss");
             entity.Property(e => e.NetWeightLoss).HasColumnName("net_weight_loss");
             entity.Property(e => e.TotalMoneyDiff).HasColumnName("total_money_diff");
+            entity.Property(e => e.TotalGoldReturnAmount).HasColumnName("total_gold_return_amount");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
@@ -3493,6 +3496,11 @@ public partial class JewelryContext : DbContext
                 .WithOne(e => e.Header)
                 .HasForeignKey(e => e.SlipId)
                 .HasConstraintName("tbt_worker_gold_loss_slip_item_slip_fk");
+
+            entity.HasMany(e => e.TbtWorkerGoldLossSlipReturn)
+                .WithOne(e => e.Slip)
+                .HasForeignKey(e => e.SlipId)
+                .HasConstraintName("tbt_worker_gold_loss_slip_return_slip_fk");
         });
 
         modelBuilder.Entity<TbtWorkerGoldLossSlipItem>(entity =>
@@ -3538,6 +3546,34 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.SlipId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_worker_gold_loss_slip_item_slip_fk");
+        });
+
+        modelBuilder.Entity<TbtWorkerGoldLossSlipReturn>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_worker_gold_loss_slip_return_pk");
+
+            entity.ToTable("tbt_worker_gold_loss_slip_return");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.SlipId).HasColumnName("slip_id");
+            entity.Property(e => e.GoldSize)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_size");
+            entity.Property(e => e.Weight).HasColumnName("weight");
+            entity.Property(e => e.PricePerGram).HasColumnName("price_per_gram");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+
+            entity.HasOne(d => d.Slip)
+                .WithMany(p => p.TbtWorkerGoldLossSlipReturn)
+                .HasForeignKey(d => d.SlipId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_worker_gold_loss_slip_return_slip_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);

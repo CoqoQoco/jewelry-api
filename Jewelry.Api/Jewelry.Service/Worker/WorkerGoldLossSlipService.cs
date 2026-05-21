@@ -19,6 +19,7 @@ namespace Jewelry.Service.Worker
         Task<GoldLossSlipResponse> CreateSlip(CreateGoldLossSlipRequest request);
         List<GoldLossSlipSummaryResponse> ListSlips(ListGoldLossSlipRequest request);
         GoldLossSlipResponse GetSlip(long id);
+        Task CancelSlip(long id);
     }
 
     public class WorkerGoldLossSlipService : BaseService, IWorkerGoldLossSlipService
@@ -36,8 +37,22 @@ namespace Jewelry.Service.Worker
         public async Task<GoldLossSlipResponse> CreateSlip(CreateGoldLossSlipRequest request)
         {
             var totalWeightLoss = request.Items.Sum(x => x.WeightLossActual ?? 0);
-            var netWeightLoss = totalWeightLoss + request.GoldReturn;
-            var totalMoneyDiff = request.Items.Sum(x => x.MoneyDiff ?? 0);
+            var totalLossAmount = request.Items.Sum(x => x.MoneyDiff ?? 0);
+
+            var returnItems = (request.GoldReturnItems ?? new List<GoldReturnItem>())
+                .Select(r => new TbtWorkerGoldLossSlipReturn
+                {
+                    GoldSize = r.GoldSize,
+                    Weight = r.Weight,
+                    PricePerGram = r.PricePerGram,
+                    Amount = r.Weight * r.PricePerGram,
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = CurrentUsername,
+                }).ToList();
+
+            var totalGoldReturnAmount = returnItems.Sum(r => r.Amount);
+            var totalReturnWeight = returnItems.Sum(r => r.Weight);
+            var netWeightLoss = totalWeightLoss - totalReturnWeight;
 
             var documentNo = await GenerateGlsDocumentNo();
 
@@ -48,10 +63,10 @@ namespace Jewelry.Service.Worker
                 WorkerName = request.WorkerName,
                 RequestDateStart = request.RequestDateStart.UtcDateTime,
                 RequestDateEnd = request.RequestDateEnd.UtcDateTime,
-                GoldReturn = request.GoldReturn,
                 TotalWeightLoss = totalWeightLoss,
                 NetWeightLoss = netWeightLoss,
-                TotalMoneyDiff = totalMoneyDiff,
+                TotalMoneyDiff = totalLossAmount,
+                TotalGoldReturnAmount = totalGoldReturnAmount,
                 Remark = request.Remark,
                 IsActive = true,
                 CreateDate = DateTime.UtcNow,
@@ -61,36 +76,57 @@ namespace Jewelry.Service.Worker
             _jewelryContext.TbtWorkerGoldLossSlip.Add(header);
             await _jewelryContext.SaveChangesAsync();
 
-            var items = request.Items.Select(x => new TbtWorkerGoldLossSlipItem
+            var planIds = request.Items.Select(x => x.ProductionPlanId).Distinct().ToList();
+            var itemNos = request.Items.Select(x => x.ItemNo).Distinct().ToList();
+            var loadedDetails = _jewelryContext.TbtProductionPlanStatusDetail
+                .Include(d => d.Header)
+                .Where(d => planIds.Contains(d.ProductionPlanId) && itemNos.Contains(d.ItemNo))
+                .ToList();
+
+            var items = request.Items.Select(x =>
             {
-                SlipId = header.Id,
-                Wo = x.Wo,
-                WoNumber = x.WoNumber,
-                ProductNumber = x.ProductNumber,
-                ProductName = x.ProductName,
-                Gold = x.Gold,
-                GoldSize = x.GoldSize,
-                JobDate = x.JobDate.HasValue ? x.JobDate.Value.UtcDateTime : (DateTime?)null,
-                GoldQtySend = x.GoldQtySend,
-                GoldWeightSend = x.GoldWeightSend,
-                GoldQtyCheck = x.GoldQtyCheck,
-                GoldWeightCheck = x.GoldWeightCheck,
-                LossPercent = x.LossPercent,
-                WeightLossAllowed = x.WeightLossAllowed,
-                WeightLossActual = x.WeightLossActual,
-                GoldLossPrice = x.GoldLossPrice,
-                MoneyDiff = x.MoneyDiff,
-                IsActive = true,
+                var detail = loadedDetails.FirstOrDefault(d => d.ProductionPlanId == x.ProductionPlanId && d.ItemNo == x.ItemNo);
+                return new TbtWorkerGoldLossSlipItem
+                {
+                    SlipId = header.Id,
+                    Wo = x.Wo,
+                    WoNumber = x.WoNumber,
+                    ProductNumber = x.ProductNumber,
+                    ProductName = x.ProductName,
+                    Gold = x.Gold,
+                    GoldSize = x.GoldSize,
+                    JobDate = x.JobDate.HasValue ? x.JobDate.Value.UtcDateTime : (DateTime?)null,
+                    GoldQtySend = x.GoldQtySend,
+                    GoldWeightSend = x.GoldWeightSend,
+                    GoldQtyCheck = x.GoldQtyCheck,
+                    GoldWeightCheck = x.GoldWeightCheck,
+                    LossPercent = x.LossPercent,
+                    WeightLossAllowed = x.WeightLossAllowed,
+                    WeightLossActual = x.WeightLossActual,
+                    GoldLossPrice = x.GoldLossPrice,
+                    MoneyDiff = x.MoneyDiff,
+                    IsActive = true,
+                };
             }).ToList();
 
             _jewelryContext.TbtWorkerGoldLossSlipItem.AddRange(items);
             await _jewelryContext.SaveChangesAsync();
 
+            foreach (var r in returnItems)
+            {
+                r.SlipId = header.Id;
+            }
+
+            if (returnItems.Any())
+            {
+                _jewelryContext.TbtWorkerGoldLossSlipReturn.AddRange(returnItems);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
             var detailsToStamp = new List<TbtProductionPlanStatusDetail>();
             foreach (var itemReq in request.Items)
             {
-                var detail = _jewelryContext.TbtProductionPlanStatusDetail
-                    .FirstOrDefault(d => d.ProductionPlanId == itemReq.ProductionPlanId && d.ItemNo == itemReq.ItemNo);
+                var detail = loadedDetails.FirstOrDefault(d => d.ProductionPlanId == itemReq.ProductionPlanId && d.ItemNo == itemReq.ItemNo);
                 if (detail != null)
                 {
                     detail.WorkerGoldLossSlipId = header.Id;
@@ -104,7 +140,7 @@ namespace Jewelry.Service.Worker
                 await _jewelryContext.SaveChangesAsync();
             }
 
-            return MapToResponse(header, items);
+            return MapToResponse(header, items, returnItems);
         }
 
         public List<GoldLossSlipSummaryResponse> ListSlips(ListGoldLossSlipRequest request)
@@ -139,10 +175,10 @@ namespace Jewelry.Service.Worker
                     WorkerName = x.WorkerName,
                     RequestDateStart = x.RequestDateStart,
                     RequestDateEnd = x.RequestDateEnd,
-                    GoldReturn = x.GoldReturn,
                     TotalWeightLoss = x.TotalWeightLoss,
                     NetWeightLoss = x.NetWeightLoss,
                     TotalMoneyDiff = x.TotalMoneyDiff,
+                    TotalGoldReturnAmount = x.TotalGoldReturnAmount,
                     Remark = x.Remark,
                     IsActive = x.IsActive,
                     CreateDate = x.CreateDate,
@@ -168,6 +204,7 @@ namespace Jewelry.Service.Worker
         {
             var header = _jewelryContext.TbtWorkerGoldLossSlip
                 .Include(x => x.TbtWorkerGoldLossSlipItem)
+                .Include(x => x.TbtWorkerGoldLossSlipReturn)
                 .FirstOrDefault(x => x.Id == id);
 
             if (header == null)
@@ -175,7 +212,38 @@ namespace Jewelry.Service.Worker
                 throw new HandleException($"ไม่พบ Gold Loss Slip Id: {id}");
             }
 
-            return MapToResponse(header, header.TbtWorkerGoldLossSlipItem.ToList());
+            return MapToResponse(header, header.TbtWorkerGoldLossSlipItem.ToList(), header.TbtWorkerGoldLossSlipReturn.ToList());
+        }
+
+        public async Task CancelSlip(long id)
+        {
+            var slip = await _jewelryContext.TbtWorkerGoldLossSlip
+                .Include(x => x.TbtWorkerGoldLossSlipItem)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive == true);
+
+            if (slip == null) throw new ArgumentException("Slip not found or already cancelled");
+
+            slip.IsActive = false;
+            slip.UpdateDate = DateTime.UtcNow;
+            slip.UpdateBy = CurrentUsername;
+
+            _jewelryContext.TbtWorkerGoldLossSlip.Update(slip);
+
+            var details = await _jewelryContext.TbtProductionPlanStatusDetail
+                .Where(d => d.WorkerGoldLossSlipId == id)
+                .ToListAsync();
+
+            foreach (var d in details)
+            {
+                d.WorkerGoldLossSlipId = null;
+            }
+
+            if (details.Any())
+            {
+                _jewelryContext.TbtProductionPlanStatusDetail.UpdateRange(details);
+            }
+
+            await _jewelryContext.SaveChangesAsync();
         }
 
         private async Task<string> GenerateGlsDocumentNo()
@@ -200,8 +268,12 @@ namespace Jewelry.Service.Worker
             return $"GLS-{dateStr}-{running.Number:000}";
         }
 
-        private GoldLossSlipResponse MapToResponse(TbtWorkerGoldLossSlip header, List<TbtWorkerGoldLossSlipItem> items)
+        private GoldLossSlipResponse MapToResponse(TbtWorkerGoldLossSlip header, List<TbtWorkerGoldLossSlipItem> items, List<TbtWorkerGoldLossSlipReturn> returnItems)
         {
+            var totalLossAmount = header.TotalMoneyDiff;
+            var totalGoldReturnAmount = header.TotalGoldReturnAmount;
+            var netPayAmount = (totalLossAmount ?? 0) + (totalGoldReturnAmount ?? 0);
+
             return new GoldLossSlipResponse
             {
                 Id = header.Id,
@@ -210,10 +282,11 @@ namespace Jewelry.Service.Worker
                 WorkerName = header.WorkerName,
                 RequestDateStart = header.RequestDateStart,
                 RequestDateEnd = header.RequestDateEnd,
-                GoldReturn = header.GoldReturn,
                 TotalWeightLoss = header.TotalWeightLoss,
                 NetWeightLoss = header.NetWeightLoss,
-                TotalMoneyDiff = header.TotalMoneyDiff,
+                TotalLossAmount = totalLossAmount,
+                TotalGoldReturnAmount = totalGoldReturnAmount,
+                NetPayAmount = netPayAmount,
                 Remark = header.Remark,
                 IsActive = header.IsActive,
                 CreateDate = header.CreateDate,
@@ -240,6 +313,14 @@ namespace Jewelry.Service.Worker
                     WeightLossActual = i.WeightLossActual,
                     GoldLossPrice = i.GoldLossPrice,
                     MoneyDiff = i.MoneyDiff,
+                }).ToList(),
+                GoldReturnItems = returnItems.Select(r => new GoldReturnItemResponse
+                {
+                    Id = r.Id,
+                    GoldSize = r.GoldSize,
+                    Weight = r.Weight,
+                    PricePerGram = r.PricePerGram,
+                    Amount = r.Amount,
                 }).ToList(),
             };
         }

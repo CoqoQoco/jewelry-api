@@ -298,6 +298,7 @@ namespace Jewelry.Service.Worker
                                         IsGoldLoss = true,
                                         LossPercent = x.LossPercent,
                                         LossRemark = x.LossRemark,
+                                        GoldLossPrice = x.GoldLossPrice,
                                         ItemNo = x.ItemNo,
                                         WorkerGoldLossSlipId = x.WorkerGoldLossSlipId,
                                         WorkerGoldLossSlipDocumentNo = x.WorkerGoldLossSlipDocumentNo,
