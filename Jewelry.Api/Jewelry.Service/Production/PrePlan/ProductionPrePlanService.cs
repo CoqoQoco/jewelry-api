@@ -286,8 +286,9 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         if (entity == null)
             throw new Exception($"ไม่พบ Pre-Plan id: {id}");
 
-        if (entity.Status != "Draft")
-            throw new Exception($"ไม่สามารถแก้ไขได้ เนื่องจากสถานะปัจจุบันคือ '{entity.Status}' (แก้ไขได้เฉพาะสถานะ Draft)");
+        var editableStatuses = new[] { "Draft", "Submitted", "Rejected" };
+        if (!editableStatuses.Contains(entity.Status))
+            throw new Exception($"ไม่สามารถแก้ไขได้ เนื่องจากสถานะปัจจุบันคือ '{entity.Status}' (แก้ไขได้เฉพาะก่อนอนุมัติ)");
 
         entity.ProductionRound = request.ProductionRound;
         entity.JobType = request.JobType;
@@ -507,6 +508,53 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             throw new Exception(result.ErrorMessage ?? "อัปโหลดไฟล์ไม่สำเร็จ");
 
         return result.BlobName;
+    }
+
+    public async Task<string> UploadProductImageAsync(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            throw new Exception("ไม่พบไฟล์ที่อัปโหลด");
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!AllowedImageExtensions.Contains(ext))
+            throw new Exception("รองรับเฉพาะไฟล์ JPG และ PNG เท่านั้น");
+
+        if (file.Length > MaxFileSizeBytes)
+            throw new Exception("ขนาดไฟล์ต้องไม่เกิน 10 MB");
+
+        var fileName = $"{Guid.NewGuid()}{ext}";
+
+        using var stream = file.OpenReadStream();
+        var result = await _blobStorage.UploadImageAsync(stream, "PrePlan/Product", fileName);
+
+        if (!result.Success)
+            throw new Exception(result.ErrorMessage ?? "อัปโหลดรูปภาพไม่สำเร็จ");
+
+        return fileName;
+    }
+
+    public async Task<string> CopyMoldDesignAsProductImageAsync(string moldDesignFilename)
+    {
+        if (string.IsNullOrWhiteSpace(moldDesignFilename))
+            throw new Exception("ไม่ระบุชื่อไฟล์");
+
+        var ext = Path.GetExtension(moldDesignFilename).ToLowerInvariant();
+        if (string.IsNullOrEmpty(ext))
+            ext = ".png";
+
+        var stream = await _blobStorage.DownloadImageAsync("MoldPlanDesign", moldDesignFilename);
+
+        var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        ms.Position = 0;
+
+        var newFileName = $"{Guid.NewGuid()}{ext}";
+        var result = await _blobStorage.UploadImageAsync(ms, "PrePlan/Product", newFileName);
+
+        if (!result.Success)
+            throw new Exception(result.ErrorMessage ?? "อัปโหลดรูปภาพไม่สำเร็จ");
+
+        return newFileName;
     }
 
     public async Task<int> GetWaitingCount()

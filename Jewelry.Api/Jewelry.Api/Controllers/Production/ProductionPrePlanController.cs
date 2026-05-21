@@ -164,6 +164,39 @@ public class ProductionPrePlanController : ApiControllerBase
         }
     }
 
+    [Route("UploadProductImage")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(UploadProductImageResponse))]
+    [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> UploadProductImage([FromForm] UploadProductImageRequest request)
+    {
+        try
+        {
+            var imagePath = await _service.UploadProductImageAsync(request.File);
+            return Ok(new UploadProductImageResponse { ImagePath = imagePath });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [Route("CopyMoldDesignAsProductImage")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(UploadProductImageResponse))]
+    [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> CopyMoldDesignAsProductImage([FromBody] CopyMoldDesignRequest request)
+    {
+        try
+        {
+            var imagePath = await _service.CopyMoldDesignAsProductImageAsync(request.MoldDesignFilename);
+            return Ok(new UploadProductImageResponse { ImagePath = imagePath });
+        }
+        catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
+    }
+
     [Route("AvailableForPlan")]
     [HttpGet]
     [ProducesResponseType((int)HttpStatusCode.OK)]

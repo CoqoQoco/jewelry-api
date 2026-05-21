@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace jewelry.Model.Production.PrePlan;
 
@@ -104,5 +105,15 @@ public class RejectPrePlanRequest
 {
     public int Id { get; set; }
     public string? RejectReason { get; set; }
+}
+
+public class UploadProductImageRequest
+{
+    public IFormFile File { get; set; } = null!;
+}
+
+public class CopyMoldDesignRequest
+{
+    public string MoldDesignFilename { get; set; } = null!;
 }
 

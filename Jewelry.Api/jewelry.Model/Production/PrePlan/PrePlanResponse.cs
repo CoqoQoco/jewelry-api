@@ -124,6 +124,11 @@ public class UploadApproveDocumentResponse
     public string Path { get; set; } = null!;
 }
 
+public class UploadProductImageResponse
+{
+    public string ImagePath { get; set; } = null!;
+}
+
 public class GetPrePlanMaterialResponse
 {
     public int Id { get; set; }
