@@ -235,7 +235,8 @@ public class ProductionPrePlanController : ApiControllerBase
             new { Code = "NewDesign", Description = "งานแบบใหม่" },
             new { Code = "Sale", Description = "งานขาย" },
             //new { Code = "CustomCustomer", Description = "งานสั่งมีชื่อลูกค้า" },
-            new { Code = "means", Description = "งานแปลว" },
+            new { Code = "ReDesign", Description = "งานแปลง" },
+            new { Code = "Order", Description = "งานสั่ง" },
         };
         return Ok(list);
     }
