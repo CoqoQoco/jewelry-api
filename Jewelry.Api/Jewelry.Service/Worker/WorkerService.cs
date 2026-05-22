@@ -116,60 +116,49 @@ namespace Jewelry.Service.Worker
         }
         public IQueryable<ListWorkerProductionResponse> Search(ListWorkerProduction request)
         {
-            var query = (from item in _jewelryContext.TbmWorker
-                         join type in _jewelryContext.TbmProductionPlanStatus on item.TypeId equals type.Id into typeJoind
-                         from tj in typeJoind.DefaultIfEmpty()
-                         select new ListWorkerProductionResponse()
-                         {
-                             Code = item.Code,
-                             NameEn = item.NameEn,
-                             NameTh = item.NameTh,
-
-                             Type = item.TypeId,
-                             TypeName = tj.Description,
-                             IsActive = item.IsActive,
-
-                             CreateDate = item.CreateDate,
-                             CreateBy = item.CreateBy,
-                             UpdateDate = item.UpdateDate,
-                             UpdateBy = item.UpdateBy,
-                         });
+            var workers = _jewelryContext.TbmWorker.AsNoTracking().AsQueryable();
 
             if (!string.IsNullOrEmpty(request.Code))
             {
-                query = (from item in query
-                         where item.Code == request.Code.ToUpper()
-                         select item);
+                var code = request.Code.ToUpper();
+                workers = workers.Where(w => w.Code == code);
             }
             if (!string.IsNullOrEmpty(request.Text))
             {
-                query = (from item in query
-                         where item.Code.Contains(request.Text.ToUpper())
-                         || item.NameTh.Contains(request.Text)
-                         || item.NameEn.Contains(request.Text)
-                         select item);
+                var textUpper = request.Text.ToUpper();
+                var text = request.Text;
+                workers = workers.Where(w =>
+                    w.Code.Contains(textUpper)
+                    || w.NameTh.Contains(text)
+                    || (w.NameEn != null && w.NameEn.Contains(text)));
             }
             if (request.Type.HasValue)
             {
-                query = (from item in query
-                         where item.Type == request.Type
-                         select item);
+                workers = workers.Where(w => w.TypeId == request.Type);
             }
             if (request.Active.HasValue)
             {
-                if (request.Active == 1)
-                {
-                    query = (from item in query
-                             where item.IsActive == true
-                             select item);
-                }
-                if (request.Active == 2)
-                {
-                    query = (from item in query
-                             where item.IsActive == false
-                             select item);
-                }
+                if (request.Active == 1) workers = workers.Where(w => w.IsActive == true);
+                else if (request.Active == 2) workers = workers.Where(w => w.IsActive == false);
             }
+
+            var query = from item in workers
+                        join type in _jewelryContext.TbmProductionPlanStatus.AsNoTracking()
+                            on item.TypeId equals type.Id into typeJoined
+                        from tj in typeJoined.DefaultIfEmpty()
+                        select new ListWorkerProductionResponse()
+                        {
+                            Code = item.Code,
+                            NameEn = item.NameEn,
+                            NameTh = item.NameTh,
+                            Type = item.TypeId,
+                            TypeName = tj.Description,
+                            IsActive = item.IsActive,
+                            CreateDate = item.CreateDate,
+                            CreateBy = item.CreateBy,
+                            UpdateDate = item.UpdateDate,
+                            UpdateBy = item.UpdateBy,
+                        };
 
             return query;
         }
