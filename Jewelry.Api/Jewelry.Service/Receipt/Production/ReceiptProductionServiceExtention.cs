@@ -1,6 +1,8 @@
 ﻿using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
+using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Client;
 using NPOI.Util;
 using System;
@@ -330,7 +332,7 @@ namespace Jewelry.Service.Receipt.Production
             };
         }
 
-        public static TbtStockMovement MapNewReceiptMovement(string skuCode, string stockNumber, string locationCode, string receiptNumber, string operatorBy)
+        public static TbtStockMovement MapNewReceiptMovement(string skuCode, string stockNumber, string locationCode, string receiptNumber, string operatorBy, string refDocType = "RECEIPT")
         {
             return new TbtStockMovement
             {
@@ -339,12 +341,51 @@ namespace Jewelry.Service.Receipt.Production
                 StockNumber = stockNumber,
                 ToLocation = locationCode,
                 Qty = 1,
-                RefDocType = "RECEIPT",
+                RefDocType = refDocType,
                 RefDocNo = receiptNumber,
                 MovementDate = DateTime.UtcNow,
                 CreateBy = operatorBy,
                 CreateDate = DateTime.UtcNow
             };
+        }
+
+        public static async Task<string> ResolveLocationCodeAsync(JewelryContext jewelryContext, string? location, string operatorBy, Dictionary<string, string> cache)
+        {
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                return "MAIN";
+            }
+
+            var locationUpper = location.ToUpper();
+
+            if (cache.ContainsKey(locationUpper))
+            {
+                return cache[locationUpper];
+            }
+
+            var exists = await jewelryContext.TbmStockLocation.AnyAsync(x => x.Code == locationUpper);
+            if (exists)
+            {
+                cache[locationUpper] = locationUpper;
+                return locationUpper;
+            }
+
+            var newLocation = new TbmStockLocation
+            {
+                Code = locationUpper,
+                NameTh = location,
+                Type = "WAREHOUSE",
+                IsSalesPoint = false,
+                IsActive = true,
+                CreateBy = operatorBy,
+                CreateDate = DateTime.UtcNow
+            };
+
+            jewelryContext.TbmStockLocation.Add(newLocation);
+            await jewelryContext.SaveChangesAsync();
+
+            cache[locationUpper] = locationUpper;
+            return locationUpper;
         }
 
     }

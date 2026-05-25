@@ -655,7 +655,7 @@ namespace Jewelry.Service.Receipt.Production
                     skuCache[skuCode] = true;
                 }
 
-                var locationCode = await ResolveLocationCodeAsync(stock.Location, locationCache);
+                var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername, locationCache);
 
                 newStockPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername));
 
@@ -749,44 +749,6 @@ namespace Jewelry.Service.Receipt.Production
 
         }
 
-        private async Task<string> ResolveLocationCodeAsync(string? location, Dictionary<string, string> cache)
-        {
-            if (string.IsNullOrWhiteSpace(location))
-            {
-                return "MAIN";
-            }
-
-            var locationUpper = location.ToUpper();
-
-            if (cache.ContainsKey(locationUpper))
-            {
-                return cache[locationUpper];
-            }
-
-            var exists = await _jewelryContext.TbmStockLocation.AnyAsync(x => x.Code == locationUpper);
-            if (exists)
-            {
-                cache[locationUpper] = locationUpper;
-                return locationUpper;
-            }
-
-            var newLocation = new TbmStockLocation
-            {
-                Code = locationUpper,
-                NameTh = location,
-                Type = "WAREHOUSE",
-                IsSalesPoint = false,
-                IsActive = true,
-                CreateBy = CurrentUsername,
-                CreateDate = DateTime.UtcNow
-            };
-
-            _jewelryContext.TbmStockLocation.Add(newLocation);
-            await _jewelryContext.SaveChangesAsync();
-
-            cache[locationUpper] = locationUpper;
-            return locationUpper;
-        }
         public async Task<string> Darft(jewelry.Model.Receipt.Production.Draft.Create.Request request)
         {
 

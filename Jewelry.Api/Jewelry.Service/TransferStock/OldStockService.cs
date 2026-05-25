@@ -4,6 +4,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Jewelry.Service.Receipt.Production;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -746,6 +747,81 @@ namespace Jewelry.Service.TransferStock
                     await _jewelryContext.SaveChangesAsync();
                 }
 
+                var newSkus9k = new List<TbtSku>();
+                var newPieces9k = new List<TbtStockPiece>();
+                var newBalances9k = new List<TbtStockBalance>();
+                var updateBalances9k = new List<TbtStockBalance>();
+                var newMovements9k = new List<TbtStockMovement>();
+
+                var skuCache9k = new Dictionary<string, bool>();
+                var locationCache9k = new Dictionary<string, string>();
+                var balanceCache9k = new Dictionary<string, TbtStockBalance>();
+
+                foreach (var stock in newProducts)
+                {
+                    var skuCode = stock.DeriveSkuCode();
+
+                    if (!skuCache9k.ContainsKey(skuCode))
+                    {
+                        var skuExists = await _jewelryContext.TbtSku.AnyAsync(x => x.SkuCode == skuCode);
+                        if (!skuExists)
+                        {
+                            newSkus9k.Add(stock.MapNewSku(skuCode, CurrentUsername ?? "system"));
+                        }
+                        skuCache9k[skuCode] = true;
+                    }
+
+                    var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername ?? "system", locationCache9k);
+
+                    newPieces9k.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername ?? "system"));
+
+                    var balanceKey = $"{skuCode}|{locationCode}";
+                    if (balanceCache9k.ContainsKey(balanceKey))
+                    {
+                        balanceCache9k[balanceKey].QtyOnHand += 1;
+                        balanceCache9k[balanceKey].LastMovementAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        var existingBalance = await _jewelryContext.TbtStockBalance
+                            .FirstOrDefaultAsync(x => x.SkuCode == skuCode && x.LocationCode == locationCode);
+
+                        if (existingBalance != null)
+                        {
+                            existingBalance.QtyOnHand += 1;
+                            existingBalance.LastMovementAt = DateTime.UtcNow;
+                            balanceCache9k[balanceKey] = existingBalance;
+                        }
+                        else
+                        {
+                            var newBalance = new TbtStockBalance
+                            {
+                                SkuCode = skuCode,
+                                LocationCode = locationCode,
+                                QtyOnHand = 1,
+                                QtyReserved = 0,
+                                LastMovementAt = DateTime.UtcNow,
+                                CreateBy = CurrentUsername ?? "system",
+                                CreateDate = DateTime.UtcNow
+                            };
+                            balanceCache9k[balanceKey] = newBalance;
+                            newBalances9k.Add(newBalance);
+                        }
+                    }
+
+                    newMovements9k.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, locationCode, stock.ReceiptNumber, CurrentUsername ?? "system", "TRANSFER_9K"));
+                }
+
+                updateBalances9k = balanceCache9k.Values.Where(x => x.Id != 0).ToList();
+
+                if (newSkus9k.Any()) _jewelryContext.TbtSku.AddRange(newSkus9k);
+                if (newPieces9k.Any()) _jewelryContext.TbtStockPiece.AddRange(newPieces9k);
+                if (newBalances9k.Any()) _jewelryContext.TbtStockBalance.AddRange(newBalances9k);
+                if (updateBalances9k.Any()) _jewelryContext.TbtStockBalance.UpdateRange(updateBalances9k);
+                if (newMovements9k.Any()) _jewelryContext.TbtStockMovement.AddRange(newMovements9k);
+
+                await _jewelryContext.SaveChangesAsync();
+
                 scope.Complete();
             }
             catch
@@ -961,6 +1037,81 @@ namespace Jewelry.Service.TransferStock
                     _jewelryContext.Stock18k.UpdateRange(batch);
                     await _jewelryContext.SaveChangesAsync();
                 }
+
+                var newSkus18k = new List<TbtSku>();
+                var newPieces18k = new List<TbtStockPiece>();
+                var newBalances18k = new List<TbtStockBalance>();
+                var updateBalances18k = new List<TbtStockBalance>();
+                var newMovements18k = new List<TbtStockMovement>();
+
+                var skuCache18k = new Dictionary<string, bool>();
+                var locationCache18k = new Dictionary<string, string>();
+                var balanceCache18k = new Dictionary<string, TbtStockBalance>();
+
+                foreach (var stock in newProducts)
+                {
+                    var skuCode = stock.DeriveSkuCode();
+
+                    if (!skuCache18k.ContainsKey(skuCode))
+                    {
+                        var skuExists = await _jewelryContext.TbtSku.AnyAsync(x => x.SkuCode == skuCode);
+                        if (!skuExists)
+                        {
+                            newSkus18k.Add(stock.MapNewSku(skuCode, CurrentUsername ?? "system"));
+                        }
+                        skuCache18k[skuCode] = true;
+                    }
+
+                    var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername ?? "system", locationCache18k);
+
+                    newPieces18k.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername ?? "system"));
+
+                    var balanceKey = $"{skuCode}|{locationCode}";
+                    if (balanceCache18k.ContainsKey(balanceKey))
+                    {
+                        balanceCache18k[balanceKey].QtyOnHand += 1;
+                        balanceCache18k[balanceKey].LastMovementAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        var existingBalance = await _jewelryContext.TbtStockBalance
+                            .FirstOrDefaultAsync(x => x.SkuCode == skuCode && x.LocationCode == locationCode);
+
+                        if (existingBalance != null)
+                        {
+                            existingBalance.QtyOnHand += 1;
+                            existingBalance.LastMovementAt = DateTime.UtcNow;
+                            balanceCache18k[balanceKey] = existingBalance;
+                        }
+                        else
+                        {
+                            var newBalance = new TbtStockBalance
+                            {
+                                SkuCode = skuCode,
+                                LocationCode = locationCode,
+                                QtyOnHand = 1,
+                                QtyReserved = 0,
+                                LastMovementAt = DateTime.UtcNow,
+                                CreateBy = CurrentUsername ?? "system",
+                                CreateDate = DateTime.UtcNow
+                            };
+                            balanceCache18k[balanceKey] = newBalance;
+                            newBalances18k.Add(newBalance);
+                        }
+                    }
+
+                    newMovements18k.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, locationCode, stock.ReceiptNumber, CurrentUsername ?? "system", "TRANSFER_18K"));
+                }
+
+                updateBalances18k = balanceCache18k.Values.Where(x => x.Id != 0).ToList();
+
+                if (newSkus18k.Any()) _jewelryContext.TbtSku.AddRange(newSkus18k);
+                if (newPieces18k.Any()) _jewelryContext.TbtStockPiece.AddRange(newPieces18k);
+                if (newBalances18k.Any()) _jewelryContext.TbtStockBalance.AddRange(newBalances18k);
+                if (updateBalances18k.Any()) _jewelryContext.TbtStockBalance.UpdateRange(updateBalances18k);
+                if (newMovements18k.Any()) _jewelryContext.TbtStockMovement.AddRange(newMovements18k);
+
+                await _jewelryContext.SaveChangesAsync();
 
                 scope.Complete();
             }
