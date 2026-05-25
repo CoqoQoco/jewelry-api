@@ -24,6 +24,11 @@ using Jewelry.Service.Stock.ProductImage;
 using Jewelry.Service.TransferStock;
 using Jewelry.Service.Permission;
 using Jewelry.Service.Setting.PrintLayout;
+using Jewelry.Service.Stock.Balance;
+using Jewelry.Service.Stock.Location;
+using Jewelry.Service.Stock.Movement;
+using Jewelry.Service.Stock.Piece;
+using Jewelry.Service.Stock.Sku;
 using Jewelry.Service.User;
 using Jewelry.Service.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -88,6 +93,12 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IOldStockService, OldStockService>();
             services.AddScoped<IStockBasketService, StockBasketService>();
             services.AddScoped<IPrintLayoutService, PrintLayoutService>();
+
+            services.AddScoped<ISkuService, SkuService>();
+            services.AddScoped<IStockLocationService, StockLocationService>();
+            services.AddScoped<IStockPieceService, StockPieceService>();
+            services.AddScoped<IStockBalanceService, StockBalanceService>();
+            services.AddScoped<IStockMovementService, StockMovementService>();
 
             return services;
         }
