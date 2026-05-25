@@ -31,5 +31,12 @@ namespace Jewelry.Api.Controllers.Stock
             var response = _service.List();
             return response.ToDataSourceResult(request);
         }
+
+        [HttpPost("ByStockNumbers")]
+        public async Task<IActionResult> ByStockNumbers([FromBody] jewelry.Model.Stock.Balance.ByStockNumbers.Request request, CancellationToken ct)
+        {
+            var result = await _service.ListByStockNumbersAsync(request.StockNumbers, ct);
+            return Ok(result);
+        }
     }
 }
