@@ -628,6 +628,41 @@ namespace Jewelry.Service.Sale.SaleOrder
                         _jewelryContext.TbtStockProduct.Update(stockProduct);
                     }
 
+                    var piece = await _jewelryContext.TbtStockPiece
+                        .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
+
+                    if (piece != null)
+                    {
+                        var balance = await _jewelryContext.TbtStockBalance
+                            .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                        if (balance != null)
+                        {
+                            balance.QtyReserved += stockItem.Qty;
+                            balance.LastMovementAt = confirmedDate;
+                            _jewelryContext.TbtStockBalance.Update(balance);
+                        }
+
+                        piece.Status = "RESERVED";
+                        piece.UpdateDate = confirmedDate;
+                        piece.UpdateBy = CurrentUsername;
+                        _jewelryContext.TbtStockPiece.Update(piece);
+
+                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                        {
+                            MovementDate = confirmedDate,
+                            MovementType = "RESERVE",
+                            SkuCode = piece.SkuCode,
+                            StockNumber = piece.StockNumber,
+                            FromLocation = piece.LocationCode,
+                            Qty = stockItem.Qty,
+                            RefDocType = "SO",
+                            RefDocNo = saleOrder.SoNumber,
+                            CreateDate = confirmedDate,
+                            CreateBy = CurrentUsername
+                        });
+                    }
+
                     confirmedStockNumbers.Add(stockItem.StockNumber);
                 }
 
@@ -684,6 +719,42 @@ namespace Jewelry.Service.Sale.SaleOrder
                         stockProduct.UpdateBy = CurrentUsername;
                         _jewelryContext.TbtStockProduct.Update(stockProduct);
                     }
+
+                    var piece = await _jewelryContext.TbtStockPiece
+                        .FirstOrDefaultAsync(p => p.StockNumber == product.StockNumber);
+
+                    if (piece != null)
+                    {
+                        var balance = await _jewelryContext.TbtStockBalance
+                            .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                        if (balance != null)
+                        {
+                            balance.QtyReserved -= product.Qty;
+                            balance.LastMovementAt = now;
+                            _jewelryContext.TbtStockBalance.Update(balance);
+                        }
+
+                        piece.Status = "IN_STOCK";
+                        piece.UpdateDate = now;
+                        piece.UpdateBy = CurrentUsername;
+                        _jewelryContext.TbtStockPiece.Update(piece);
+
+                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                        {
+                            MovementDate = now,
+                            MovementType = "UNRESERVE",
+                            SkuCode = piece.SkuCode,
+                            StockNumber = piece.StockNumber,
+                            ToLocation = piece.LocationCode,
+                            Qty = product.Qty,
+                            RefDocType = "SO",
+                            RefDocNo = saleOrder.SoNumber,
+                            CreateDate = now,
+                            CreateBy = CurrentUsername
+                        });
+                    }
+
                     _jewelryContext.TbtSaleOrderProduct.Remove(product);
                 }
 
@@ -788,6 +859,41 @@ namespace Jewelry.Service.Sale.SaleOrder
                             stockProduct.UpdateDate = unconfirmedDate;
                             stockProduct.UpdateBy = CurrentUsername;
                             _jewelryContext.TbtStockProduct.Update(stockProduct);
+                        }
+
+                        var piece = await _jewelryContext.TbtStockPiece
+                            .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
+
+                        if (piece != null)
+                        {
+                            var balance = await _jewelryContext.TbtStockBalance
+                                .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                            if (balance != null)
+                            {
+                                balance.QtyReserved -= confirmedProduct.Qty;
+                                balance.LastMovementAt = unconfirmedDate;
+                                _jewelryContext.TbtStockBalance.Update(balance);
+                            }
+
+                            piece.Status = "IN_STOCK";
+                            piece.UpdateDate = unconfirmedDate;
+                            piece.UpdateBy = CurrentUsername;
+                            _jewelryContext.TbtStockPiece.Update(piece);
+
+                            _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                            {
+                                MovementDate = unconfirmedDate,
+                                MovementType = "UNRESERVE",
+                                SkuCode = piece.SkuCode,
+                                StockNumber = piece.StockNumber,
+                                ToLocation = piece.LocationCode,
+                                Qty = confirmedProduct.Qty,
+                                RefDocType = "SO",
+                                RefDocNo = saleOrder.SoNumber,
+                                CreateDate = unconfirmedDate,
+                                CreateBy = CurrentUsername
+                            });
                         }
 
                         // Remove confirmed product entry
