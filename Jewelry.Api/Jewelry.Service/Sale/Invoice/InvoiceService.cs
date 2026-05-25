@@ -146,6 +146,46 @@ namespace Jewelry.Service.Sale.Invoice
             }
             _jewelryContext.TbtSaleOrderProduct.UpdateRange(getstockConfrim);
 
+            foreach (var soProduct in getstockConfrim)
+            {
+                var piece = await _jewelryContext.TbtStockPiece
+                    .FirstOrDefaultAsync(p => p.StockNumber == soProduct.StockNumber);
+
+                if (piece == null) continue;
+
+                var balance = await _jewelryContext.TbtStockBalance
+                    .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                if (balance == null) continue;
+
+                piece.Status = "SOLD";
+                piece.UpdateBy = CurrentUsername;
+                piece.UpdateDate = DateTime.UtcNow;
+
+                balance.QtyOnHand -= soProduct.Qty;
+                balance.QtyReserved -= soProduct.Qty;
+                balance.LastMovementAt = DateTime.UtcNow;
+                balance.UpdateBy = CurrentUsername;
+                balance.UpdateDate = DateTime.UtcNow;
+
+                _jewelryContext.TbtStockPiece.Update(piece);
+                _jewelryContext.TbtStockBalance.Update(balance);
+
+                _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                {
+                    MovementType = "SALE",
+                    SkuCode = piece.SkuCode,
+                    StockNumber = piece.StockNumber,
+                    FromLocation = piece.LocationCode,
+                    Qty = soProduct.Qty,
+                    RefDocType = "INVOICE",
+                    RefDocNo = invoiceNumber,
+                    MovementDate = DateTime.UtcNow,
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = CurrentUsername
+                });
+            }
+
             await _jewelryContext.SaveChangesAsync();
 
             return invoiceNumber;
@@ -417,6 +457,45 @@ namespace Jewelry.Service.Sale.Invoice
 
             foreach (var product in saleOrderProducts)
             {
+                var piece = await _jewelryContext.TbtStockPiece
+                    .FirstOrDefaultAsync(p => p.StockNumber == product.StockNumber);
+
+                if (piece != null && piece.Status == "SOLD")
+                {
+                    var balance = await _jewelryContext.TbtStockBalance
+                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                    if (balance != null)
+                    {
+                        piece.Status = "RESERVED";
+                        piece.UpdateBy = CurrentUsername;
+                        piece.UpdateDate = DateTime.UtcNow;
+
+                        balance.QtyOnHand += product.Qty;
+                        balance.QtyReserved += product.Qty;
+                        balance.LastMovementAt = DateTime.UtcNow;
+                        balance.UpdateBy = CurrentUsername;
+                        balance.UpdateDate = DateTime.UtcNow;
+
+                        _jewelryContext.TbtStockPiece.Update(piece);
+                        _jewelryContext.TbtStockBalance.Update(balance);
+
+                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                        {
+                            MovementType = "RETURN",
+                            SkuCode = piece.SkuCode,
+                            StockNumber = piece.StockNumber,
+                            ToLocation = piece.LocationCode,
+                            Qty = product.Qty,
+                            RefDocType = "INVOICE_DELETE",
+                            RefDocNo = request.InvoiceNumber,
+                            MovementDate = DateTime.UtcNow,
+                            CreateDate = DateTime.UtcNow,
+                            CreateBy = CurrentUsername
+                        });
+                    }
+                }
+
                 product.Invoice = null;
                 product.InvoiceItem = null;
                 product.DkInvoiceNumber = null;
