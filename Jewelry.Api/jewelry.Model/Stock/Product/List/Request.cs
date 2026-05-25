@@ -31,5 +31,7 @@ namespace jewelry.Model.Stock.Product.List
         public string? Size { get; set; }
 
         public bool? HasCostDetail { get; set; }
+
+        public string? PieceStatus { get; set; }
     }
 }

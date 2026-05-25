@@ -122,6 +122,14 @@ namespace Jewelry.Service.Stock.Product
                 }
             }
 
+            if (!string.IsNullOrEmpty(request.PieceStatus))
+            {
+                var pieceStatus = request.PieceStatus;
+                stock = stock.Where(x => _jewelryContext.TbtStockPiece
+                    .AsNoTracking()
+                    .Any(p => p.StockNumber == x.StockNumber && p.Status == pieceStatus));
+            }
+
             var response = from item in stock
                            select new jewelry.Model.Stock.Product.List.Response()
                            {
