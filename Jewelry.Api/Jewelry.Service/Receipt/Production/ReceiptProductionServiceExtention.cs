@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -253,6 +254,97 @@ namespace Jewelry.Service.Receipt.Production
             }
 
             return result;
+        }
+
+        public static string DeriveSkuCode(this TbtStockProduct stock)
+        {
+            if (!string.IsNullOrWhiteSpace(stock.ProductNumber))
+            {
+                return $"SKU-{stock.ProductNumber.ToUpper()}";
+            }
+
+            var raw = string.Concat(
+                stock.ProductNameTh ?? "",
+                stock.Mold ?? "",
+                stock.Size ?? "",
+                stock.ProductionType ?? "",
+                stock.ProductionTypeSize ?? "");
+
+            using var md5 = MD5.Create();
+            var hashBytes = md5.ComputeHash(Encoding.UTF8.GetBytes(raw));
+            var hashHex = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
+
+            return $"SKU-{hashHex.Substring(0, 8)}";
+        }
+
+        public static TbtSku MapNewSku(this TbtStockProduct stock, string skuCode, string operatorBy)
+        {
+            return new TbtSku
+            {
+                SkuCode = skuCode,
+                ProductNumber = stock.ProductNumber,
+                ProductNameTh = stock.ProductNameTh ?? "",
+                ProductNameEn = stock.ProductNameEn ?? "",
+                ProductType = stock.ProductType,
+                ProductTypeName = stock.ProductTypeName,
+                Mold = stock.Mold,
+                MoldDesign = stock.MoldDesign,
+                StudEarring = stock.StudEarring,
+                Size = stock.Size,
+                ProductionType = stock.ProductionType,
+                ProductionTypeSize = stock.ProductionTypeSize,
+                ImageName = stock.ImageName,
+                ImagePath = stock.ImagePath,
+                DefaultPrice = stock.ProductPrice,
+                TagPriceMultiplier = stock.TagPriceMultiplier,
+                IsActive = true,
+                IsSerialized = true,
+                CreateBy = operatorBy,
+                CreateDate = DateTime.UtcNow
+            };
+        }
+
+        public static TbtStockPiece MapNewStockPiece(this TbtStockProduct stock, string skuCode, string locationCode, string operatorBy)
+        {
+            return new TbtStockPiece
+            {
+                StockNumber = stock.StockNumber,
+                SkuCode = skuCode,
+                LocationCode = locationCode,
+                Status = "IN_STOCK",
+                ReceiptNumber = stock.ReceiptNumber,
+                ReceiptType = stock.ReceiptType,
+                ReceiptDate = stock.ReceiptDate,
+                ProductionDate = stock.ProductionDate,
+                Wo = stock.Wo,
+                WoNumber = stock.WoNumber,
+                WoOrigin = stock.WoOrigin,
+                ProductCost = stock.ProductCost,
+                ProductCostDetail = stock.ProductCostDetail,
+                WeightActual = null,
+                SizeActual = null,
+                Barcode = null,
+                Remark = stock.Remark,
+                CreateBy = operatorBy,
+                CreateDate = DateTime.UtcNow
+            };
+        }
+
+        public static TbtStockMovement MapNewReceiptMovement(string skuCode, string stockNumber, string locationCode, string receiptNumber, string operatorBy)
+        {
+            return new TbtStockMovement
+            {
+                MovementType = "RECEIPT",
+                SkuCode = skuCode,
+                StockNumber = stockNumber,
+                ToLocation = locationCode,
+                Qty = 1,
+                RefDocType = "RECEIPT",
+                RefDocNo = receiptNumber,
+                MovementDate = DateTime.UtcNow,
+                CreateBy = operatorBy,
+                CreateDate = DateTime.UtcNow
+            };
         }
 
     }
