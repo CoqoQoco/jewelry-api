@@ -17,5 +17,5 @@ public partial class TbtStockProductReceipt
 
     public string Type { get; set; } = null!;
 
-    public virtual ICollection<TbtStockProduct> TbtStockProduct { get; set; } = new List<TbtStockProduct>();
+
 }

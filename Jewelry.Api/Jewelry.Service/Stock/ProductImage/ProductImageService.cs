@@ -36,101 +36,27 @@ namespace Jewelry.Service.Stock.ProductImage
 
         public async Task<string> Create(jewelry.Model.Stock.Product.Image.Create.Request request)
         {
-            var year = DateTime.UtcNow.Year;
             var name = request.Name.ToUpper();
             var namePath = $"{name}.jpg";
 
-            var image = (from item in _jewelryContext.TbtStockProductImage
-                         where item.Name == name 
-                         && item.Year == year
-                         && item.IsActive == true
-                         select item).SingleOrDefault();
+            using var stream = request.Image.OpenReadStream();
+            var result = await _azureBlobService.UploadImageAsync(
+                stream,
+                "Stock/Product",
+                namePath
+            );
 
-            if (image != null)
+            if (!result.Success)
             {
-                throw new HandleException($"{ErrorMessage.AlreadyExist} : {name}");
+                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
             }
 
-            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)) 
-            {
-                var newImage = new TbtStockProductImage()
-                {
-                    Name = name,
-                    Year = year,
-
-                    NamePath = namePath,
-                    Remark = request.Description ?? string.Empty,
-
-                    IsActive = true,
-
-                    CreateDate = DateTime.UtcNow,
-                    CreateBy = CurrentUsername,
-                };
-
-                try
-                {
-                    // Upload to Azure Blob Storage (Single Container Architecture)
-                    using var stream = request.Image.OpenReadStream();
-                    var result = await _azureBlobService.UploadImageAsync(
-                        stream,
-                        "Stock/Product",  // folder name in jewelry-images container
-                        namePath
-                    );
-
-                    if (!result.Success)
-                    {
-                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
-                    }
-
-                    // บันทึก filename only: "{NAME}.jpg" — frontend ImagePreview ต่อ Stock/Product/ prefix ให้
-                    newImage.NamePath = namePath;
-                }
-                catch (Exception ex)
-                {
-                    throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
-                }
-
-                _jewelryContext.TbtStockProductImage.Add(newImage);
-                await _jewelryContext.SaveChangesAsync();
-
-                scope.Complete();
-            }
-
-                return "success";
+            return "success";
         }
 
         public IQueryable<jewelry.Model.Stock.Product.Image.List.Response> List(jewelry.Model.Stock.Product.Image.List.Search request)
         {
-            var query = (from item in _jewelryContext.TbtStockProductImage
-                         where item.IsActive == true
-                         select new jewelry.Model.Stock.Product.Image.List.Response()
-                         {
-                             Id = item.Id,
-
-                             Name = item.Name,
-                             Year = item.Year,
-
-                             CreateBy = item.CreateBy,
-                             CreateDate = item.CreateDate,
-                             UpdateBy = item.UpdateBy,
-                             UpdateDate = item.UpdateDate,
-
-                             IsActive = item.IsActive,
-                             Remark = item.Remark,
-                             NamePath = item.NamePath,
-
-                         }).AsNoTracking();
-
-            if (!string.IsNullOrEmpty(request.Name))
-            { 
-                query = query.Where(x => x.Name.Contains(request.Name.ToUpper()));
-            }
-            if (request.Year.HasValue)
-            {
-                query = query.Where(x => x.Year == request.Year.Value);
-            }
-
-            return query;
+            return Enumerable.Empty<jewelry.Model.Stock.Product.Image.List.Response>().AsQueryable();
         }
     }
 }

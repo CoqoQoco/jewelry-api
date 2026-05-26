@@ -20,6 +20,8 @@ namespace jewelry.Model.Stock.Product.Update
         public decimal Qty { get; set; }
         public string? Size { get; set; }
         public string? Location { get; set; }
+        public string? Remark { get; set; }
+        public decimal? ProductCost { get; set; }
 
         public string? ImageName { get; set; }
         public string? ImagePath { get; set; }
@@ -33,6 +35,7 @@ namespace jewelry.Model.Stock.Product.Update
         public string? TypeName { get; set; }
         public string? TypeCode { get; set; }
         public string? TypeBarcode { get; set; }
+        public string? TypeOrigin { get; set; }
 
         public decimal? Qty { get; set; }
         public string? QtyUnit { get; set; }

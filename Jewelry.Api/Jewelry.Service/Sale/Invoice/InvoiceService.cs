@@ -176,6 +176,7 @@ namespace Jewelry.Service.Sale.Invoice
                     MovementType = "SALE",
                     SkuCode = piece.SkuCode,
                     StockNumber = piece.StockNumber,
+                    ProductCode = piece.ProductCode,
                     FromLocation = piece.LocationCode,
                     Qty = soProduct.Qty,
                     RefDocType = "INVOICE",
@@ -380,16 +381,17 @@ namespace Jewelry.Service.Sale.Invoice
             {
                 entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
                     .Any(p => p.Invoice == x.Running
-                        && _jewelryContext.TbtStockProduct
-                            .Any(s => s.StockNumber == p.StockNumber && s.ProductNumber.Contains(request.ProductNumber))));
+                        && _jewelryContext.TbtStockPiece
+                            .Any(piece => piece.StockNumber == p.StockNumber && piece.ProductCode.Contains(request.ProductNumber))));
             }
 
             if (!string.IsNullOrEmpty(request.MoldNumber))
             {
                 entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
                     .Any(p => p.Invoice == x.Running
-                        && _jewelryContext.TbtStockProduct
-                            .Any(s => s.StockNumber == p.StockNumber && s.Mold != null && s.Mold.Contains(request.MoldNumber))));
+                        && _jewelryContext.TbtStockPiece
+                            .Any(piece => piece.StockNumber == p.StockNumber
+                                && _jewelryContext.TbtSku.Any(sku => sku.SkuCode == piece.SkuCode && sku.MoldDesign != null && sku.MoldDesign.Contains(request.MoldNumber)))));
             }
 
             var query = from invoice in entityQuery
@@ -485,6 +487,7 @@ namespace Jewelry.Service.Sale.Invoice
                             MovementType = "RETURN",
                             SkuCode = piece.SkuCode,
                             StockNumber = piece.StockNumber,
+                            ProductCode = piece.ProductCode,
                             ToLocation = piece.LocationCode,
                             Qty = product.Qty,
                             RefDocType = "INVOICE_DELETE",

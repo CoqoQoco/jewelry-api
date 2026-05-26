@@ -96,7 +96,7 @@ namespace Jewelry.Service.Receipt.Production
             }
         }
 
-        public static TbtStockProduct MapNewStockProduction(this TbtStockProductReceiptItem stock,
+        public static StockProductDto MapNewStockProduction(this TbtStockProductReceiptItem stock,
             TbtStockProductReceiptPlan receipt,
             TbtProductionPlan plan,
             jewelry.Model.Receipt.Production.Confirm.ConfirmStock confirm,
@@ -104,7 +104,7 @@ namespace Jewelry.Service.Receipt.Production
             string operatorBy)
         {
 
-            var response = new TbtStockProduct
+            var response = new StockProductDto
             {
                 StockNumber = stockRunning,
                 Status = StockProductStatus.Available,
@@ -148,7 +148,7 @@ namespace Jewelry.Service.Receipt.Production
             return response;
         }
 
-        public static jewelry.Model.Receipt.Production.Confirm.Stock MapResponseNewStockProduction(this TbtStockProduct stock)
+        public static jewelry.Model.Receipt.Production.Confirm.Stock MapResponseNewStockProduction(this StockProductDto stock)
         {
 
             var response = new jewelry.Model.Receipt.Production.Confirm.Stock()
@@ -197,17 +197,19 @@ namespace Jewelry.Service.Receipt.Production
             return response;
         }
 
-        public static List<TbtStockProductMaterial> MapNewStockProductionMaterial(this jewelry.Model.Receipt.Production.Confirm.ConfirmStock confirm,
+        public static List<TbtStockPieceMaterial> MapNewStockPieceMaterial(this jewelry.Model.Receipt.Production.Confirm.ConfirmStock confirm,
             string stockRunning,
+            string productCode,
             string operatorBy)
         {
-            var response = new List<TbtStockProductMaterial>();
+            var response = new List<TbtStockPieceMaterial>();
 
             foreach (var item in confirm.Materials)
             {
-                response.Add(new TbtStockProductMaterial
+                response.Add(new TbtStockPieceMaterial
                 {
                     StockNumber = stockRunning,
+                    ProductCode = productCode,
 
                     Type = item.Type,
                     TypeName = item.TypeName,
@@ -231,7 +233,7 @@ namespace Jewelry.Service.Receipt.Production
             return response;
         }
 
-        public static List<jewelry.Model.Receipt.Production.Confirm.Material> MapResponseNewStockMaterialProduction(this List<TbtStockProductMaterial> stocks)
+        public static List<jewelry.Model.Receipt.Production.Confirm.Material> MapResponseNewStockMaterialProduction(this List<TbtStockPieceMaterial> stocks)
         {
             var result = new List<jewelry.Model.Receipt.Production.Confirm.Material>();
 
@@ -258,7 +260,7 @@ namespace Jewelry.Service.Receipt.Production
             return result;
         }
 
-        public static string DeriveSkuCode(this TbtStockProduct stock)
+        public static string DeriveSkuCode(this StockProductDto stock)
         {
             if (!string.IsNullOrWhiteSpace(stock.ProductNumber))
             {
@@ -279,7 +281,7 @@ namespace Jewelry.Service.Receipt.Production
             return $"SKU-{hashHex.Substring(0, 8)}";
         }
 
-        public static TbtSku MapNewSku(this TbtStockProduct stock, string skuCode, string operatorBy)
+        public static TbtSku MapNewSku(this StockProductDto stock, string skuCode, string operatorBy)
         {
             return new TbtSku
             {
@@ -306,11 +308,12 @@ namespace Jewelry.Service.Receipt.Production
             };
         }
 
-        public static TbtStockPiece MapNewStockPiece(this TbtStockProduct stock, string skuCode, string locationCode, string operatorBy)
+        public static TbtStockPiece MapNewStockPiece(this StockProductDto stock, string skuCode, string locationCode, string operatorBy, string? stockNumberOrigin = null)
         {
             return new TbtStockPiece
             {
                 StockNumber = stock.StockNumber,
+                ProductCode = stock.ProductNumber ?? stock.StockNumber,
                 SkuCode = skuCode,
                 LocationCode = locationCode,
                 Status = "IN_STOCK",
@@ -321,6 +324,7 @@ namespace Jewelry.Service.Receipt.Production
                 Wo = stock.Wo,
                 WoNumber = stock.WoNumber,
                 WoOrigin = stock.WoOrigin,
+                StockNumberOrigin = stockNumberOrigin,
                 ProductCost = stock.ProductCost,
                 ProductCostDetail = stock.ProductCostDetail,
                 WeightActual = null,
@@ -332,13 +336,14 @@ namespace Jewelry.Service.Receipt.Production
             };
         }
 
-        public static TbtStockMovement MapNewReceiptMovement(string skuCode, string stockNumber, string locationCode, string receiptNumber, string operatorBy, string refDocType = "RECEIPT")
+        public static TbtStockMovement MapNewReceiptMovement(string skuCode, string stockNumber, string productCode, string locationCode, string receiptNumber, string operatorBy, string refDocType = "RECEIPT")
         {
             return new TbtStockMovement
             {
                 MovementType = "RECEIPT",
                 SkuCode = skuCode,
                 StockNumber = stockNumber,
+                ProductCode = productCode,
                 ToLocation = locationCode,
                 Qty = 1,
                 RefDocType = refDocType,

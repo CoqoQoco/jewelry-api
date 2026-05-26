@@ -495,24 +495,21 @@ namespace Jewelry.Service.Receipt.Production
                 throw new KeyNotFoundException($"{ErrorMessage.NotFound} --> draft");
             }
 
-            var cheackProductNumber = request.Stocks.Select(x => x.ProductNumber).ToArray();
+            var checkProductNumbers = request.Stocks.Select(x => x.ProductNumber.ToUpper()).ToArray();
 
-            var duplicateStock = (from item in _jewelryContext.TbtStockProduct
-                                  where cheackProductNumber.Contains(item.ProductNumber)
-                                  select item);
+            var duplicatePiece = await _jewelryContext.TbtSku
+                .Where(x => checkProductNumbers.Contains(x.ProductNumber))
+                .Select(x => x.ProductNumber)
+                .ToListAsync();
 
-            if (duplicateStock.Any())
+            if (duplicatePiece.Any())
             {
-                // รวมรหัสสินค้าทั้งหมดเป็นข้อความเดียวโดยคั่นด้วยเครื่องหมาย comma
-                var duplicateProductNumbers = string.Join(", ", duplicateStock.Select(x => x.ProductNumber));
-
-                // โยน exception พร้อมข้อความที่รวมรายการรหัสสินค้าที่ซ้ำกัน
+                var duplicateProductNumbers = string.Join(", ", duplicatePiece);
                 throw new HandleException($"{ErrorMessage.AlreadyExist} --> รหัสสินค้า: {duplicateProductNumbers}");
             }
 
-
-            var newStocks = new List<TbtStockProduct>();
-            var newStocksMaterial = new List<TbtStockProductMaterial>();
+            var newStocks = new List<StockProductDto>();
+            var newStockPieceMaterials = new List<TbtStockPieceMaterial>();
 
             var updateReceipt = query.receipt;
             var updateReceiptItem = new List<TbtStockProductReceiptItem>();
@@ -534,17 +531,16 @@ namespace Jewelry.Service.Receipt.Production
 
                 var _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
 
-                //เเก้ตรงนี้ต้อง prefix ต้อง 18K ,9K
-
                 var newProduct = match.MapNewStockProduction(query.receipt, query.plan, stock, _stockRunning, CurrentUsername);
                 var newProductResponse = newProduct.MapResponseNewStockProduction();
                 newStocks.Add(newProduct);
 
-                var newProductMaterial = new List<TbtStockProductMaterial>();
+                var newProductMaterial = new List<TbtStockPieceMaterial>();
                 if (stock.Materials != null && stock.Materials.Any())
                 {
-                    newProductMaterial = stock.MapNewStockProductionMaterial(_stockRunning, CurrentUsername);
-                    newStocksMaterial.AddRange(newProductMaterial);
+                    var pieceProductCode = stock.ProductNumber.ToUpper();
+                    newProductMaterial = stock.MapNewStockPieceMaterial(_stockRunning, pieceProductCode, CurrentUsername);
+                    newStockPieceMaterials.AddRange(newProductMaterial);
 
                     if (newProductMaterial.Any())
                     {
@@ -591,24 +587,18 @@ namespace Jewelry.Service.Receipt.Production
                         draft.MoldDesign = newProduct.MoldDesign;
                         draft.Materials = new List<jewelry.Model.Receipt.Production.PlanGet.Material>();
 
-                        //map  draft.Materials by newStocksMaterial
                         if (newProductMaterial.Any())
                         {
-                            foreach (var _newStocksMaterial in newProductMaterial)
+                            foreach (var _newMat in newProductMaterial)
                             {
                                 draft.Materials.Add(new jewelry.Model.Receipt.Production.PlanGet.Material
                                 {
-                                    Type = _newStocksMaterial.Type,
-                                    TypeName = _newStocksMaterial.TypeName,
-                                    TypeCode = _newStocksMaterial.TypeCode,
-                                    TypeBarcode = _newStocksMaterial.TypeBarcode,
+                                    Type = _newMat.Type,
+                                    TypeName = _newMat.TypeName,
+                                    TypeCode = _newMat.TypeCode,
+                                    TypeBarcode = _newMat.TypeBarcode,
 
-                                    //Qty = _newStocksMaterial.Qty,
-                                    //Weight = _newStocksMaterial.Weight,
-
-                                    //Size = _newStocksMaterial.Size,
-                                    Region = _newStocksMaterial.Region,
-                                    //Price = _newStocksMaterial.Price
+                                    Region = _newMat.Region,
                                 });
                             }
                         }
@@ -656,6 +646,7 @@ namespace Jewelry.Service.Receipt.Production
                 }
 
                 var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername, locationCache);
+                var pieceProductCode = stock.ProductNumber ?? stock.StockNumber;
 
                 newStockPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername));
 
@@ -693,7 +684,7 @@ namespace Jewelry.Service.Receipt.Production
                     }
                 }
 
-                newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, locationCode, stock.ReceiptNumber, CurrentUsername));
+                newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername));
             }
 
             var updateBalances = balanceCache.Values
@@ -702,15 +693,6 @@ namespace Jewelry.Service.Receipt.Production
 
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-
-                if (newStocks.Any())
-                {
-                    _jewelryContext.TbtStockProduct.AddRange(newStocks);
-                }
-                if (newStocksMaterial.Any())
-                {
-                    _jewelryContext.TbtStockProductMaterial.AddRange(newStocksMaterial);
-                }
                 if (updateReceiptItem.Any())
                 {
                     _jewelryContext.TbtStockProductReceiptItem.UpdateRange(updateReceiptItem);
@@ -727,6 +709,10 @@ namespace Jewelry.Service.Receipt.Production
                 if (newStockPieces.Any())
                 {
                     _jewelryContext.TbtStockPiece.AddRange(newStockPieces);
+                }
+                if (newStockPieceMaterials.Any())
+                {
+                    _jewelryContext.TbtStockPieceMaterial.AddRange(newStockPieceMaterials);
                 }
                 if (upsertBalances.Any())
                 {
@@ -818,34 +804,36 @@ namespace Jewelry.Service.Receipt.Production
 
             var query = (from item in receipt
 
-                         join stock in _jewelryContext.TbtStockProduct
-                         on item.StockNumber equals stock.StockNumber
+                         join piece in _jewelryContext.TbtStockPiece
+                         on item.StockNumber equals piece.StockNumber
+
+                         join sku in _jewelryContext.TbtSku
+                         on piece.SkuCode equals sku.SkuCode
 
                          select new jewelry.Model.Receipt.Production.History.List.Response()
                          {
-
-                             StockNumber = stock.StockNumber,
-                             Status = stock.Status,
+                             StockNumber = piece.StockNumber,
+                             Status = piece.Status,
 
                              ReceiptNumber = item.StockReceiptNumber,
-                             ReceiptDate = stock.ReceiptDate,
+                             ReceiptDate = piece.ReceiptDate.GetValueOrDefault(),
                              ReceiptType = item.Type,
 
                              Mold = item.MoldDesign ?? item.Mold,
                              MoldDesign = item.MoldDesign,
 
-                             Qty = stock.Qty,
-                             ProductPrice = stock.ProductPrice,
+                             Qty = 1,
+                             ProductPrice = sku.DefaultPrice ?? 0,
 
-                             ProductNumber = stock.ProductNumber,
-                             ProductNameTh = stock.ProductNameTh,
-                             ProductNameEn = stock.ProductNameEn,
+                             ProductNumber = sku.ProductNumber,
+                             ProductNameTh = sku.ProductNameTh,
+                             ProductNameEn = sku.ProductNameEn,
 
-                             ProductType = stock.ProductType,
+                             ProductType = sku.ProductType,
                              ProductTypeName = item.ProductTypeName,
 
-                             ImageName = stock.ImageName,
-                             ImagePath = stock.ImagePath,
+                             ImageName = sku.ImageName,
+                             ImagePath = sku.ImagePath,
 
                              Wo = item.Wo,
                              WoNumber = item.WoNumber,
@@ -855,11 +843,11 @@ namespace Jewelry.Service.Receipt.Production
                              ProductionType = item.ProductionType,
                              ProductionTypeSize = item.ProductionTypeSize,
 
-                             Size = stock.Size,
-                             Location = stock.Location,
-                             Remark = stock.Remark,
+                             Size = sku.Size,
+                             Location = piece.LocationCode,
+                             Remark = piece.Remark,
 
-                             StudEarring = stock.StudEarring,
+                             StudEarring = sku.StudEarring,
 
                              CreateBy = item.CreateBy,
                              CreateDate = item.CreateDate,

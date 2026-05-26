@@ -329,23 +329,34 @@ namespace Jewelry.Service.Sale.SaleOrder
             #endregion
             #region *** get stock product ***
             if (response.StockConfirm.Any())
-            { 
+            {
                 var stockArray = response.StockConfirm.Select(s => s.StockNumber).ToArray();
-                var stockProducts = (from item in _jewelryContext.TbtStockProduct
-                                     where stockArray.Contains(item.StockNumber)
-                                     select item).ToList();
+                var pieces = await _jewelryContext.TbtStockPiece
+                    .Where(p => stockArray.Contains(p.StockNumber))
+                    .ToListAsync();
 
-                if(stockProducts.Any())
+                var skuLocationPairs = pieces
+                    .Select(p => new { p.SkuCode, p.LocationCode })
+                    .Distinct()
+                    .ToList();
+
+                var balances = await _jewelryContext.TbtStockBalance
+                    .Where(b => skuLocationPairs.Select(x => x.SkuCode).Contains(b.SkuCode))
+                    .ToListAsync();
+
+                if (pieces.Any())
                 {
-                    foreach(var stock in response.StockConfirm)
+                    foreach (var stock in response.StockConfirm)
                     {
-                        var matchStock = stockProducts.FirstOrDefault(s => s.StockNumber == stock.StockNumber);
-                        if(matchStock != null)
+                        var piece = pieces.FirstOrDefault(p => p.StockNumber == stock.StockNumber);
+                        if (piece != null)
                         {
-                            if (matchStock.QtyRemaining <= 0)
+                            var balance = balances.FirstOrDefault(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+                            var qtyRemaining = balance != null ? balance.QtyOnHand - balance.QtyReserved : 0;
+                            if (qtyRemaining <= 0)
                             {
                                 stock.IsRemainProduct = false;
-                                stock.Message = stock.IsConfirm || stock.IsInvoice ? null : "�Թ������ʵ�͡";
+                                stock.Message = stock.IsConfirm || stock.IsInvoice ? null : "สินค้าหมดสต็อก";
                             }
                         }
                     }
@@ -415,9 +426,9 @@ namespace Jewelry.Service.Sale.SaleOrder
                 var keyword = request.ProductNumber.Trim();
                 query = query.Where(x =>
                     (from p in _jewelryContext.TbtSaleOrderProduct
-                     join s in _jewelryContext.TbtStockProduct on p.StockNumber equals s.StockNumber
+                     join piece in _jewelryContext.TbtStockPiece on p.StockNumber equals piece.StockNumber
                      where p.SoNumber == x.SoNumber
-                        && EF.Functions.ILike(s.ProductNumber, $"%{keyword}%")
+                        && EF.Functions.ILike(piece.ProductCode, $"%{keyword}%")
                      select 1).Any());
             }
 
@@ -426,10 +437,11 @@ namespace Jewelry.Service.Sale.SaleOrder
                 var keyword = request.MoldNumber.Trim();
                 query = query.Where(x =>
                     (from p in _jewelryContext.TbtSaleOrderProduct
-                     join s in _jewelryContext.TbtStockProduct on p.StockNumber equals s.StockNumber
+                     join piece in _jewelryContext.TbtStockPiece on p.StockNumber equals piece.StockNumber
+                     join sku in _jewelryContext.TbtSku on piece.SkuCode equals sku.SkuCode
                      where p.SoNumber == x.SoNumber
-                        && s.MoldDesign != null
-                        && EF.Functions.ILike(s.MoldDesign, $"%{keyword}%")
+                        && sku.MoldDesign != null
+                        && EF.Functions.ILike(sku.MoldDesign, $"%{keyword}%")
                      select 1).Any());
             }
 
@@ -523,11 +535,6 @@ namespace Jewelry.Service.Sale.SaleOrder
             //    throw new HandleException($"Cannot confirm stock items for Sale Order {request.SoNumber}. Invalid status: {saleOrder.StatusName}.");
             //}
 
-            var arrayStock = request.StockItems.Select(i => i.StockNumber).ToArray();
-            var stockProducts = await _jewelryContext.TbtStockProduct
-                .Where(s => arrayStock.Contains(s.StockNumber))
-                .ToListAsync();
-
             var confirmedStockNumbers = new List<string>();
             var errors = new List<string>();
             var confirmedDate = DateTime.UtcNow;
@@ -556,23 +563,6 @@ namespace Jewelry.Service.Sale.SaleOrder
                     continue;
                 }
 
-
-                var stockProduct = stockProducts.FirstOrDefault(s => s.StockNumber == stockItem.StockNumber);
-                if (stockProduct == null)
-                {
-                    errors.Add($"Stock item {stockItem.StockNumber} not found in inventory.");
-                    continue;
-                }
-
-                if (stockProduct != null)
-                {
-                    var remainingQty = stockProduct.Qty - stockProduct.QtySale;
-                    if (stockItem.Qty > remainingQty)
-                    {
-                        errors.Add($"Insufficient stock for item {stockItem.StockNumber}. Requested: {stockItem.Qty}, Available: {remainingQty}.");
-                        continue;
-                    }
-                }
 
                 //// Check if item is already confirmed in this sale order
                 //var existingConfirmation = await _jewelryContext.TbtSaleOrderProduct
@@ -616,18 +606,6 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                     _jewelryContext.TbtSaleOrderProduct.Add(newProduct);
 
-                    // Update stock quantity (reduce available quantity)
-                    var stockProduct = await _jewelryContext.TbtStockProduct
-                        .FirstOrDefaultAsync(s => s.StockNumber == stockItem.StockNumber);
-
-                    if (stockProduct != null)
-                    {
-                        stockProduct.QtySale += stockItem.Qty;
-                        stockProduct.UpdateDate = confirmedDate;
-                        stockProduct.UpdateBy = CurrentUsername;
-                        _jewelryContext.TbtStockProduct.Update(stockProduct);
-                    }
-
                     var piece = await _jewelryContext.TbtStockPiece
                         .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
 
@@ -654,6 +632,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                             MovementType = "RESERVE",
                             SkuCode = piece.SkuCode,
                             StockNumber = piece.StockNumber,
+                            ProductCode = piece.ProductCode,
                             FromLocation = piece.LocationCode,
                             Qty = stockItem.Qty,
                             RefDocType = "SO",
@@ -710,16 +689,6 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                 foreach (var product in confirmedProducts)
                 {
-                    var stockProduct = await _jewelryContext.TbtStockProduct
-                        .FirstOrDefaultAsync(s => s.StockNumber == product.StockNumber);
-                    if (stockProduct != null)
-                    {
-                        stockProduct.QtySale -= product.Qty;
-                        stockProduct.UpdateDate = now;
-                        stockProduct.UpdateBy = CurrentUsername;
-                        _jewelryContext.TbtStockProduct.Update(stockProduct);
-                    }
-
                     var piece = await _jewelryContext.TbtStockPiece
                         .FirstOrDefaultAsync(p => p.StockNumber == product.StockNumber);
 
@@ -746,6 +715,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                             MovementType = "UNRESERVE",
                             SkuCode = piece.SkuCode,
                             StockNumber = piece.StockNumber,
+                            ProductCode = piece.ProductCode,
                             ToLocation = piece.LocationCode,
                             Qty = product.Qty,
                             RefDocType = "SO",
@@ -849,18 +819,6 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                     if (confirmedProduct != null)
                     {
-                        // Update stock quantity (restore available quantity)
-                        var stockProduct = await _jewelryContext.TbtStockProduct
-                            .FirstOrDefaultAsync(s => s.StockNumber == stockItem.StockNumber);
-
-                        if (stockProduct != null)
-                        {
-                            stockProduct.QtySale -= confirmedProduct.Qty;
-                            stockProduct.UpdateDate = unconfirmedDate;
-                            stockProduct.UpdateBy = CurrentUsername;
-                            _jewelryContext.TbtStockProduct.Update(stockProduct);
-                        }
-
                         var piece = await _jewelryContext.TbtStockPiece
                             .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
 
@@ -887,6 +845,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                                 MovementType = "UNRESERVE",
                                 SkuCode = piece.SkuCode,
                                 StockNumber = piece.StockNumber,
+                                ProductCode = piece.ProductCode,
                                 ToLocation = piece.LocationCode,
                                 Qty = confirmedProduct.Qty,
                                 RefDocType = "SO",

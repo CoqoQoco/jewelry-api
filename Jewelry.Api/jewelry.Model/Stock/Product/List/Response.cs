@@ -60,6 +60,7 @@ namespace jewelry.Model.Stock.Product.List
         public string? TypeName { get; set; }
         public string? TypeCode { get; set; }
         public string? TypeBarcode { get; set; }
+        public string? TypeOrigin { get; set; }
 
         public decimal? Qty { get; set; }
         public string? QtyUnit { get; set; }
@@ -69,8 +70,6 @@ namespace jewelry.Model.Stock.Product.List
         public string? Size { get; set; }
         public string? Region { get; set; }
         public decimal? Price { get; set; }
-
-      
     }
 
     public class PriceTransection

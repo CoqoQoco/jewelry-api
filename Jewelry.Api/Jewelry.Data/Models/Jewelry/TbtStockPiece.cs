@@ -29,6 +29,8 @@ public partial class TbtStockPiece
 
     public string? WoOrigin { get; set; }
 
+    public string? StockNumberOrigin { get; set; }
+
     public string? PoNumber { get; set; }
 
     public decimal? ProductCost { get; set; }

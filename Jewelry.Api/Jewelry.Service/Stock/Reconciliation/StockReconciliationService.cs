@@ -4,6 +4,7 @@ using Jewelry.Model.Stock.Reconciliation;
 using Microsoft.EntityFrameworkCore;
 using System.Transactions;
 
+
 namespace Jewelry.Service.Stock.Reconciliation
 {
     public class StockReconciliationService : IStockReconciliationService
@@ -21,9 +22,6 @@ namespace Jewelry.Service.Stock.Reconciliation
             {
                 CheckedAt = DateTime.UtcNow
             };
-
-            report.LegacyStockCount = await _jewelryContext.TbtStockProduct
-                .AsNoTracking().CountAsync(ct);
 
             report.NewPieceCount = await _jewelryContext.TbtStockPiece
                 .AsNoTracking().CountAsync(ct);
@@ -111,50 +109,6 @@ namespace Jewelry.Service.Stock.Reconciliation
             report.BalanceOnHandMismatchCount = onHandMismatches.Count;
             report.ReservedMismatches = reservedMismatches.Take(100).ToList();
             report.BalanceReservedMismatchCount = reservedMismatches.Count;
-
-            report.StatusMismatches = await _jewelryContext.TbtStockPiece
-                .AsNoTracking()
-                .Join(
-                    _jewelryContext.TbtStockProduct.AsNoTracking(),
-                    piece => piece.StockNumber,
-                    legacy => legacy.StockNumber,
-                    (piece, legacy) => new { piece, legacy }
-                )
-                .Where(x =>
-                    (x.piece.Status == "SOLD" && x.legacy.QtySale == 0) ||
-                    (x.piece.Status != "SOLD" && x.legacy.QtySale > 0 && x.piece.Status == "IN_STOCK"))
-                .Select(x => new StatusMismatch
-                {
-                    StockNumber = x.piece.StockNumber,
-                    PieceStatus = x.piece.Status,
-                    LegacyQtySale = x.legacy.QtySale
-                })
-                .Take(100)
-                .ToListAsync(ct);
-
-            report.StatusMismatchCount = report.StatusMismatches.Count;
-
-            report.LegacyQtySaleMismatches = await _jewelryContext.TbtStockProduct
-                .AsNoTracking()
-                .Join(
-                    _jewelryContext.TbtStockPiece.AsNoTracking(),
-                    legacy => legacy.StockNumber,
-                    piece => piece.StockNumber,
-                    (legacy, piece) => new { legacy, piece }
-                )
-                .Where(x =>
-                    (x.legacy.QtySale > 0 && x.piece.Status != "RESERVED" && x.piece.Status != "SOLD") ||
-                    (x.legacy.QtySale == 0 && x.piece.Status == "RESERVED"))
-                .Select(x => new QtySaleMismatch
-                {
-                    StockNumber = x.legacy.StockNumber,
-                    LegacyQtySale = x.legacy.QtySale,
-                    PieceStatus = x.piece.Status
-                })
-                .Take(100)
-                .ToListAsync(ct);
-
-            report.LegacyQtySaleMismatchCount = report.LegacyQtySaleMismatches.Count;
 
             return report;
         }

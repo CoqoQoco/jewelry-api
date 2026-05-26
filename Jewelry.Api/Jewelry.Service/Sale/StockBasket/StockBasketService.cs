@@ -89,19 +89,22 @@ public class StockBasketService : BaseService, IStockBasketService
         var items = await (
             from item in _jewelryContext.TbtStockBasketItem
             where item.BasketRunning == request.Running
-            join product in _jewelryContext.TbtStockProduct
-                on item.StockNumber equals product.StockNumber into productGroup
-            from product in productGroup.DefaultIfEmpty()
+            join piece in _jewelryContext.TbtStockPiece
+                on item.StockNumber equals piece.StockNumber into pieceGroup
+            from piece in pieceGroup.DefaultIfEmpty()
+            join sku in _jewelryContext.TbtSku
+                on (piece != null ? piece.SkuCode : null) equals sku.SkuCode into skuGroup
+            from sku in skuGroup.DefaultIfEmpty()
             select new jewelry.Model.Sale.StockBasket.Get.BasketItemResponse
             {
                 Id = item.Id,
                 StockNumber = item.StockNumber,
-                ProductNumber = product != null ? product.ProductNumber : null,
-                ProductNameTh = product != null ? product.ProductNameTh : null,
-                ProductNameEn = product != null ? product.ProductNameEn : null,
-                ProductType = product != null ? product.ProductType : null,
-                ProductionTypeSize = product != null ? product.ProductionTypeSize : null,
-                ImagePath = product != null ? product.ImagePath : null,
+                ProductNumber = sku != null ? sku.ProductNumber : null,
+                ProductNameTh = sku != null ? sku.ProductNameTh : null,
+                ProductNameEn = sku != null ? sku.ProductNameEn : null,
+                ProductType = sku != null ? sku.ProductType : null,
+                ProductionTypeSize = sku != null ? sku.ProductionTypeSize : null,
+                ImagePath = sku != null ? sku.ImagePath : null,
                 Status = item.Status,
                 StatusName = item.StatusName,
                 CreateDate = item.CreateDate
@@ -217,16 +220,16 @@ public class StockBasketService : BaseService, IStockBasketService
         {
             foreach (var stockNumber in request.StockNumbers)
             {
-                var product = await _jewelryContext.TbtStockProduct
-                    .FirstOrDefaultAsync(p => p.StockNumber == stockNumber);
-
-                if (product == null)
+                if (activeBasketStockNumbers.Contains(stockNumber))
                 {
                     response.SkippedStockNumbers.Add(stockNumber);
                     continue;
                 }
 
-                if (activeBasketStockNumbers.Contains(stockNumber))
+                var piece = await _jewelryContext.TbtStockPiece
+                    .FirstOrDefaultAsync(p => p.StockNumber == stockNumber);
+
+                if (piece == null || piece.Status != "IN_STOCK")
                 {
                     response.SkippedStockNumbers.Add(stockNumber);
                     continue;
@@ -249,39 +252,42 @@ public class StockBasketService : BaseService, IStockBasketService
 
         if (request.CategoryFilter != null)
         {
-            var productQuery = _jewelryContext.TbtStockProduct.AsQueryable();
+            var pieceQuery = _jewelryContext.TbtStockPiece
+                .Include(p => p.SkuCodeNavigation)
+                .Where(p => p.Status == "IN_STOCK")
+                .AsQueryable();
 
             if (!string.IsNullOrEmpty(request.CategoryFilter.ProductType))
             {
-                productQuery = productQuery.Where(p => p.ProductType.Contains(request.CategoryFilter.ProductType));
+                pieceQuery = pieceQuery.Where(p => p.SkuCodeNavigation.ProductType != null && p.SkuCodeNavigation.ProductType.Contains(request.CategoryFilter.ProductType));
             }
 
             if (!string.IsNullOrEmpty(request.CategoryFilter.ProductionType))
             {
-                productQuery = productQuery.Where(p => p.ProductionType != null && p.ProductionType.Contains(request.CategoryFilter.ProductionType));
+                pieceQuery = pieceQuery.Where(p => p.SkuCodeNavigation.ProductionType != null && p.SkuCodeNavigation.ProductionType.Contains(request.CategoryFilter.ProductionType));
             }
 
             if (!string.IsNullOrEmpty(request.CategoryFilter.ProductionTypeSize))
             {
-                productQuery = productQuery.Where(p => p.ProductionTypeSize != null && p.ProductionTypeSize.Contains(request.CategoryFilter.ProductionTypeSize));
+                pieceQuery = pieceQuery.Where(p => p.SkuCodeNavigation.ProductionTypeSize != null && p.SkuCodeNavigation.ProductionTypeSize.Contains(request.CategoryFilter.ProductionTypeSize));
             }
 
             if (!string.IsNullOrEmpty(request.CategoryFilter.ReceiptNumber))
             {
-                productQuery = productQuery.Where(p => p.ReceiptNumber.Contains(request.CategoryFilter.ReceiptNumber));
+                pieceQuery = pieceQuery.Where(p => p.ReceiptNumber != null && p.ReceiptNumber.Contains(request.CategoryFilter.ReceiptNumber));
             }
 
-            var categoryProducts = await productQuery
+            var categoryPieces = await pieceQuery
                 .Where(p => !activeBasketStockNumbers.Contains(p.StockNumber))
                 .ToListAsync();
 
-            foreach (var product in categoryProducts)
+            foreach (var piece in categoryPieces)
             {
                 itemsToAdd.Add(new TbtStockBasketItem
                 {
                     BasketRunning = request.BasketRunning,
                     BasketNumber = basket.BasketNumber,
-                    StockNumber = product.StockNumber,
+                    StockNumber = piece.StockNumber,
                     Status = "InBasket",
                     StatusName = "อยู่ในตะกร้า",
                     CreateDate = DateTime.UtcNow,

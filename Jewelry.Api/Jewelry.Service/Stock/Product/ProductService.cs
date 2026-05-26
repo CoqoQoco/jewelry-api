@@ -67,7 +67,7 @@ namespace Jewelry.Service.Stock.Product
             }
             if (!string.IsNullOrEmpty(request.StockNumberOrigin))
             {
-                pieces = pieces.Where(x => x.WoOrigin != null && x.WoOrigin.Contains(request.StockNumberOrigin));
+                pieces = pieces.Where(x => x.StockNumberOrigin != null && x.StockNumberOrigin.Contains(request.StockNumberOrigin));
             }
             if (!string.IsNullOrEmpty(request.Mold))
             {
@@ -124,7 +124,7 @@ namespace Jewelry.Service.Stock.Product
                            select new jewelry.Model.Stock.Product.List.Response()
                            {
                                StockNumber = item.StockNumber,
-                               StockNumberOrigin = item.WoOrigin,
+                               StockNumberOrigin = item.StockNumberOrigin,
                                Status = item.Status,
 
                                ReceiptNumber = item.ReceiptNumber,
@@ -154,7 +154,7 @@ namespace Jewelry.Service.Stock.Product
                                ProductionType = item.SkuCodeNavigation.ProductionType,
                                ProductionTypeSize = item.SkuCodeNavigation.ProductionTypeSize,
 
-                               Size = item.SkuCodeNavigation.Size,
+                               Size = item.SizeActual ?? item.SkuCodeNavigation.Size,
                                Location = item.LocationCode,
                                Remark = item.Remark,
 
@@ -173,6 +173,7 @@ namespace Jewelry.Service.Stock.Product
                                           TypeName = material.TypeName,
                                           TypeCode = material.TypeCode,
                                           TypeBarcode = material.TypeBarcode,
+                                          TypeOrigin = material.TypeOrigin,
                                           Qty = material.Qty,
                                           QtyUnit = material.QtyUnit,
                                           Weight = material.Weight,
@@ -189,17 +190,16 @@ namespace Jewelry.Service.Stock.Product
         public IQueryable<jewelry.Model.Stock.Product.List.PriceTransection> GetStockCostDetail(string stockNumber)
         {
 
-            var stock = (from item in _jewelryContext.TbtStockProduct
-                         .Include(x => x.TbtStockProductMaterial)
+            var piece = (from item in _jewelryContext.TbtStockPiece
                          where item.StockNumber == stockNumber
                          select item).FirstOrDefault();
 
-            if (stock == null)
+            if (piece == null)
             {
                 return new List<jewelry.Model.Stock.Product.List.PriceTransection>().AsQueryable();
             }
 
-            if (stock.ProductCostDetail == null || string.IsNullOrEmpty(stock.ProductCostDetail))
+            if (piece.ProductCostDetail == null || string.IsNullOrEmpty(piece.ProductCostDetail))
             {
                 return new List<jewelry.Model.Stock.Product.List.PriceTransection>().AsQueryable();
             }
@@ -209,7 +209,7 @@ namespace Jewelry.Service.Stock.Product
                 PropertyNameCaseInsensitive = true
             };
 
-            return JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.List.PriceTransection>>(stock.ProductCostDetail, options)!.AsQueryable();
+            return JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.List.PriceTransection>>(piece.ProductCostDetail, options)!.AsQueryable();
         }
 
         public async Task<jewelry.Model.Stock.Product.Get.Response> Get(jewelry.Model.Stock.Product.Get.Request request)
@@ -234,7 +234,7 @@ namespace Jewelry.Service.Stock.Product
 
             if (!string.IsNullOrEmpty(request.StockNumberOrigin))
             {
-                query = query.Where(x => x.WoOrigin == request.StockNumberOrigin);
+                query = query.Where(x => x.StockNumberOrigin == request.StockNumberOrigin);
             }
 
             if (!string.IsNullOrEmpty(request.ProductNumber))
@@ -254,7 +254,7 @@ namespace Jewelry.Service.Stock.Product
             var response = new jewelry.Model.Stock.Product.Get.Response()
             {
                 StockNumber = piece.StockNumber,
-                StockNumberOrigin = piece.WoOrigin ?? piece.StockNumber,
+                StockNumberOrigin = piece.StockNumberOrigin,
 
                 ReceiptNumber = piece.ReceiptNumber,
                 ReceiptType = piece.ReceiptType,
@@ -277,7 +277,7 @@ namespace Jewelry.Service.Stock.Product
                 ImagePath = sku.ImagePath,
                 Qty = 1,
                 Location = piece.LocationCode,
-                Size = sku.Size,
+                Size = piece.SizeActual ?? sku.Size,
                 Remark = piece.Remark,
                 CreateBy = piece.CreateBy,
                 CreateDate = piece.CreateDate,
@@ -411,55 +411,63 @@ namespace Jewelry.Service.Stock.Product
         {
             CheckPermissionLevel("update_stock");
 
-            var stock = (from item in _jewelryContext.TbtStockProduct
-                         .Include(x => x.TbtStockProductMaterial)
-                         where item.StockNumber == request.StockNumber
-                         && item.ReceiptNumber == request.ReceiptNumber
-                         select item).FirstOrDefault();
+            var piece = await _jewelryContext.TbtStockPiece
+                .Include(x => x.TbtStockPieceMaterial)
+                .FirstOrDefaultAsync(x => x.StockNumber == request.StockNumber);
 
-            if (stock == null)
+            if (piece == null)
             {
                 throw new HandleException(ErrorMessage.NotFound);
             }
 
+            var sku = await _jewelryContext.TbtSku
+                .FirstOrDefaultAsync(x => x.SkuCode == piece.SkuCode);
+
+            if (sku == null)
+            {
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            var now = DateTime.UtcNow;
+
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                stock.ProductNameEn = request.ProductNameEn;
-                stock.ProductNameTh = request.ProductNameTh;
+                piece.LocationCode = request.Location ?? piece.LocationCode;
+                piece.SizeActual = request.Size;
+                piece.Remark = request.Remark;
+                piece.ProductCost = request.ProductCost ?? piece.ProductCost;
+                piece.UpdateDate = now;
+                piece.UpdateBy = CurrentUsername;
 
-                stock.ImagePath = request.ImagePath;
-                stock.ImageName = request.ImageName;
+                sku.ProductNameEn = request.ProductNameEn;
+                sku.ProductNameTh = request.ProductNameTh;
+                sku.MoldDesign = request.Mold;
+                sku.DefaultPrice = request.ProductPrice;
+                sku.ImageName = request.ImageName;
+                sku.ImagePath = request.ImagePath;
+                sku.UpdateDate = now;
+                sku.UpdateBy = CurrentUsername;
 
-                stock.Qty = request.Qty;
-                stock.ProductPrice = request.ProductPrice;
-
-                stock.MoldDesign = request.Mold;
-
-                stock.Size = request.Size;
-                stock.Location = request.Location;
-
-                stock.UpdateDate = DateTime.UtcNow;
-                stock.UpdateBy = CurrentUsername;
-
-
-                if (stock.TbtStockProductMaterial.Any())
+                if (piece.TbtStockPieceMaterial.Any())
                 {
-                    _jewelryContext.TbtStockProductMaterial.RemoveRange(stock.TbtStockProductMaterial);
+                    _jewelryContext.TbtStockPieceMaterial.RemoveRange(piece.TbtStockPieceMaterial);
                 }
 
-                var newMats = new List<TbtStockProductMaterial>();
+                var newMats = new List<TbtStockPieceMaterial>();
                 if (request.Materials.Any())
                 {
                     foreach (var item in request.Materials)
                     {
-                        var newMat = new TbtStockProductMaterial
+                        newMats.Add(new TbtStockPieceMaterial
                         {
-                            StockNumber = request.StockNumber,
+                            StockNumber = piece.StockNumber,
+                            ProductCode = piece.ProductCode,
 
                             Type = item.Type,
                             TypeName = item.TypeName,
                             TypeCode = item.TypeCode,
                             TypeBarcode = item.TypeBarcode,
+                            TypeOrigin = item.TypeOrigin,
 
                             Qty = item.Qty,
                             QtyUnit = item.QtyUnit,
@@ -471,16 +479,16 @@ namespace Jewelry.Service.Stock.Product
                             Price = item.Price,
 
                             CreateBy = CurrentUsername,
-                            CreateDate = DateTime.UtcNow
-                        };
-                        newMats.Add(newMat);
+                            CreateDate = now
+                        });
                     }
                 }
 
-                _jewelryContext.TbtStockProduct.Update(stock);
+                _jewelryContext.TbtStockPiece.Update(piece);
+                _jewelryContext.TbtSku.Update(sku);
                 if (newMats.Any())
                 {
-                    _jewelryContext.TbtStockProductMaterial.AddRange(newMats);
+                    _jewelryContext.TbtStockPieceMaterial.AddRange(newMats);
                 }
 
                 await _jewelryContext.SaveChangesAsync();
@@ -496,22 +504,21 @@ namespace Jewelry.Service.Stock.Product
         {
             var _running = await _runningNumberService.GenerateRunningNumber("CP");
 
-
-            var stock = (from item in _jewelryContext.TbtStockProduct
-                        .Include(x => x.TbtStockProductMaterial)
-                         where item.Status == "Available" && item.StockNumber == request.StockNumber   
+            var piece = (from item in _jewelryContext.TbtStockPiece
+                         where item.Status == "IN_STOCK" && item.StockNumber == request.StockNumber
                          select item).FirstOrDefault();
 
-            if (stock == null)
-            { 
-                throw new HandleException(ErrorMessage.NotFound);   
+            if (piece == null)
+            {
+                throw new HandleException(ErrorMessage.NotFound);
             }
 
-            var newPlan = new TbtStockCostPlan()
+            var newPlan = new TbtStockPieceCostPlan()
             {
                 Running = _running,
                 StockNumber = request.StockNumber,
-                StockNumberOrigin = stock.ProductCode,
+                ProductCode = piece.ProductCode,
+                StockNumberOrigin = piece.StockNumberOrigin,
 
                 Remark = request.Remark,
 
@@ -542,7 +549,7 @@ namespace Jewelry.Service.Stock.Product
             };
             myJob.DataJob = JsonSerializer.Serialize(newPlan, options);
 
-            _jewelryContext.TbtStockCostPlan.Add(newPlan);
+            _jewelryContext.TbtStockPieceCostPlan.Add(newPlan);
             _jewelryContext.TbtMyJob.Add(myJob);
 
             await _jewelryContext.SaveChangesAsync();
@@ -553,22 +560,28 @@ namespace Jewelry.Service.Stock.Product
 
             //CheckPermissionLevel("update_stock");
 
-            var stock = (from item in _jewelryContext.TbtStockProduct
-                         .Include(x => x.TbtStockProductMaterial)
+            var piece = (from item in _jewelryContext.TbtStockPiece
                          where item.StockNumber == request.StockNumber
                          select item).FirstOrDefault();
 
-            if (stock == null)
+            if (piece == null)
             {
                 throw new HandleException(ErrorMessage.NotFound);
             }
 
-            var priceTransactionList = new Data.Models.Jewelry.TbtStockCostVersion()
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            var priceTransactionList = new TbtStockPieceCostVersion()
             {
                 Running = await _runningNumberService.GenerateRunningNumber("CV"),
                 JobRunning = request.PlanRunning,
 
                 StockNumber = request.StockNumber,
+                ProductCode = piece.ProductCode,
                 CreateBy = CurrentUsername,
                 CreateDate = DateTime.UtcNow,
 
@@ -582,55 +595,47 @@ namespace Jewelry.Service.Stock.Product
                 CurrencyUnit = request.CurrencyUnit,
                 CurrencyRate = request.CurrencyRate,
 
+                ProductCostDetail = JsonSerializer.Serialize(request.Prictransection, options),
+                CustomStockInfo = request.CustomStockInfo != null && request.CustomStockInfo.Any()
+                    ? JsonSerializer.Serialize(request.CustomStockInfo, options)
+                    : null,
             };
 
-
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-            priceTransactionList.ProductCostDetail = JsonSerializer.Serialize(request.Prictransection, options);
-            priceTransactionList.CustomStockInfo = request.CustomStockInfo != null && request.CustomStockInfo.Any()
-                ? JsonSerializer.Serialize(request.CustomStockInfo, options)
-                : null;
-
-            _jewelryContext.TbtStockCostVersion.Add(priceTransactionList);
+            _jewelryContext.TbtStockPieceCostVersion.Add(priceTransactionList);
 
             if (request.IsOriginCost)
             {
-                stock.ProductCostDetail = priceTransactionList.ProductCostDetail;
-                stock.ProductCost = request.Prictransection.Sum(x => x.TotalPrice);
-                stock.TagPriceMultiplier = request.TagPriceMultiplier;
+                piece.ProductCostDetail = priceTransactionList.ProductCostDetail;
+                piece.ProductCost = request.Prictransection.Sum(x => x.TotalPrice);
 
-                stock.UpdateBy = CurrentUsername;
-                stock.UpdateDate = DateTime.UtcNow;
-                _jewelryContext.TbtStockProduct.Update(stock);
+                piece.UpdateBy = CurrentUsername;
+                piece.UpdateDate = DateTime.UtcNow;
+                _jewelryContext.TbtStockPiece.Update(piece);
             }
 
             if (!string.IsNullOrEmpty(request.PlanRunning))
             {
-                var query = (from item in _jewelryContext.TbtStockCostPlan
-                             where item.Running == request.PlanRunning
-                             select item).FirstOrDefault();
+                var costPlan = (from item in _jewelryContext.TbtStockPieceCostPlan
+                                where item.Running == request.PlanRunning
+                                select item).FirstOrDefault();
 
-                if (query != null)
+                if (costPlan != null)
                 {
-                    query.VersionRunning = priceTransactionList.Running;
-                    query.UpdateBy = CurrentUsername;
-                    query.UpdateDate = DateTime.UtcNow;
+                    costPlan.VersionRunning = priceTransactionList.Running;
+                    costPlan.UpdateBy = CurrentUsername;
+                    costPlan.UpdateDate = DateTime.UtcNow;
 
-                    query.StatusId = JobStatus.Completed;
-                    query.StatusName = JobStatus.GetStatusNameEn(JobStatus.Completed);
+                    costPlan.StatusId = JobStatus.Completed;
+                    costPlan.StatusName = JobStatus.GetStatusNameEn(JobStatus.Completed);
 
-                    _jewelryContext.TbtStockCostPlan.Update(query);
+                    _jewelryContext.TbtStockPieceCostPlan.Update(costPlan);
                 }
 
                 var myJob = (from job in _jewelryContext.TbtMyJob
                              where job.JobRunning == request.PlanRunning
                              select job).FirstOrDefault();
-                if (myJob != null )
-                { 
+                if (myJob != null)
+                {
                     myJob.StatusId = JobStatus.Completed;
                     myJob.StatusName = JobStatus.GetStatusNameEn(JobStatus.Completed);
                     myJob.UpdateBy = CurrentUsername;
@@ -650,7 +655,7 @@ namespace Jewelry.Service.Stock.Product
                 PropertyNameCaseInsensitive = true
             };
 
-            var response = (from item in _jewelryContext.TbtStockCostVersion
+            var response = (from item in _jewelryContext.TbtStockPieceCostVersion
                             where item.StockNumber == stockNumber
                             select new jewelry.Model.Stock.Product.ListProductCost.Response()
                             {
@@ -690,7 +695,7 @@ namespace Jewelry.Service.Stock.Product
                 PropertyNameCaseInsensitive = true
             };
 
-            var costVersion = (from item in _jewelryContext.TbtStockCostVersion
+            var costVersion = (from item in _jewelryContext.TbtStockPieceCostVersion
                                where item.JobRunning == request.PlanRunning
                                select item).FirstOrDefault();
 
@@ -728,7 +733,7 @@ namespace Jewelry.Service.Stock.Product
 
         public IQueryable<jewelry.Model.Stock.Product.ListStockCostPlan.Response> ListStockCostPlan(jewelry.Model.Stock.Product.ListStockCostPlan.Search request)
         {
-            var query = (from item in _jewelryContext.TbtStockCostPlan
+            var query = (from item in _jewelryContext.TbtStockPieceCostPlan
                          select item);
 
             // Apply filters
@@ -799,7 +804,7 @@ namespace Jewelry.Service.Stock.Product
                 PropertyNameCaseInsensitive = true
             };
 
-            var query = (from item in _jewelryContext.TbtStockCostVersion
+            var query = (from item in _jewelryContext.TbtStockPieceCostVersion
                          select item);
 
             if (!string.IsNullOrEmpty(request.StockNumber))
@@ -860,7 +865,7 @@ namespace Jewelry.Service.Stock.Product
             if (request.Mode == "TH")
             {
                 var response = (
-                    from item in _jewelryContext.TbtStockProduct
+                    from item in _jewelryContext.TbtSku
                     where item.ProductNameTh.Contains(request.Text)
                     select new jewelry.Model.Stock.Product.ListName.Response()
                     {
@@ -873,7 +878,7 @@ namespace Jewelry.Service.Stock.Product
             if (request.Mode == "EN")
             {
                 var response = (
-                    from item in _jewelryContext.TbtStockProduct
+                    from item in _jewelryContext.TbtSku
                     where item.ProductNameEn.Contains(request.Text)
                     select new jewelry.Model.Stock.Product.ListName.Response()
                     {
@@ -978,11 +983,31 @@ namespace Jewelry.Service.Stock.Product
 
         #region Private Helper Methods
 
-        private IQueryable<TbtStockProduct> BuildStockQuery(DashboardRequest request)
+        private IQueryable<StockDashboardItem> BuildStockQuery(DashboardRequest request)
         {
-            var query = _jewelryContext.TbtStockProduct
-                .Where(x => x.QtyRemaining > 0)
-                .AsNoTracking();
+            var query = from piece in _jewelryContext.TbtStockPiece.AsNoTracking()
+                        join sku in _jewelryContext.TbtSku.AsNoTracking() on piece.SkuCode equals sku.SkuCode
+                        where piece.Status == "IN_STOCK" || piece.Status == "RESERVED"
+                        select new StockDashboardItem
+                        {
+                            StockNumber = piece.StockNumber,
+                            ProductNumber = sku.ProductNumber,
+                            ProductNameTh = sku.ProductNameTh,
+                            ProductNameEn = sku.ProductNameEn,
+                            ProductType = sku.ProductType,
+                            ProductTypeName = sku.ProductTypeName,
+                            ProductionType = sku.ProductionType,
+                            ProductionTypeSize = sku.ProductionTypeSize,
+                            Status = piece.Status,
+                            Qty = 1m,
+                            ProductPrice = sku.DefaultPrice ?? 0m,
+                            Mold = sku.Mold,
+                            MoldDesign = sku.MoldDesign,
+                            Wo = piece.Wo,
+                            WoNumber = piece.WoNumber,
+                            CreateDate = piece.CreateDate,
+                            CreateBy = piece.CreateBy
+                        };
 
             if (request.ProductType != null && request.ProductType.Any())
             {
@@ -1242,5 +1267,26 @@ namespace Jewelry.Service.Stock.Product
 
             }
         }
+    }
+
+    internal class StockDashboardItem
+    {
+        public string StockNumber { get; set; } = null!;
+        public string? ProductNumber { get; set; }
+        public string ProductNameTh { get; set; } = null!;
+        public string ProductNameEn { get; set; } = null!;
+        public string? ProductType { get; set; }
+        public string? ProductTypeName { get; set; }
+        public string? ProductionType { get; set; }
+        public string? ProductionTypeSize { get; set; }
+        public string? Status { get; set; }
+        public decimal Qty { get; set; }
+        public decimal ProductPrice { get; set; }
+        public string? Mold { get; set; }
+        public string? MoldDesign { get; set; }
+        public string? Wo { get; set; }
+        public int? WoNumber { get; set; }
+        public DateTime CreateDate { get; set; }
+        public string CreateBy { get; set; } = null!;
     }
 }
