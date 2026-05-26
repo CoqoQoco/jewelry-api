@@ -50,154 +50,138 @@ namespace Jewelry.Service.Stock.Product
 
         public IQueryable<jewelry.Model.Stock.Product.List.Response> List(jewelry.Model.Stock.Product.List.Search request)
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            };
-
-            var stock = (from item in _jewelryContext.TbtStockProduct
-                         .Include(x => x.TbtStockProductMaterial)
-                         where item.Status == "Available"
-                         select item);
+            var pieces = _jewelryContext.TbtStockPiece
+                .AsNoTracking()
+                .Include(x => x.SkuCodeNavigation)
+                .Include(x => x.TbtStockPieceMaterial)
+                .AsQueryable();
 
             if (request.ReceiptType != null && request.ReceiptType.Any())
             {
-                var stockTypeArray = request.ReceiptType.Select(x => x).ToArray();
-                stock = stock.Where(x => stockTypeArray.Contains(x.ProductionType));
+                var receiptTypeArray = request.ReceiptType.ToArray();
+                pieces = pieces.Where(x => receiptTypeArray.Contains(x.SkuCodeNavigation.ProductionType));
             }
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
-                stock = stock.Where(x => x.StockNumber.Contains(request.StockNumber));
+                pieces = pieces.Where(x => x.StockNumber.Contains(request.StockNumber));
             }
             if (!string.IsNullOrEmpty(request.StockNumberOrigin))
             {
-                stock = stock.Where(x => x.ProductCode.Contains(request.StockNumberOrigin));
+                pieces = pieces.Where(x => x.WoOrigin != null && x.WoOrigin.Contains(request.StockNumberOrigin));
             }
             if (!string.IsNullOrEmpty(request.Mold))
             {
-                stock = stock.Where(x => x.MoldDesign.Contains(request.Mold));
+                pieces = pieces.Where(x => x.SkuCodeNavigation.MoldDesign != null && x.SkuCodeNavigation.MoldDesign.Contains(request.Mold));
             }
             if (request.ProductType != null && request.ProductType.Any())
             {
-                var productTypeArray = request.ProductType.Select(x => x).ToArray();
-                stock = stock.Where(x => productTypeArray.Contains(x.ProductType));
+                var productTypeArray = request.ProductType.ToArray();
+                pieces = pieces.Where(x => productTypeArray.Contains(x.SkuCodeNavigation.ProductType));
             }
-
             if (request.Gold != null && request.Gold.Any())
             {
-                var productTypeArray = request.Gold.Select(x => x).ToArray();
-                stock = stock.Where(x => productTypeArray.Contains(x.ProductionType));
+                var goldArray = request.Gold.ToArray();
+                pieces = pieces.Where(x => goldArray.Contains(x.SkuCodeNavigation.ProductionType));
             }
             if (request.GoldSize != null && request.GoldSize.Any())
             {
-                var productTypeArray = request.GoldSize.Select(x => x).ToArray();
-                stock = stock.Where(x => productTypeArray.Contains(x.ProductionTypeSize));
+                var goldSizeArray = request.GoldSize.ToArray();
+                pieces = pieces.Where(x => goldSizeArray.Contains(x.SkuCodeNavigation.ProductionTypeSize));
             }
-
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
-                stock = stock.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+                pieces = pieces.Where(x => x.ProductCode.Contains(request.ProductNumber));
             }
             if (!string.IsNullOrEmpty(request.ProductNameTh))
             {
-                stock = stock.Where(x => x.ProductNameTh.Contains(request.ProductNameTh));
+                pieces = pieces.Where(x => x.SkuCodeNavigation.ProductNameTh.Contains(request.ProductNameTh));
             }
             if (!string.IsNullOrEmpty(request.ProductNameEn))
             {
-                stock = stock.Where(x => x.ProductNameEn.Contains(request.ProductNameEn));
+                pieces = pieces.Where(x => x.SkuCodeNavigation.ProductNameEn.Contains(request.ProductNameEn));
             }
             if (!string.IsNullOrEmpty(request.Size))
             {
-                stock = stock.Where(x => x.Size.Contains(request.Size));
+                pieces = pieces.Where(x => x.SkuCodeNavigation.Size != null && x.SkuCodeNavigation.Size.Contains(request.Size));
             }
             if (request.HasCostDetail.HasValue)
             {
                 if (request.HasCostDetail.Value)
                 {
-                    stock = stock.Where(x => x.ProductCostDetail != null && x.ProductCostDetail != "");
+                    pieces = pieces.Where(x => x.ProductCostDetail != null && x.ProductCostDetail != "");
                 }
                 else
                 {
-                    stock = stock.Where(x => x.ProductCostDetail == null || x.ProductCostDetail == "");
+                    pieces = pieces.Where(x => x.ProductCostDetail == null || x.ProductCostDetail == "");
                 }
             }
-
             if (!string.IsNullOrEmpty(request.PieceStatus))
             {
-                var pieceStatus = request.PieceStatus;
-                stock = stock.Where(x => _jewelryContext.TbtStockPiece
-                    .AsNoTracking()
-                    .Any(p => p.StockNumber == x.StockNumber && p.Status == pieceStatus));
+                pieces = pieces.Where(x => x.Status == request.PieceStatus);
             }
 
-            var response = from item in stock
+            var response = from item in pieces
                            select new jewelry.Model.Stock.Product.List.Response()
                            {
                                StockNumber = item.StockNumber,
-                               StockNumberOrigin = item.ProductCode,
+                               StockNumberOrigin = item.WoOrigin,
                                Status = item.Status,
 
                                ReceiptNumber = item.ReceiptNumber,
-                               ReceiptDate = item.ReceiptDate,
-                               ReceiptType = item.ProductionType,
+                               ReceiptDate = item.ReceiptDate ?? item.CreateDate,
+                               ReceiptType = item.ReceiptType,
 
-                               Mold = item.MoldDesign ?? item.Mold,
+                               Mold = item.SkuCodeNavigation.MoldDesign ?? item.SkuCodeNavigation.Mold,
 
-                               Qty = item.Qty,
-                               ProductPrice = item.ProductPrice,
+                               Qty = 1,
+                               ProductPrice = item.SkuCodeNavigation.DefaultPrice ?? 0,
 
-                               ProductNumber = item.ProductNumber,
-                               ProductNameTh = item.ProductNameTh,
-                               ProductNameEn = item.ProductNameEn,
+                               ProductNumber = item.SkuCodeNavigation.ProductNumber,
+                               ProductNameTh = item.SkuCodeNavigation.ProductNameTh,
+                               ProductNameEn = item.SkuCodeNavigation.ProductNameEn,
 
-                               ProductType = item.ProductType,
-                               ProductTypeName = item.ProductTypeName,
+                               ProductType = item.SkuCodeNavigation.ProductType,
+                               ProductTypeName = item.SkuCodeNavigation.ProductTypeName,
 
-                               ImageName = item.ImageName,
-                               ImagePath = item.ImagePath,
+                               ImageName = item.SkuCodeNavigation.ImageName,
+                               ImagePath = item.SkuCodeNavigation.ImagePath,
 
                                Wo = item.Wo,
                                WoNumber = item.WoNumber,
                                WoText = string.IsNullOrEmpty(item.Wo) ? null : $"{item.Wo}{item.WoNumber.ToString()}",
 
-                               ProductionDate = item.CreateDate,
-                               ProductionType = item.ProductionType,
-                               ProductionTypeSize = item.ProductionTypeSize,
+                               ProductionDate = item.ProductionDate ?? item.CreateDate,
+                               ProductionType = item.SkuCodeNavigation.ProductionType,
+                               ProductionTypeSize = item.SkuCodeNavigation.ProductionTypeSize,
 
-                               Size = item.Size,
-                               Location = item.Location,
+                               Size = item.SkuCodeNavigation.Size,
+                               Location = item.LocationCode,
                                Remark = item.Remark,
 
                                CreateBy = item.CreateBy,
                                CreateDate = item.CreateDate,
+                               UpdateDate = item.UpdateDate,
+                               UpdateBy = item.UpdateBy,
 
-                               TagPriceMultiplier = item.TagPriceMultiplier ?? 1,
+                               TagPriceMultiplier = item.SkuCodeNavigation.TagPriceMultiplier ?? 1,
 
-                               Materials = item.TbtStockProductMaterial.Any() ?
-                                            (from material in item.TbtStockProductMaterial
-                                             select new jewelry.Model.Stock.Product.List.Material()
-                                             {
-                                                 Type = material.Type,
-                                                 TypeName = material.TypeName,
-                                                 TypeCode = material.TypeCode,
-                                                 TypeBarcode = material.TypeBarcode,
-                                                 Qty = material.Qty,
-                                                 QtyUnit = material.QtyUnit,
-                                                 Weight = material.Weight,
-                                                 WeightUnit = material.WeightUnit,
-                                                 Size = material.Size,
-                                                 Region = material.Region,
-                                                 Price = material.Price
-                                             }).ToList()
-                                             : new List<jewelry.Model.Stock.Product.List.Material>(),
-
-                               //PriceTransection = new Func<List<jewelry.Model.Stock.Product.List.PriceTransection>?>(() => {
-                               //    try {
-                               //        return !string.IsNullOrEmpty(item.ProductCostDetail)
-                               //            ? JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.List.PriceTransection>>(item.ProductCostDetail, options)
-                               //            : null;
-                               //    } catch { return null; }
-                               //})()
+                               Materials = item.TbtStockPieceMaterial.Any()
+                                   ? (from material in item.TbtStockPieceMaterial
+                                      select new jewelry.Model.Stock.Product.List.Material()
+                                      {
+                                          Type = material.Type,
+                                          TypeName = material.TypeName,
+                                          TypeCode = material.TypeCode,
+                                          TypeBarcode = material.TypeBarcode,
+                                          Qty = material.Qty,
+                                          QtyUnit = material.QtyUnit,
+                                          Weight = material.Weight,
+                                          WeightUnit = material.WeightUnit,
+                                          Size = material.Size,
+                                          Region = material.Region,
+                                          Price = material.Price
+                                      }).ToList()
+                                   : new List<jewelry.Model.Stock.Product.List.Material>(),
                            };
 
             return response;
@@ -237,12 +221,11 @@ namespace Jewelry.Service.Stock.Product
                 throw new HandleException("StockNumber or ProductNumber or StockNumberOrigin is Required");
             }
 
-            var query = (from item in _jewelryContext.TbtStockProduct
-                        .Include(x => x.TbtStockProductMaterial)
-                         where item.Status == "Available"
-                         select item);
-
-            query = query.Where(x => x.QtyRemaining > 0);
+            var query = _jewelryContext.TbtStockPiece
+                .AsNoTracking()
+                .Include(x => x.SkuCodeNavigation)
+                .Include(x => x.TbtStockPieceMaterial)
+                .AsQueryable();
 
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
@@ -251,53 +234,57 @@ namespace Jewelry.Service.Stock.Product
 
             if (!string.IsNullOrEmpty(request.StockNumberOrigin))
             {
-                query = query.Where(x => x.ProductCode == request.StockNumberOrigin);
+                query = query.Where(x => x.WoOrigin == request.StockNumberOrigin);
             }
 
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
-                query = query.Where(x => x.ProductNumber == request.ProductNumber);
+                query = query.Where(x => x.ProductCode == request.ProductNumber);
             }
 
-            if (!query.Any())
+            var piece = query.FirstOrDefault();
+
+            if (piece == null)
             {
                 throw new HandleException(ErrorMessage.NotFound);
             }
 
-            var stock = query.FirstOrDefault();
+            var sku = piece.SkuCodeNavigation;
+
             var response = new jewelry.Model.Stock.Product.Get.Response()
             {
-                StockNumber = stock.StockNumber,
-                StockNumberOrigin = stock.ProductCode ?? stock.StockNumber,
+                StockNumber = piece.StockNumber,
+                StockNumberOrigin = piece.WoOrigin ?? piece.StockNumber,
 
-                ReceiptNumber = stock.ReceiptNumber,
-                ReceiptType = stock.ProductionType,
-                ReceiptDate = stock.ReceiptDate,
+                ReceiptNumber = piece.ReceiptNumber,
+                ReceiptType = piece.ReceiptType,
+                ReceiptDate = piece.ReceiptDate ?? piece.CreateDate,
 
-                ProductNumber = stock.ProductNumber,
-                ProductNameTh = stock.ProductNameTh,
-                ProductNameEn = stock.ProductNameEn,
-                ProductType = stock.ProductType,
-                ProductTypeName = stock.ProductTypeName,
-                ProductPrice = stock.ProductPrice,
-                Wo = stock.Wo,
-                WoNumber = stock.WoNumber,
-                WoText = $"{stock.Wo}{stock.WoNumber.ToString()}",
-                ProductionDate = stock.CreateDate,
-                ProductionTypeSize = stock.ProductionTypeSize,
-                Mold = stock.MoldDesign ?? stock.Mold,
-                ImageName = stock.ImageName,
-                ImagePath = stock.ImagePath,
-                Qty = stock.Qty,
-                Location = stock.Location,
-                Size = stock.Size,
-                Remark = stock.Remark,
-                CreateBy = stock.CreateBy,
-                CreateDate = stock.CreateDate,
-                UpdateBy = stock.UpdateBy,
-                UpdateDate = stock.UpdateDate,
-                TagPriceMultiplier = stock.TagPriceMultiplier ?? 1,
-                Materials = (from material in stock.TbtStockProductMaterial
+                ProductNumber = sku.ProductNumber,
+                ProductNameTh = sku.ProductNameTh,
+                ProductNameEn = sku.ProductNameEn,
+                ProductType = sku.ProductType,
+                ProductTypeName = sku.ProductTypeName,
+                ProductPrice = sku.DefaultPrice ?? 0,
+                Wo = piece.Wo,
+                WoNumber = piece.WoNumber,
+                WoText = $"{piece.Wo}{piece.WoNumber.ToString()}",
+                ProductionDate = piece.ProductionDate ?? piece.CreateDate,
+                ProductionType = sku.ProductionType,
+                ProductionTypeSize = sku.ProductionTypeSize,
+                Mold = sku.MoldDesign ?? sku.Mold,
+                ImageName = sku.ImageName,
+                ImagePath = sku.ImagePath,
+                Qty = 1,
+                Location = piece.LocationCode,
+                Size = sku.Size,
+                Remark = piece.Remark,
+                CreateBy = piece.CreateBy,
+                CreateDate = piece.CreateDate,
+                UpdateBy = piece.UpdateBy,
+                UpdateDate = piece.UpdateDate,
+                TagPriceMultiplier = sku.TagPriceMultiplier ?? 1,
+                Materials = (from material in piece.TbtStockPieceMaterial
                              select new jewelry.Model.Stock.Product.Get.Material()
                              {
                                  Type = material.Type,
@@ -312,11 +299,8 @@ namespace Jewelry.Service.Stock.Product
                                  Region = material.Region,
                                  Price = material.Price
                              }).ToList(),
-
             };
 
-
-            // Step A: Query plan once (ถ้ามี Wo+WoNumber) — ใช้สำหรับทั้ง PriceTransactions fallback และ PlanPriceItems
             TbtProductionPlan plan = null;
             if (!string.IsNullOrEmpty(response.Wo) && response.WoNumber.HasValue)
             {
@@ -327,18 +311,15 @@ namespace Jewelry.Service.Stock.Product
                         select item).FirstOrDefault();
             }
 
-            // Step B: PriceTransactions — priority: ProductCostDetail JSON → plan fallback → materials
-            // ขั้น 1: จาก ProductCostDetail JSON
-            if (stock.ProductCostDetail != null)
+            if (piece.ProductCostDetail != null)
             {
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 };
-                response.PriceTransactions = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.Get.PriceTransaction>>(stock.ProductCostDetail, options) ?? new List<jewelry.Model.Stock.Product.Get.PriceTransaction>();
+                response.PriceTransactions = JsonSerializer.Deserialize<List<jewelry.Model.Stock.Product.Get.PriceTransaction>>(piece.ProductCostDetail, options) ?? new List<jewelry.Model.Stock.Product.Get.PriceTransaction>();
             }
 
-            // ขั้น 2: fallback จาก plan (ถ้า PriceTransactions ยังว่าง)
             if (!response.PriceTransactions.Any())
             {
                 if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
@@ -383,7 +364,6 @@ namespace Jewelry.Service.Stock.Product
                 }
                 else
                 {
-                    // ขั้น 3: fallback จาก materials
                     var materials = response.Materials.Where(x => x.Type == "Gold" || x.Type == "Gem" || x.Type == "Diamond").ToList();
                     int no = 1;
                     foreach (var mat in materials)
@@ -394,7 +374,7 @@ namespace Jewelry.Service.Stock.Product
                             Name = mat.TypeName,
                             NameDescription = mat.TypeCode,
                             NameGroup = GetNameGroupGroup(mat.Type),
-                            Date = stock.CreateDate,
+                            Date = piece.CreateDate,
                             Qty = mat.Qty,
                             QtyPrice = 0m,
                             QtyWeight = mat.Weight,
@@ -405,7 +385,6 @@ namespace Jewelry.Service.Stock.Product
                 }
             }
 
-            // Step C: PlanPriceItems — ใส่เสมอถ้า plan มีข้อมูล (แสดงเป็น reference section)
             if (plan != null && plan.TbtProductionPlanPrice != null && plan.TbtProductionPlanPrice.Any())
             {
                 response.PlanQty = plan.ProductQty;
