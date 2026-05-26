@@ -174,6 +174,12 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockMovement> TbtStockMovement { get; set; }
 
+    public virtual DbSet<TbtStockPieceMaterial> TbtStockPieceMaterial { get; set; }
+
+    public virtual DbSet<TbtStockPieceCostVersion> TbtStockPieceCostVersion { get; set; }
+
+    public virtual DbSet<TbtStockPieceCostPlan> TbtStockPieceCostPlan { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -3714,7 +3720,7 @@ public partial class JewelryContext : DbContext
 
         modelBuilder.Entity<TbtStockPiece>(entity =>
         {
-            entity.HasKey(e => e.StockNumber).HasName("tbt_stock_piece_pk");
+            entity.HasKey(e => new { e.StockNumber, e.ProductCode }).HasName("tbt_stock_piece_pk");
 
             entity.ToTable("tbt_stock_piece");
 
@@ -3727,6 +3733,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.StockNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("stock_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
             entity.Property(e => e.SkuCode)
                 .HasColumnType("character varying")
                 .HasColumnName("sku_code");
@@ -3865,6 +3874,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.StockNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("stock_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
             entity.Property(e => e.FromLocation)
                 .HasColumnType("character varying")
                 .HasColumnName("from_location");
@@ -3894,7 +3906,7 @@ public partial class JewelryContext : DbContext
 
             entity.HasOne(d => d.StockNumberNavigation)
                 .WithMany(p => p.TbtStockMovement)
-                .HasForeignKey(d => d.StockNumber)
+                .HasForeignKey(d => new { d.StockNumber, d.ProductCode })
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_stock_movement_piece_fk");
 
@@ -3909,6 +3921,191 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.ToLocation)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_stock_movement_to_location_fk");
+        });
+
+        modelBuilder.Entity<TbtStockPieceMaterial>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_piece_material_pk");
+
+            entity.ToTable("tbt_stock_piece_material");
+
+            entity.HasIndex(e => new { e.StockNumber, e.ProductCode }).HasDatabaseName("idx_piece_material_piece");
+            entity.HasIndex(e => e.Type).HasDatabaseName("idx_piece_material_type");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
+            entity.Property(e => e.Type)
+                .HasColumnType("character varying")
+                .HasColumnName("type");
+            entity.Property(e => e.TypeName)
+                .HasColumnType("character varying")
+                .HasColumnName("type_name");
+            entity.Property(e => e.TypeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("type_code");
+            entity.Property(e => e.TypeBarcode)
+                .HasColumnType("character varying")
+                .HasColumnName("type_barcode");
+            entity.Property(e => e.TypeOrigin)
+                .HasColumnType("character varying")
+                .HasColumnName("type_origin");
+            entity.Property(e => e.Size)
+                .HasColumnType("character varying")
+                .HasColumnName("size");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.QtyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("qty_unit");
+            entity.Property(e => e.Weight).HasColumnName("weight");
+            entity.Property(e => e.WeightUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("weight_unit");
+            entity.Property(e => e.Region)
+                .HasColumnType("character varying")
+                .HasColumnName("region");
+            entity.Property(e => e.Price).HasColumnName("price");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(d => d.StockPieceNavigation)
+                .WithMany(p => p.TbtStockPieceMaterial)
+                .HasForeignKey(d => new { d.StockNumber, d.ProductCode })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_piece_material_piece_fk");
+        });
+
+        modelBuilder.Entity<TbtStockPieceCostVersion>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_stock_piece_cost_version_pk");
+
+            entity.ToTable("tbt_stock_piece_cost_version");
+
+            entity.HasIndex(e => new { e.StockNumber, e.ProductCode }).HasDatabaseName("idx_piece_cost_version_piece");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
+            entity.Property(e => e.CustomerName)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_name");
+            entity.Property(e => e.CustomerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_code");
+            entity.Property(e => e.CustomerAddress)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_address");
+            entity.Property(e => e.CustomerTel)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_tel");
+            entity.Property(e => e.CustomerEmail)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_email");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.ProductCostDetail)
+                .HasColumnType("text")
+                .HasColumnName("product_cost_detail");
+            entity.Property(e => e.JobRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("job_running");
+            entity.Property(e => e.TagPriceMultiplier).HasColumnName("tag_price_multiplier");
+            entity.Property(e => e.CurrencyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("currency_unit");
+            entity.Property(e => e.CurrencyRate).HasColumnName("currency_rate");
+            entity.Property(e => e.CustomStockInfo)
+                .HasColumnType("character varying")
+                .HasColumnName("custom_stock_info");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(d => d.StockPieceNavigation)
+                .WithMany(p => p.TbtStockPieceCostVersion)
+                .HasForeignKey(d => new { d.StockNumber, d.ProductCode })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_piece_cost_version_piece_fk");
+        });
+
+        modelBuilder.Entity<TbtStockPieceCostPlan>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_stock_piece_cost_plan_pk");
+
+            entity.ToTable("tbt_stock_piece_cost_plan");
+
+            entity.HasIndex(e => new { e.StockNumber, e.ProductCode }).HasDatabaseName("idx_piece_cost_plan_piece");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
+            entity.Property(e => e.StockNumberOrigin)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number_origin");
+            entity.Property(e => e.VersionRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("version_running");
+            entity.Property(e => e.StatusId)
+                .HasDefaultValue(0)
+                .HasColumnName("status_id");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.IsMobileActive).HasColumnName("is_mobile_active");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(d => d.StockPieceNavigation)
+                .WithMany(p => p.TbtStockPieceCostPlan)
+                .HasForeignKey(d => new { d.StockNumber, d.ProductCode })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_piece_cost_plan_piece_fk");
+
+            entity.HasOne(d => d.VersionRunningNavigation)
+                .WithMany(p => p.TbtStockPieceCostPlan)
+                .HasForeignKey(d => d.VersionRunning)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_piece_cost_plan_version_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);

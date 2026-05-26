@@ -15,6 +15,8 @@ public partial class TbtStockMovement
 
     public string? StockNumber { get; set; }
 
+    public string? ProductCode { get; set; }
+
     public string? FromLocation { get; set; }
 
     public string? ToLocation { get; set; }

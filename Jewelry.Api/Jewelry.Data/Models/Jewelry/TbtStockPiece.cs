@@ -7,6 +7,8 @@ public partial class TbtStockPiece
 {
     public string StockNumber { get; set; } = null!;
 
+    public string ProductCode { get; set; } = null!;
+
     public string SkuCode { get; set; } = null!;
 
     public string LocationCode { get; set; } = null!;
@@ -54,4 +56,10 @@ public partial class TbtStockPiece
     public virtual TbmStockLocation LocationCodeNavigation { get; set; } = null!;
 
     public virtual ICollection<TbtStockMovement> TbtStockMovement { get; set; } = new List<TbtStockMovement>();
+
+    public virtual ICollection<TbtStockPieceMaterial> TbtStockPieceMaterial { get; set; } = new List<TbtStockPieceMaterial>();
+
+    public virtual ICollection<TbtStockPieceCostVersion> TbtStockPieceCostVersion { get; set; } = new List<TbtStockPieceCostVersion>();
+
+    public virtual ICollection<TbtStockPieceCostPlan> TbtStockPieceCostPlan { get; set; } = new List<TbtStockPieceCostPlan>();
 }
