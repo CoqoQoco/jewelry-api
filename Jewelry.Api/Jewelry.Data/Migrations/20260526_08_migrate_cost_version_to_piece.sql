@@ -58,7 +58,10 @@ WHERE NOT EXISTS (
     SELECT 1
     FROM tbt_stock_piece_cost_version v
     WHERE v.running = src.running
-);
+)
+ORDER BY src.running, src.create_date ASC;
+-- DISTINCT ON keeps the oldest row per running (legacy has 1 known dup: CV202602180483)
+-- Result: piece_cost_version count may be 1 less than legacy due to dedup
 
 -- Verify (run after migration):
 -- SELECT (SELECT COUNT(*) FROM tbt_stock_piece_cost_version) AS new_count,

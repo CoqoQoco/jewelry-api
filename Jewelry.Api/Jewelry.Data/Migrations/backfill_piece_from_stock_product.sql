@@ -1,10 +1,12 @@
 -- =============================================
 -- Migration: Backfill Stock Piece from Stock Product (Phase 2 - Stock Refactor Plan D)
--- Date: 2026-05-25
+-- Date: 2026-05-25 (updated 2026-05-26 — composite PK + stock_number_origin)
 -- Description: (1) Auto-seed locations จาก free-text location ใน tbt_stock_product
 --              (2) Insert ข้อมูล per-piece จาก tbt_stock_product เข้า tbt_stock_piece
+--                  รวม product_code + stock_number_origin ตั้งแต่แรก
+--                  (รองรับกรณี piece table มี composite PK + columns พร้อมแล้ว)
 -- Run order: 2 (ต้องรัน backfill_sku ก่อน เพราะมี FK → tbt_sku)
--- Re-run safe: ทั้ง 2 ส่วนใช้ ON CONFLICT DO NOTHING — idempotent
+-- Re-run safe: ON CONFLICT DO NOTHING — idempotent
 -- =============================================
 
 -- =============================================
@@ -33,6 +35,8 @@ ON CONFLICT (code) DO NOTHING;
 -- location_code: UPPER(TRIM(location)) หรือ 'MAIN' ถ้า NULL/blank
 INSERT INTO tbt_stock_piece (
     stock_number,
+    product_code,
+    stock_number_origin,
     sku_code,
     location_code,
     status,
@@ -57,6 +61,24 @@ INSERT INTO tbt_stock_piece (
 )
 SELECT
     src.stock_number,
+    CASE
+        WHEN NULLIF(TRIM(src.product_number), '') IS NOT NULL
+            THEN UPPER(TRIM(src.product_number))
+        ELSE
+            'SKU-' || SUBSTRING(
+                MD5(
+                    LOWER(
+                        COALESCE(src.product_name_th, '') ||
+                        COALESCE(src.mold, '')             ||
+                        COALESCE(src.size, '')             ||
+                        COALESCE(src.production_type, '')  ||
+                        COALESCE(src.production_type_size, '')
+                    )
+                ),
+                1, 8
+            )
+    END                                                         AS product_code,
+    src.product_code                                            AS stock_number_origin,
     CASE
         WHEN NULLIF(TRIM(src.product_number), '') IS NOT NULL
             THEN 'SKU-' || UPPER(TRIM(src.product_number))
@@ -98,4 +120,4 @@ SELECT
     src.update_date,
     src.update_by
 FROM tbt_stock_product src
-ON CONFLICT (stock_number) DO NOTHING;
+ON CONFLICT (stock_number, product_code) DO NOTHING;
