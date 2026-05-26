@@ -23,101 +23,94 @@ namespace Jewelry.Service.Stock.Reconciliation
             };
 
             report.LegacyStockCount = await _jewelryContext.TbtStockProduct
-                .AsNoTracking()
-                .CountAsync(ct);
+                .AsNoTracking().CountAsync(ct);
 
             report.NewPieceCount = await _jewelryContext.TbtStockPiece
-                .AsNoTracking()
-                .CountAsync(ct);
+                .AsNoTracking().CountAsync(ct);
 
-            var onHandMismatches = await _jewelryContext.TbtStockBalance
+            var pieceGroups = await _jewelryContext.TbtStockPiece
                 .AsNoTracking()
-                .Join(
-                    _jewelryContext.TbtStockPiece
-                        .AsNoTracking()
-                        .Where(p => p.Status == "IN_STOCK")
-                        .GroupBy(p => new { p.SkuCode, p.LocationCode })
-                        .Select(g => new { g.Key.SkuCode, g.Key.LocationCode, PieceCount = g.Count() }),
-                    b => new { b.SkuCode, b.LocationCode },
-                    p => new { p.SkuCode, p.LocationCode },
-                    (b, p) => new { Balance = b, Piece = p }
-                )
-                .Where(x => (int)x.Balance.QtyOnHand != x.Piece.PieceCount)
-                .Select(x => new BalanceMismatch
+                .GroupBy(p => new { p.SkuCode, p.LocationCode })
+                .Select(g => new
                 {
-                    SkuCode = x.Balance.SkuCode,
-                    LocationCode = x.Balance.LocationCode,
-                    BalanceQty = x.Balance.QtyOnHand,
-                    PieceCount = x.Piece.PieceCount
+                    g.Key.SkuCode,
+                    g.Key.LocationCode,
+                    ExpectedOnHand   = g.Count(p => p.Status == "IN_STOCK" || p.Status == "RESERVED"),
+                    ExpectedReserved = g.Count(p => p.Status == "RESERVED")
                 })
-                .Take(100)
                 .ToListAsync(ct);
 
-            // Also capture balances that have no matching pieces
-            var balancesWithNoPieces = await _jewelryContext.TbtStockBalance
+            var balances = await _jewelryContext.TbtStockBalance
                 .AsNoTracking()
-                .Where(b => b.QtyOnHand != 0)
-                .Where(b => !_jewelryContext.TbtStockPiece
-                    .Any(p => p.SkuCode == b.SkuCode && p.LocationCode == b.LocationCode && p.Status == "IN_STOCK"))
-                .Select(b => new BalanceMismatch
-                {
-                    SkuCode = b.SkuCode,
-                    LocationCode = b.LocationCode,
-                    BalanceQty = b.QtyOnHand,
-                    PieceCount = 0
-                })
-                .Take(100)
+                .Select(b => new { b.SkuCode, b.LocationCode, b.QtyOnHand, b.QtyReserved })
                 .ToListAsync(ct);
 
-            report.OnHandMismatches = onHandMismatches
-                .Concat(balancesWithNoPieces)
-                .Take(100)
-                .ToList();
-            report.BalanceOnHandMismatchCount = report.OnHandMismatches.Count;
+            var balanceMap = balances
+                .ToDictionary(b => (b.SkuCode, b.LocationCode));
 
-            var reservedMismatches = await _jewelryContext.TbtStockBalance
-                .AsNoTracking()
-                .Join(
-                    _jewelryContext.TbtStockPiece
-                        .AsNoTracking()
-                        .Where(p => p.Status == "RESERVED")
-                        .GroupBy(p => new { p.SkuCode, p.LocationCode })
-                        .Select(g => new { g.Key.SkuCode, g.Key.LocationCode, PieceCount = g.Count() }),
-                    b => new { b.SkuCode, b.LocationCode },
-                    p => new { p.SkuCode, p.LocationCode },
-                    (b, p) => new { Balance = b, Piece = p }
-                )
-                .Where(x => (int)x.Balance.QtyReserved != x.Piece.PieceCount)
-                .Select(x => new BalanceMismatch
+            var pieceKeys = new HashSet<(string, string)>(
+                pieceGroups.Select(p => (p.SkuCode, p.LocationCode)));
+
+            var onHandMismatches = new List<BalanceMismatch>();
+            var reservedMismatches = new List<BalanceMismatch>();
+
+            foreach (var pg in pieceGroups)
+            {
+                balanceMap.TryGetValue((pg.SkuCode, pg.LocationCode), out var bal);
+                var actualOnHand   = bal == null ? 0m : bal.QtyOnHand;
+                var actualReserved = bal == null ? 0m : bal.QtyReserved;
+
+                if ((int)actualOnHand != pg.ExpectedOnHand)
                 {
-                    SkuCode = x.Balance.SkuCode,
-                    LocationCode = x.Balance.LocationCode,
-                    BalanceQty = x.Balance.QtyReserved,
-                    PieceCount = x.Piece.PieceCount
-                })
-                .Take(100)
-                .ToListAsync(ct);
-
-            var balancesWithNoReservedPieces = await _jewelryContext.TbtStockBalance
-                .AsNoTracking()
-                .Where(b => b.QtyReserved != 0)
-                .Where(b => !_jewelryContext.TbtStockPiece
-                    .Any(p => p.SkuCode == b.SkuCode && p.LocationCode == b.LocationCode && p.Status == "RESERVED"))
-                .Select(b => new BalanceMismatch
+                    onHandMismatches.Add(new BalanceMismatch
+                    {
+                        SkuCode = pg.SkuCode,
+                        LocationCode = pg.LocationCode,
+                        BalanceQty = actualOnHand,
+                        PieceCount = pg.ExpectedOnHand
+                    });
+                }
+                if ((int)actualReserved != pg.ExpectedReserved)
                 {
-                    SkuCode = b.SkuCode,
-                    LocationCode = b.LocationCode,
-                    BalanceQty = b.QtyReserved,
-                    PieceCount = 0
-                })
-                .Take(100)
-                .ToListAsync(ct);
+                    reservedMismatches.Add(new BalanceMismatch
+                    {
+                        SkuCode = pg.SkuCode,
+                        LocationCode = pg.LocationCode,
+                        BalanceQty = actualReserved,
+                        PieceCount = pg.ExpectedReserved
+                    });
+                }
+            }
 
-            report.ReservedMismatches = reservedMismatches
-                .Concat(balancesWithNoReservedPieces)
-                .Take(100)
-                .ToList();
-            report.BalanceReservedMismatchCount = report.ReservedMismatches.Count;
+            foreach (var b in balances)
+            {
+                if (pieceKeys.Contains((b.SkuCode, b.LocationCode))) continue;
+                if (b.QtyOnHand != 0)
+                {
+                    onHandMismatches.Add(new BalanceMismatch
+                    {
+                        SkuCode = b.SkuCode,
+                        LocationCode = b.LocationCode,
+                        BalanceQty = b.QtyOnHand,
+                        PieceCount = 0
+                    });
+                }
+                if (b.QtyReserved != 0)
+                {
+                    reservedMismatches.Add(new BalanceMismatch
+                    {
+                        SkuCode = b.SkuCode,
+                        LocationCode = b.LocationCode,
+                        BalanceQty = b.QtyReserved,
+                        PieceCount = 0
+                    });
+                }
+            }
+
+            report.OnHandMismatches = onHandMismatches.Take(100).ToList();
+            report.BalanceOnHandMismatchCount = onHandMismatches.Count;
+            report.ReservedMismatches = reservedMismatches.Take(100).ToList();
+            report.BalanceReservedMismatchCount = reservedMismatches.Count;
 
             report.StatusMismatches = await _jewelryContext.TbtStockPiece
                 .AsNoTracking()
