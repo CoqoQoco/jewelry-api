@@ -138,6 +138,7 @@ builder.Services.AddCors(c =>
                 "http://localhost:7000",
                 "https://localhost:7001",
                 "http://localhost:5173",
+                "http://localhost:5174",
                 "http://localhost:5175"
             )
             .AllowAnyMethod()
