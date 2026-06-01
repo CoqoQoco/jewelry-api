@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
@@ -22,6 +23,7 @@ namespace Jewelry.Service.TransferStock
     public interface IOldStockService
     {
         Task<string> TransferStock9K(jewelry.Model.Stock.OldStock._9K.Request request);
+        Task<string> TransferStock14K(jewelry.Model.Stock.OldStock._9K.Request request);
         Task<string> TransferStock18K(jewelry.Model.Stock.OldStock._9K.Request request);
     }
     public class OldStockService : BaseService, IOldStockService
@@ -542,304 +544,86 @@ namespace Jewelry.Service.TransferStock
         }
 
 
-        #region *** 2025-11-16 Trasfer Stock 9K ***
+        #region *** Public wrappers ***
 
-        public async Task<string> TransferStock9K(jewelry.Model.Stock.OldStock._9K.Request request)
-        {
-            const int batchSize = 500;
+        public Task<string> TransferStock9K(jewelry.Model.Stock.OldStock._9K.Request request) =>
+            TransferStockCore<Stock9k>(
+                _jewelryContext.Stock9k.AsQueryable(),
+                "DK9K", "DK-9K", "TRANSFER_9K",
+                x => x.NoProduct,
+                x => x.IsTransfer,
+                x => x.IsTransfer = true,
+                request.Take);
 
-            // 1. Query ครั้งเดียว → ToListAsync เก็บ memory
-            var get9kStock = await (from item in _jewelryContext.Stock9k
-                              join stock in _jewelryContext.Stock
-                              on item.NoProduct equals stock.Noproduct
-                              into _stock
-                              from stocks in _stock.DefaultIfEmpty()
-                              where item.IsTransfer == false
-                              select new { item, stocks }).Take(request.Take).ToListAsync();
+        public Task<string> TransferStock14K(jewelry.Model.Stock.OldStock._9K.Request request) =>
+            TransferStockCore<Stock14k>(
+                _jewelryContext.Stock14k.AsQueryable(),
+                "DK14K", "DK-14K", "TRANSFER_14K",
+                x => x.NoProduct,
+                x => x.IsTransfer,
+                x => x.IsTransfer = true,
+                request.Take);
 
-            if (!get9kStock.Any())
-            {
-                throw new HandleException("No 9K stock to transfer.");
-            }
+        public Task<string> TransferStock18K(jewelry.Model.Stock.OldStock._9K.Request request) =>
+            TransferStockCore<Stock18k>(
+                _jewelryContext.Stock18k.AsQueryable(),
+                "DK18K", "DK-18K", "TRANSFER_18K",
+                x => x.NoProduct,
+                x => x.IsTransfer,
+                x => x.IsTransfer = true,
+                request.Take);
 
-            var masterProductType = await _jewelryContext.TbmProductType.ToListAsync();
-            var masterGold = await _jewelryContext.TbmGold.ToListAsync();
-            var masterGoldSize = await _jewelryContext.TbmGoldSize.ToListAsync();
-
-            // 2. เช็ค existing ก่อน เพื่อรู้จำนวนที่ต้อง insert จริง
-            var validItems = get9kStock.Where(x => x.stocks != null && !string.IsNullOrEmpty(x.stocks.NoCode)).ToList();
-            var productCodes = validItems.Select(x => x.stocks.Noproduct).Distinct().ToList();
-
-            // แบ่ง batch สำหรับ IN query (ป้องกัน parameter limit)
-            var existingPieceProductCodes = new HashSet<string>();
-            foreach (var codeBatch in productCodes.Chunk(500))
-            {
-                var batch = await _jewelryContext.TbtSku
-                    .Where(x => codeBatch.Contains(x.ProductNumber))
-                    .Select(x => x.ProductNumber)
-                    .ToListAsync();
-                foreach (var code in batch)
-                {
-                    if (code != null) existingPieceProductCodes.Add(code);
-                }
-            }
-
-            // 3. นับจำนวนที่ต้อง insert จริง แล้วค่อย generate running number
-            var itemsToInsert = validItems.Where(x => !existingPieceProductCodes.Contains(x.stocks.Noproduct ?? "")).ToList();
-            var _receiptRunning = await _runningNumberService.GenerateRunningNumber("DK9K");
-
-            var stockRunningNumbers = new List<string>();
-            for (int i = 0; i < itemsToInsert.Count; i++)
-            {
-                stockRunningNumbers.Add(await _runningNumberService.GenerateRunningNumberForStockProductHash("DK-9K"));
-            }
-
-            // 4. แยก insert / update
-            var newProducts = new List<StockProductDto>();
-            var newPieceMaterials = new List<TbtStockPieceMaterial>();
-            var stock9kUpdates = new List<Stock9k>();
-
-            int addCount = 0;
-            int runningIndex = 0;
-
-            foreach (var _stock in get9kStock)
-            {
-                var stock = _stock.stocks;
-                var stock9kItem = _stock.item;
-
-                if (stock == null || string.IsNullOrEmpty(stock.NoCode))
-                {
-                    stock9kItem.IsTransfer = true;
-                    stock9kUpdates.Add(stock9kItem);
-                    continue;
-                }
-
-                var productCode = stock.Noproduct ?? "";
-
-                if (existingPieceProductCodes.Contains(productCode))
-                {
-                    stock9kItem.IsTransfer = true;
-                    stock9kUpdates.Add(stock9kItem);
-                    continue;
-                }
-
-                var _stockRunning = stockRunningNumbers[runningIndex++];
-                addCount++;
-
-                var newProduct = new StockProductDto
-                {
-                    StockNumber = _stockRunning,
-                    Status = StockProductStatus.Available,
-
-                    ReceiptNumber = _receiptRunning,
-                    ReceiptDate = DateTime.UtcNow,
-                    ReceiptType = "transfer",
-
-                    Mold = stock.NoCode,
-                    MoldDesign = stock.NoCode,
-
-                    Qty = stock.Quantity ?? 1,
-                    ProductPrice = stock.Pricesale ?? 0,
-
-                    ProductCost = string.IsNullOrEmpty(stock.Pricecost) ? 0 :
-                        decimal.TryParse(stock.Pricecost, out var cost) ? cost : 0,
-                    ProductCode = stock.Noproduct,
-                    ProductNumber = stock.Codeproduct,
-                    ProductNameTh = stock.Productname ?? "DK",
-                    ProductNameEn = stock.Productname ?? "DK",
-
-                    ImageName = stock.NoCode,
-                    ImagePath = $"{stock.NoCode}.jpg",
-
-                    Size = stock.Ringsize,
-                    Remark = stock.Remark,
-                    TagPriceMultiplier = 1,
-
-                    CreateBy = CurrentUsername ?? "system",
-                    CreateDate = DateTime.UtcNow
-                };
-
-                if (!string.IsNullOrEmpty(stock.Typep))
-                {
-                    var productType = GetProductType(masterProductType, stock.Typep);
-                    newProduct.ProductType = productType.Code;
-                    newProduct.ProductTypeName = productType.NameTh;
-                }
-
-                newProduct.ProductionDate = GetProductionDate(stock.Dateproduct);
-                newProduct.ProductionType = ProducttionType(masterGold, stock.Typeg);
-                newProduct.ProductionTypeSize = ProducttionTypeSize(masterGoldSize, stock.Productname);
-                newProduct.WoOrigin = stock.Jobno;
-                newProduct.Wo = GetWO(stock.Jobno);
-                newProduct.WoNumber = GetWONumber(stock.Jobno);
-
-                newProducts.Add(newProduct);
-
-                if (!string.IsNullOrEmpty(productCode))
-                {
-                    existingPieceProductCodes.Add(productCode);
-                }
-
-                var pieceProductCode = stock.Codeproduct ?? stock.Noproduct ?? _stockRunning;
-                var materialTypes = new[]
-                {
-                    new { Type = stock.Typeg, TypeCode = stock.Typed1, Qty = stock.Qtyg, Weight = stock.Wg, Unit = stock.Unit1, Price = stock.Priceg, Size = (string)null },
-                    new { Type = stock.Typed, TypeCode = stock.Typed1, Qty = stock.Qtyd, Weight = stock.Wd, Unit = stock.Unit2, Price = stock.Priced, Size = (string)null },
-                    new { Type = stock.Typer, TypeCode = stock.Typed1, Qty = stock.Qtyr, Weight = stock.Wr, Unit = stock.Unit3, Price = stock.Pricer, Size = stock.Sizer },
-                    new { Type = stock.TypeS, TypeCode = stock.Typed1, Qty = stock.Qtys, Weight = stock.Ws, Unit = stock.Unit4, Price = stock.Prices, Size = stock.Sizes },
-                    new { Type = stock.Typee, TypeCode = stock.Typed1, Qty = stock.Qtye, Weight = stock.We, Unit = stock.Unit5, Price = stock.Pricee, Size = stock.Sizee },
-                    new { Type = stock.Typem, TypeCode = stock.Typed1, Qty = stock.Qtym, Weight = stock.Wm, Unit = stock.Unit6, Price = stock.Pricem, Size = stock.Sizem }
-                };
-
-                foreach (var mat in materialTypes)
-                {
-                    if (!string.IsNullOrEmpty(mat.Type))
-                    {
-                        var newMaterial = GetPieceMaterial(_stockRunning, pieceProductCode, mat.Type.ToUpper().Trim(),
-                            mat.Type, mat.TypeCode, mat.Qty, mat.Weight, mat.Unit, mat.Price, mat.Size);
-
-                        if (CheckTypeOrigin(newMaterial.TypeOrigin))
-                        {
-                            newPieceMaterials.Add(newMaterial);
-                        }
-                    }
-                }
-
-                stock9kItem.IsTransfer = true;
-                stock9kUpdates.Add(stock9kItem);
-            }
-
-            // 5. Save แบบ batch (ทีละ 500)
-            using var scope = new TransactionScope(
-               TransactionScopeOption.Required,
-               new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
-               TransactionScopeAsyncFlowOption.Enabled);
-
-            try
-            {
-                foreach (var batch in stock9kUpdates.Chunk(batchSize))
-                {
-                    _jewelryContext.Stock9k.UpdateRange(batch);
-                    await _jewelryContext.SaveChangesAsync();
-                }
-
-                var newSkus9k = new List<TbtSku>();
-                var newPieces9k = new List<TbtStockPiece>();
-                var newBalances9k = new List<TbtStockBalance>();
-                var updateBalances9k = new List<TbtStockBalance>();
-                var newMovements9k = new List<TbtStockMovement>();
-
-                var skuCache9k = new Dictionary<string, bool>();
-                var locationCache9k = new Dictionary<string, string>();
-                var balanceCache9k = new Dictionary<string, TbtStockBalance>();
-
-                foreach (var stock in newProducts)
-                {
-                    var skuCode = stock.DeriveSkuCode();
-
-                    if (!skuCache9k.ContainsKey(skuCode))
-                    {
-                        var skuExists = await _jewelryContext.TbtSku.AnyAsync(x => x.SkuCode == skuCode);
-                        if (!skuExists)
-                        {
-                            newSkus9k.Add(stock.MapNewSku(skuCode, CurrentUsername ?? "system"));
-                        }
-                        skuCache9k[skuCode] = true;
-                    }
-
-                    var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername ?? "system", locationCache9k);
-                    var stockNumberOrigin = stock.ProductCode;
-
-                    newPieces9k.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername ?? "system", stockNumberOrigin));
-
-                    var balanceKey = $"{skuCode}|{locationCode}";
-                    if (balanceCache9k.ContainsKey(balanceKey))
-                    {
-                        balanceCache9k[balanceKey].QtyOnHand += 1;
-                        balanceCache9k[balanceKey].LastMovementAt = DateTime.UtcNow;
-                    }
-                    else
-                    {
-                        var existingBalance = await _jewelryContext.TbtStockBalance
-                            .FirstOrDefaultAsync(x => x.SkuCode == skuCode && x.LocationCode == locationCode);
-
-                        if (existingBalance != null)
-                        {
-                            existingBalance.QtyOnHand += 1;
-                            existingBalance.LastMovementAt = DateTime.UtcNow;
-                            balanceCache9k[balanceKey] = existingBalance;
-                        }
-                        else
-                        {
-                            var newBalance = new TbtStockBalance
-                            {
-                                SkuCode = skuCode,
-                                LocationCode = locationCode,
-                                QtyOnHand = 1,
-                                QtyReserved = 0,
-                                LastMovementAt = DateTime.UtcNow,
-                                CreateBy = CurrentUsername ?? "system",
-                                CreateDate = DateTime.UtcNow
-                            };
-                            balanceCache9k[balanceKey] = newBalance;
-                            newBalances9k.Add(newBalance);
-                        }
-                    }
-
-                    var pieceProductCode9k = stock.ProductNumber ?? stock.StockNumber;
-                    newMovements9k.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode9k, locationCode, stock.ReceiptNumber, CurrentUsername ?? "system", "TRANSFER_9K"));
-                }
-
-                updateBalances9k = balanceCache9k.Values.Where(x => x.Id != 0).ToList();
-
-                if (newSkus9k.Any()) _jewelryContext.TbtSku.AddRange(newSkus9k);
-                if (newPieces9k.Any()) _jewelryContext.TbtStockPiece.AddRange(newPieces9k);
-                if (newPieceMaterials.Any()) _jewelryContext.TbtStockPieceMaterial.AddRange(newPieceMaterials);
-                if (newBalances9k.Any()) _jewelryContext.TbtStockBalance.AddRange(newBalances9k);
-                if (updateBalances9k.Any()) _jewelryContext.TbtStockBalance.UpdateRange(updateBalances9k);
-                if (newMovements9k.Any()) _jewelryContext.TbtStockMovement.AddRange(newMovements9k);
-
-                await _jewelryContext.SaveChangesAsync();
-
-                scope.Complete();
-            }
-            catch
-            {
-                scope.Dispose();
-                throw;
-            }
-
-            return $"success add {addCount} item";
-        }
         #endregion
-        #region *** 2025-11-25 TranferStock 18K ***
-        public async Task<string> TransferStock18K(jewelry.Model.Stock.OldStock._9K.Request request)
+
+        #region *** Generic core ***
+
+        private static Expression<Func<T, bool>> Not<T>(Expression<Func<T, bool>> expr)
+        {
+            return Expression.Lambda<Func<T, bool>>(Expression.Not(expr.Body), expr.Parameters);
+        }
+
+        private async Task<string> TransferStockCore<TStock>(
+            IQueryable<TStock> stockSource,
+            string receiptPrefix,
+            string runningPrefix,
+            string refDocType,
+            Expression<Func<TStock, string?>> noProductSelector,
+            Expression<Func<TStock, bool>> isTransferSelector,
+            Action<TStock> markTransfer,
+            int take)
+            where TStock : class
         {
             const int batchSize = 500;
 
-            // 1. Query ครั้งเดียว → ToListAsync เก็บ memory
-            var get18kStock = await (from item in _jewelryContext.Stock18k
-                              join stock in _jewelryContext.Stock
-                              on item.NoProduct equals stock.Noproduct
-                              into _stock
-                              from stocks in _stock.DefaultIfEmpty()
-                              where item.IsTransfer == false
-                              select new { item, stocks }).Take(request.Take).ToListAsync();
+            // Build negated expression: item => !item.IsTransfer
+            var notTransferred = Not(isTransferSelector);
 
-            if (!get18kStock.Any())
+            // 1. Query: LEFT JOIN stockSource with Stock master using GroupJoin + SelectMany + DefaultIfEmpty
+            var rawList = await stockSource
+                .Where(notTransferred)
+                .GroupJoin(_jewelryContext.Stock,
+                    noProductSelector,
+                    s => s.Noproduct,
+                    (item, stocks) => new { item, stocks })
+                .SelectMany(
+                    g => g.stocks.DefaultIfEmpty(),
+                    (g, stock) => new { g.item, stocks = stock })
+                .Take(take)
+                .ToListAsync();
+
+            if (!rawList.Any())
             {
-                throw new HandleException("No 18K stock to transfer.");
+                throw new HandleException($"No {refDocType} stock to transfer.");
             }
 
             var masterProductType = await _jewelryContext.TbmProductType.ToListAsync();
             var masterGold = await _jewelryContext.TbmGold.ToListAsync();
             var masterGoldSize = await _jewelryContext.TbmGoldSize.ToListAsync();
 
-            // 2. เช็ค existing ก่อน เพื่อรู้จำนวนที่ต้อง insert จริง
-            var validItems = get18kStock.Where(x => x.stocks != null && !string.IsNullOrEmpty(x.stocks.NoCode)).ToList();
-            var productCodes = validItems.Select(x => x.stocks.Noproduct).Distinct().ToList();
+            // 2. Check existing SKUs
+            var validItems = rawList.Where(x => x.stocks != null && !string.IsNullOrEmpty(x.stocks.NoCode)).ToList();
+            var productCodes = validItems.Select(x => x.stocks!.Noproduct).Distinct().ToList();
 
-            // แบ่ง batch สำหรับ IN query (ป้องกัน parameter limit)
             var existingPieceProductCodes = new HashSet<string>();
             foreach (var codeBatch in productCodes.Chunk(500))
             {
@@ -853,33 +637,33 @@ namespace Jewelry.Service.TransferStock
                 }
             }
 
-            // 3. นับจำนวนที่ต้อง insert จริง แล้วค่อย generate running number
-            var itemsToInsert = validItems.Where(x => !existingPieceProductCodes.Contains(x.stocks.Noproduct ?? "")).ToList();
-            var _receiptRunning = await _runningNumberService.GenerateRunningNumber("DK18K");
+            // 3. Generate running numbers
+            var itemsToInsert = validItems.Where(x => !existingPieceProductCodes.Contains(x.stocks!.Noproduct ?? "")).ToList();
+            var receiptRunning = await _runningNumberService.GenerateRunningNumber(receiptPrefix);
 
             var stockRunningNumbers = new List<string>();
             for (int i = 0; i < itemsToInsert.Count; i++)
             {
-                stockRunningNumbers.Add(await _runningNumberService.GenerateRunningNumberForStockProductHash("DK-18K"));
+                stockRunningNumbers.Add(await _runningNumberService.GenerateRunningNumberForStockProductHash(runningPrefix));
             }
 
-            // 4. แยก insert / skip
+            // 4. Build insert/update lists
             var newProducts = new List<StockProductDto>();
             var newPieceMaterials = new List<TbtStockPieceMaterial>();
-            var stock18kUpdates = new List<Stock18k>();
+            var stockUpdates = new List<TStock>();
 
             int addCount = 0;
             int runningIndex = 0;
 
-            foreach (var _stock in get18kStock)
+            foreach (var _stock in rawList)
             {
                 var stock = _stock.stocks;
-                var stock18kItem = _stock.item;
+                var stockItem = _stock.item;
 
                 if (stock == null || string.IsNullOrEmpty(stock.NoCode))
                 {
-                    stock18kItem.IsTransfer = true;
-                    stock18kUpdates.Add(stock18kItem);
+                    markTransfer(stockItem);
+                    stockUpdates.Add(stockItem);
                     continue;
                 }
 
@@ -887,20 +671,20 @@ namespace Jewelry.Service.TransferStock
 
                 if (existingPieceProductCodes.Contains(productCode))
                 {
-                    stock18kItem.IsTransfer = true;
-                    stock18kUpdates.Add(stock18kItem);
+                    markTransfer(stockItem);
+                    stockUpdates.Add(stockItem);
                     continue;
                 }
 
-                var _stockRunning = stockRunningNumbers[runningIndex++];
+                var stockRunning = stockRunningNumbers[runningIndex++];
                 addCount++;
 
                 var newProduct = new StockProductDto
                 {
-                    StockNumber = _stockRunning,
+                    StockNumber = stockRunning,
                     Status = StockProductStatus.Available,
 
-                    ReceiptNumber = _receiptRunning,
+                    ReceiptNumber = receiptRunning,
                     ReceiptDate = DateTime.UtcNow,
                     ReceiptType = "transfer",
 
@@ -949,11 +733,11 @@ namespace Jewelry.Service.TransferStock
                     existingPieceProductCodes.Add(productCode);
                 }
 
-                var pieceProductCode = stock.Codeproduct ?? stock.Noproduct ?? _stockRunning;
+                var pieceProductCode = stock.Codeproduct ?? stock.Noproduct ?? stockRunning;
                 var materialTypes = new[]
                 {
-                    new { Type = stock.Typeg, TypeCode = stock.Typed1, Qty = stock.Qtyg, Weight = stock.Wg, Unit = stock.Unit1, Price = stock.Priceg, Size = (string)null },
-                    new { Type = stock.Typed, TypeCode = stock.Typed1, Qty = stock.Qtyd, Weight = stock.Wd, Unit = stock.Unit2, Price = stock.Priced, Size = (string)null },
+                    new { Type = stock.Typeg, TypeCode = stock.Typed1, Qty = stock.Qtyg, Weight = stock.Wg, Unit = stock.Unit1, Price = stock.Priceg, Size = (string?)null },
+                    new { Type = stock.Typed, TypeCode = stock.Typed1, Qty = stock.Qtyd, Weight = stock.Wd, Unit = stock.Unit2, Price = stock.Priced, Size = (string?)null },
                     new { Type = stock.Typer, TypeCode = stock.Typed1, Qty = stock.Qtyr, Weight = stock.Wr, Unit = stock.Unit3, Price = stock.Pricer, Size = stock.Sizer },
                     new { Type = stock.TypeS, TypeCode = stock.Typed1, Qty = stock.Qtys, Weight = stock.Ws, Unit = stock.Unit4, Price = stock.Prices, Size = stock.Sizes },
                     new { Type = stock.Typee, TypeCode = stock.Typed1, Qty = stock.Qtye, Weight = stock.We, Unit = stock.Unit5, Price = stock.Pricee, Size = stock.Sizee },
@@ -964,7 +748,7 @@ namespace Jewelry.Service.TransferStock
                 {
                     if (!string.IsNullOrEmpty(mat.Type))
                     {
-                        var newMaterial = GetPieceMaterial(_stockRunning, pieceProductCode, mat.Type.ToUpper().Trim(),
+                        var newMaterial = GetPieceMaterial(stockRunning, pieceProductCode, mat.Type.ToUpper().Trim(),
                             mat.Type, mat.TypeCode, mat.Qty, mat.Weight, mat.Unit, mat.Price, mat.Size);
 
                         if (CheckTypeOrigin(newMaterial.TypeOrigin))
@@ -974,11 +758,11 @@ namespace Jewelry.Service.TransferStock
                     }
                 }
 
-                stock18kItem.IsTransfer = true;
-                stock18kUpdates.Add(stock18kItem);
+                markTransfer(stockItem);
+                stockUpdates.Add(stockItem);
             }
 
-            // 5. Save แบบ batch (ทีละ 500)
+            // 5. Save in batches
             using var scope = new TransactionScope(
                TransactionScopeOption.Required,
                new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
@@ -986,46 +770,46 @@ namespace Jewelry.Service.TransferStock
 
             try
             {
-                foreach (var batch in stock18kUpdates.Chunk(batchSize))
+                foreach (var batch in stockUpdates.Chunk(batchSize))
                 {
-                    _jewelryContext.Stock18k.UpdateRange(batch);
+                    _jewelryContext.Set<TStock>().UpdateRange(batch);
                     await _jewelryContext.SaveChangesAsync();
                 }
 
-                var newSkus18k = new List<TbtSku>();
-                var newPieces18k = new List<TbtStockPiece>();
-                var newBalances18k = new List<TbtStockBalance>();
-                var updateBalances18k = new List<TbtStockBalance>();
-                var newMovements18k = new List<TbtStockMovement>();
+                var newSkus = new List<TbtSku>();
+                var newPieces = new List<TbtStockPiece>();
+                var newBalances = new List<TbtStockBalance>();
+                var updateBalances = new List<TbtStockBalance>();
+                var newMovements = new List<TbtStockMovement>();
 
-                var skuCache18k = new Dictionary<string, bool>();
-                var locationCache18k = new Dictionary<string, string>();
-                var balanceCache18k = new Dictionary<string, TbtStockBalance>();
+                var skuCache = new Dictionary<string, bool>();
+                var locationCache = new Dictionary<string, string>();
+                var balanceCache = new Dictionary<string, TbtStockBalance>();
 
                 foreach (var stock in newProducts)
                 {
                     var skuCode = stock.DeriveSkuCode();
 
-                    if (!skuCache18k.ContainsKey(skuCode))
+                    if (!skuCache.ContainsKey(skuCode))
                     {
                         var skuExists = await _jewelryContext.TbtSku.AnyAsync(x => x.SkuCode == skuCode);
                         if (!skuExists)
                         {
-                            newSkus18k.Add(stock.MapNewSku(skuCode, CurrentUsername ?? "system"));
+                            newSkus.Add(stock.MapNewSku(skuCode, CurrentUsername ?? "system"));
                         }
-                        skuCache18k[skuCode] = true;
+                        skuCache[skuCode] = true;
                     }
 
-                    var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername ?? "system", locationCache18k);
+                    var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername ?? "system", locationCache);
                     var stockNumberOrigin = stock.ProductCode;
 
-                    newPieces18k.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername ?? "system", stockNumberOrigin));
+                    newPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername ?? "system", stockNumberOrigin));
 
                     var balanceKey = $"{skuCode}|{locationCode}";
-                    if (balanceCache18k.ContainsKey(balanceKey))
+                    if (balanceCache.ContainsKey(balanceKey))
                     {
-                        balanceCache18k[balanceKey].QtyOnHand += 1;
-                        balanceCache18k[balanceKey].LastMovementAt = DateTime.UtcNow;
+                        balanceCache[balanceKey].QtyOnHand += 1;
+                        balanceCache[balanceKey].LastMovementAt = DateTime.UtcNow;
                     }
                     else
                     {
@@ -1036,7 +820,7 @@ namespace Jewelry.Service.TransferStock
                         {
                             existingBalance.QtyOnHand += 1;
                             existingBalance.LastMovementAt = DateTime.UtcNow;
-                            balanceCache18k[balanceKey] = existingBalance;
+                            balanceCache[balanceKey] = existingBalance;
                         }
                         else
                         {
@@ -1050,23 +834,23 @@ namespace Jewelry.Service.TransferStock
                                 CreateBy = CurrentUsername ?? "system",
                                 CreateDate = DateTime.UtcNow
                             };
-                            balanceCache18k[balanceKey] = newBalance;
-                            newBalances18k.Add(newBalance);
+                            balanceCache[balanceKey] = newBalance;
+                            newBalances.Add(newBalance);
                         }
                     }
 
-                    var pieceProductCode18k = stock.ProductNumber ?? stock.StockNumber;
-                    newMovements18k.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode18k, locationCode, stock.ReceiptNumber, CurrentUsername ?? "system", "TRANSFER_18K"));
+                    var pieceProductCode = stock.ProductNumber ?? stock.StockNumber;
+                    newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername ?? "system", refDocType));
                 }
 
-                updateBalances18k = balanceCache18k.Values.Where(x => x.Id != 0).ToList();
+                updateBalances = balanceCache.Values.Where(x => x.Id != 0).ToList();
 
-                if (newSkus18k.Any()) _jewelryContext.TbtSku.AddRange(newSkus18k);
-                if (newPieces18k.Any()) _jewelryContext.TbtStockPiece.AddRange(newPieces18k);
+                if (newSkus.Any()) _jewelryContext.TbtSku.AddRange(newSkus);
+                if (newPieces.Any()) _jewelryContext.TbtStockPiece.AddRange(newPieces);
                 if (newPieceMaterials.Any()) _jewelryContext.TbtStockPieceMaterial.AddRange(newPieceMaterials);
-                if (newBalances18k.Any()) _jewelryContext.TbtStockBalance.AddRange(newBalances18k);
-                if (updateBalances18k.Any()) _jewelryContext.TbtStockBalance.UpdateRange(updateBalances18k);
-                if (newMovements18k.Any()) _jewelryContext.TbtStockMovement.AddRange(newMovements18k);
+                if (newBalances.Any()) _jewelryContext.TbtStockBalance.AddRange(newBalances);
+                if (updateBalances.Any()) _jewelryContext.TbtStockBalance.UpdateRange(updateBalances);
+                if (newMovements.Any()) _jewelryContext.TbtStockMovement.AddRange(newMovements);
 
                 await _jewelryContext.SaveChangesAsync();
 
@@ -1080,6 +864,7 @@ namespace Jewelry.Service.TransferStock
 
             return $"success add {addCount} item";
         }
+
         #endregion
 
     }

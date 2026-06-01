@@ -174,6 +174,24 @@ namespace Jewelry.Api.Controllers.Receipt
         }
 
 
+        [Route("Transfer/14K")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Transfer14K(jewelry.Model.Stock.OldStock._9K.Request request)
+        {
+            try
+            {
+                var response = await _oldStockService.TransferStock14K(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("Transfer/18K")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
