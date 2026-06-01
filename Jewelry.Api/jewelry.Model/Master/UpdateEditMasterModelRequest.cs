@@ -19,5 +19,8 @@ namespace jewelry.Model.Master
 
         public string? Prefix { get; set; }
         public string? Prefix2 { get; set; }
+
+        //gold-size
+        public decimal? GoldPercent { get; set; }
     }
 }

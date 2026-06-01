@@ -228,7 +228,8 @@ namespace Jewelry.Service.Master
                                     NameEn = item.NameEn,
                                     NameTh = item.NameTh,
                                     Code = item.Code,
-                                    Description = $"{item.Code}: {item.NameTh}"
+                                    Description = $"{item.Code}: {item.NameTh}",
+                                    GoldPercent = item.GoldPercent
                                 });
 
                 if (!string.IsNullOrEmpty(request.Text))
@@ -406,6 +407,7 @@ namespace Jewelry.Service.Master
 
                 goldSize.NameEn = request.NameEn;
                 goldSize.NameTh = request.NameTh;
+                goldSize.GoldPercent = request.GoldPercent ?? goldSize.GoldPercent;
 
                 _jewelryContext.TbmGoldSize.Update(goldSize);
                 await _jewelryContext.SaveChangesAsync();
@@ -599,6 +601,7 @@ namespace Jewelry.Service.Master
                     Code = request.Code.ToUpper(),
                     NameEn = request.NameEn,
                     NameTh = request.NameTh,
+                    GoldPercent = request.GoldPercent,
                     CreateDate = DateTime.UtcNow,
                     CreateBy = CurrentUsername,
                     IsActive = true,

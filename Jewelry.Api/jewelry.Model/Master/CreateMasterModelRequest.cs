@@ -21,5 +21,8 @@ namespace jewelry.Model.Master
         //zill
         public string? GoldCode { get; set; }
         public string? GoldSizeCode { get; set; }
+
+        //gold-size
+        public decimal GoldPercent { get; set; }
     }
 }
