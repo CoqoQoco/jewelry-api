@@ -3328,6 +3328,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.IsSalesPoint)
                 .HasDefaultValue(false)
                 .HasColumnName("is_sales_point");
+            entity.Property(e => e.IsTemporary)
+                .HasDefaultValue(false)
+                .HasColumnName("is_temporary");
             entity.Property(e => e.IsActive)
                 .HasDefaultValue(true)
                 .HasColumnName("is_active");

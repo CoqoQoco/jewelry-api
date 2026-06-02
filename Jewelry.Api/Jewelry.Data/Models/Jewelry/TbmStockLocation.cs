@@ -17,6 +17,8 @@ public partial class TbmStockLocation
 
     public bool IsSalesPoint { get; set; }
 
+    public bool IsTemporary { get; set; }
+
     public bool IsActive { get; set; }
 
     public int? SortOrder { get; set; }

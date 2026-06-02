@@ -1,9 +1,12 @@
+using jewelry.Model.Exceptions;
+using jewelry.Model.Stock.Movement.Move;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Stock.Movement;
 using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Net;
 
 namespace Jewelry.Api.Controllers.Stock
 {
@@ -30,6 +33,24 @@ namespace Jewelry.Api.Controllers.Stock
         {
             var response = _service.List();
             return response.ToDataSourceResult(request);
+        }
+
+        [Route("Move")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Move([FromBody] Request request)
+        {
+            try
+            {
+                var response = await _service.MoveLocation(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
         }
     }
 }

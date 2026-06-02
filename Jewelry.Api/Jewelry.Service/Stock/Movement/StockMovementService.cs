@@ -1,13 +1,22 @@
+using jewelry.Model.Exceptions;
+using jewelry.Model.Stock.Movement.Move;
 using Jewelry.Data.Context;
+using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
+using Microsoft.AspNetCore.Http;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Jewelry.Service.Stock.Movement
 {
-    public class StockMovementService : IStockMovementService
+    public class StockMovementService : BaseService, IStockMovementService
     {
         private readonly JewelryContext _jewelryContext;
 
-        public StockMovementService(JewelryContext jewelryContext)
+        public StockMovementService(JewelryContext jewelryContext,
+            IHttpContextAccessor httpContextAccessor) : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
         }
@@ -15,6 +24,132 @@ namespace Jewelry.Service.Stock.Movement
         public IQueryable<object> List()
         {
             return Enumerable.Empty<object>().AsQueryable();
+        }
+
+        public async Task<Response> MoveLocation(Request req)
+        {
+            if (req.StockNumbers == null || !req.StockNumbers.Any())
+            {
+                throw new HandleException("กรุณาระบุ StockNumbers อย่างน้อย 1 รายการ");
+            }
+
+            var target = req.TargetLocationCode.ToUpper();
+
+            var targetLocation = _jewelryContext.TbmStockLocation
+                .FirstOrDefault(x => x.Code == target);
+
+            if (targetLocation == null)
+            {
+                throw new HandleException($"ไม่พบ Location {req.TargetLocationCode} ในระบบ");
+            }
+
+            var pieces = _jewelryContext.TbtStockPiece
+                .Where(p => req.StockNumbers.Contains(p.StockNumber))
+                .ToList();
+
+            var now = DateTime.UtcNow;
+            var username = CurrentUsername;
+
+            var balancesToUpdate = new List<TbtStockBalance>();
+            var balancesToAdd = new List<TbtStockBalance>();
+            var movementsToAdd = new List<TbtStockMovement>();
+            var piecesToUpdate = new List<TbtStockPiece>();
+
+            int movedCount = 0;
+
+            foreach (var piece in pieces)
+            {
+                var oldLocation = piece.LocationCode;
+
+                if (oldLocation == target)
+                    continue;
+
+                // ปรับ balance ต้นทาง
+                var srcBalance = _jewelryContext.TbtStockBalance
+                    .FirstOrDefault(b => b.SkuCode == piece.SkuCode && b.LocationCode == oldLocation);
+
+                if (srcBalance != null)
+                {
+                    srcBalance.QtyOnHand -= 1;
+                    // Assumption: ปรับเฉพาะ QtyOnHand (1 ต่อ piece); QtyReserved คงเดิม
+                    srcBalance.QtyAvailable = srcBalance.QtyOnHand - srcBalance.QtyReserved;
+                    srcBalance.LastMovementAt = now;
+                    srcBalance.UpdateDate = now;
+                    srcBalance.UpdateBy = username;
+                    balancesToUpdate.Add(srcBalance);
+                }
+
+                // ปรับ/สร้าง balance ปลายทาง
+                var dstBalance = _jewelryContext.TbtStockBalance
+                    .FirstOrDefault(b => b.SkuCode == piece.SkuCode && b.LocationCode == target);
+
+                if (dstBalance == null)
+                {
+                    dstBalance = new TbtStockBalance
+                    {
+                        SkuCode = piece.SkuCode,
+                        LocationCode = target,
+                        QtyOnHand = 1,
+                        QtyReserved = 0,
+                        QtyAvailable = 1,
+                        LastMovementAt = now,
+                        CreateDate = now,
+                        CreateBy = username
+                    };
+                    balancesToAdd.Add(dstBalance);
+                }
+                else
+                {
+                    dstBalance.QtyOnHand += 1;
+                    // Assumption: ปรับเฉพาะ QtyOnHand (1 ต่อ piece); QtyReserved คงเดิม
+                    dstBalance.QtyAvailable = dstBalance.QtyOnHand - dstBalance.QtyReserved;
+                    dstBalance.LastMovementAt = now;
+                    dstBalance.UpdateDate = now;
+                    dstBalance.UpdateBy = username;
+                    balancesToUpdate.Add(dstBalance);
+                }
+
+                // สร้าง movement record
+                movementsToAdd.Add(new TbtStockMovement
+                {
+                    MovementDate = now,
+                    MovementType = "Transfer",
+                    SkuCode = piece.SkuCode,
+                    StockNumber = piece.StockNumber,
+                    ProductCode = piece.ProductCode,
+                    FromLocation = oldLocation,
+                    ToLocation = target,
+                    Qty = 1,
+                    RefDocType = "MoveLocation",
+                    Remark = req.Remark,
+                    CreateDate = now,
+                    CreateBy = username
+                });
+
+                // อัปเดต piece
+                piece.LocationCode = target;
+                piece.UpdateDate = now;
+                piece.UpdateBy = username;
+                piecesToUpdate.Add(piece);
+
+                movedCount++;
+            }
+
+            if (balancesToUpdate.Any())
+                _jewelryContext.TbtStockBalance.UpdateRange(balancesToUpdate);
+
+            if (balancesToAdd.Any())
+                _jewelryContext.TbtStockBalance.AddRange(balancesToAdd);
+
+            if (movementsToAdd.Any())
+                _jewelryContext.TbtStockMovement.AddRange(movementsToAdd);
+
+            if (piecesToUpdate.Any())
+                _jewelryContext.TbtStockPiece.UpdateRange(piecesToUpdate);
+
+            await _jewelryContext.SaveChangesAsync();
+
+            return new Response { Message = "success", MovedCount = movedCount };
         }
     }
 }
