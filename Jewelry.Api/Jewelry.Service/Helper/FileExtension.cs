@@ -155,7 +155,7 @@ namespace Jewelry.Service.Helper
             try
             {
                 // Map old local path to Azure Blob folder name
-                // Example: "Images/Mold" -> "Mold", "Images/OrderPlan" -> "ProductionPlan"
+                // Example: "Mold" -> "Mold", "Images/OrderPlan" -> "ProductionPlan"
                 string folderName = path
                     .Replace("Images/", "")
                     .Replace("Images\\", "")
