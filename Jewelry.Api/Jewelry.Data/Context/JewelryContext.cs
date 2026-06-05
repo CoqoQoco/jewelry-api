@@ -2397,6 +2397,37 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("customer_code");
         });
 
+        modelBuilder.Entity<TbtSaleDocument>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_sale_document_pkey");
+
+            entity.ToTable("tbt_sale_document");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.FileName)
+                .HasColumnType("character varying")
+                .HasColumnName("file_name");
+            entity.Property(e => e.BlobPath)
+                .HasColumnType("character varying")
+                .HasColumnName("blob_path");
+            entity.Property(e => e.DocumentMonth).HasColumnName("document_month");
+            entity.Property(e => e.DocumentYear).HasColumnName("document_year");
+            entity.Property(e => e.Tags)
+                .HasColumnType("character varying")
+                .HasColumnName("tags");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
 
         modelBuilder.Entity<TbtStockGem>(entity =>
         {

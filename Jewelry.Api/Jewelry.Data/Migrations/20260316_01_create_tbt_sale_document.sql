@@ -1,5 +1,8 @@
+-- =============================================
 -- Migration: Create tbt_sale_document table
 -- Date: 2026-03-16
+-- Description: สร้างตาราง tbt_sale_document สำหรับจัดเก็บเอกสาร Sale Document
+-- =============================================
 
 CREATE TABLE IF NOT EXISTS tbt_sale_document (
     id              SERIAL PRIMARY KEY,
@@ -16,5 +19,5 @@ CREATE TABLE IF NOT EXISTS tbt_sale_document (
     update_date     TIMESTAMPTZ
 );
 
-CREATE INDEX idx_sale_document_month_year ON tbt_sale_document (document_year, document_month);
-CREATE INDEX idx_sale_document_active     ON tbt_sale_document (is_active);
+CREATE INDEX IF NOT EXISTS idx_sale_document_month_year ON tbt_sale_document (document_year, document_month);
+CREATE INDEX IF NOT EXISTS idx_sale_document_active     ON tbt_sale_document (is_active);
