@@ -21,6 +21,7 @@ namespace jewelry.Model.Stock.Product.List
         public string? Mold { get; set; }
 
         public string? ProductNumber { get; set; }
+        public List<string>? ProductNumbers { get; set; }
         public string? ProductNameEn { get; set; }
         public string? ProductNameTh { get; set; }
 

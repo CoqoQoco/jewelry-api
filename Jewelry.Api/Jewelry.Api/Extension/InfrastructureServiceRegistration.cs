@@ -28,6 +28,7 @@ using Jewelry.Service.Stock.Balance;
 using Jewelry.Service.Stock.Location;
 using Jewelry.Service.Stock.Movement;
 using Jewelry.Service.Stock.Piece;
+using Jewelry.Service.Catalog;
 using Jewelry.Service.Stock.Reconciliation;
 using Jewelry.Service.Stock.Sku;
 using Jewelry.Service.User;
@@ -101,6 +102,8 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IStockBalanceService, StockBalanceService>();
             services.AddScoped<IStockMovementService, StockMovementService>();
             services.AddScoped<IStockReconciliationService, StockReconciliationService>();
+
+            services.AddScoped<ICatalogService, CatalogService>();
 
             return services;
         }

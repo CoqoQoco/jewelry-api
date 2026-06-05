@@ -173,6 +173,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockPieceCostPlan> TbtStockPieceCostPlan { get; set; }
 
+    public virtual DbSet<TbmProductCatalog> TbmProductCatalog { get; set; }
+
+    public virtual DbSet<TbtCatalogProduct> TbtCatalogProduct { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -3821,6 +3825,93 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.VersionRunning)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_stock_piece_cost_plan_version_fk");
+        });
+
+        modelBuilder.Entity<TbmProductCatalog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbm_product_catalog_pk");
+
+            entity.ToTable("tbm_product_catalog");
+
+            entity.HasIndex(e => e.Code)
+                .IsUnique()
+                .HasDatabaseName("tbm_product_catalog_code_uq");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.CollectionTitle)
+                .HasColumnType("character varying")
+                .HasColumnName("collection_title");
+            entity.Property(e => e.HeaderLabel)
+                .HasColumnType("character varying")
+                .HasColumnName("header_label");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasMany(e => e.TbtCatalogProduct)
+                .WithOne(e => e.Catalog)
+                .HasForeignKey(e => e.CatalogId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_catalog_product_catalog_fk");
+        });
+
+        modelBuilder.Entity<TbtCatalogProduct>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_catalog_product_pk");
+
+            entity.ToTable("tbt_catalog_product");
+
+            entity.HasIndex(e => e.CatalogId).HasDatabaseName("idx_catalog_product_catalog_id");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.CatalogId).HasColumnName("catalog_id");
+            entity.Property(e => e.ProductNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("product_number");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.Dimension1)
+                .HasColumnType("character varying")
+                .HasColumnName("dimension_1");
+            entity.Property(e => e.Dimension2)
+                .HasColumnType("character varying")
+                .HasColumnName("dimension_2");
+            entity.Property(e => e.Dimension3)
+                .HasColumnType("character varying")
+                .HasColumnName("dimension_3");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(d => d.Catalog)
+                .WithMany(p => p.TbtCatalogProduct)
+                .HasForeignKey(d => d.CatalogId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_catalog_product_catalog_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);

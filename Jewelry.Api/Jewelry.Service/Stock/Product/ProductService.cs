@@ -92,6 +92,12 @@ namespace Jewelry.Service.Stock.Product
             {
                 pieces = pieces.Where(x => x.ProductCode.Contains(request.ProductNumber));
             }
+            if (request.ProductNumbers != null && request.ProductNumbers.Any())
+            {
+                var productNumbersArray = request.ProductNumbers.ToArray();
+                pieces = pieces.Where(x => x.SkuCodeNavigation.ProductNumber != null
+                    && productNumbersArray.Contains(x.SkuCodeNavigation.ProductNumber));
+            }
             if (!string.IsNullOrEmpty(request.ProductNameTh))
             {
                 pieces = pieces.Where(x => x.SkuCodeNavigation.ProductNameTh.Contains(request.ProductNameTh));
