@@ -257,9 +257,9 @@ namespace Jewelry.Service.Worker
                                 .Select(x =>
                                 {
                                     var weightDiff = (x.GoldWeightSend ?? 0) - (x.GoldWeightCheck ?? 0);
-                                    var weightLossAllowed = (x.GoldWeightSend ?? 0) * (x.LossPercent ?? 0) / 100m;
-                                    var weightLossActual = weightLossAllowed - weightDiff;
-                                    var moneyDiff = weightLossActual * (x.GoldLossPrice ?? 0);
+                                    var weightLossAllowed = (x.GoldWeightCheck ?? 0) * (x.LossPercent ?? 0) / 100m;
+                                    var weightLossActual = Math.Round(weightLossAllowed - weightDiff, 4, MidpointRounding.ToPositiveInfinity);
+                                    var moneyDiff = Math.Round(weightLossActual, 2, MidpointRounding.ToPositiveInfinity) * (x.GoldLossPrice ?? 0);
 
                                     return new SearchWorkerWages
                                     {
