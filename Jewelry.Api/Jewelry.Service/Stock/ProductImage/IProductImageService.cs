@@ -12,5 +12,7 @@ namespace Jewelry.Service.Stock.ProductImage
         Task<string> Create(jewelry.Model.Stock.Product.Image.Create.Request request);
 
         IQueryable<jewelry.Model.Stock.Product.Image.List.Response> List(jewelry.Model.Stock.Product.Image.List.Search request);
+
+        Task<jewelry.Model.Stock.Product.Image.Replace.Response> Replace(jewelry.Model.Stock.Product.Image.Replace.Request request);
     }
 }

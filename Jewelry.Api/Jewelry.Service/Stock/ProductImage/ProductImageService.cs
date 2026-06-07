@@ -58,5 +58,63 @@ namespace Jewelry.Service.Stock.ProductImage
         {
             return Enumerable.Empty<jewelry.Model.Stock.Product.Image.List.Response>().AsQueryable();
         }
+
+        public async Task<jewelry.Model.Stock.Product.Image.Replace.Response> Replace(jewelry.Model.Stock.Product.Image.Replace.Request request)
+        {
+            var piece = await _jewelryContext.TbtStockPiece
+                .FirstOrDefaultAsync(x => x.StockNumber == request.StockNumber);
+
+            if (piece == null)
+            {
+                throw new HandleException($"ไม่พบสินค้าในสต็อก StockNumber: {request.StockNumber}");
+            }
+
+            var sku = await _jewelryContext.TbtSku
+                .FirstOrDefaultAsync(x => x.SkuCode == piece.SkuCode);
+
+            if (sku == null)
+            {
+                throw new HandleException($"ไม่พบข้อมูล SKU สำหรับ SkuCode: {piece.SkuCode}");
+            }
+
+            var newBaseName = $"{piece.SkuCode}-{DateTime.UtcNow:yyyyMMddHHmmss}".ToUpper();
+            var newFileName = $"{newBaseName}.jpg";
+
+            using var stream = request.Image.OpenReadStream();
+            var result = await _azureBlobService.UploadImageAsync(stream, "Stock/Product", newFileName);
+
+            if (!result.Success)
+            {
+                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
+            }
+
+            var oldImageName = sku.ImageName;
+
+            if (!string.IsNullOrEmpty(oldImageName))
+            {
+                try
+                {
+                    await _azureBlobService.DeleteImageAsync("Stock/Product", oldImageName);
+                }
+                catch
+                {
+                    // non-critical — ignore deletion failure
+                }
+            }
+
+            sku.ImageName = newFileName;
+            sku.ImagePath = "Stock/Product";
+            sku.UpdateDate = DateTime.UtcNow;
+            sku.UpdateBy = CurrentUsername;
+
+            _jewelryContext.TbtSku.Update(sku);
+            await _jewelryContext.SaveChangesAsync();
+
+            return new jewelry.Model.Stock.Product.Image.Replace.Response
+            {
+                ImageName = newFileName,
+                ImagePath = "Stock/Product"
+            };
+        }
     }
 }

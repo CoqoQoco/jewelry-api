@@ -48,6 +48,24 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("Replace")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.Image.Replace.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Replace([FromForm] jewelry.Model.Stock.Product.Image.Replace.Request request)
+        {
+            try
+            {
+                var response = await _service.Replace(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("List")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.Image.List.Response>))]
