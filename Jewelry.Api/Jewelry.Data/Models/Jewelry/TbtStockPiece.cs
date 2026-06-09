@@ -33,6 +33,8 @@ public partial class TbtStockPiece
 
     public string? PoNumber { get; set; }
 
+    public string? Vendor { get; set; }
+
     public decimal? ProductCost { get; set; }
 
     public string? ProductCostDetail { get; set; }

@@ -11,6 +11,7 @@ using Jewelry.Service.Production.PlanBOM;
 using Jewelry.Service.Production.PrePlan;
 using Jewelry.Service.ProductionPlan;
 using Jewelry.Service.Receipt.Gem;
+using Jewelry.Service.Receipt.Outsource;
 using Jewelry.Service.Receipt.Production;
 using Jewelry.Service.Sale.Quotation;
 using Jewelry.Service.Sale.SaleDocument;
@@ -85,6 +86,7 @@ namespace Jewelry.Api.Extension
 
             services.AddScoped<IPlanReceiptService, PlanReceiptService>();
             services.AddScoped<IReceiptProductionService, ReceiptProductionService>();
+            services.AddScoped<IReceiptOutsourceService, ReceiptOutsourceService>();
 
             services.AddScoped<ILoginService, LoginService>();
             services.AddScoped<IPermissionService, Jewelry.Service.Permission.PermissionService>();

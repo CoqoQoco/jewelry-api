@@ -41,6 +41,8 @@ public partial class TbtStockProductReceiptPlan
 
     public string? PoNumber { get; set; }
 
+    public string? Vendor { get; set; }
+
     public string? JsonBreakdown { get; set; }
 
     public virtual ICollection<TbtStockProductReceiptItem> TbtStockProductReceiptItem { get; set; } = new List<TbtStockProductReceiptItem>();

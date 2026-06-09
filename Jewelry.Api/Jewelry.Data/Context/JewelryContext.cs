@@ -2055,6 +2055,14 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
             entity.Property(e => e.Vat).HasColumnName("vat");
+            entity.Property(e => e.SubTotal).HasColumnName("sub_total");
+            entity.Property(e => e.SpecialDiscountAmt).HasColumnName("special_discount_amt");
+            entity.Property(e => e.SpecialAdditionAmt).HasColumnName("special_addition_amt");
+            entity.Property(e => e.FreightAmt).HasColumnName("freight_amt");
+            entity.Property(e => e.VatAmount).HasColumnName("vat_amount");
+            entity.Property(e => e.GrandTotalRaw).HasColumnName("grand_total_raw");
+            entity.Property(e => e.GrandTotalRounded).HasColumnName("grand_total_rounded");
+            entity.Property(e => e.RoundingAdjustment).HasColumnName("rounding_adjustment");
         });
 
         modelBuilder.Entity<TbtSaleInvoicePaymentItem>(entity =>
@@ -2210,6 +2218,14 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.SpecialAddition).HasColumnName("special_addition");
             entity.Property(e => e.Vat).HasColumnName("vat");
             entity.Property(e => e.Freight).HasColumnName("freight");
+            entity.Property(e => e.SubTotal).HasColumnName("sub_total");
+            entity.Property(e => e.SpecialDiscountAmt).HasColumnName("special_discount_amt");
+            entity.Property(e => e.SpecialAdditionAmt).HasColumnName("special_addition_amt");
+            entity.Property(e => e.FreightAmt).HasColumnName("freight_amt");
+            entity.Property(e => e.VatAmount).HasColumnName("vat_amount");
+            entity.Property(e => e.GrandTotalRaw).HasColumnName("grand_total_raw");
+            entity.Property(e => e.GrandTotalRounded).HasColumnName("grand_total_rounded");
+            entity.Property(e => e.RoundingAdjustment).HasColumnName("rounding_adjustment");
         });
 
         modelBuilder.Entity<TbtSaleOrderProduct>(entity =>
@@ -2395,6 +2411,14 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CustomerCode)
                 .HasColumnType("character varying")
                 .HasColumnName("customer_code");
+            entity.Property(e => e.SubTotal).HasColumnName("sub_total");
+            entity.Property(e => e.SpecialDiscountAmt).HasColumnName("special_discount_amt");
+            entity.Property(e => e.SpecialAdditionAmt).HasColumnName("special_addition_amt");
+            entity.Property(e => e.FreightAmt).HasColumnName("freight_amt");
+            entity.Property(e => e.VatAmount).HasColumnName("vat_amount");
+            entity.Property(e => e.GrandTotalRaw).HasColumnName("grand_total_raw");
+            entity.Property(e => e.GrandTotalRounded).HasColumnName("grand_total_rounded");
+            entity.Property(e => e.RoundingAdjustment).HasColumnName("rounding_adjustment");
         });
 
         modelBuilder.Entity<TbtSaleDocument>(entity =>
@@ -2626,6 +2650,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Po)
                 .HasColumnType("character varying")
                 .HasColumnName("po");
+            entity.Property(e => e.Vendor)
+                .HasColumnType("character varying")
+                .HasColumnName("vendor");
             entity.Property(e => e.ProductType)
                 .HasComment("รหัสประเภทสินค้า")
                 .HasColumnType("character varying")
@@ -2698,6 +2725,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.PoNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("po_number");
+            entity.Property(e => e.Vendor)
+                .HasColumnType("character varying")
+                .HasColumnName("vendor");
             entity.Property(e => e.Qty).HasColumnName("qty");
             entity.Property(e => e.QtyRunning).HasColumnName("qty_running");
             entity.Property(e => e.Type)
@@ -3513,6 +3543,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.PoNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("po_number");
+            entity.Property(e => e.Vendor)
+                .HasColumnType("character varying")
+                .HasColumnName("vendor");
             entity.Property(e => e.ProductCost).HasColumnName("product_cost");
             entity.Property(e => e.ProductCostDetail)
                 .HasColumnType("text")

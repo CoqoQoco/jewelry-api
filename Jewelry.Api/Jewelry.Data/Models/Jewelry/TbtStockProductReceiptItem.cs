@@ -33,6 +33,8 @@ public partial class TbtStockProductReceiptItem
 
     public string? Po { get; set; }
 
+    public string? Vendor { get; set; }
+
     public string? WoText { get; set; }
 
     public string? StockNumber { get; set; }

@@ -325,6 +325,8 @@ namespace Jewelry.Service.Receipt.Production
                 WoNumber = stock.WoNumber,
                 WoOrigin = stock.WoOrigin,
                 StockNumberOrigin = stockNumberOrigin,
+                PoNumber = stock.PoNumber,
+                Vendor = stock.Vendor,
                 ProductCost = stock.ProductCost,
                 ProductCostDetail = stock.ProductCostDetail,
                 WeightActual = null,
