@@ -495,24 +495,18 @@ namespace Jewelry.Service.Receipt.Production
                 throw new KeyNotFoundException($"{ErrorMessage.NotFound} --> draft");
             }
 
-            var checkProductNumbers = request.Stocks.Select(x => x.ProductNumber.ToUpper()).ToArray();
-
-            var duplicatePiece = await _jewelryContext.TbtSku
-                .Where(x => checkProductNumbers.Contains(x.ProductNumber))
-                .Select(x => x.ProductNumber)
-                .ToListAsync();
-
-            if (duplicatePiece.Any())
-            {
-                var duplicateProductNumbers = string.Join(", ", duplicatePiece);
-                throw new HandleException($"{ErrorMessage.AlreadyExist} --> รหัสสินค้า: {duplicateProductNumbers}");
-            }
-
             var newStocks = new List<StockProductDto>();
             var newStockPieceMaterials = new List<TbtStockPieceMaterial>();
 
             var updateReceipt = query.receipt;
             var updateReceiptItem = new List<TbtStockProductReceiptItem>();
+
+            decimal? productCostPerUnit = null;
+            if (query.plan.TbtProductionPlanPrice != null && query.plan.TbtProductionPlanPrice.Any() && query.plan.ProductQty > 0)
+            {
+                var totalCost = query.plan.TbtProductionPlanPrice.Sum(x => x.TotalPrice);
+                productCostPerUnit = decimal.Round(totalCost / query.plan.ProductQty, 2, MidpointRounding.AwayFromZero);
+            }
 
             foreach (var stock in request.Stocks)
             {
@@ -532,6 +526,7 @@ namespace Jewelry.Service.Receipt.Production
                 var _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
 
                 var newProduct = match.MapNewStockProduction(query.receipt, query.plan, stock, _stockRunning, CurrentUsername);
+                newProduct.ProductCost = productCostPerUnit;
                 var newProductResponse = newProduct.MapResponseNewStockProduction();
                 newStocks.Add(newProduct);
 

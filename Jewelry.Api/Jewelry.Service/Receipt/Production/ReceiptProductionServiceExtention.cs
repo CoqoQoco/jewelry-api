@@ -387,7 +387,6 @@ namespace Jewelry.Service.Receipt.Production
             };
 
             jewelryContext.TbmStockLocation.Add(newLocation);
-            await jewelryContext.SaveChangesAsync();
 
             cache[locationUpper] = locationUpper;
             return locationUpper;
