@@ -32,5 +32,9 @@ namespace jewelry.Model.Sale.Quotation.Create
         public string Data { get; set; }
 
         public DateTimeOffset? Date { get; set; }
+
+        public decimal? SubTotal { get; set; }
+
+        public decimal? GrandTotalRaw { get; set; }
     }
 }

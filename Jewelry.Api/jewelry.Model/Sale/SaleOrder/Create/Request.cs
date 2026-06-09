@@ -44,5 +44,9 @@ namespace jewelry.Model.Sale.SaleOrder.Create
         public decimal? Freight { get; set; }
 
         public string? Remark { get; set; }
+
+        public decimal? SubTotal { get; set; }
+
+        public decimal? GrandTotalRaw { get; set; }
     }
 }

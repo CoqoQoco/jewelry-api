@@ -44,6 +44,15 @@ namespace jewelry.Model.Sale.Invoice.Get
         public decimal FreightAndInsurance { get; set; }
         public decimal Vat { get; set; }
 
+        public decimal? SubTotal { get; set; }
+        public decimal? SpecialDiscountAmt { get; set; }
+        public decimal? SpecialAdditionAmt { get; set; }
+        public decimal? FreightAmt { get; set; }
+        public decimal? VatAmount { get; set; }
+        public decimal? GrandTotalRaw { get; set; }
+        public decimal? GrandTotalRounded { get; set; }
+        public decimal? RoundingAdjustment { get; set; }
+
         public int Status { get; set; }
         public string StatusName { get; set; }
 

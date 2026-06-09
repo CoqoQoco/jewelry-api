@@ -50,4 +50,20 @@ public partial class TbtSaleQuotation
     public decimal? GoldPerOz { get; set; }
 
     public string? CustomerCode { get; set; }
+
+    public decimal? SubTotal { get; set; }
+
+    public decimal? SpecialDiscountAmt { get; set; }
+
+    public decimal? SpecialAdditionAmt { get; set; }
+
+    public decimal? FreightAmt { get; set; }
+
+    public decimal? VatAmount { get; set; }
+
+    public decimal? GrandTotalRaw { get; set; }
+
+    public decimal? GrandTotalRounded { get; set; }
+
+    public decimal? RoundingAdjustment { get; set; }
 }

@@ -44,6 +44,13 @@ namespace Jewelry.Service.Sale.Quotation
 
             if (quotation == null)
             {
+                var tCreate = MathHelper.ComputeTotals(
+                    request.SubTotal ?? 0,
+                    request.SpecialDiscount ?? 0,
+                    request.SpecialAddition ?? 0,
+                    request.Freight ?? 0,
+                    request.Vat ?? 0);
+
                 quotation = new Data.Models.Jewelry.TbtSaleQuotation
                 {
                     Number = request.Number.ToUpper(),
@@ -72,7 +79,16 @@ namespace Jewelry.Service.Sale.Quotation
                     SpecialAddition = request.SpecialAddition,
                     Vat = request.Vat,
                     GoldPerOz = request.GoldPerOz,
-                    Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow
+                    Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow,
+
+                    SubTotal = tCreate.subTotal,
+                    SpecialDiscountAmt = request.SpecialDiscount ?? 0,
+                    SpecialAdditionAmt = request.SpecialAddition ?? 0,
+                    FreightAmt = request.Freight ?? 0,
+                    VatAmount = tCreate.vatAmount,
+                    GrandTotalRaw = tCreate.raw,
+                    GrandTotalRounded = tCreate.rounded,
+                    RoundingAdjustment = tCreate.adjustment
                 };
 
                 _jewelryContext.TbtSaleQuotation.Add(quotation);
@@ -102,6 +118,22 @@ namespace Jewelry.Service.Sale.Quotation
 
             quotation.Data = request.Data;
             quotation.Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow;
+
+            var tUpdate = MathHelper.ComputeTotals(
+                request.SubTotal ?? 0,
+                request.SpecialDiscount ?? 0,
+                request.SpecialAddition ?? 0,
+                request.Freight ?? 0,
+                request.Vat ?? 0);
+
+            quotation.SubTotal = tUpdate.subTotal;
+            quotation.SpecialDiscountAmt = request.SpecialDiscount ?? 0;
+            quotation.SpecialAdditionAmt = request.SpecialAddition ?? 0;
+            quotation.FreightAmt = request.Freight ?? 0;
+            quotation.VatAmount = tUpdate.vatAmount;
+            quotation.GrandTotalRaw = tUpdate.raw;
+            quotation.GrandTotalRounded = tUpdate.rounded;
+            quotation.RoundingAdjustment = tUpdate.adjustment;
 
             quotation.UpdateDate = DateTime.UtcNow;
             quotation.UpdateBy = CurrentUsername;
@@ -151,7 +183,16 @@ namespace Jewelry.Service.Sale.Quotation
                 SpecialAddition = quotation.SpecialAddition,
                 Vat = quotation.Vat,
                 GoldPerOz = quotation.GoldPerOz,
-                Date = quotation.Date.HasValue ? quotation.Date.Value : null
+                Date = quotation.Date.HasValue ? quotation.Date.Value : null,
+
+                SubTotal = quotation.SubTotal,
+                SpecialDiscountAmt = quotation.SpecialDiscountAmt,
+                SpecialAdditionAmt = quotation.SpecialAdditionAmt,
+                FreightAmt = quotation.FreightAmt,
+                VatAmount = quotation.VatAmount,
+                GrandTotalRaw = quotation.GrandTotalRaw,
+                GrandTotalRounded = quotation.GrandTotalRounded,
+                RoundingAdjustment = quotation.RoundingAdjustment
             };
         }
 

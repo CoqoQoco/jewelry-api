@@ -86,6 +86,11 @@ namespace Jewelry.Service.Sale.Invoice
             // Generate invoice number
             var invoiceNumber = await GenerateInvoiceNumber();
 
+            // Compute totals from confirmed items
+            var subTotal = getstockConfrim.Sum(x =>
+                (x.PriceOrigin * (1 - (x.Discount ?? 0) / 100m) / request.CurrencyRate) * x.Qty);
+            var t = MathHelper.ComputeTotals(subTotal, request.SpecialDiscount, request.SpecialAddition, request.FreightAndInsurance, request.Vat);
+
             // Create invoice header
             var invoiceHeader = new TbtSaleInvoiceHeader
             {
@@ -126,6 +131,15 @@ namespace Jewelry.Service.Sale.Invoice
                 SpecialAddition = request.SpecialAddition,
                 FreightAndInsurance = request.FreightAndInsurance,
                 Vat = request.Vat,
+
+                SubTotal = t.subTotal,
+                SpecialDiscountAmt = request.SpecialDiscount,
+                SpecialAdditionAmt = request.SpecialAddition,
+                FreightAmt = request.FreightAndInsurance,
+                VatAmount = t.vatAmount,
+                GrandTotalRaw = t.raw,
+                GrandTotalRounded = t.rounded,
+                RoundingAdjustment = t.adjustment,
             };
 
             _jewelryContext.TbtSaleInvoiceHeader.Add(invoiceHeader);
@@ -283,6 +297,15 @@ namespace Jewelry.Service.Sale.Invoice
                 SpecialAddition = invoiceHeader.SpecialAddition,
                 FreightAndInsurance = invoiceHeader.FreightAndInsurance,
                 Vat = invoiceHeader.Vat,
+
+                SubTotal = invoiceHeader.SubTotal,
+                SpecialDiscountAmt = invoiceHeader.SpecialDiscountAmt,
+                SpecialAdditionAmt = invoiceHeader.SpecialAdditionAmt,
+                FreightAmt = invoiceHeader.FreightAmt,
+                VatAmount = invoiceHeader.VatAmount,
+                GrandTotalRaw = invoiceHeader.GrandTotalRaw,
+                GrandTotalRounded = invoiceHeader.GrandTotalRounded,
+                RoundingAdjustment = invoiceHeader.RoundingAdjustment,
 
                 ConfirmedItems = confirmedItems
             };

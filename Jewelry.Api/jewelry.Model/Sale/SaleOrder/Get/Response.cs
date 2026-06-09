@@ -49,8 +49,17 @@ namespace jewelry.Model.Sale.SaleOrder.Get
 
         public string? Remark { get; set; }
 
+        public decimal? SubTotal { get; set; }
+        public decimal? SpecialDiscountAmt { get; set; }
+        public decimal? SpecialAdditionAmt { get; set; }
+        public decimal? FreightAmt { get; set; }
+        public decimal? VatAmount { get; set; }
+        public decimal? GrandTotalRaw { get; set; }
+        public decimal? GrandTotalRounded { get; set; }
+        public decimal? RoundingAdjustment { get; set; }
+
         public List<StockConfirm> StockConfirm { get; set; }
-        
+
     }
 
     public class StockConfirm

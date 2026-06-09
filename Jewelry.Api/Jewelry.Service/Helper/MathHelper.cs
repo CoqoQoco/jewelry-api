@@ -28,5 +28,18 @@ namespace Jewelry.Service.Helper
         {
             return RoundDecimal(amount * (percent / 100), decimalPosition);
         }
+
+        public static decimal CeilMoney(decimal value)
+            => Math.Ceiling(Math.Round(value, 2, MidpointRounding.AwayFromZero));
+
+        public static (decimal subTotal, decimal vatAmount, decimal raw, decimal rounded, decimal adjustment)
+            ComputeTotals(decimal subTotal, decimal specialDiscount, decimal specialAddition, decimal freight, decimal vatPercent)
+        {
+            var afterSpecial = subTotal - specialDiscount + specialAddition + freight;
+            var vatAmount = afterSpecial * (vatPercent / 100m);
+            var raw = afterSpecial + vatAmount;
+            var rounded = CeilMoney(raw);
+            return (subTotal, vatAmount, raw, rounded, rounded - raw);
+        }
     }
 }

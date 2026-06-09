@@ -58,6 +58,14 @@ namespace Jewelry.Service.Sale.SaleOrder
             if (string.IsNullOrEmpty(request.SoNumber))
             {
                 soNumber = await _runningNumberService.GenerateRunningNumberForGold("SO");
+
+                var tCreate = MathHelper.ComputeTotals(
+                    request.SubTotal ?? 0,
+                    request.SpecialDiscount ?? 0,
+                    request.SpecialAddition ?? 0,
+                    request.Freight ?? 0,
+                    request.Vat ?? 0);
+
                 // Create new sale order
                 saleOrder = new TbtSaleOrder
                 {
@@ -98,6 +106,15 @@ namespace Jewelry.Service.Sale.SaleOrder
                     Freight = request.Freight,
 
                     Remark = request.Remark,
+
+                    SubTotal = tCreate.subTotal,
+                    SpecialDiscountAmt = request.SpecialDiscount ?? 0,
+                    SpecialAdditionAmt = request.SpecialAddition ?? 0,
+                    FreightAmt = request.Freight ?? 0,
+                    VatAmount = tCreate.vatAmount,
+                    GrandTotalRaw = tCreate.raw,
+                    GrandTotalRounded = tCreate.rounded,
+                    RoundingAdjustment = tCreate.adjustment,
 
                     CreateDate = DateTime.UtcNow,
                     CreateBy = CurrentUsername
@@ -148,6 +165,22 @@ namespace Jewelry.Service.Sale.SaleOrder
                 saleOrder.Freight = request.Freight;
 
                 saleOrder.Remark = request.Remark;
+
+                var tUpdate = MathHelper.ComputeTotals(
+                    request.SubTotal ?? 0,
+                    request.SpecialDiscount ?? 0,
+                    request.SpecialAddition ?? 0,
+                    request.Freight ?? 0,
+                    request.Vat ?? 0);
+
+                saleOrder.SubTotal = tUpdate.subTotal;
+                saleOrder.SpecialDiscountAmt = request.SpecialDiscount ?? 0;
+                saleOrder.SpecialAdditionAmt = request.SpecialAddition ?? 0;
+                saleOrder.FreightAmt = request.Freight ?? 0;
+                saleOrder.VatAmount = tUpdate.vatAmount;
+                saleOrder.GrandTotalRaw = tUpdate.raw;
+                saleOrder.GrandTotalRounded = tUpdate.rounded;
+                saleOrder.RoundingAdjustment = tUpdate.adjustment;
 
                 saleOrder.UpdateDate = DateTime.UtcNow;
                 saleOrder.UpdateBy = CurrentUsername;
@@ -218,7 +251,16 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                 SoDate = saleOrder.SoDate,
 
-                Remark = saleOrder.Remark
+                Remark = saleOrder.Remark,
+
+                SubTotal = saleOrder.SubTotal,
+                SpecialDiscountAmt = saleOrder.SpecialDiscountAmt,
+                SpecialAdditionAmt = saleOrder.SpecialAdditionAmt,
+                FreightAmt = saleOrder.FreightAmt,
+                VatAmount = saleOrder.VatAmount,
+                GrandTotalRaw = saleOrder.GrandTotalRaw,
+                GrandTotalRounded = saleOrder.GrandTotalRounded,
+                RoundingAdjustment = saleOrder.RoundingAdjustment
             };
 
             if (!string.IsNullOrEmpty(response.Data))

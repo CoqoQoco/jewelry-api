@@ -60,4 +60,20 @@ public partial class TbtSaleOrder
     public decimal? Vat { get; set; }
 
     public decimal? Freight { get; set; }
+
+    public decimal? SubTotal { get; set; }
+
+    public decimal? SpecialDiscountAmt { get; set; }
+
+    public decimal? SpecialAdditionAmt { get; set; }
+
+    public decimal? FreightAmt { get; set; }
+
+    public decimal? VatAmount { get; set; }
+
+    public decimal? GrandTotalRaw { get; set; }
+
+    public decimal? GrandTotalRounded { get; set; }
+
+    public decimal? RoundingAdjustment { get; set; }
 }
