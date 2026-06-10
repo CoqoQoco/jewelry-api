@@ -1573,75 +1573,43 @@ namespace Jewelry.Service.Mold
                     _jewelryContext.TbtProductMoldPlanDesign.Update(design);
                 }
 
-                var resinList = (from item in _jewelryContext.TbtProductMoldPlanResin
-                                 where item.PlanId == request.Id
-                                 select item).ToList();
-                foreach (var item in resinList)
-                {
-                    item.CodePlan = request.MoldCode.ToUpper();
-                    item.UpdateBy = CurrentUsername;
-                    item.UpdateDate = DateTime.UtcNow;
-                }
-                if (resinList.Any())
-                {
-                    _jewelryContext.TbtProductMoldPlanResin.UpdateRange(resinList);
-                }
+                var newCode = request.MoldCode.ToUpper();
+                var now = DateTime.UtcNow;
 
-                var castingSilverList = (from item in _jewelryContext.TbtProductMoldPlanCastingSilver
-                                         where item.PlanId == request.Id
-                                         select item).ToList();
-                foreach (var item in castingSilverList)
-                {
-                    item.CodePlan = request.MoldCode.ToUpper();
-                    item.UpdateBy = CurrentUsername;
-                    item.UpdateDate = DateTime.UtcNow;
-                }
-                if (castingSilverList.Any())
-                {
-                    _jewelryContext.TbtProductMoldPlanCastingSilver.UpdateRange(castingSilverList);
-                }
+                await _jewelryContext.TbtProductMoldPlanResin
+                    .Where(x => x.PlanId == request.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(e => e.CodePlan, newCode)
+                        .SetProperty(e => e.UpdateBy, CurrentUsername)
+                        .SetProperty(e => e.UpdateDate, now));
 
-                var castingList = (from item in _jewelryContext.TbtProductMoldPlanCasting
-                                   where item.PlanId == request.Id
-                                   select item).ToList();
-                foreach (var item in castingList)
-                {
-                    item.CodePlan = request.MoldCode.ToUpper();
-                    item.UpdateBy = CurrentUsername;
-                    item.UpdateDate = DateTime.UtcNow;
-                }
-                if (castingList.Any())
-                {
-                    _jewelryContext.TbtProductMoldPlanCasting.UpdateRange(castingList);
-                }
+                await _jewelryContext.TbtProductMoldPlanCastingSilver
+                    .Where(x => x.PlanId == request.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(e => e.CodePlan, newCode)
+                        .SetProperty(e => e.UpdateBy, CurrentUsername)
+                        .SetProperty(e => e.UpdateDate, now));
 
-                var cuttingList = (from item in _jewelryContext.TbtProductMoldPlanCutting
-                                   where item.PlanId == request.Id
-                                   select item).ToList();
-                foreach (var item in cuttingList)
-                {
-                    item.CodePlan = request.MoldCode.ToUpper();
-                    item.UpdateBy = CurrentUsername;
-                    item.UpdateDate = DateTime.UtcNow;
-                }
-                if (cuttingList.Any())
-                {
-                    _jewelryContext.TbtProductMoldPlanCutting.UpdateRange(cuttingList);
-                }
+                await _jewelryContext.TbtProductMoldPlanCasting
+                    .Where(x => x.PlanId == request.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(e => e.CodePlan, newCode)
+                        .SetProperty(e => e.UpdateBy, CurrentUsername)
+                        .SetProperty(e => e.UpdateDate, now));
 
-                var storeList = (from item in _jewelryContext.TbtProductMoldPlanStore
-                                 where item.PlanId == request.Id
-                                 select item).ToList();
-                foreach (var item in storeList)
-                {
-                    item.CodePlan = request.MoldCode.ToUpper();
-                    item.UpdateBy = CurrentUsername;
-                    item.UpdateDate = DateTime.UtcNow;
-                }
-                if (storeList.Any())
-                {
-                    _jewelryContext.TbtProductMoldPlanStore.UpdateRange(storeList);
-                }
+                await _jewelryContext.TbtProductMoldPlanCutting
+                    .Where(x => x.PlanId == request.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(e => e.CodePlan, newCode)
+                        .SetProperty(e => e.UpdateBy, CurrentUsername)
+                        .SetProperty(e => e.UpdateDate, now));
+
+                await _jewelryContext.TbtProductMoldPlanStore
+                    .Where(x => x.PlanId == request.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(e => e.CodePlan, newCode)
+                        .SetProperty(e => e.UpdateBy, CurrentUsername)
+                        .SetProperty(e => e.UpdateDate, now));
 
                 await _jewelryContext.SaveChangesAsync();
                 scope.Complete();
