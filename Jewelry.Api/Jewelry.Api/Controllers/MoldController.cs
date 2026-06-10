@@ -9,8 +9,10 @@ using jewelry.Model.Mold.PlanGems;
 using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
 using jewelry.Model.Mold.PlanMelting;
+using jewelry.Model.Mold.PlanMoldCode;
 using jewelry.Model.Mold.PlanRemodel;
 using jewelry.Model.Mold.PlanResin;
+using jewelry.Model.Mold.PlanStageImage;
 using jewelry.Model.Mold.PlanStore;
 using jewelry.Model.ProductionPlan.ProductionPlanCreate;
 using jewelry.Model.ProductionPlan.ProductionPlanGet;
@@ -339,6 +341,42 @@ namespace Jewelry.Api.Controllers
             try
             {
                 var response = await _servicePlan.PlanRemodel(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("PlanMoldCode")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanMoldCode([FromBody] PlanMoldCodeRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanMoldCode(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("PlanStageImage")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PlanStageImage([FromForm] PlanStageImageRequest request)
+        {
+            try
+            {
+                var response = await _servicePlan.PlanStageImage(request);
                 return Ok(response);
             }
             catch (HandleException ex)

@@ -11,8 +11,10 @@ using jewelry.Model.Mold.PlanGems;
 using jewelry.Model.Mold.PlanGet;
 using jewelry.Model.Mold.PlanList;
 using jewelry.Model.Mold.PlanMelting;
+using jewelry.Model.Mold.PlanMoldCode;
 using jewelry.Model.Mold.PlanRemodel;
 using jewelry.Model.Mold.PlanResin;
+using jewelry.Model.Mold.PlanStageImage;
 using jewelry.Model.Mold.PlanStore;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -49,6 +51,9 @@ namespace Jewelry.Service.Mold
 
         Task<string> NewPlanDesign(PlanDesignRequest request);
         Task<string> NewPlanStore(PlanStoreRequest request);
+
+        Task<string> PlanMoldCode(PlanMoldCodeRequest request);
+        Task<string> PlanStageImage(PlanStageImageRequest request);
     }
     public class MoldPlanService : BaseService, IMoldPlanService
     {
@@ -1524,6 +1529,436 @@ namespace Jewelry.Service.Mold
             }
 
             #endregion
+
+            return "success";
+        }
+
+        public async Task<string> PlanMoldCode(PlanMoldCodeRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductMoldPlan
+                        where item.Id == request.Id
+                        select item).FirstOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException("ไม่พบข้อมูลแบบแม่พิมพ์ กรุณาลองใหม่อีกครั้ง");
+            }
+
+            if (plan.Status == MoldPlanStatus.Melting)
+            {
+                throw new HandleException("แม่พิมพ์ถูกหลอมแล้ว ไม่สามารถแก้ไขได้");
+            }
+
+            var duplicate = (from item in _jewelryContext.TbtProductMoldPlanDesign
+                             where item.CodePlan == request.MoldCode.ToUpper()
+                             && item.PlanId != request.Id
+                             select item).FirstOrDefault();
+
+            if (duplicate != null)
+            {
+                throw new HandleException("รหัสตั้งแม่พิมพ์นี้ถูกใช้แล้ว");
+            }
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var design = (from item in _jewelryContext.TbtProductMoldPlanDesign
+                              where item.PlanId == request.Id
+                              select item).FirstOrDefault();
+
+                if (design != null)
+                {
+                    design.CodePlan = request.MoldCode.ToUpper();
+                    design.UpdateBy = CurrentUsername;
+                    design.UpdateDate = DateTime.UtcNow;
+                    _jewelryContext.TbtProductMoldPlanDesign.Update(design);
+                }
+
+                var resinList = (from item in _jewelryContext.TbtProductMoldPlanResin
+                                 where item.PlanId == request.Id
+                                 select item).ToList();
+                foreach (var item in resinList)
+                {
+                    item.CodePlan = request.MoldCode.ToUpper();
+                    item.UpdateBy = CurrentUsername;
+                    item.UpdateDate = DateTime.UtcNow;
+                }
+                if (resinList.Any())
+                {
+                    _jewelryContext.TbtProductMoldPlanResin.UpdateRange(resinList);
+                }
+
+                var castingSilverList = (from item in _jewelryContext.TbtProductMoldPlanCastingSilver
+                                         where item.PlanId == request.Id
+                                         select item).ToList();
+                foreach (var item in castingSilverList)
+                {
+                    item.CodePlan = request.MoldCode.ToUpper();
+                    item.UpdateBy = CurrentUsername;
+                    item.UpdateDate = DateTime.UtcNow;
+                }
+                if (castingSilverList.Any())
+                {
+                    _jewelryContext.TbtProductMoldPlanCastingSilver.UpdateRange(castingSilverList);
+                }
+
+                var castingList = (from item in _jewelryContext.TbtProductMoldPlanCasting
+                                   where item.PlanId == request.Id
+                                   select item).ToList();
+                foreach (var item in castingList)
+                {
+                    item.CodePlan = request.MoldCode.ToUpper();
+                    item.UpdateBy = CurrentUsername;
+                    item.UpdateDate = DateTime.UtcNow;
+                }
+                if (castingList.Any())
+                {
+                    _jewelryContext.TbtProductMoldPlanCasting.UpdateRange(castingList);
+                }
+
+                var cuttingList = (from item in _jewelryContext.TbtProductMoldPlanCutting
+                                   where item.PlanId == request.Id
+                                   select item).ToList();
+                foreach (var item in cuttingList)
+                {
+                    item.CodePlan = request.MoldCode.ToUpper();
+                    item.UpdateBy = CurrentUsername;
+                    item.UpdateDate = DateTime.UtcNow;
+                }
+                if (cuttingList.Any())
+                {
+                    _jewelryContext.TbtProductMoldPlanCutting.UpdateRange(cuttingList);
+                }
+
+                var storeList = (from item in _jewelryContext.TbtProductMoldPlanStore
+                                 where item.PlanId == request.Id
+                                 select item).ToList();
+                foreach (var item in storeList)
+                {
+                    item.CodePlan = request.MoldCode.ToUpper();
+                    item.UpdateBy = CurrentUsername;
+                    item.UpdateDate = DateTime.UtcNow;
+                }
+                if (storeList.Any())
+                {
+                    _jewelryContext.TbtProductMoldPlanStore.UpdateRange(storeList);
+                }
+
+                await _jewelryContext.SaveChangesAsync();
+                scope.Complete();
+            }
+
+            return "success";
+        }
+
+        public async Task<string> PlanStageImage(PlanStageImageRequest request)
+        {
+            var plan = (from item in _jewelryContext.TbtProductMoldPlan
+                        where item.Id == request.Id
+                        select item).FirstOrDefault();
+
+            if (plan == null)
+            {
+                throw new HandleException("ไม่พบข้อมูลแบบแม่พิมพ์ กรุณาลองใหม่อีกครั้ง");
+            }
+
+            if (plan.Status == MoldPlanStatus.Melting)
+            {
+                throw new HandleException("แม่พิมพ์ถูกหลอมแล้ว ไม่สามารถแก้ไขได้");
+            }
+
+            var stageNorm = request.Stage?.ToLower()?.Trim();
+
+            string folderName;
+            int maxImages;
+            string stageSuffix;
+
+            switch (stageNorm)
+            {
+                case "design":
+                    folderName = "MoldPlanDesign";
+                    maxImages = 2;
+                    stageSuffix = "Design";
+                    break;
+                case "resin":
+                    folderName = "MoldPlanResin";
+                    maxImages = 1;
+                    stageSuffix = "Resin";
+                    break;
+                case "castingsilver":
+                    folderName = "MoldPlanCastingSilver";
+                    maxImages = 1;
+                    stageSuffix = "CastingSilver";
+                    break;
+                case "casting":
+                    folderName = "MoldPlanCasting";
+                    maxImages = 1;
+                    stageSuffix = "Casting";
+                    break;
+                case "cutting":
+                    folderName = "MoldPlanCutting";
+                    maxImages = 1;
+                    stageSuffix = "Cutting";
+                    break;
+                case "store":
+                    folderName = "Mold";
+                    maxImages = 1;
+                    stageSuffix = "Mold";
+                    break;
+                default:
+                    throw new HandleException("stage ไม่ถูกต้อง");
+            }
+
+            if (request.Images == null || request.Images.Count == 0 || request.Images.Count > maxImages)
+            {
+                throw new HandleException($"จำนวนรูปภาพต้องอยู่ระหว่าง 1 ถึง {maxImages} รูป");
+            }
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                List<string> imagesUrl = new List<string>();
+                int count = 1;
+
+                if (stageNorm == "store")
+                {
+                    var stageRecord = (from item in _jewelryContext.TbtProductMoldPlanStore
+                                       where item.PlanId == request.Id
+                                       select item).FirstOrDefault();
+
+                    if (stageRecord == null)
+                    {
+                        throw new HandleException("ไม่พบข้อมูลขั้นตอนนี้");
+                    }
+
+                    var img = request.Images[0];
+                    try
+                    {
+                        string fileName = $"{stageRecord.Code.ToUpper().Trim()}-{stageSuffix}.png";
+                        using var stream = img.OpenReadStream();
+                        var result = await _azureBlobService.UploadImageAsync(stream, folderName, fileName);
+                        if (!result.Success)
+                        {
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
+                        }
+                        imagesUrl.Add(result.BlobName);
+                    }
+                    catch (HandleException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                    }
+
+                    stageRecord.ImageUrl = string.Join(",", imagesUrl);
+                    stageRecord.UpdateBy = CurrentUsername;
+                    stageRecord.UpdateDate = DateTime.UtcNow;
+                    _jewelryContext.TbtProductMoldPlanStore.Update(stageRecord);
+                }
+                else if (stageNorm == "design")
+                {
+                    var stageRecord = (from item in _jewelryContext.TbtProductMoldPlanDesign
+                                       where item.PlanId == request.Id
+                                       select item).FirstOrDefault();
+
+                    if (stageRecord == null)
+                    {
+                        throw new HandleException("ไม่พบข้อมูลขั้นตอนนี้");
+                    }
+
+                    foreach (var img in request.Images)
+                    {
+                        try
+                        {
+                            string fileName = $"{stageRecord.CodePlan.ToUpper().Trim()}-{count}-{stageSuffix}.png";
+                            using var stream = img.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(stream, folderName, fileName);
+                            if (!result.Success)
+                            {
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
+                            }
+                            imagesUrl.Add(result.BlobName);
+                            count++;
+                        }
+                        catch (HandleException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                        }
+                    }
+
+                    stageRecord.ImageUrl = string.Join(",", imagesUrl);
+                    stageRecord.UpdateBy = CurrentUsername;
+                    stageRecord.UpdateDate = DateTime.UtcNow;
+                    _jewelryContext.TbtProductMoldPlanDesign.Update(stageRecord);
+                }
+                else if (stageNorm == "resin")
+                {
+                    var stageRecord = (from item in _jewelryContext.TbtProductMoldPlanResin
+                                       where item.PlanId == request.Id
+                                       select item).FirstOrDefault();
+
+                    if (stageRecord == null)
+                    {
+                        throw new HandleException("ไม่พบข้อมูลขั้นตอนนี้");
+                    }
+
+                    foreach (var img in request.Images)
+                    {
+                        try
+                        {
+                            string fileName = $"{stageRecord.CodePlan.ToUpper().Trim()}-{count}-{stageSuffix}.png";
+                            using var stream = img.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(stream, folderName, fileName);
+                            if (!result.Success)
+                            {
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
+                            }
+                            imagesUrl.Add(result.BlobName);
+                            count++;
+                        }
+                        catch (HandleException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                        }
+                    }
+
+                    stageRecord.ImageUrl = string.Join(",", imagesUrl);
+                    stageRecord.UpdateBy = CurrentUsername;
+                    stageRecord.UpdateDate = DateTime.UtcNow;
+                    _jewelryContext.TbtProductMoldPlanResin.Update(stageRecord);
+                }
+                else if (stageNorm == "castingsilver")
+                {
+                    var stageRecord = (from item in _jewelryContext.TbtProductMoldPlanCastingSilver
+                                       where item.PlanId == request.Id
+                                       select item).FirstOrDefault();
+
+                    if (stageRecord == null)
+                    {
+                        throw new HandleException("ไม่พบข้อมูลขั้นตอนนี้");
+                    }
+
+                    foreach (var img in request.Images)
+                    {
+                        try
+                        {
+                            string fileName = $"{stageRecord.CodePlan.ToUpper().Trim()}-{count}-{stageSuffix}.png";
+                            using var stream = img.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(stream, folderName, fileName);
+                            if (!result.Success)
+                            {
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
+                            }
+                            imagesUrl.Add(result.BlobName);
+                            count++;
+                        }
+                        catch (HandleException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                        }
+                    }
+
+                    stageRecord.ImageUrl = string.Join(",", imagesUrl);
+                    stageRecord.UpdateBy = CurrentUsername;
+                    stageRecord.UpdateDate = DateTime.UtcNow;
+                    _jewelryContext.TbtProductMoldPlanCastingSilver.Update(stageRecord);
+                }
+                else if (stageNorm == "casting")
+                {
+                    var stageRecord = (from item in _jewelryContext.TbtProductMoldPlanCasting
+                                       where item.PlanId == request.Id
+                                       select item).FirstOrDefault();
+
+                    if (stageRecord == null)
+                    {
+                        throw new HandleException("ไม่พบข้อมูลขั้นตอนนี้");
+                    }
+
+                    foreach (var img in request.Images)
+                    {
+                        try
+                        {
+                            string fileName = $"{stageRecord.CodePlan.ToUpper().Trim()}-{count}-{stageSuffix}.png";
+                            using var stream = img.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(stream, folderName, fileName);
+                            if (!result.Success)
+                            {
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
+                            }
+                            imagesUrl.Add(result.BlobName);
+                            count++;
+                        }
+                        catch (HandleException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                        }
+                    }
+
+                    stageRecord.ImageUrl = string.Join(",", imagesUrl);
+                    stageRecord.UpdateBy = CurrentUsername;
+                    stageRecord.UpdateDate = DateTime.UtcNow;
+                    _jewelryContext.TbtProductMoldPlanCasting.Update(stageRecord);
+                }
+                else if (stageNorm == "cutting")
+                {
+                    var stageRecord = (from item in _jewelryContext.TbtProductMoldPlanCutting
+                                       where item.PlanId == request.Id
+                                       select item).FirstOrDefault();
+
+                    if (stageRecord == null)
+                    {
+                        throw new HandleException("ไม่พบข้อมูลขั้นตอนนี้");
+                    }
+
+                    foreach (var img in request.Images)
+                    {
+                        try
+                        {
+                            string fileName = $"{stageRecord.CodePlan.ToUpper().Trim()}-{count}-{stageSuffix}.png";
+                            using var stream = img.OpenReadStream();
+                            var result = await _azureBlobService.UploadImageAsync(stream, folderName, fileName);
+                            if (!result.Success)
+                            {
+                                throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
+                            }
+                            imagesUrl.Add(result.BlobName);
+                            count++;
+                        }
+                        catch (HandleException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {ex.Message}");
+                        }
+                    }
+
+                    stageRecord.ImageUrl = string.Join(",", imagesUrl);
+                    stageRecord.UpdateBy = CurrentUsername;
+                    stageRecord.UpdateDate = DateTime.UtcNow;
+                    _jewelryContext.TbtProductMoldPlanCutting.Update(stageRecord);
+                }
+
+                await _jewelryContext.SaveChangesAsync();
+                scope.Complete();
+            }
 
             return "success";
         }
