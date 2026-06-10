@@ -147,6 +147,40 @@ public class ProductionPrePlanController : ApiControllerBase
         }
     }
 
+    [Route("Cancel/{id}")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> Cancel([FromRoute] int id, [FromBody] CancelPrePlanRequest request)
+    {
+        try
+        {
+            var response = await _service.Cancel(id, request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
+    [Route("CancelItem/{itemId}")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> CancelItem([FromRoute] int itemId, [FromBody] CancelPrePlanItemRequest request)
+    {
+        try
+        {
+            var response = await _service.CancelItem(itemId, request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
     [Route("UploadApproveDocument")]
     [HttpPost]
     [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(UploadApproveDocumentResponse))]
@@ -270,6 +304,7 @@ public class ProductionPrePlanController : ApiControllerBase
             new { Code = "PartiallyConsumed", Description = "สร้างแผนบางส่วน" },
             new { Code = "Consumed", Description = "สร้างแผนครบ" },
             new { Code = "Rejected", Description = "ปฏิเสธ" },
+            new { Code = "Cancelled", Description = "ยกเลิก" },
         };
         return Ok(list);
     }

@@ -89,9 +89,9 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             DeliveryDate = x.DeliveryDate,
             CreateBy = x.CreateBy,
             CreateDate = x.CreateDate,
-            ItemCount = x.Items.Count,
-            PrimaryMoldCode = x.Items.OrderBy(i => i.ItemNo).FirstOrDefault()?.MoldCode,
-            LinkedItemCount = x.Items.Count(i => i.LinkedProductionPlanId.HasValue),
+            ItemCount = x.Items.Count(i => !i.IsCancelled),
+            PrimaryMoldCode = x.Items.Where(i => !i.IsCancelled).OrderBy(i => i.ItemNo).FirstOrDefault()?.MoldCode,
+            LinkedItemCount = x.Items.Count(i => i.LinkedProductionPlanId.HasValue && !i.IsCancelled),
             ApprovedDocumentPath = x.ApprovedDocumentPath,
             Items = x.Items.OrderBy(i => i.ItemNo).Select(i => new SearchPrePlanItemResponse
             {
@@ -107,6 +107,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                 LinkedProductionPlanId = i.LinkedProductionPlanId,
                 PlanStatus = i.LinkedProductionPlanId.HasValue && planStatuses.ContainsKey(i.LinkedProductionPlanId.Value)
                     ? planStatuses[i.LinkedProductionPlanId.Value].StatusStr : null,
+                IsCancelled = i.IsCancelled,
                 Materials = materials.Where(m => m.PrePlanItemId == i.Id)
                     .Select(m => new SearchPrePlanMaterialBrief
                     {
@@ -177,6 +178,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                 CreateDate = i.CreateDate,
                 UpdateBy = i.UpdateBy,
                 UpdateDate = i.UpdateDate,
+                IsCancelled = i.IsCancelled,
                 Materials = i.Materials.Select(m => new GetPrePlanMaterialResponse
                 {
                     Id = m.Id,
@@ -433,7 +435,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
     {
         var query = from h in _jewelryContext.TbtProductionPrePlan
                     join i in _jewelryContext.TbtProductionPrePlanItem on h.Id equals i.PrePlanId
-                    where (h.Status == "Approved" || h.Status == "PartiallyConsumed") && i.LinkedProductionPlanId == null
+                    where (h.Status == "Approved" || h.Status == "PartiallyConsumed") && i.LinkedProductionPlanId == null && i.IsCancelled == false
                     select new AvailableForPlanResponse
                     {
                         PrePlanId = h.Id,
@@ -566,6 +568,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                       join i in _jewelryContext.TbtProductionPrePlanItem on h.Id equals i.PrePlanId
                       where (h.Status == "Approved" || h.Status == "PartiallyConsumed")
                             && i.LinkedProductionPlanId == null
+                            && i.IsCancelled == false
                       select i.Id).CountAsync();
     }
 
@@ -590,21 +593,110 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             .Include(x => x.Items)
             .FirstAsync(x => x.Id == item.PrePlanId);
 
-        var totalItems = header.Items.Count;
-        var linkedItems = header.Items.Count(i => i.LinkedProductionPlanId.HasValue);
+        var previousStatus = header.Status;
+        RecalcHeaderStatus(header);
 
-        string newStatus = header.Status;
-        if (linkedItems == 0) newStatus = "Approved";
-        else if (linkedItems < totalItems) newStatus = "PartiallyConsumed";
-        else if (linkedItems == totalItems) newStatus = "Consumed";
+        if (header.Status != previousStatus)
+        {
+            _jewelryContext.TbtProductionPrePlan.Update(header);
+            await _jewelryContext.SaveChangesAsync();
+        }
+    }
+
+    private void RecalcHeaderStatus(TbtProductionPrePlan header)
+    {
+        var active = header.Items.Where(i => !i.IsCancelled).ToList();
+        string newStatus;
+        if (active.Count == 0)
+        {
+            newStatus = "Cancelled";
+        }
+        else
+        {
+            var linked = active.Count(i => i.LinkedProductionPlanId.HasValue);
+            if (linked == 0) newStatus = "Approved";
+            else if (linked < active.Count) newStatus = "PartiallyConsumed";
+            else newStatus = "Consumed";
+        }
 
         if (newStatus != header.Status)
         {
             header.Status = newStatus;
             header.UpdateBy = CurrentUsername;
             header.UpdateDate = DateTime.UtcNow;
-            _jewelryContext.TbtProductionPrePlan.Update(header);
-            await _jewelryContext.SaveChangesAsync();
         }
+    }
+
+    public async Task<string> CancelItem(int itemId, CancelPrePlanItemRequest request)
+    {
+        var item = await _jewelryContext.TbtProductionPrePlanItem
+            .FirstOrDefaultAsync(x => x.Id == itemId)
+            ?? throw new Exception("ไม่พบรายการ");
+
+        if (item.LinkedProductionPlanId.HasValue)
+            throw new Exception("รายการนี้สร้างแผนผลิตแล้ว ไม่สามารถยกเลิกได้");
+
+        if (item.IsCancelled)
+            throw new Exception("รายการนี้ถูกยกเลิกแล้ว");
+
+        item.IsCancelled = true;
+        item.CancelBy = CurrentUsername;
+        item.CancelDate = DateTime.UtcNow;
+        item.CancelReason = request.CancelReason;
+        item.UpdateBy = CurrentUsername;
+        item.UpdateDate = DateTime.UtcNow;
+
+        _jewelryContext.TbtProductionPrePlanItem.Update(item);
+        await _jewelryContext.SaveChangesAsync();
+
+        var header = await _jewelryContext.TbtProductionPrePlan
+            .Include(x => x.Items)
+            .FirstAsync(x => x.Id == item.PrePlanId);
+
+        RecalcHeaderStatus(header);
+
+        _jewelryContext.TbtProductionPrePlan.Update(header);
+        await _jewelryContext.SaveChangesAsync();
+
+        return "ยกเลิกรายการสำเร็จ";
+    }
+
+    public async Task<string> Cancel(int id, CancelPrePlanRequest request)
+    {
+        var entity = await _jewelryContext.TbtProductionPrePlan
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == id)
+            ?? throw new Exception("ไม่พบใบสั่งผลิต");
+
+        if (entity.Items.Any(i => i.LinkedProductionPlanId.HasValue))
+            throw new Exception("ไม่สามารถยกเลิกทั้งใบได้ เนื่องจากมีรายการที่สร้างแผนผลิตแล้ว — กรุณายกเลิกเป็นรายการ");
+
+        var cancellableStatuses = new[] { "Draft", "Submitted", "Rejected", "Approved" };
+        if (!cancellableStatuses.Contains(entity.Status))
+            throw new Exception("ไม่สามารถยกเลิกได้ในสถานะปัจจุบัน");
+
+        var now = DateTime.UtcNow;
+
+        foreach (var item in entity.Items.Where(i => !i.IsCancelled))
+        {
+            item.IsCancelled = true;
+            item.CancelBy = CurrentUsername;
+            item.CancelDate = now;
+            item.CancelReason = request.CancelReason;
+            item.UpdateBy = CurrentUsername;
+            item.UpdateDate = now;
+        }
+
+        entity.Status = "Cancelled";
+        entity.CancelBy = CurrentUsername;
+        entity.CancelDate = now;
+        entity.CancelReason = request.CancelReason;
+        entity.UpdateBy = CurrentUsername;
+        entity.UpdateDate = now;
+
+        _jewelryContext.TbtProductionPrePlan.Update(entity);
+        await _jewelryContext.SaveChangesAsync();
+
+        return "ยกเลิกใบสั่งผลิตสำเร็จ";
     }
 }

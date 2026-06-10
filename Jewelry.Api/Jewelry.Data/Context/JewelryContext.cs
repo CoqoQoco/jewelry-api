@@ -3086,6 +3086,13 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ApprovedDocumentPath)
                 .HasColumnType("character varying")
                 .HasColumnName("approved_document_path");
+            entity.Property(e => e.CancelBy)
+                .HasColumnType("character varying")
+                .HasColumnName("cancel_by");
+            entity.Property(e => e.CancelDate).HasColumnName("cancel_date");
+            entity.Property(e => e.CancelReason)
+                .HasColumnType("character varying")
+                .HasColumnName("cancel_reason");
 
             entity.HasMany(e => e.Items)
                 .WithOne(e => e.PrePlan)
@@ -3138,6 +3145,14 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.IsCancelled).HasColumnName("is_cancelled");
+            entity.Property(e => e.CancelBy)
+                .HasColumnType("character varying")
+                .HasColumnName("cancel_by");
+            entity.Property(e => e.CancelDate).HasColumnName("cancel_date");
+            entity.Property(e => e.CancelReason)
+                .HasColumnType("character varying")
+                .HasColumnName("cancel_reason");
 
             entity.HasOne(d => d.PrePlan)
                 .WithMany(p => p.Items)

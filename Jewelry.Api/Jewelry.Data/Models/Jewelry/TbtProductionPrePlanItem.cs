@@ -41,6 +41,14 @@ public partial class TbtProductionPrePlanItem
 
     public DateTime? UpdateDate { get; set; }
 
+    public bool IsCancelled { get; set; }
+
+    public string? CancelBy { get; set; }
+
+    public DateTime? CancelDate { get; set; }
+
+    public string? CancelReason { get; set; }
+
     public virtual TbtProductionPrePlan PrePlan { get; set; } = null!;
 
     public virtual ICollection<TbtProductionPrePlanMaterial> Materials { get; set; } = new List<TbtProductionPrePlanMaterial>();

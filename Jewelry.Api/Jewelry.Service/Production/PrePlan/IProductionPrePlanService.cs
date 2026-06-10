@@ -16,6 +16,8 @@ public interface IProductionPrePlanService
     Task<string> Submit(int id);
     Task<string> Approve(int id, ApprovePrePlanRequest request);
     Task<string> Reject(int id, RejectPrePlanRequest request);
+    Task<string> Cancel(int id, CancelPrePlanRequest request);
+    Task<string> CancelItem(int itemId, CancelPrePlanItemRequest request);
     Task<List<AvailableForPlanResponse>> GetAvailableForPlan(string? moldCode);
     Task LinkProductionPlan(int prePlanItemId, TbtProductionPlan plan);
     Task<string> UploadApproveDocument(IFormFile file);

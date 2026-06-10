@@ -36,6 +36,7 @@ public class SearchPrePlanItemResponse
     public string? WoText { get; set; }
     public int? LinkedProductionPlanId { get; set; }
     public string? PlanStatus { get; set; }
+    public bool IsCancelled { get; set; }
     public List<SearchPrePlanMaterialBrief> Materials { get; set; } = new();
 }
 
@@ -96,6 +97,7 @@ public class GetPrePlanItemResponse
     public DateTime? CreateDate { get; set; }
     public string? UpdateBy { get; set; }
     public DateTime? UpdateDate { get; set; }
+    public bool IsCancelled { get; set; }
 
     public List<GetPrePlanMaterialResponse> Materials { get; set; } = new List<GetPrePlanMaterialResponse>();
 }

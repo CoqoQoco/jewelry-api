@@ -115,3 +115,15 @@ public class CopyMoldDesignRequest
     public string MoldDesignFilename { get; set; } = null!;
 }
 
+public class CancelPrePlanRequest
+{
+    public int Id { get; set; }
+    public string? CancelReason { get; set; }
+}
+
+public class CancelPrePlanItemRequest
+{
+    public int ItemId { get; set; }
+    public string? CancelReason { get; set; }
+}
+

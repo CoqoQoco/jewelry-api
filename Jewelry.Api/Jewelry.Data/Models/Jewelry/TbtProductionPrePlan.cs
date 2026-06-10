@@ -49,5 +49,11 @@ public partial class TbtProductionPrePlan
 
     public string? ApprovedDocumentPath { get; set; }
 
+    public string? CancelBy { get; set; }
+
+    public DateTime? CancelDate { get; set; }
+
+    public string? CancelReason { get; set; }
+
     public virtual ICollection<TbtProductionPrePlanItem> Items { get; set; } = new List<TbtProductionPrePlanItem>();
 }
