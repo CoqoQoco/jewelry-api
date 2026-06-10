@@ -1,19 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Http;
 
 namespace jewelry.Model.Production.PrePlan;
 
-public class SearchPrePlanRequest
+public class SearchPrePlanRequest : DataSourceRequest
 {
     public string? MoldCode { get; set; }
     public string? Status { get; set; }
     public DateTimeOffset? OrderDateFrom { get; set; }
     public DateTimeOffset? OrderDateTo { get; set; }
-    public int Take { get; set; } = 50;
-    public int Skip { get; set; } = 0;
-    public string? Sort { get; set; }
     public bool IncludeCompleted { get; set; } = false;
 }
 

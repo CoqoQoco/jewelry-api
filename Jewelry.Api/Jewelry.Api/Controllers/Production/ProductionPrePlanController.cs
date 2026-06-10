@@ -1,6 +1,7 @@
 using jewelry.Model.Production.PrePlan;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Production.PrePlan;
+using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +27,7 @@ public class ProductionPrePlanController : ApiControllerBase
 
     [Route("Search")]
     [HttpPost]
-    [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
     [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
     public async Task<IActionResult> Search([FromBody] SearchPrePlanRequest request)
     {

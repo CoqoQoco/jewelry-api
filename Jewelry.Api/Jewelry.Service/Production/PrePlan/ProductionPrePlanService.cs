@@ -3,6 +3,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -35,7 +36,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         _blobStorage = blobStorage;
     }
 
-    public async Task<IList<SearchPrePlanResponse>> Search(SearchPrePlanRequest request)
+    public async Task<DataSourceResult> Search(SearchPrePlanRequest request)
     {
         var query = _jewelryContext.TbtProductionPrePlan
             .Include(x => x.Items)
@@ -56,16 +57,17 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         if (string.IsNullOrEmpty(request.Status) && !request.IncludeCompleted)
             query = query.Where(x => x.Status != "Consumed");
 
-        var list = await query
-            .OrderByDescending(x => x.CreateDate)
-            .ToListAsync();
+        query = query.OrderByDescending(x => x.CreateDate);
 
-        var allItemIds = list.SelectMany(h => h.Items.Select(i => i.Id)).ToList();
+        var dataSource = query.ToDataSourceResult(request);
+        var pageEntities = dataSource.Data.Cast<TbtProductionPrePlan>().ToList();
+
+        var allItemIds = pageEntities.SelectMany(h => h.Items.Select(i => i.Id)).ToList();
         var materials = await _jewelryContext.TbtProductionPrePlanMaterial
             .Where(m => allItemIds.Contains(m.PrePlanItemId))
             .ToListAsync();
 
-        var linkedPlanIds = list.SelectMany(h => h.Items)
+        var linkedPlanIds = pageEntities.SelectMany(h => h.Items)
             .Where(i => i.LinkedProductionPlanId.HasValue)
             .Select(i => i.LinkedProductionPlanId!.Value).Distinct().ToList();
         var planStatusList = await _jewelryContext.TbtProductionPlan
@@ -74,7 +76,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             .ToListAsync();
         var planStatuses = planStatusList.ToDictionary(p => p.Id, p => new { p.Id, StatusStr = p.Status.ToString(), p.WoText });
 
-        var result = list.Select(x => new SearchPrePlanResponse
+        var result = pageEntities.Select(x => new SearchPrePlanResponse
         {
             Id = x.Id,
             OrderNo = x.OrderNo,
@@ -117,7 +119,8 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             }).ToList(),
         }).ToList();
 
-        return result;
+        dataSource.Data = result;
+        return dataSource;
     }
 
     public async Task<GetPrePlanResponse> Get(int id)

@@ -63,9 +63,9 @@ docker-compose down && docker-compose build && docker-compose up -d
 | Setting | Development | Docker |
 |---|---|---|
 | DB Host | `localhost:5432` | `host.docker.internal:5432` |
-| API Port | `http://7000`, `https://7001` | Port `2001` → container `80` |
+| API Port | `http://localhost:2001` (https 7000/7001 optional) | Port `2001` → container `80` |
 | Swagger | `/swagger` | ไม่เปิด |
-| CORS | `localhost:5173`, `7000`, `7001` | — |
+| CORS | `localhost:2002` (UI dev), `2001`, `5173–5175`, `7000`, `7001` | — |
 
 Connection string อยู่ใน `appsettings.json`
 
@@ -116,4 +116,5 @@ Images stored in `Images/` subdirectories organized by feature (Mold, Stock, etc
 | @.claude/skills/md-instruction/SKILL.md | เขียน/แก้ไขไฟล์ .md |
 | @.claude/skills/datetime-handling/SKILL.md | DateTimeOffset, UTC filter, บันทึกวันที่ |
 | @.claude/skills/migration/SKILL.md | สร้าง DB migration SQL, naming convention, scaffold |
+| @.claude/skills/paging/SKILL.md | ทำ list endpoint แบบ paging/sort/filter |
 | @.claude/agents/api-implementer.md | implement API ตาม plan ที่ confirm แล้ว |
