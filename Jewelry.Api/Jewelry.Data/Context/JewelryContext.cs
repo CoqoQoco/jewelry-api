@@ -177,6 +177,12 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtCatalogProduct> TbtCatalogProduct { get; set; }
 
+    public virtual DbSet<TbtSaleDocumentCatalog> TbtSaleDocumentCatalog { get; set; }
+
+    public virtual DbSet<TbtSaleDocumentCatalogItem> TbtSaleDocumentCatalogItem { get; set; }
+
+    public virtual DbSet<TbtSaleDocumentCatalogItemImage> TbtSaleDocumentCatalogItemImage { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -3991,6 +3997,98 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.CatalogId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_catalog_product_catalog_fk");
+        });
+
+        modelBuilder.Entity<TbtSaleDocumentCatalog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_sale_document_catalog_pk");
+            entity.ToTable("tbt_sale_document_catalog");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.HeaderLabel)
+                .HasColumnType("character varying")
+                .HasColumnName("header_label");
+            entity.Property(e => e.CollectionTitle)
+                .HasColumnType("character varying")
+                .HasColumnName("collection_title");
+            entity.Property(e => e.DocumentMonth).HasColumnName("document_month");
+            entity.Property(e => e.DocumentYear).HasColumnName("document_year");
+            entity.Property(e => e.Tags)
+                .HasColumnType("character varying")
+                .HasColumnName("tags");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasMany(e => e.TbtSaleDocumentCatalogItem)
+                .WithOne(e => e.CatalogNavigation)
+                .HasForeignKey(e => e.CatalogId)
+                .HasConstraintName("tbt_sale_document_catalog_item_catalog_id_fk");
+        });
+
+        modelBuilder.Entity<TbtSaleDocumentCatalogItem>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_sale_document_catalog_item_pk");
+            entity.ToTable("tbt_sale_document_catalog_item");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.CatalogId).HasColumnName("catalog_id");
+            entity.Property(e => e.ProductNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("product_number");
+            entity.Property(e => e.DescriptionLine1)
+                .HasColumnType("character varying")
+                .HasColumnName("description_line1");
+            entity.Property(e => e.DescriptionLine2)
+                .HasColumnType("character varying")
+                .HasColumnName("description_line2");
+            entity.Property(e => e.Dimension1)
+                .HasColumnType("character varying")
+                .HasColumnName("dimension1");
+            entity.Property(e => e.Dimension2)
+                .HasColumnType("character varying")
+                .HasColumnName("dimension2");
+            entity.Property(e => e.Dimension3)
+                .HasColumnType("character varying")
+                .HasColumnName("dimension3");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+
+            entity.HasMany(e => e.TbtSaleDocumentCatalogItemImage)
+                .WithOne(e => e.ItemNavigation)
+                .HasForeignKey(e => e.ItemId)
+                .HasConstraintName("tbt_sale_document_catalog_item_image_item_id_fk");
+        });
+
+        modelBuilder.Entity<TbtSaleDocumentCatalogItemImage>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_sale_document_catalog_item_image_pk");
+            entity.ToTable("tbt_sale_document_catalog_item_image");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.ItemId).HasColumnName("item_id");
+            entity.Property(e => e.BlobPath)
+                .HasColumnType("character varying")
+                .HasColumnName("blob_path");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
         });
 
         OnModelCreatingPartial(modelBuilder);
