@@ -563,9 +563,6 @@ namespace Jewelry.Service.Stock.Product
         }
         public async Task<string> AddProductCostDeatialVersion(jewelry.Model.Stock.Product.AddProductCost.Request request)
         {
-
-            //CheckPermissionLevel("update_stock");
-
             var piece = (from item in _jewelryContext.TbtStockPiece
                          where item.StockNumber == request.StockNumber
                          select item).FirstOrDefault();

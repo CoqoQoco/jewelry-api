@@ -55,7 +55,7 @@ namespace Jewelry.Service.Base
                 ["new_user"] = new[] { "Admin", "Dev" },
                 ["edit_user"] = new[] { "Admin", "Dev" },
                 ["delete_user"] = new[] { "Admin", "Dev" },
-                ["update_stock"] = new[] { "Dev" },
+                ["update_stock"] = new[] { "Dev", "Admin", "StockOperator" },
                 ["update_plan"] = new[] { "UpdatePlan"},
                 ["froce_password"] = new[] { "Dev" }
             };
