@@ -436,6 +436,13 @@ namespace Jewelry.Service.Stock.Product
 
             var now = DateTime.UtcNow;
 
+            TbmProductType? productTypeMaster = null;
+            if (!string.IsNullOrEmpty(request.ProductType))
+            {
+                productTypeMaster = await _jewelryContext.TbmProductType
+                    .FirstOrDefaultAsync(x => x.Code == request.ProductType && x.IsActive == true);
+            }
+
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
                 piece.LocationCode = request.Location ?? piece.LocationCode;
@@ -451,6 +458,11 @@ namespace Jewelry.Service.Stock.Product
                 sku.DefaultPrice = request.ProductPrice;
                 sku.ImageName = request.ImageName;
                 sku.ImagePath = request.ImagePath;
+                if (!string.IsNullOrEmpty(request.ProductType))
+                {
+                    sku.ProductType = request.ProductType;
+                    sku.ProductTypeName = productTypeMaster?.NameTh;
+                }
                 sku.UpdateDate = now;
                 sku.UpdateBy = CurrentUsername;
 

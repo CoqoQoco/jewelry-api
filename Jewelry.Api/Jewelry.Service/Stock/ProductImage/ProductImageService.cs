@@ -39,6 +39,13 @@ namespace Jewelry.Service.Stock.ProductImage
             var name = request.Name.ToUpper();
             var namePath = $"{name}.jpg";
 
+            var existing = _jewelryContext.TbtStockProductImage
+                .FirstOrDefault(x => x.Name == name && x.Year == DateTime.UtcNow.Year && x.IsActive == true);
+            if (existing != null)
+            {
+                throw new HandleException($"มีรูปภาพชื่อ {name} ในปี {DateTime.UtcNow.Year} อยู่แล้ว");
+            }
+
             using var stream = request.Image.OpenReadStream();
             var result = await _azureBlobService.UploadImageAsync(
                 stream,
@@ -51,12 +58,52 @@ namespace Jewelry.Service.Stock.ProductImage
                 throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
             }
 
+            var nextId = (await _jewelryContext.TbtStockProductImage.MaxAsync(x => (int?)x.Id) ?? 0) + 1;
+
+            var newImage = new TbtStockProductImage
+            {
+                Id = nextId,
+                Name = name,
+                Year = DateTime.UtcNow.Year,
+                NamePath = namePath,
+                Remark = request.Description ?? string.Empty,
+                IsActive = true,
+                CreateDate = DateTime.UtcNow,
+                CreateBy = CurrentUsername,
+            };
+            _jewelryContext.TbtStockProductImage.Add(newImage);
+            await _jewelryContext.SaveChangesAsync();
+
             return "success";
         }
 
         public IQueryable<jewelry.Model.Stock.Product.Image.List.Response> List(jewelry.Model.Stock.Product.Image.List.Search request)
         {
-            return Enumerable.Empty<jewelry.Model.Stock.Product.Image.List.Response>().AsQueryable();
+            var query = (from item in _jewelryContext.TbtStockProductImage
+                         where item.IsActive == true
+                         select new jewelry.Model.Stock.Product.Image.List.Response()
+                         {
+                             Id = item.Id,
+                             Name = item.Name,
+                             Year = item.Year,
+                             CreateBy = item.CreateBy,
+                             CreateDate = item.CreateDate,
+                             UpdateBy = item.UpdateBy,
+                             UpdateDate = item.UpdateDate,
+                             IsActive = item.IsActive,
+                             Remark = item.Remark,
+                             NamePath = item.NamePath,
+                         }).AsNoTracking();
+
+            if (!string.IsNullOrEmpty(request.Name))
+            {
+                query = query.Where(x => x.Name.Contains(request.Name.ToUpper()));
+            }
+            if (request.Year.HasValue)
+            {
+                query = query.Where(x => x.Year == request.Year.Value);
+            }
+            return query;
         }
 
         public async Task<jewelry.Model.Stock.Product.Image.Replace.Response> Replace(jewelry.Model.Stock.Product.Image.Replace.Request request)

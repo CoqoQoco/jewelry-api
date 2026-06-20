@@ -26,6 +26,8 @@ namespace jewelry.Model.Stock.Product.Update
         public string? ImageName { get; set; }
         public string? ImagePath { get; set; }
 
+        public string? ProductType { get; set; }
+
         public List<Material> Materials { get; set; } = new List<Material>();
     }
 
