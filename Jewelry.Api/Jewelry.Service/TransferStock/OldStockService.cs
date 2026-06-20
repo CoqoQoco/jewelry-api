@@ -627,14 +627,14 @@ namespace Jewelry.Service.TransferStock
             var existingPieceProductCodes = new HashSet<string>();
             foreach (var codeBatch in productCodes.Chunk(500))
             {
-                var batch = await _jewelryContext.TbtSku
-                    .Where(x => codeBatch.Contains(x.ProductNumber))
-                    .Select(x => x.ProductNumber)
+                var batch = await _jewelryContext.TbtStockPiece
+                    .Where(x => x.ReceiptType == "transfer"
+                             && x.StockNumberOrigin != null
+                             && codeBatch.Contains(x.StockNumberOrigin))
+                    .Select(x => x.StockNumberOrigin!)
                     .ToListAsync();
                 foreach (var code in batch)
-                {
-                    if (code != null) existingPieceProductCodes.Add(code);
-                }
+                    existingPieceProductCodes.Add(code);
             }
 
             // 3. Generate running numbers
