@@ -185,6 +185,12 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleDocumentCatalogItemImage> TbtSaleDocumentCatalogItemImage { get; set; }
 
+    public virtual DbSet<TbmTicketStatus> TbmTicketStatus { get; set; }
+
+    public virtual DbSet<TbtTicket> TbtTicket { get; set; }
+
+    public virtual DbSet<TbtTicketImage> TbtTicketImage { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -4109,6 +4115,127 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("blob_path");
             entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+        });
+
+        modelBuilder.Entity<TbmTicketStatus>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbm_ticket_status_pk");
+
+            entity.ToTable("tbm_ticket_status");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+
+            entity.HasMany(e => e.TbtTicket)
+                .WithOne(e => e.StatusNavigation)
+                .HasForeignKey(e => e.Status)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_ticket_status_fk");
+        });
+
+        modelBuilder.Entity<TbtTicket>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ticket_pk");
+
+            entity.ToTable("tbt_ticket");
+
+            entity.HasIndex(e => e.TicketNo)
+                .IsUnique()
+                .HasDatabaseName("tbt_ticket_no_uq");
+
+            entity.HasIndex(e => e.Status).HasDatabaseName("idx_tbt_ticket_status");
+            entity.HasIndex(e => e.CreateBy).HasDatabaseName("idx_tbt_ticket_create_by");
+            entity.HasIndex(e => e.Type).HasDatabaseName("idx_tbt_ticket_type");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.TicketNo)
+                .HasColumnType("character varying")
+                .HasColumnName("ticket_no");
+            entity.Property(e => e.Type).HasColumnName("type");
+            entity.Property(e => e.TopicRoute)
+                .HasColumnType("character varying")
+                .HasColumnName("topic_route");
+            entity.Property(e => e.TopicName)
+                .HasColumnType("character varying")
+                .HasColumnName("topic_name");
+            entity.Property(e => e.Title)
+                .HasColumnType("character varying")
+                .HasColumnName("title");
+            entity.Property(e => e.Description)
+                .HasColumnType("character varying")
+                .HasColumnName("description");
+            entity.Property(e => e.ScreenshotUrl)
+                .HasColumnType("character varying")
+                .HasColumnName("screenshot_url");
+            entity.Property(e => e.Status)
+                .HasDefaultValue(1)
+                .HasColumnName("status");
+            entity.Property(e => e.DevAnalysis)
+                .HasColumnType("character varying")
+                .HasColumnName("dev_analysis");
+            entity.Property(e => e.DevResponse)
+                .HasColumnType("character varying")
+                .HasColumnName("dev_response");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(d => d.StatusNavigation)
+                .WithMany(p => p.TbtTicket)
+                .HasForeignKey(d => d.Status)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_ticket_status_fk");
+
+            entity.HasMany(e => e.TbtTicketImage)
+                .WithOne(e => e.Ticket)
+                .HasForeignKey(e => e.TicketId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_ticket_image_ticket_fk");
+        });
+
+        modelBuilder.Entity<TbtTicketImage>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ticket_image_pk");
+
+            entity.ToTable("tbt_ticket_image");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.TicketId).HasColumnName("ticket_id");
+            entity.Property(e => e.Number).HasColumnName("number");
+            entity.Property(e => e.Path)
+                .HasColumnType("character varying")
+                .HasColumnName("path");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(d => d.Ticket)
+                .WithMany(p => p.TbtTicketImage)
+                .HasForeignKey(d => d.TicketId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_ticket_image_ticket_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);
