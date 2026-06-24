@@ -130,5 +130,26 @@ namespace Jewelry.Api.Controllers.Ticket
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("AddLog")]
+        [HttpPost]
+        [RequirePermission("ticket:manage")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> AddLog([FromBody] AddTicketLogRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var response = await _service.AddTicketLog(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }

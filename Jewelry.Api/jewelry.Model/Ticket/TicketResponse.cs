@@ -3,6 +3,17 @@ using System.Collections.Generic;
 
 namespace jewelry.Model.Ticket;
 
+public class TicketLogResponse
+{
+    public long Id { get; set; }
+    public string Action { get; set; } = null!;
+    public string? Detail { get; set; }
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+    public string CreateBy { get; set; } = null!;
+    public DateTime CreateDate { get; set; }
+}
+
 public class TicketListResponse
 {
     public long Id { get; set; }
@@ -23,4 +34,5 @@ public class TicketListResponse
     public DateTime CreateDate { get; set; }
     public DateTime? UpdateDate { get; set; }
     public string? UpdateBy { get; set; }
+    public List<TicketLogResponse> Logs { get; set; } = new();
 }

@@ -191,6 +191,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtTicketImage> TbtTicketImage { get; set; }
 
+    public virtual DbSet<TbtTicketLog> TbtTicketLog { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -4236,6 +4238,34 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.TicketId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_ticket_image_ticket_fk");
+        });
+
+        modelBuilder.Entity<TbtTicketLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ticket_log_pk");
+
+            entity.ToTable("tbt_ticket_log");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.TicketId).HasColumnName("ticket_id");
+            entity.Property(e => e.Action)
+                .HasColumnType("character varying")
+                .HasColumnName("action");
+            entity.Property(e => e.Detail)
+                .HasColumnType("character varying")
+                .HasColumnName("detail");
+            entity.Property(e => e.OldValue)
+                .HasColumnType("character varying")
+                .HasColumnName("old_value");
+            entity.Property(e => e.NewValue)
+                .HasColumnType("character varying")
+                .HasColumnName("new_value");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
         });
 
         OnModelCreatingPartial(modelBuilder);

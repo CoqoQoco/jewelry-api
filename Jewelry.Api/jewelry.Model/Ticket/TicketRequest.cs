@@ -35,3 +35,5 @@ public class UpdateTicketDevRequest
     public string? DevAnalysis { get; set; }
     public string? DevResponse { get; set; }
 }
+
+public class AddTicketLogRequest { public long TicketId { get; set; } public string Detail { get; set; } = null!; }

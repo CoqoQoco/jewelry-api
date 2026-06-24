@@ -145,6 +145,28 @@ public class TicketService : BaseService, ITicketService
         var imagesByTicket = images.GroupBy(x => x.TicketId)
             .ToDictionary(g => g.Key, g => g.Select(i => i.Path).ToList());
 
+        Dictionary<long, List<TicketLogResponse>> logsByTicket = new();
+        if (request.TicketId.HasValue)
+        {
+            var logs = await _jewelryContext.TbtTicketLog
+                .AsNoTracking()
+                .Where(x => ticketIds.Contains(x.TicketId))
+                .OrderByDescending(x => x.CreateDate)
+                .ToListAsync();
+
+            logsByTicket = logs.GroupBy(x => x.TicketId)
+                .ToDictionary(g => g.Key, g => g.Select(l => new TicketLogResponse
+                {
+                    Id = l.Id,
+                    Action = l.Action,
+                    Detail = l.Detail,
+                    OldValue = l.OldValue,
+                    NewValue = l.NewValue,
+                    CreateBy = l.CreateBy,
+                    CreateDate = l.CreateDate
+                }).ToList());
+        }
+
         var pageItems = pageEntities.Select(x => new TicketListResponse
         {
             Id = x.Id,
@@ -164,7 +186,8 @@ public class TicketService : BaseService, ITicketService
             CreateDate = x.CreateDate,
             UpdateDate = x.UpdateDate,
             UpdateBy = x.UpdateBy,
-            ImageUrls = imagesByTicket.TryGetValue(x.Id, out var urls) ? urls : new List<string>()
+            ImageUrls = imagesByTicket.TryGetValue(x.Id, out var urls) ? urls : new List<string>(),
+            Logs = logsByTicket.TryGetValue(x.Id, out var ticketLogs) ? ticketLogs : new List<TicketLogResponse>()
         }).ToList();
 
         dataSource.Data = pageItems;
@@ -219,6 +242,24 @@ public class TicketService : BaseService, ITicketService
         var imagesByTicket2 = images2.GroupBy(x => x.TicketId)
             .ToDictionary(g => g.Key, g => g.Select(i => i.Path).ToList());
 
+        var logs2 = await _jewelryContext.TbtTicketLog
+            .AsNoTracking()
+            .Where(x => ticketIds.Contains(x.TicketId))
+            .OrderByDescending(x => x.CreateDate)
+            .ToListAsync();
+
+        var logsByTicket2 = logs2.GroupBy(x => x.TicketId)
+            .ToDictionary(g => g.Key, g => g.Select(l => new TicketLogResponse
+            {
+                Id = l.Id,
+                Action = l.Action,
+                Detail = l.Detail,
+                OldValue = l.OldValue,
+                NewValue = l.NewValue,
+                CreateBy = l.CreateBy,
+                CreateDate = l.CreateDate
+            }).ToList());
+
         var pageItems2 = pageEntities.Select(x => new TicketListResponse
         {
             Id = x.Id,
@@ -238,7 +279,8 @@ public class TicketService : BaseService, ITicketService
             CreateDate = x.CreateDate,
             UpdateDate = x.UpdateDate,
             UpdateBy = x.UpdateBy,
-            ImageUrls = imagesByTicket2.TryGetValue(x.Id, out var urls2) ? urls2 : new List<string>()
+            ImageUrls = imagesByTicket2.TryGetValue(x.Id, out var urls2) ? urls2 : new List<string>(),
+            Logs = logsByTicket2.TryGetValue(x.Id, out var ticketLogs2) ? ticketLogs2 : new List<TicketLogResponse>()
         }).ToList();
 
         dataSource.Data = pageItems2;
@@ -254,11 +296,14 @@ public class TicketService : BaseService, ITicketService
         if (ticket == null)
             throw new HandleException($"ไม่พบ Ticket รหัส {request.TicketId}");
 
+        var oldStatus = ticket.Status;
+
         ticket.Status = request.Status;
         ticket.UpdateDate = DateTime.UtcNow;
         ticket.UpdateBy = CurrentUsername;
 
         _jewelryContext.TbtTicket.Update(ticket);
+        _jewelryContext.TbtTicketLog.Add(BuildLog(ticket.Id, "status", null, oldStatus.ToString(), request.Status.ToString()));
         await _jewelryContext.SaveChangesAsync();
 
         return "success";
@@ -279,8 +324,35 @@ public class TicketService : BaseService, ITicketService
         ticket.UpdateBy = CurrentUsername;
 
         _jewelryContext.TbtTicket.Update(ticket);
+        _jewelryContext.TbtTicketLog.Add(BuildLog(ticket.Id, "dev", "อัปเดตผลวิเคราะห์ / คำตอบถึงผู้แจ้ง", null, null));
         await _jewelryContext.SaveChangesAsync();
 
         return "success";
     }
+
+    public async Task<string> AddTicketLog(AddTicketLogRequest request)
+    {
+        var ticket = _jewelryContext.TbtTicket
+            .Where(x => x.Id == request.TicketId)
+            .SingleOrDefault();
+
+        if (ticket == null)
+            throw new HandleException($"ไม่พบ Ticket รหัส {request.TicketId}");
+
+        _jewelryContext.TbtTicketLog.Add(BuildLog(request.TicketId, "note", request.Detail, null, null));
+        await _jewelryContext.SaveChangesAsync();
+
+        return "success";
+    }
+
+    private TbtTicketLog BuildLog(long ticketId, string action, string? detail, string? oldVal, string? newVal) => new TbtTicketLog
+    {
+        TicketId = ticketId,
+        Action = action,
+        Detail = detail,
+        OldValue = oldVal,
+        NewValue = newVal,
+        CreateDate = DateTime.UtcNow,
+        CreateBy = CurrentUsername
+    };
 }
