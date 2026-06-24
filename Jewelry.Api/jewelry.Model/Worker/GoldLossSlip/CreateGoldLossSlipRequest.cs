@@ -16,6 +16,7 @@ namespace jewelry.Model.Worker.GoldLossSlip
 
     public class GoldReturnItem
     {
+        public string? Gold { get; set; }
         public string GoldSize { get; set; }
         public decimal Weight { get; set; }
         public decimal PricePerGram { get; set; }

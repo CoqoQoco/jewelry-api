@@ -43,6 +43,7 @@ namespace Jewelry.Service.Worker
                 .Select(r => new TbtWorkerGoldLossSlipReturn
                 {
                     GoldSize = r.GoldSize,
+                    Gold = r.Gold,
                     Weight = r.Weight,
                     PricePerGram = r.PricePerGram,
                     Amount = r.Weight * r.PricePerGram,
@@ -317,12 +318,51 @@ namespace Jewelry.Service.Worker
                 GoldReturnItems = returnItems.Select(r => new GoldReturnItemResponse
                 {
                     Id = r.Id,
+                    Gold = r.Gold,
                     GoldSize = r.GoldSize,
                     Weight = r.Weight,
                     PricePerGram = r.PricePerGram,
                     Amount = r.Amount,
                 }).ToList(),
+                TypeSummaries = BuildTypeSummaries(items, returnItems),
             };
+        }
+
+        private List<GoldLossTypeSummaryResponse> BuildTypeSummaries(List<TbtWorkerGoldLossSlipItem> items, List<TbtWorkerGoldLossSlipReturn> returnItems)
+        {
+            var goldTypes = items.Select(i => (Gold: i.Gold ?? "", GoldSize: i.GoldSize ?? ""))
+                .Concat(returnItems.Select(r => (Gold: r.Gold ?? "", GoldSize: r.GoldSize ?? "")))
+                .Distinct()
+                .OrderBy(g => g.Gold).ThenBy(g => g.GoldSize)
+                .ToList();
+
+            return goldTypes.Select(key =>
+            {
+                var totalWeightLoss = items
+                    .Where(i => (i.Gold ?? "") == key.Gold && (i.GoldSize ?? "") == key.GoldSize)
+                    .Sum(i => i.WeightLossActual ?? 0);
+                var totalMoneyLoss = items
+                    .Where(i => (i.Gold ?? "") == key.Gold && (i.GoldSize ?? "") == key.GoldSize)
+                    .Sum(i => i.MoneyDiff ?? 0);
+                var returnWeight = returnItems
+                    .Where(r => (r.Gold ?? "") == key.Gold && (r.GoldSize ?? "") == key.GoldSize)
+                    .Sum(r => r.Weight);
+                var returnAmount = returnItems
+                    .Where(r => (r.Gold ?? "") == key.Gold && (r.GoldSize ?? "") == key.GoldSize)
+                    .Sum(r => r.Amount);
+
+                return new GoldLossTypeSummaryResponse
+                {
+                    Gold = key.Gold,
+                    GoldSize = key.GoldSize == "" ? null : key.GoldSize,
+                    TotalWeightLoss = totalWeightLoss,
+                    TotalMoneyLoss = totalMoneyLoss,
+                    ReturnWeight = returnWeight,
+                    ReturnAmount = returnAmount,
+                    NetWeight = totalWeightLoss - returnWeight,
+                    NetAmount = totalMoneyLoss + returnAmount,
+                };
+            }).ToList();
         }
     }
 }

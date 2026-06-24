@@ -24,15 +24,29 @@ namespace jewelry.Model.Worker.GoldLossSlip
         public string? UpdateBy { get; set; }
         public List<GoldLossSlipItemResponse> Items { get; set; } = new List<GoldLossSlipItemResponse>();
         public List<GoldReturnItemResponse> GoldReturnItems { get; set; } = new List<GoldReturnItemResponse>();
+        public List<GoldLossTypeSummaryResponse> TypeSummaries { get; set; } = new List<GoldLossTypeSummaryResponse>();
     }
 
     public class GoldReturnItemResponse
     {
         public long Id { get; set; }
+        public string? Gold { get; set; }
         public string GoldSize { get; set; }
         public decimal Weight { get; set; }
         public decimal PricePerGram { get; set; }
         public decimal Amount { get; set; }
+    }
+
+    public class GoldLossTypeSummaryResponse
+    {
+        public string Gold { get; set; } = null!;
+        public string? GoldSize { get; set; }
+        public decimal TotalWeightLoss { get; set; }
+        public decimal TotalMoneyLoss { get; set; }
+        public decimal ReturnWeight { get; set; }
+        public decimal ReturnAmount { get; set; }
+        public decimal NetWeight { get; set; }
+        public decimal NetAmount { get; set; }
     }
 
     public class GoldLossSlipItemResponse
