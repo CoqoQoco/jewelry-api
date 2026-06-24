@@ -107,6 +107,21 @@ await _jewelryContext.SaveChangesAsync();
 ### File Storage
 Images stored in `Images/` subdirectories organized by feature (Mold, Stock, etc.)
 
+### Audit Fields — create_by / update_by
+เก็บ `CurrentUsername` (ชื่อผู้ใช้) เสมอ — **ห้ามเก็บ user id**
+
+```csharp
+// ✅ Good — ตรงมาตรฐานทั้งระบบ
+ticket.CreateBy = CurrentUsername;
+ticket.UpdateBy = CurrentUsername;
+
+// ❌ Bad — เก็บเป็นเลข id อ่านไม่รู้เรื่อง ต้อง join เพิ่มตอนแสดงผล
+ticket.CreateBy = CurrentUserId ?? CurrentUsername;
+```
+
+- filter "ของฉัน" ก็เทียบด้วย username: `x.CreateBy == CurrentUsername`
+- `CurrentUserId` ใช้เฉพาะ logic ที่ต้องการ id จริงๆ ไม่ใช่ audit field
+
 ---
 
 ## Skills & Agents Reference

@@ -60,7 +60,7 @@ public class TicketService : BaseService, ITicketService
             ScreenshotUrl = screenshotUrl,
             Status = 1,
             CreateDate = DateTime.UtcNow,
-            CreateBy = CurrentUserId ?? CurrentUsername
+            CreateBy = CurrentUsername
         };
 
         _jewelryContext.TbtTicket.Add(ticket);
@@ -87,7 +87,7 @@ public class TicketService : BaseService, ITicketService
                     Path = result.Url,
                     IsActive = true,
                     CreateDate = DateTime.UtcNow,
-                    CreateBy = CurrentUserId ?? CurrentUsername
+                    CreateBy = CurrentUsername
                 });
 
                 n++;
@@ -173,12 +173,12 @@ public class TicketService : BaseService, ITicketService
 
     public async Task<DataSourceResult> GetMyTickets(SearchTicketRequest request)
     {
-        var userId = CurrentUserId ?? CurrentUsername;
+        var username = CurrentUsername;
 
         var query = _jewelryContext.TbtTicket
             .AsNoTracking()
             .Include(x => x.StatusNavigation)
-            .Where(x => x.CreateBy == userId)
+            .Where(x => x.CreateBy == username)
             .AsQueryable();
 
         if (request.TicketId.HasValue)
@@ -256,7 +256,7 @@ public class TicketService : BaseService, ITicketService
 
         ticket.Status = request.Status;
         ticket.UpdateDate = DateTime.UtcNow;
-        ticket.UpdateBy = CurrentUserId ?? CurrentUsername;
+        ticket.UpdateBy = CurrentUsername;
 
         _jewelryContext.TbtTicket.Update(ticket);
         await _jewelryContext.SaveChangesAsync();
@@ -276,7 +276,7 @@ public class TicketService : BaseService, ITicketService
         ticket.DevAnalysis = request.DevAnalysis;
         ticket.DevResponse = request.DevResponse;
         ticket.UpdateDate = DateTime.UtcNow;
-        ticket.UpdateBy = CurrentUserId ?? CurrentUsername;
+        ticket.UpdateBy = CurrentUsername;
 
         _jewelryContext.TbtTicket.Update(ticket);
         await _jewelryContext.SaveChangesAsync();
