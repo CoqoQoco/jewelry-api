@@ -17,8 +17,8 @@ public class CreateTicketRequest
 public class SearchTicketRequest : DataSourceRequest
 {
     public long? TicketId { get; set; }
-    public int? Status { get; set; }
-    public int? Type { get; set; }
+    public List<int>? Status { get; set; }
+    public List<int>? Type { get; set; }
     public string? TopicRoute { get; set; }
     public string? Keyword { get; set; }
 }
@@ -37,3 +37,9 @@ public class UpdateTicketDevRequest
 }
 
 public class AddTicketLogRequest { public long TicketId { get; set; } public string Detail { get; set; } = null!; }
+
+public class AddTicketCommentRequest { public long TicketId { get; set; } public string Type { get; set; } = null!; public string Message { get; set; } = null!; }
+
+public class AddMyTicketCommentRequest { public long TicketId { get; set; } public string Message { get; set; } = null!; }
+
+public class DeleteTicketCommentRequest { public long CommentId { get; set; } }

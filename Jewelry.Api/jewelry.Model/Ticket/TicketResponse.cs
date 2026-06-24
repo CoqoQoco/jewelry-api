@@ -35,4 +35,15 @@ public class TicketListResponse
     public DateTime? UpdateDate { get; set; }
     public string? UpdateBy { get; set; }
     public List<TicketLogResponse> Logs { get; set; } = new();
+    public List<TicketCommentResponse> Comments { get; set; } = new();
+}
+
+public class TicketCommentResponse
+{
+    public long Id { get; set; }
+    public string Type { get; set; } = null!;
+    public string AuthorRole { get; set; } = null!;
+    public string Message { get; set; } = null!;
+    public string CreateBy { get; set; } = null!;
+    public DateTime CreateDate { get; set; }
 }

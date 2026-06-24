@@ -12,4 +12,8 @@ public interface ITicketService
     Task<string> UpdateTicketStatus(UpdateTicketStatusRequest request);
     Task<string> UpdateTicketDev(UpdateTicketDevRequest request);
     Task<string> AddTicketLog(AddTicketLogRequest request);
+    Task<string> AddTicketComment(AddTicketCommentRequest request);
+    Task<string> AddMyTicketComment(AddMyTicketCommentRequest request);
+    Task<string> DeleteTicketComment(DeleteTicketCommentRequest request);
+    Task<string> DeleteMyTicketComment(DeleteTicketCommentRequest request);
 }

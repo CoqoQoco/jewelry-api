@@ -151,5 +151,87 @@ namespace Jewelry.Api.Controllers.Ticket
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("AddComment")]
+        [HttpPost]
+        [RequirePermission("ticket:manage")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> AddComment([FromBody] AddTicketCommentRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var response = await _service.AddTicketComment(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("AddMyComment")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> AddMyComment([FromBody] AddMyTicketCommentRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var response = await _service.AddMyTicketComment(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("DeleteComment")]
+        [HttpPost]
+        [RequirePermission("ticket:manage")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> DeleteComment([FromBody] DeleteTicketCommentRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var response = await _service.DeleteTicketComment(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("DeleteMyComment")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> DeleteMyComment([FromBody] DeleteTicketCommentRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var response = await _service.DeleteMyTicketComment(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }

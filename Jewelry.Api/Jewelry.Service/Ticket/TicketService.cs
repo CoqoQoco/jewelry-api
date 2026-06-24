@@ -110,11 +110,11 @@ public class TicketService : BaseService, ITicketService
         if (request.TicketId.HasValue)
             query = query.Where(x => x.Id == request.TicketId.Value);
 
-        if (request.Status.HasValue)
-            query = query.Where(x => x.Status == request.Status.Value);
+        if (request.Status != null && request.Status.Any())
+            query = query.Where(x => request.Status.Contains(x.Status));
 
-        if (request.Type.HasValue)
-            query = query.Where(x => x.Type == request.Type.Value);
+        if (request.Type != null && request.Type.Any())
+            query = query.Where(x => request.Type.Contains(x.Type));
 
         if (!string.IsNullOrEmpty(request.TopicRoute))
             query = query.Where(x => x.TopicRoute == request.TopicRoute);
@@ -146,6 +146,7 @@ public class TicketService : BaseService, ITicketService
             .ToDictionary(g => g.Key, g => g.Select(i => i.Path).ToList());
 
         Dictionary<long, List<TicketLogResponse>> logsByTicket = new();
+        Dictionary<long, List<TicketCommentResponse>> commentsByTicket = new();
         if (request.TicketId.HasValue)
         {
             var logs = await _jewelryContext.TbtTicketLog
@@ -164,6 +165,23 @@ public class TicketService : BaseService, ITicketService
                     NewValue = l.NewValue,
                     CreateBy = l.CreateBy,
                     CreateDate = l.CreateDate
+                }).ToList());
+
+            var comments = await _jewelryContext.TbtTicketComment
+                .AsNoTracking()
+                .Where(x => ticketIds.Contains(x.TicketId) && x.IsActive)
+                .OrderBy(x => x.CreateDate)
+                .ToListAsync();
+
+            commentsByTicket = comments.GroupBy(x => x.TicketId)
+                .ToDictionary(g => g.Key, g => g.Select(c => new TicketCommentResponse
+                {
+                    Id = c.Id,
+                    Type = c.Type,
+                    AuthorRole = c.AuthorRole,
+                    Message = c.Message,
+                    CreateBy = c.CreateBy,
+                    CreateDate = c.CreateDate
                 }).ToList());
         }
 
@@ -187,7 +205,8 @@ public class TicketService : BaseService, ITicketService
             UpdateDate = x.UpdateDate,
             UpdateBy = x.UpdateBy,
             ImageUrls = imagesByTicket.TryGetValue(x.Id, out var urls) ? urls : new List<string>(),
-            Logs = logsByTicket.TryGetValue(x.Id, out var ticketLogs) ? ticketLogs : new List<TicketLogResponse>()
+            Logs = logsByTicket.TryGetValue(x.Id, out var ticketLogs) ? ticketLogs : new List<TicketLogResponse>(),
+            Comments = commentsByTicket.TryGetValue(x.Id, out var ticketComments) ? ticketComments : new List<TicketCommentResponse>()
         }).ToList();
 
         dataSource.Data = pageItems;
@@ -207,11 +226,11 @@ public class TicketService : BaseService, ITicketService
         if (request.TicketId.HasValue)
             query = query.Where(x => x.Id == request.TicketId.Value);
 
-        if (request.Status.HasValue)
-            query = query.Where(x => x.Status == request.Status.Value);
+        if (request.Status != null && request.Status.Any())
+            query = query.Where(x => request.Status.Contains(x.Status));
 
-        if (request.Type.HasValue)
-            query = query.Where(x => x.Type == request.Type.Value);
+        if (request.Type != null && request.Type.Any())
+            query = query.Where(x => request.Type.Contains(x.Type));
 
         if (!string.IsNullOrEmpty(request.TopicRoute))
             query = query.Where(x => x.TopicRoute == request.TopicRoute);
@@ -260,6 +279,24 @@ public class TicketService : BaseService, ITicketService
                 CreateDate = l.CreateDate
             }).ToList());
 
+        var myCommentTypes = new[] { "response", "change" };
+        var myComments = await _jewelryContext.TbtTicketComment
+            .AsNoTracking()
+            .Where(x => ticketIds.Contains(x.TicketId) && x.IsActive && myCommentTypes.Contains(x.Type))
+            .OrderBy(x => x.CreateDate)
+            .ToListAsync();
+
+        var myCommentsByTicket = myComments.GroupBy(x => x.TicketId)
+            .ToDictionary(g => g.Key, g => g.Select(c => new TicketCommentResponse
+            {
+                Id = c.Id,
+                Type = c.Type,
+                AuthorRole = c.AuthorRole,
+                Message = c.Message,
+                CreateBy = c.CreateBy,
+                CreateDate = c.CreateDate
+            }).ToList());
+
         var pageItems2 = pageEntities.Select(x => new TicketListResponse
         {
             Id = x.Id,
@@ -280,7 +317,8 @@ public class TicketService : BaseService, ITicketService
             UpdateDate = x.UpdateDate,
             UpdateBy = x.UpdateBy,
             ImageUrls = imagesByTicket2.TryGetValue(x.Id, out var urls2) ? urls2 : new List<string>(),
-            Logs = logsByTicket2.TryGetValue(x.Id, out var ticketLogs2) ? ticketLogs2 : new List<TicketLogResponse>()
+            Logs = logsByTicket2.TryGetValue(x.Id, out var ticketLogs2) ? ticketLogs2 : new List<TicketLogResponse>(),
+            Comments = myCommentsByTicket.TryGetValue(x.Id, out var myTicketComments) ? myTicketComments : new List<TicketCommentResponse>()
         }).ToList();
 
         dataSource.Data = pageItems2;
@@ -304,6 +342,7 @@ public class TicketService : BaseService, ITicketService
 
         _jewelryContext.TbtTicket.Update(ticket);
         _jewelryContext.TbtTicketLog.Add(BuildLog(ticket.Id, "status", null, oldStatus.ToString(), request.Status.ToString()));
+        _jewelryContext.TbtTicketComment.Add(BuildComment(ticket.Id, "change", "system", "เปลี่ยนสถานะ"));
         await _jewelryContext.SaveChangesAsync();
 
         return "success";
@@ -345,6 +384,87 @@ public class TicketService : BaseService, ITicketService
         return "success";
     }
 
+    public async Task<string> AddTicketComment(AddTicketCommentRequest request)
+    {
+        var validTypes = new[] { "analysis", "response", "change" };
+        if (!validTypes.Contains(request.Type))
+            throw new HandleException($"Type ไม่ถูกต้อง ต้องเป็น analysis, response หรือ change");
+
+        var ticket = _jewelryContext.TbtTicket
+            .Where(x => x.Id == request.TicketId)
+            .SingleOrDefault();
+
+        if (ticket == null)
+            throw new HandleException($"ไม่พบ Ticket รหัส {request.TicketId}");
+
+        _jewelryContext.TbtTicketComment.Add(BuildComment(request.TicketId, request.Type, "dev", request.Message));
+        await _jewelryContext.SaveChangesAsync();
+
+        return "success";
+    }
+
+    public async Task<string> AddMyTicketComment(AddMyTicketCommentRequest request)
+    {
+        var ticket = _jewelryContext.TbtTicket
+            .Where(x => x.Id == request.TicketId)
+            .SingleOrDefault();
+
+        if (ticket == null)
+            throw new HandleException("ไม่พบ Ticket");
+
+        if (ticket.CreateBy != CurrentUsername)
+            throw new HandleException("ไม่มีสิทธิ์แสดงความคิดเห็นใน ticket นี้");
+
+        _jewelryContext.TbtTicketComment.Add(BuildComment(request.TicketId, "response", "user", request.Message));
+        await _jewelryContext.SaveChangesAsync();
+
+        return "success";
+    }
+
+    public async Task<string> DeleteTicketComment(DeleteTicketCommentRequest request)
+    {
+        var comment = await _jewelryContext.TbtTicketComment
+            .Where(x => x.Id == request.CommentId && x.IsActive)
+            .SingleOrDefaultAsync();
+
+        if (comment == null)
+            throw new HandleException("ไม่พบความคิดเห็น");
+
+        if (comment.AuthorRole == "system")
+            throw new HandleException("ไม่สามารถลบรายการที่ระบบสร้างได้");
+
+        comment.IsActive = false;
+        comment.UpdateDate = DateTime.UtcNow;
+        comment.UpdateBy = CurrentUsername;
+
+        _jewelryContext.TbtTicketComment.Update(comment);
+        await _jewelryContext.SaveChangesAsync();
+
+        return "success";
+    }
+
+    public async Task<string> DeleteMyTicketComment(DeleteTicketCommentRequest request)
+    {
+        var comment = await _jewelryContext.TbtTicketComment
+            .Where(x => x.Id == request.CommentId && x.IsActive)
+            .SingleOrDefaultAsync();
+
+        if (comment == null)
+            throw new HandleException("ไม่พบความคิดเห็น");
+
+        if (!(comment.AuthorRole == "user" && comment.CreateBy == CurrentUsername))
+            throw new HandleException("ไม่มีสิทธิ์ลบความคิดเห็นนี้");
+
+        comment.IsActive = false;
+        comment.UpdateDate = DateTime.UtcNow;
+        comment.UpdateBy = CurrentUsername;
+
+        _jewelryContext.TbtTicketComment.Update(comment);
+        await _jewelryContext.SaveChangesAsync();
+
+        return "success";
+    }
+
     private TbtTicketLog BuildLog(long ticketId, string action, string? detail, string? oldVal, string? newVal) => new TbtTicketLog
     {
         TicketId = ticketId,
@@ -352,6 +472,17 @@ public class TicketService : BaseService, ITicketService
         Detail = detail,
         OldValue = oldVal,
         NewValue = newVal,
+        CreateDate = DateTime.UtcNow,
+        CreateBy = CurrentUsername
+    };
+
+    private TbtTicketComment BuildComment(long ticketId, string type, string authorRole, string message) => new TbtTicketComment
+    {
+        TicketId = ticketId,
+        Type = type,
+        AuthorRole = authorRole,
+        Message = message,
+        IsActive = true,
         CreateDate = DateTime.UtcNow,
         CreateBy = CurrentUsername
     };

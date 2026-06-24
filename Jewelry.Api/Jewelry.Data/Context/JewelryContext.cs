@@ -193,6 +193,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtTicketLog> TbtTicketLog { get; set; }
 
+    public virtual DbSet<TbtTicketComment> TbtTicketComment { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -4269,6 +4271,36 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
+        });
+
+        modelBuilder.Entity<TbtTicketComment>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ticket_comment_pk");
+
+            entity.ToTable("tbt_ticket_comment");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.TicketId).HasColumnName("ticket_id");
+            entity.Property(e => e.Type)
+                .HasColumnType("character varying")
+                .HasColumnName("type");
+            entity.Property(e => e.AuthorRole)
+                .HasColumnType("character varying")
+                .HasColumnName("author_role");
+            entity.Property(e => e.Message)
+                .HasColumnType("character varying")
+                .HasColumnName("message");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
         });
 
         OnModelCreatingPartial(modelBuilder);
