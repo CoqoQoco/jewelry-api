@@ -22,11 +22,13 @@ namespace jewelry.Model.Customer
         public string? Email { get; set; }
         public string? ContactName { get; set; }
         public string? Remark { get; set; }
+        public int? Discount { get; set; }
     }
 
     public class UpdateCustomerRequest
     {
         public string Code { get; set; }
+        public string? Type { get; set; }
         public string? NameTH { get; set; }
         public string? NameEN { get; set; }
         public string? Address { get; set; }
@@ -35,5 +37,6 @@ namespace jewelry.Model.Customer
         public string? Email { get; set; }
         public string? ContactName { get; set; }
         public string? Remark { get; set; }
+        public int? Discount { get; set; }
     }
 }

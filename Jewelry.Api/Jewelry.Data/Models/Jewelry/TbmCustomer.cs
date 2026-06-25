@@ -25,6 +25,8 @@ public partial class TbmCustomer
 
     public string? Remark { get; set; }
 
+    public int Discount { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;

@@ -64,6 +64,13 @@ namespace Jewelry.Service.Customer
                 );
             }
 
+            if (request.TypeCodes != null && request.TypeCodes.Any())
+                query = query.Where(x => request.TypeCodes.Contains(x.TypeCode));
+            if (request.DiscountMin.HasValue)
+                query = query.Where(x => x.Discount >= request.DiscountMin.Value);
+            if (request.DiscountMax.HasValue)
+                query = query.Where(x => x.Discount <= request.DiscountMax.Value);
+
             // 3. ทำ LEFT JOIN กับตาราง TbtProductionPlan แบบปรับปรุง
             var result = query.GroupJoin(
                 _jewelryContext.TbtProductionPlan,
@@ -82,6 +89,7 @@ namespace Jewelry.Service.Customer
                     Remark = customer.Remark,
                     TypeCode = customer.TypeCode,
                     TypeName = customer.TypeCodeNavigation.NameTh,
+                    Discount = customer.Discount,
                     ProductionPlanCount = plans.Count()
                 });
 
@@ -107,6 +115,7 @@ namespace Jewelry.Service.Customer
 
                                 TypeCode = item.TypeCode,
                                 TypeName = item.TypeCodeNavigation.NameTh,
+                                Discount = item.Discount,
                             });
 
             return response;
@@ -138,6 +147,7 @@ namespace Jewelry.Service.Customer
                 ContactName = request.ContactName,
                 Email = request.Email,
                 Remark = request.Remark,
+                Discount = request.Discount ?? 0,
 
                 CreateDate = DateTime.UtcNow,
                 CreateBy = CurrentUsername
@@ -160,6 +170,7 @@ namespace Jewelry.Service.Customer
                 throw new HandleException($"ไม่พบรหัสลูกค้า {request.Code} ในระบบ");
             }
 
+            if (request.Type != null) customer.TypeCode = request.Type;
             if (request.NameTH != null) customer.NameTh = request.NameTH;
             if (request.NameEN != null) customer.NameEn = request.NameEN;
             if (request.Address != null) customer.Address = request.Address;
@@ -168,6 +179,7 @@ namespace Jewelry.Service.Customer
             if (request.Email != null) customer.Email = request.Email;
             if (request.ContactName != null) customer.ContactName = request.ContactName;
             if (request.Remark != null) customer.Remark = request.Remark;
+            if (request.Discount.HasValue) customer.Discount = request.Discount.Value;
 
             customer.UpdateDate = DateTime.UtcNow;
             customer.UpdateBy = CurrentUsername;

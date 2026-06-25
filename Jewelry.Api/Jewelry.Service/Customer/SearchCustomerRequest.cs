@@ -15,5 +15,8 @@ namespace Jewelry.Service.Customer
     public class SearchCustomer
     {
         public string? Text { get; set; }
+        public List<string>? TypeCodes { get; set; }
+        public int? DiscountMin { get; set; }
+        public int? DiscountMax { get; set; }
     }
 }
