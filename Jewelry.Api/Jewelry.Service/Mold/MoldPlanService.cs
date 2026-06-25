@@ -88,7 +88,10 @@ namespace Jewelry.Service.Mold
                          {
                              Id = plan.Id,
                              MoldCode = plan.TbtProductMoldPlanDesign.CodePlan,
-                             Code = plan.TbtProductMoldPlanCutting.Any() ? plan.TbtProductMoldPlanCutting.First().Code : string.Empty,
+                             Code = plan.TbtProductMoldPlanCutting.Any()
+                                  ? plan.TbtProductMoldPlanCutting.First().Code
+                                  : (plan.TbtProductMoldPlanStore.Any()
+                                     ? plan.TbtProductMoldPlanStore.First().Code : string.Empty),
 
                              CreateDate = plan.CreateDate,
                              UpdateDate = plan.UpdateDate ?? default,
@@ -115,8 +118,12 @@ namespace Jewelry.Service.Mold
                              ImgStore = plan.TbtProductMoldPlanStore.Any()
                                 ? plan.TbtProductMoldPlanStore.First().ImageUrl ?? string.Empty : string.Empty,
 
-                             ProductionCount = _jewelryContext.TbtProductionPlan
-                                .Count(p => p.Mold == (plan.TbtProductMoldPlanCutting.Any() ? plan.TbtProductMoldPlanCutting.First().Code : string.Empty)),
+                             ProductionCount = (plan.TbtProductMoldPlanCutting.Any() || plan.TbtProductMoldPlanStore.Any())
+                                ? _jewelryContext.TbtProductionPlan.Count(p => p.Mold ==
+                                    (plan.TbtProductMoldPlanCutting.Any()
+                                     ? plan.TbtProductMoldPlanCutting.First().Code
+                                     : plan.TbtProductMoldPlanStore.First().Code))
+                                : 0,
                          });
 
             if (!string.IsNullOrEmpty(request.MoldCode))
