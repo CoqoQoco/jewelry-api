@@ -9,7 +9,7 @@ namespace jewelry.Model.Production.PrePlan;
 public class SearchPrePlanRequest : DataSourceRequest
 {
     public string? MoldCode { get; set; }
-    public string? Status { get; set; }
+    public List<string>? Status { get; set; }
     public DateTimeOffset? OrderDateFrom { get; set; }
     public DateTimeOffset? OrderDateTo { get; set; }
     public bool IncludeCompleted { get; set; } = false;

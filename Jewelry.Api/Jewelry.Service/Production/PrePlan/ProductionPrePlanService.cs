@@ -45,8 +45,8 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         if (!string.IsNullOrEmpty(request.MoldCode))
             query = query.Where(x => x.Items.Any(i => i.MoldCode == request.MoldCode));
 
-        if (!string.IsNullOrEmpty(request.Status))
-            query = query.Where(x => x.Status == request.Status);
+        if (request.Status != null && request.Status.Any())
+            query = query.Where(x => request.Status.Contains(x.Status));
 
         if (request.OrderDateFrom.HasValue)
             query = query.Where(x => x.OrderDate >= request.OrderDateFrom.Value.StartOfDayUtc());
@@ -54,7 +54,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
         if (request.OrderDateTo.HasValue)
             query = query.Where(x => x.OrderDate <= request.OrderDateTo.Value.EndOfDayUtc());
 
-        if (string.IsNullOrEmpty(request.Status) && !request.IncludeCompleted)
+        if ((request.Status == null || !request.Status.Any()) && !request.IncludeCompleted)
             query = query.Where(x => x.Status != "Consumed");
 
         query = query.OrderByDescending(x => x.CreateDate);
