@@ -214,6 +214,15 @@ namespace Jewelry.Api.Controllers.Ticket
             }
         }
 
+        [Route("CountOpen")]
+        [HttpPost]
+        [RequirePermission("ticket:manage")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(int))]
+        public async Task<IActionResult> CountOpen()
+        {
+            return Ok(await _service.CountOpen());
+        }
+
         [Route("DeleteMyComment")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]

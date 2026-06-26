@@ -145,6 +145,16 @@ public class TicketService : BaseService, ITicketService
         var imagesByTicket = images.GroupBy(x => x.TicketId)
             .ToDictionary(g => g.Key, g => g.Select(i => i.Path).ToList());
 
+        var analysisComments = await _jewelryContext.TbtTicketComment
+            .AsNoTracking()
+            .Where(c => ticketIds.Contains(c.TicketId) && c.Type == "analysis" && c.IsActive)
+            .OrderByDescending(c => c.CreateDate)
+            .ToListAsync();
+
+        var latestAnalysisByTicket = analysisComments
+            .GroupBy(c => c.TicketId)
+            .ToDictionary(g => g.Key, g => g.First().Message);
+
         Dictionary<long, List<TicketLogResponse>> logsByTicket = new();
         Dictionary<long, List<TicketCommentResponse>> commentsByTicket = new();
         if (request.TicketId.HasValue)
@@ -200,6 +210,7 @@ public class TicketService : BaseService, ITicketService
             StatusNameEn = x.StatusNavigation.NameEn,
             DevAnalysis = x.DevAnalysis,
             DevResponse = x.DevResponse,
+            LatestAnalysis = latestAnalysisByTicket.TryGetValue(x.Id, out var latestAnalysis) ? latestAnalysis : x.DevAnalysis,
             CreateBy = x.CreateBy,
             CreateDate = x.CreateDate,
             UpdateDate = x.UpdateDate,
@@ -463,6 +474,11 @@ public class TicketService : BaseService, ITicketService
         await _jewelryContext.SaveChangesAsync();
 
         return "success";
+    }
+
+    public async Task<int> CountOpen()
+    {
+        return await _jewelryContext.TbtTicket.CountAsync(x => x.Status == 1 || x.Status == 2);
     }
 
     private TbtTicketLog BuildLog(long ticketId, string action, string? detail, string? oldVal, string? newVal) => new TbtTicketLog

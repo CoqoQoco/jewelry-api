@@ -16,4 +16,5 @@ public interface ITicketService
     Task<string> AddMyTicketComment(AddMyTicketCommentRequest request);
     Task<string> DeleteTicketComment(DeleteTicketCommentRequest request);
     Task<string> DeleteMyTicketComment(DeleteTicketCommentRequest request);
+    Task<int> CountOpen();
 }

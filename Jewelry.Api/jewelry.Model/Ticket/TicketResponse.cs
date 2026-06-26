@@ -30,6 +30,7 @@ public class TicketListResponse
     public string StatusNameEn { get; set; } = null!;
     public string? DevAnalysis { get; set; }
     public string? DevResponse { get; set; }
+    public string? LatestAnalysis { get; set; }
     public string CreateBy { get; set; } = null!;
     public DateTime CreateDate { get; set; }
     public DateTime? UpdateDate { get; set; }
