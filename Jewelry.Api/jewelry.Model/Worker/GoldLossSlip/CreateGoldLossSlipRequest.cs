@@ -31,7 +31,7 @@ namespace jewelry.Model.Worker.GoldLossSlip
         public string ProductNumber { get; set; }
         public string ProductName { get; set; }
         public string Gold { get; set; }
-        public string GoldSize { get; set; }
+        public string? GoldSize { get; set; }
         public DateTimeOffset? JobDate { get; set; }
         public decimal? GoldQtySend { get; set; }
         public decimal? GoldWeightSend { get; set; }
