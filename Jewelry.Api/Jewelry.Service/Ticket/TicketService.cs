@@ -1,5 +1,6 @@
 using jewelry.Model.Exceptions;
 using jewelry.Model.Ticket;
+using jewelry.Model.Ticket.Dashboard;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
@@ -479,6 +480,118 @@ public class TicketService : BaseService, ITicketService
     public async Task<int> CountOpen()
     {
         return await _jewelryContext.TbtTicket.CountAsync(x => x.Status == 1 || x.Status == 2);
+    }
+
+    public async Task<TicketDashboardResponse> GetTicketDashboard(TicketDashboardRequest request)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var startDate = request.StartDate?.StartOfDayUtc() ?? now.AddDays(-30).StartOfDayUtc();
+        var endDate = request.EndDate?.EndOfDayUtc() ?? now.EndOfDayUtc();
+
+        var response = new TicketDashboardResponse();
+
+        response.Summary = await GetTicketSummary();
+        response.ByStatus = await GetTicketByStatus();
+        response.ByTopic = await GetTicketByTopic();
+        response.Trend = await GetTicketTrend(startDate, endDate);
+        response.Aging = await GetTicketAging();
+
+        return response;
+    }
+
+    private async Task<TicketSummary> GetTicketSummary()
+    {
+        var summary = await _jewelryContext.TbtTicket
+            .GroupBy(x => 1)
+            .Select(g => new TicketSummary
+            {
+                Total = g.Count(),
+                Open = g.Count(x => x.Status == 1),
+                InProgress = g.Count(x => x.Status == 2),
+                Resolved = g.Count(x => x.Status == 3),
+                Closed = g.Count(x => x.Status == 4),
+                Cancelled = g.Count(x => x.Status == 5),
+                Bug = g.Count(x => x.Type == 1),
+                Feature = g.Count(x => x.Type == 2),
+                Unanalyzed = g.Count(x => x.DevAnalysis == null && (x.Status == 1 || x.Status == 2))
+            })
+            .FirstOrDefaultAsync();
+
+        if (summary == null)
+            return new TicketSummary();
+
+        summary.ResolvedRate = summary.Total == 0
+            ? 0
+            : Math.Round((decimal)summary.Resolved / summary.Total * 100, 2);
+
+        return summary;
+    }
+
+    private async Task<List<TicketStatusBreakdown>> GetTicketByStatus()
+    {
+        return await (from t in _jewelryContext.TbtTicket
+                      join s in _jewelryContext.TbmTicketStatus on t.Status equals s.Id
+                      group new { t, s } by new { t.Status, s.NameTh, s.NameEn } into g
+                      select new TicketStatusBreakdown
+                      {
+                          StatusId = g.Key.Status,
+                          NameTh = g.Key.NameTh,
+                          NameEn = g.Key.NameEn,
+                          Count = g.Count()
+                      })
+            .Where(x => x.Count > 0)
+            .OrderBy(x => x.StatusId)
+            .ToListAsync();
+    }
+
+    private async Task<List<TicketTopicBreakdown>> GetTicketByTopic()
+    {
+        return await _jewelryContext.TbtTicket
+            .GroupBy(x => new { x.TopicRoute, x.TopicName })
+            .Select(g => new TicketTopicBreakdown
+            {
+                TopicRoute = g.Key.TopicRoute,
+                TopicName = g.Key.TopicName,
+                Count = g.Count()
+            })
+            .OrderByDescending(x => x.Count)
+            .ToListAsync();
+    }
+
+    private async Task<List<TicketTrend>> GetTicketTrend(DateTimeOffset startDate, DateTimeOffset endDate)
+    {
+        return await _jewelryContext.TbtTicket
+            .Where(x => x.CreateDate >= startDate.UtcDateTime && x.CreateDate <= endDate.UtcDateTime)
+            .GroupBy(x => x.CreateDate.Date)
+            .Select(g => new TicketTrend
+            {
+                Date = g.Key,
+                Created = g.Count(),
+                Resolved = g.Count(x => x.Status == 3)
+            })
+            .OrderBy(x => x.Date)
+            .ToListAsync();
+    }
+
+    private async Task<TicketAging> GetTicketAging()
+    {
+        var nowDate = DateTime.UtcNow.Date;
+        var createDates = await _jewelryContext.TbtTicket
+            .Where(x => x.Status == 1 || x.Status == 2)
+            .Select(x => x.CreateDate)
+            .ToListAsync();
+
+        var aging = new TicketAging();
+        foreach (var createDate in createDates)
+        {
+            var days = (nowDate - createDate.Date).Days;
+            if (days == 0) aging.Today++;
+            else if (days >= 1 && days <= 3) aging.Days1To3++;
+            else if (days >= 4 && days <= 7) aging.Days4To7++;
+            else aging.Over7++;
+        }
+
+        return aging;
     }
 
     private TbtTicketLog BuildLog(long ticketId, string action, string? detail, string? oldVal, string? newVal) => new TbtTicketLog

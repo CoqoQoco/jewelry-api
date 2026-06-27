@@ -1,4 +1,5 @@
 using jewelry.Model.Ticket;
+using jewelry.Model.Ticket.Dashboard;
 using Kendo.DynamicLinqCore;
 using System.Threading.Tasks;
 
@@ -17,4 +18,5 @@ public interface ITicketService
     Task<string> DeleteTicketComment(DeleteTicketCommentRequest request);
     Task<string> DeleteMyTicketComment(DeleteTicketCommentRequest request);
     Task<int> CountOpen();
+    Task<TicketDashboardResponse> GetTicketDashboard(TicketDashboardRequest request);
 }
