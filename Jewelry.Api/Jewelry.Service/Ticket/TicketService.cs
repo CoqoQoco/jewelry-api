@@ -196,29 +196,53 @@ public class TicketService : BaseService, ITicketService
                 }).ToList());
         }
 
-        var pageItems = pageEntities.Select(x => new TicketListResponse
+        var devUsername = CurrentUsername;
+
+        var readStatuses = await _jewelryContext.TbtTicketReadStatus
+            .AsNoTracking()
+            .Where(x => ticketIds.Contains(x.TicketId) && x.Username == devUsername)
+            .ToListAsync();
+
+        var readByTicket = readStatuses.ToDictionary(x => x.TicketId, x => x.LastReadDate);
+
+        var latestUserCommentDate = await _jewelryContext.TbtTicketComment
+            .AsNoTracking()
+            .Where(x => ticketIds.Contains(x.TicketId) && x.IsActive && x.AuthorRole == "user")
+            .GroupBy(x => x.TicketId)
+            .Select(g => new { TicketId = g.Key, MaxDate = g.Max(c => c.CreateDate) })
+            .ToListAsync();
+
+        var latestUserDateByTicket = latestUserCommentDate.ToDictionary(x => x.TicketId, x => x.MaxDate);
+
+        var pageItems = pageEntities.Select(x =>
         {
-            Id = x.Id,
-            TicketNo = x.TicketNo,
-            Type = x.Type,
-            TopicRoute = x.TopicRoute,
-            TopicName = x.TopicName,
-            Title = x.Title,
-            Description = x.Description,
-            ScreenshotUrl = x.ScreenshotUrl,
-            StatusId = x.Status,
-            StatusNameTh = x.StatusNavigation.NameTh,
-            StatusNameEn = x.StatusNavigation.NameEn,
-            DevAnalysis = x.DevAnalysis,
-            DevResponse = x.DevResponse,
-            LatestAnalysis = latestAnalysisByTicket.TryGetValue(x.Id, out var latestAnalysis) ? latestAnalysis : x.DevAnalysis,
-            CreateBy = x.CreateBy,
-            CreateDate = x.CreateDate,
-            UpdateDate = x.UpdateDate,
-            UpdateBy = x.UpdateBy,
-            ImageUrls = imagesByTicket.TryGetValue(x.Id, out var urls) ? urls : new List<string>(),
-            Logs = logsByTicket.TryGetValue(x.Id, out var ticketLogs) ? ticketLogs : new List<TicketLogResponse>(),
-            Comments = commentsByTicket.TryGetValue(x.Id, out var ticketComments) ? ticketComments : new List<TicketCommentResponse>()
+            var lastRead = readByTicket.TryGetValue(x.Id, out var lr) ? lr : DateTime.MinValue;
+            var hasNew = latestUserDateByTicket.TryGetValue(x.Id, out var maxUser) && maxUser > lastRead;
+            return new TicketListResponse
+            {
+                Id = x.Id,
+                TicketNo = x.TicketNo,
+                Type = x.Type,
+                TopicRoute = x.TopicRoute,
+                TopicName = x.TopicName,
+                Title = x.Title,
+                Description = x.Description,
+                ScreenshotUrl = x.ScreenshotUrl,
+                StatusId = x.Status,
+                StatusNameTh = x.StatusNavigation.NameTh,
+                StatusNameEn = x.StatusNavigation.NameEn,
+                DevAnalysis = x.DevAnalysis,
+                DevResponse = x.DevResponse,
+                LatestAnalysis = latestAnalysisByTicket.TryGetValue(x.Id, out var latestAnalysis) ? latestAnalysis : x.DevAnalysis,
+                CreateBy = x.CreateBy,
+                CreateDate = x.CreateDate,
+                UpdateDate = x.UpdateDate,
+                UpdateBy = x.UpdateBy,
+                HasNewMessage = hasNew,
+                ImageUrls = imagesByTicket.TryGetValue(x.Id, out var urls) ? urls : new List<string>(),
+                Logs = logsByTicket.TryGetValue(x.Id, out var ticketLogs) ? ticketLogs : new List<TicketLogResponse>(),
+                Comments = commentsByTicket.TryGetValue(x.Id, out var ticketComments) ? ticketComments : new List<TicketCommentResponse>()
+            };
         }).ToList();
 
         dataSource.Data = pageItems;
@@ -309,28 +333,50 @@ public class TicketService : BaseService, ITicketService
                 CreateDate = c.CreateDate
             }).ToList());
 
-        var pageItems2 = pageEntities.Select(x => new TicketListResponse
+        var readStatuses2 = await _jewelryContext.TbtTicketReadStatus
+            .AsNoTracking()
+            .Where(x => ticketIds.Contains(x.TicketId) && x.Username == username)
+            .ToListAsync();
+
+        var readByTicket2 = readStatuses2.ToDictionary(x => x.TicketId, x => x.LastReadDate);
+
+        var latestDevCommentDate2 = await _jewelryContext.TbtTicketComment
+            .AsNoTracking()
+            .Where(x => ticketIds.Contains(x.TicketId) && x.IsActive && x.AuthorRole != "user")
+            .GroupBy(x => x.TicketId)
+            .Select(g => new { TicketId = g.Key, MaxDate = g.Max(c => c.CreateDate) })
+            .ToListAsync();
+
+        var latestDevDateByTicket2 = latestDevCommentDate2.ToDictionary(x => x.TicketId, x => x.MaxDate);
+
+        var pageItems2 = pageEntities.Select(x =>
         {
-            Id = x.Id,
-            TicketNo = x.TicketNo,
-            Type = x.Type,
-            TopicRoute = x.TopicRoute,
-            TopicName = x.TopicName,
-            Title = x.Title,
-            Description = x.Description,
-            ScreenshotUrl = x.ScreenshotUrl,
-            StatusId = x.Status,
-            StatusNameTh = x.StatusNavigation.NameTh,
-            StatusNameEn = x.StatusNavigation.NameEn,
-            DevAnalysis = x.DevAnalysis,
-            DevResponse = x.DevResponse,
-            CreateBy = x.CreateBy,
-            CreateDate = x.CreateDate,
-            UpdateDate = x.UpdateDate,
-            UpdateBy = x.UpdateBy,
-            ImageUrls = imagesByTicket2.TryGetValue(x.Id, out var urls2) ? urls2 : new List<string>(),
-            Logs = logsByTicket2.TryGetValue(x.Id, out var ticketLogs2) ? ticketLogs2 : new List<TicketLogResponse>(),
-            Comments = myCommentsByTicket.TryGetValue(x.Id, out var myTicketComments) ? myTicketComments : new List<TicketCommentResponse>()
+            var lastRead2 = readByTicket2.TryGetValue(x.Id, out var lr2) ? lr2 : DateTime.MinValue;
+            var hasNew2 = latestDevDateByTicket2.TryGetValue(x.Id, out var maxDev2) && maxDev2 > lastRead2;
+            return new TicketListResponse
+            {
+                Id = x.Id,
+                TicketNo = x.TicketNo,
+                Type = x.Type,
+                TopicRoute = x.TopicRoute,
+                TopicName = x.TopicName,
+                Title = x.Title,
+                Description = x.Description,
+                ScreenshotUrl = x.ScreenshotUrl,
+                StatusId = x.Status,
+                StatusNameTh = x.StatusNavigation.NameTh,
+                StatusNameEn = x.StatusNavigation.NameEn,
+                DevAnalysis = x.DevAnalysis,
+                DevResponse = x.DevResponse,
+                CreateBy = x.CreateBy,
+                CreateDate = x.CreateDate,
+                UpdateDate = x.UpdateDate,
+                UpdateBy = x.UpdateBy,
+                HasNewMessage = hasNew2,
+                ImageUrls = imagesByTicket2.TryGetValue(x.Id, out var urls2) ? urls2 : new List<string>(),
+                Logs = logsByTicket2.TryGetValue(x.Id, out var ticketLogs2) ? ticketLogs2 : new List<TicketLogResponse>(),
+                Comments = myCommentsByTicket.TryGetValue(x.Id, out var myTicketComments) ? myTicketComments : new List<TicketCommentResponse>()
+            };
         }).ToList();
 
         dataSource.Data = pageItems2;
@@ -592,6 +638,31 @@ public class TicketService : BaseService, ITicketService
         }
 
         return aging;
+    }
+
+    public async Task MarkTicketAsRead(long ticketId)
+    {
+        var username = CurrentUsername;
+        var existing = await _jewelryContext.TbtTicketReadStatus
+            .Where(x => x.TicketId == ticketId && x.Username == username)
+            .SingleOrDefaultAsync();
+
+        if (existing != null)
+        {
+            existing.LastReadDate = DateTime.UtcNow;
+            _jewelryContext.TbtTicketReadStatus.Update(existing);
+        }
+        else
+        {
+            _jewelryContext.TbtTicketReadStatus.Add(new TbtTicketReadStatus
+            {
+                TicketId = ticketId,
+                Username = username,
+                LastReadDate = DateTime.UtcNow
+            });
+        }
+
+        await _jewelryContext.SaveChangesAsync();
     }
 
     private TbtTicketLog BuildLog(long ticketId, string action, string? detail, string? oldVal, string? newVal) => new TbtTicketLog

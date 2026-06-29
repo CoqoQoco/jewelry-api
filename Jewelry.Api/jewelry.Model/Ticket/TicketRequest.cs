@@ -43,3 +43,5 @@ public class AddTicketCommentRequest { public long TicketId { get; set; } public
 public class AddMyTicketCommentRequest { public long TicketId { get; set; } public string Message { get; set; } = null!; }
 
 public class DeleteTicketCommentRequest { public long CommentId { get; set; } }
+
+public class MarkTicketReadRequest { public long TicketId { get; set; } }

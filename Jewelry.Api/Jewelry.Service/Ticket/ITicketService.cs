@@ -19,4 +19,5 @@ public interface ITicketService
     Task<string> DeleteMyTicketComment(DeleteTicketCommentRequest request);
     Task<int> CountOpen();
     Task<TicketDashboardResponse> GetTicketDashboard(TicketDashboardRequest request);
+    Task MarkTicketAsRead(long ticketId);
 }

@@ -161,6 +161,7 @@ namespace Jewelry.Service.Stock.Product
                                ProductionTypeSize = item.SkuCodeNavigation.ProductionTypeSize,
 
                                Size = item.SizeActual ?? item.SkuCodeNavigation.Size,
+                               EarringStemSize = item.SkuCodeNavigation.EarringStemSize,
                                Location = item.LocationCode,
                                Remark = item.Remark,
 
@@ -284,6 +285,7 @@ namespace Jewelry.Service.Stock.Product
                 Qty = 1,
                 Location = piece.LocationCode,
                 Size = piece.SizeActual ?? sku.Size,
+                EarringStemSize = sku.EarringStemSize,
                 Remark = piece.Remark,
                 CreateBy = piece.CreateBy,
                 CreateDate = piece.CreateDate,
@@ -458,6 +460,7 @@ namespace Jewelry.Service.Stock.Product
                 sku.DefaultPrice = request.ProductPrice;
                 sku.ImageName = request.ImageName;
                 sku.ImagePath = request.ImagePath;
+                sku.EarringStemSize = request.EarringStemSize;
                 if (!string.IsNullOrEmpty(request.ProductType))
                 {
                     sku.ProductType = request.ProductType;

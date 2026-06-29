@@ -195,6 +195,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtTicketComment> TbtTicketComment { get; set; }
 
+    public virtual DbSet<TbtTicketReadStatus> TbtTicketReadStatus { get; set; }
+
+    public virtual DbSet<TbtSaleInvoicePrintLog> TbtSaleInvoicePrintLog { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -3514,6 +3518,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.StudEarring)
                 .HasColumnType("character varying")
                 .HasColumnName("stud_earring");
+            entity.Property(e => e.EarringStemSize)
+                .HasColumnType("character varying")
+                .HasColumnName("earring_stem_size");
             entity.Property(e => e.Size)
                 .HasColumnType("character varying")
                 .HasColumnName("size");
@@ -4302,6 +4309,59 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
+        });
+
+        modelBuilder.Entity<TbtTicketReadStatus>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ticket_read_status_pk");
+
+            entity.ToTable("tbt_ticket_read_status");
+
+            entity.HasIndex(e => new { e.TicketId, e.Username })
+                .IsUnique()
+                .HasDatabaseName("uq_tbt_ticket_read_status_ticket_user");
+
+            entity.HasIndex(e => e.Username)
+                .HasDatabaseName("idx_tbt_ticket_read_status_username");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.TicketId).HasColumnName("ticket_id");
+            entity.Property(e => e.Username)
+                .HasColumnType("character varying")
+                .HasColumnName("username");
+            entity.Property(e => e.LastReadDate).HasColumnName("last_read_date");
+        });
+
+        modelBuilder.Entity<TbtSaleInvoicePrintLog>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_sale_invoice_print_log_pk");
+
+            entity.ToTable("tbt_sale_invoice_print_log");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.InvoiceRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_running");
+            entity.Property(e => e.InvoiceNo)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_no");
+            entity.Property(e => e.PaperType)
+                .HasColumnType("character varying")
+                .HasColumnName("paper_type");
+            entity.Property(e => e.CopyNo)
+                .HasDefaultValue(1)
+                .HasColumnName("copy_no");
+            entity.Property(e => e.Data)
+                .HasColumnType("jsonb")
+                .HasColumnName("data");
+            entity.Property(e => e.PrintedBy)
+                .HasColumnType("character varying")
+                .HasColumnName("printed_by");
+            entity.Property(e => e.PrintedAt).HasColumnName("printed_at");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -40,6 +40,7 @@ namespace jewelry.Model.Stock.Product.List
 
         public string? Location { get; set; }
         public string? Size { get; set; }
+        public string? EarringStemSize { get; set; }
 
         public string? Remark { get; set; }
 

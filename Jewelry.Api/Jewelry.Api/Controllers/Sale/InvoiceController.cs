@@ -275,5 +275,62 @@ namespace Jewelry.Api.Controllers.Sale
                     new { message = "An error occurred while deleting payment record" });
             }
         }
+
+        // Invoice Print Log Endpoints
+
+        [Route("PrintLog/Create")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CreatePrintLog([FromBody] jewelry.Model.Sale.Invoice.PrintLog.Create.Request request)
+        {
+            try
+            {
+                var result = await _service.CreatePrintLog(request);
+                return Ok(new { running = result });
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error creating print log for invoice: {InvoiceNumber}", request.InvoiceNumber);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error creating print log for invoice: {InvoiceNumber}", request.InvoiceNumber);
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while creating print log" });
+            }
+        }
+
+        [Route("PrintLog/List")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public IActionResult ListPrintLogs([FromBody] jewelry.Model.Sale.Invoice.PrintLog.List.Request request)
+        {
+            try
+            {
+                var query = _service.ListPrintLogs(request);
+                var result = query.ToList();
+                return Ok(new
+                {
+                    data = result,
+                    total = result.Count
+                });
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error listing print logs for invoice: {InvoiceNumber}", request.InvoiceNumber);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error listing print logs for invoice: {InvoiceNumber}", request.InvoiceNumber);
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while listing print logs" });
+            }
+        }
     }
 }

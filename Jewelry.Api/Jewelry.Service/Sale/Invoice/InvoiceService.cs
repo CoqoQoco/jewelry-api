@@ -241,17 +241,23 @@ namespace Jewelry.Service.Sale.Invoice
             }
 
             // Get confirmed items with invoice info
-            var confirmedItems = await _jewelryContext.TbtSaleOrderProduct
-                .Where(x => x.Invoice == request.InvoiceNumber)
-                .Select(x => new jewelry.Model.Sale.Invoice.Get.Item
+            var confirmedItems = await (
+                from sop in _jewelryContext.TbtSaleOrderProduct
+                join piece in _jewelryContext.TbtStockPiece on sop.StockNumber equals piece.StockNumber into pieceJoin
+                from piece in pieceJoin.DefaultIfEmpty()
+                join sku in _jewelryContext.TbtSku on piece.SkuCode equals sku.SkuCode into skuJoin
+                from sku in skuJoin.DefaultIfEmpty()
+                where sop.Invoice == request.InvoiceNumber
+                select new jewelry.Model.Sale.Invoice.Get.Item
                 {
-                    Id = x.Id,
-                    StockNumber = x.StockNumber,
+                    Id = sop.Id,
+                    StockNumber = sop.StockNumber,
                     IsConfirmed = true,
-                    Invoice = x.Invoice,
-                    InvoiceItem = x.InvoiceItem
-                })
-                .ToListAsync();
+                    Invoice = sop.Invoice,
+                    InvoiceItem = sop.InvoiceItem,
+                    EarringStemSize = sku != null ? sku.EarringStemSize : null
+                }
+            ).ToListAsync();
 
             var response = new jewelry.Model.Sale.Invoice.Get.Response
             {
@@ -876,8 +882,77 @@ namespace Jewelry.Service.Sale.Invoice
             return $"Payment {request.PaymentRunning} deleted successfully";
         }
 
+        // Print Log Methods
 
+        public async Task<string> CreatePrintLog(jewelry.Model.Sale.Invoice.PrintLog.Create.Request request)
+        {
+            if (string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                throw new HandleException("Invoice Number is Required.");
+            }
 
+            if (string.IsNullOrEmpty(request.PaperType))
+            {
+                throw new HandleException("Paper Type is Required.");
+            }
 
+            // Resolve invoice_running from invoice_no
+            var invoiceHeader = await _jewelryContext.TbtSaleInvoiceHeader
+                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber && x.IsDelete == false);
+
+            string? invoiceRunning = invoiceHeader?.Running;
+
+            // Compute copy_no = max copy_no for this invoice_no + 1
+            var maxCopyNo = await _jewelryContext.TbtSaleInvoicePrintLog
+                .Where(x => x.InvoiceNo == request.InvoiceNumber)
+                .Select(x => (int?)x.CopyNo)
+                .MaxAsync();
+
+            var copyNo = (maxCopyNo ?? 0) + 1;
+
+            // Generate running using running number service
+            var running = await _runningNumberService.GenerateRunningNumberForGold($"PRINT-{request.InvoiceNumber}");
+
+            var printLog = new Jewelry.Data.Models.Jewelry.TbtSaleInvoicePrintLog
+            {
+                Running = running,
+                InvoiceRunning = invoiceRunning,
+                InvoiceNo = request.InvoiceNumber,
+                PaperType = request.PaperType,
+                CopyNo = copyNo,
+                Data = request.Data,
+                PrintedBy = CurrentUsername,
+                PrintedAt = DateTime.UtcNow
+            };
+
+            _jewelryContext.TbtSaleInvoicePrintLog.Add(printLog);
+            await _jewelryContext.SaveChangesAsync();
+
+            return running;
+        }
+
+        public IQueryable<jewelry.Model.Sale.Invoice.PrintLog.List.Response> ListPrintLogs(jewelry.Model.Sale.Invoice.PrintLog.List.Request request)
+        {
+            if (string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                throw new HandleException("Invoice Number is Required.");
+            }
+
+            var query = from log in _jewelryContext.TbtSaleInvoicePrintLog
+                        where log.InvoiceNo == request.InvoiceNumber
+                        orderby log.PrintedAt descending
+                        select new jewelry.Model.Sale.Invoice.PrintLog.List.Response
+                        {
+                            Running = log.Running,
+                            InvoiceNo = log.InvoiceNo,
+                            PaperType = log.PaperType,
+                            CopyNo = log.CopyNo,
+                            Data = log.Data,
+                            PrintedBy = log.PrintedBy,
+                            PrintedAt = log.PrintedAt
+                        };
+
+            return query;
+        }
     }
 }

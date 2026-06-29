@@ -70,6 +70,7 @@ namespace jewelry.Model.Sale.Invoice.Get
         public bool IsInvoice => !string.IsNullOrEmpty(Invoice);
         public string? Invoice { get; set; }
         public string? InvoiceItem { get; set; }
+        public string? EarringStemSize { get; set; }
     }
 
     public class Payment

@@ -23,5 +23,9 @@ namespace Jewelry.Service.Sale.Invoice
         Task<string> CreatePayment(jewelry.Model.Sale.InvoicePayment.Create.Request request);
         IQueryable<jewelry.Model.Sale.InvoicePayment.List.Response> GetPaymentList(jewelry.Model.Sale.InvoicePayment.List.Request request);
         Task<string> DeletePayment(jewelry.Model.Sale.InvoicePayment.Delete.Request request);
+
+        // Invoice Print Log methods
+        Task<string> CreatePrintLog(jewelry.Model.Sale.Invoice.PrintLog.Create.Request request);
+        IQueryable<jewelry.Model.Sale.Invoice.PrintLog.List.Response> ListPrintLogs(jewelry.Model.Sale.Invoice.PrintLog.List.Request request);
     }
 }

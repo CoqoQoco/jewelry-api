@@ -243,6 +243,26 @@ namespace Jewelry.Api.Controllers.Ticket
             }
         }
 
+        [Route("MarkAsRead")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> MarkAsRead([FromBody] MarkTicketReadRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                await _service.MarkTicketAsRead(request.TicketId);
+                return Ok("success");
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("DeleteMyComment")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]

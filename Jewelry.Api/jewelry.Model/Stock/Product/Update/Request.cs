@@ -19,6 +19,7 @@ namespace jewelry.Model.Stock.Product.Update
 
         public decimal Qty { get; set; }
         public string? Size { get; set; }
+        public string? EarringStemSize { get; set; }
         public string? Location { get; set; }
         public string? Remark { get; set; }
         public decimal? ProductCost { get; set; }

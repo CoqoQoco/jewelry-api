@@ -23,6 +23,8 @@ public partial class TbtSku
 
     public string? StudEarring { get; set; }
 
+    public string? EarringStemSize { get; set; }
+
     public string? Size { get; set; }
 
     public string? ProductionType { get; set; }
