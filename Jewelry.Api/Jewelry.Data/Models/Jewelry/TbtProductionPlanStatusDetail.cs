@@ -45,5 +45,7 @@ public partial class TbtProductionPlanStatusDetail
 
     public long? WorkerGoldLossSlipId { get; set; }
 
+    public long? GoldLossTangSlipId { get; set; }
+
     public virtual TbtProductionPlanStatusHeader Header { get; set; } = null!;
 }

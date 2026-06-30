@@ -5,6 +5,7 @@ using jewelry.Model.ProductionPlan.ProductionPlanReport;
 using jewelry.Model.Worker;
 using jewelry.Model.Worker.Create;
 using jewelry.Model.Worker.GoldLossSlip;
+using jewelry.Model.Worker.GoldLossTangSlip;
 using jewelry.Model.Worker.List;
 using jewelry.Model.Worker.Report;
 using jewelry.Model.Worker.TrackingWorker;
@@ -29,16 +30,19 @@ namespace Jewelry.Api.Controllers
         private readonly ILogger<MoldController> _logger;
         private readonly IWorkerService _service;
         private readonly IWorkerGoldLossSlipService _goldLossSlipService;
+        private readonly IGoldLossTangSlipService _goldLossTangSlipService;
 
         public WorkerController(ILogger<MoldController> logger,
             IWorkerService service,
             IWorkerGoldLossSlipService goldLossSlipService,
+            IGoldLossTangSlipService goldLossTangSlipService,
             IOptions<ApiBehaviorOptions> apiBehaviorOptions)
             : base(apiBehaviorOptions)
         {
             _logger = logger;
             _service = service;
             _goldLossSlipService = goldLossSlipService;
+            _goldLossTangSlipService = goldLossTangSlipService;
         }
 
         [Route("GetWorkerProductionType")]
@@ -272,6 +276,114 @@ namespace Jewelry.Api.Controllers
             {
                 await _goldLossSlipService.CancelSlip(request.Id);
                 return Ok();
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("SearchGoldLossTangJobs")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(List<SearchGoldLossTangJobsResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult SearchGoldLossTangJobs([FromBody] SearchGoldLossTangJobsRequest request)
+        {
+            try
+            {
+                var response = _goldLossTangSlipService.SearchJobs(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("CreateGoldLossTangSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossTangSlipResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CreateGoldLossTangSlip([FromBody] CreateGoldLossTangSlipRequest request)
+        {
+            try
+            {
+                var response = await _goldLossTangSlipService.CreateSlip(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListGoldLossTangSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(List<GoldLossTangSlipSummaryResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult ListGoldLossTangSlip([FromBody] ListGoldLossTangSlipRequest request)
+        {
+            try
+            {
+                var response = _goldLossTangSlipService.ListSlips(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GetGoldLossTangSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossTangSlipResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult GetGoldLossTangSlip([FromBody] GetGoldLossTangSlipRequest request)
+        {
+            try
+            {
+                var response = _goldLossTangSlipService.GetSlip(request.Id);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("CancelGoldLossTangSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CancelGoldLossTangSlip([FromBody] CancelGoldLossTangSlipRequest request)
+        {
+            try
+            {
+                await _goldLossTangSlipService.CancelSlip(request.Id);
+                return Ok();
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("UpdateGoldLossTangSlip")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossTangSlipResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UpdateGoldLossTangSlip([FromBody] UpdateGoldLossTangSlipRequest request)
+        {
+            try
+            {
+                var response = await _goldLossTangSlipService.UpdateSlip(request);
+                return Ok(response);
             }
             catch (HandleException ex)
             {

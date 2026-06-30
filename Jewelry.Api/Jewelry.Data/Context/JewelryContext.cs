@@ -159,6 +159,12 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtWorkerGoldLossSlipReturn> TbtWorkerGoldLossSlipReturn { get; set; }
 
+    public virtual DbSet<TbtGoldLossTangSlip> TbtGoldLossTangSlip { get; set; }
+
+    public virtual DbSet<TbtGoldLossTangSlipItem> TbtGoldLossTangSlipItem { get; set; }
+
+    public virtual DbSet<TbtGoldLossTangSlipExtra> TbtGoldLossTangSlipExtra { get; set; }
+
     public virtual DbSet<TbmStockLocation> TbmStockLocation { get; set; }
 
     public virtual DbSet<TbtSku> TbtSku { get; set; }
@@ -1831,6 +1837,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("loss_remark");
             entity.Property(e => e.WorkerGoldLossSlipId).HasColumnName("worker_gold_loss_slip_id");
+            entity.Property(e => e.GoldLossTangSlipId).HasColumnName("gold_loss_tang_slip_id");
 
             entity.HasOne(d => d.Header).WithMany(p => p.TbtProductionPlanStatusDetail)
                 .HasForeignKey(d => d.HeaderId)
@@ -4362,6 +4369,134 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("printed_by");
             entity.Property(e => e.PrintedAt).HasColumnName("printed_at");
+        });
+
+        modelBuilder.Entity<TbtGoldLossTangSlip>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_gold_loss_tang_slip_pk");
+
+            entity.ToTable("tbt_gold_loss_tang_slip");
+
+            entity.HasIndex(e => e.DocumentNo)
+                .IsUnique()
+                .HasDatabaseName("tbt_gold_loss_tang_slip_document_no_uq");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.DocumentNo)
+                .HasColumnType("character varying")
+                .HasColumnName("document_no");
+            entity.Property(e => e.WorkerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("worker_code");
+            entity.Property(e => e.WorkerName)
+                .HasColumnType("character varying")
+                .HasColumnName("worker_name");
+            entity.Property(e => e.RequestDateStart).HasColumnName("request_date_start");
+            entity.Property(e => e.RequestDateEnd).HasColumnName("request_date_end");
+            entity.Property(e => e.LossPercent).HasColumnName("loss_percent");
+            entity.Property(e => e.PricePerGram).HasColumnName("price_per_gram");
+            entity.Property(e => e.IssuedTotal).HasColumnName("issued_total");
+            entity.Property(e => e.ReturnedTotal).HasColumnName("returned_total");
+            entity.Property(e => e.RawLoss).HasColumnName("raw_loss");
+            entity.Property(e => e.AllowedLoss).HasColumnName("allowed_loss");
+            entity.Property(e => e.DiffLoss).HasColumnName("diff_loss");
+            entity.Property(e => e.TotalMoneyDiff).HasColumnName("total_money_diff");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasMany(e => e.TbtGoldLossTangSlipItem)
+                .WithOne(e => e.Header)
+                .HasForeignKey(e => e.SlipId)
+                .HasConstraintName("tbt_gold_loss_tang_slip_item_slip_fk");
+
+            entity.HasMany(e => e.TbtGoldLossTangSlipExtra)
+                .WithOne(e => e.Header)
+                .HasForeignKey(e => e.SlipId)
+                .HasConstraintName("tbt_gold_loss_tang_slip_extra_slip_fk");
+        });
+
+        modelBuilder.Entity<TbtGoldLossTangSlipItem>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_gold_loss_tang_slip_item_pk");
+
+            entity.ToTable("tbt_gold_loss_tang_slip_item");
+
+            entity.HasIndex(e => e.SlipId).HasDatabaseName("idx_gold_loss_tang_slip_item_slip_id");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.SlipId).HasColumnName("slip_id");
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.ItemNo)
+                .HasColumnType("character varying")
+                .HasColumnName("item_no");
+            entity.Property(e => e.Wo)
+                .HasColumnType("character varying")
+                .HasColumnName("wo");
+            entity.Property(e => e.WoNumber).HasColumnName("wo_number");
+            entity.Property(e => e.ProductNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("product_number");
+            entity.Property(e => e.ProductName)
+                .HasColumnType("character varying")
+                .HasColumnName("product_name");
+            entity.Property(e => e.Gold)
+                .HasColumnType("character varying")
+                .HasColumnName("gold");
+            entity.Property(e => e.GoldSize)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_size");
+            entity.Property(e => e.JobDate).HasColumnName("job_date");
+            entity.Property(e => e.GoldQtySend).HasColumnName("gold_qty_send");
+            entity.Property(e => e.GoldWeightSend).HasColumnName("gold_weight_send");
+            entity.Property(e => e.GoldQtyCheck).HasColumnName("gold_qty_check");
+            entity.Property(e => e.GoldWeightCheck).HasColumnName("gold_weight_check");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+
+            entity.HasOne(d => d.Header)
+                .WithMany(p => p.TbtGoldLossTangSlipItem)
+                .HasForeignKey(d => d.SlipId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_gold_loss_tang_slip_item_slip_fk");
+        });
+
+        modelBuilder.Entity<TbtGoldLossTangSlipExtra>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_gold_loss_tang_slip_extra_pk");
+
+            entity.ToTable("tbt_gold_loss_tang_slip_extra");
+
+            entity.HasIndex(e => e.SlipId).HasDatabaseName("idx_gold_loss_tang_slip_extra_slip_id");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.SlipId).HasColumnName("slip_id");
+            entity.Property(e => e.Kind).HasColumnName("kind");
+            entity.Property(e => e.Name)
+                .HasColumnType("character varying")
+                .HasColumnName("name");
+            entity.Property(e => e.Weight).HasColumnName("weight");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+
+            entity.HasOne(d => d.Header)
+                .WithMany(p => p.TbtGoldLossTangSlipExtra)
+                .HasForeignKey(d => d.SlipId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_gold_loss_tang_slip_extra_slip_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);
