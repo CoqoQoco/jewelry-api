@@ -186,7 +186,8 @@ namespace Jewelry.Service.Worker
 
             // Formula (ToPositiveInfinity, matching stage-80 pattern)
             decimal rawLoss = issuedTotal - returnedTotal;
-            decimal allowedLoss = Math.Round(returnedTotal * request.LossPercent / 100m, 4, MidpointRounding.ToPositiveInfinity);
+            // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) ไม่รวม add-on
+            decimal allowedLoss = Math.Round(returnedFromJobs * request.LossPercent / 100m, 4, MidpointRounding.ToPositiveInfinity);
             decimal diffLoss = Math.Round(allowedLoss - rawLoss, 4, MidpointRounding.ToPositiveInfinity);
             decimal totalMoneyDiff = Math.Round(diffLoss, 2, MidpointRounding.ToPositiveInfinity) * request.PricePerGram;
 
@@ -382,7 +383,8 @@ namespace Jewelry.Service.Worker
             decimal returnedTotal = returnedFromJobs + returnedFromCustom;
 
             decimal rawLoss = issuedTotal - returnedTotal;
-            decimal allowedLoss = Math.Round(returnedTotal * request.LossPercent / 100m, 4, MidpointRounding.ToPositiveInfinity);
+            // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) ไม่รวม add-on
+            decimal allowedLoss = Math.Round(returnedFromJobs * request.LossPercent / 100m, 4, MidpointRounding.ToPositiveInfinity);
             decimal diffLoss = Math.Round(allowedLoss - rawLoss, 4, MidpointRounding.ToPositiveInfinity);
             decimal totalMoneyDiff = Math.Round(diffLoss, 2, MidpointRounding.ToPositiveInfinity) * request.PricePerGram;
 
