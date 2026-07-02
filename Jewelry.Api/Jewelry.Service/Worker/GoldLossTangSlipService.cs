@@ -177,9 +177,9 @@ namespace Jewelry.Service.Worker
             decimal returnedFromJobs = loadedDetails.Sum(d => d.GoldWeightCheck ?? 0);
 
             decimal issuedFromCustom = (request.IssuedLines ?? new List<GoldLossTangExtraLine>())
-                .Sum(l => l.Weight);
+                .Where(l => l.CountInCalc).Sum(l => l.Weight);
             decimal returnedFromCustom = (request.ReturnedLines ?? new List<GoldLossTangExtraLine>())
-                .Sum(l => l.Weight);
+                .Where(l => l.CountInCalc).Sum(l => l.Weight);
 
             decimal issuedTotal = issuedFromJobs + issuedFromCustom;
             decimal returnedTotal = returnedFromJobs + returnedFromCustom;
@@ -229,13 +229,13 @@ namespace Jewelry.Service.Worker
                     SlipId = header.Id,
                     ProductionPlanId = itemReq.ProductionPlanId,
                     ItemNo = itemReq.ItemNo,
-                    Wo = itemReq.Wo,
-                    WoNumber = itemReq.WoNumber,
-                    ProductNumber = itemReq.ProductNumber,
-                    ProductName = itemReq.ProductName,
-                    Gold = itemReq.Gold,
-                    GoldSize = itemReq.GoldSize,
-                    JobDate = itemReq.JobDate.HasValue ? itemReq.JobDate.Value.UtcDateTime : (DateTime?)null,
+                    Wo = detail?.Header?.ProductionPlan?.Wo,
+                    WoNumber = detail?.Header?.ProductionPlan?.WoNumber,
+                    ProductNumber = detail?.Header?.ProductionPlan?.ProductNumber,
+                    ProductName = detail?.Header?.ProductionPlan?.ProductName,
+                    Gold = detail?.Gold,
+                    GoldSize = detail?.Header?.ProductionPlan?.TypeSize,
+                    JobDate = detail?.RequestDate,
                     GoldQtySend = detail?.GoldQtySend,
                     GoldWeightSend = detail?.GoldWeightSend,
                     GoldQtyCheck = detail?.GoldQtyCheck,
@@ -260,6 +260,7 @@ namespace Jewelry.Service.Worker
                     Kind = 1,
                     Name = line.Name,
                     Weight = line.Weight,
+                    CountInCalc = line.CountInCalc,
                     IsActive = true,
                 });
             }
@@ -271,6 +272,7 @@ namespace Jewelry.Service.Worker
                     Kind = 2,
                     Name = line.Name,
                     Weight = line.Weight,
+                    CountInCalc = line.CountInCalc,
                     IsActive = true,
                 });
             }
@@ -375,9 +377,9 @@ namespace Jewelry.Service.Worker
             decimal returnedFromJobs = loadedDetails.Sum(d => d.GoldWeightCheck ?? 0);
 
             decimal issuedFromCustom = (request.IssuedLines ?? new List<GoldLossTangExtraLine>())
-                .Sum(l => l.Weight);
+                .Where(l => l.CountInCalc).Sum(l => l.Weight);
             decimal returnedFromCustom = (request.ReturnedLines ?? new List<GoldLossTangExtraLine>())
-                .Sum(l => l.Weight);
+                .Where(l => l.CountInCalc).Sum(l => l.Weight);
 
             decimal issuedTotal = issuedFromJobs + issuedFromCustom;
             decimal returnedTotal = returnedFromJobs + returnedFromCustom;
@@ -429,13 +431,13 @@ namespace Jewelry.Service.Worker
                     SlipId = slip.Id,
                     ProductionPlanId = itemReq.ProductionPlanId,
                     ItemNo = itemReq.ItemNo,
-                    Wo = itemReq.Wo,
-                    WoNumber = itemReq.WoNumber,
-                    ProductNumber = itemReq.ProductNumber,
-                    ProductName = itemReq.ProductName,
-                    Gold = itemReq.Gold,
-                    GoldSize = itemReq.GoldSize,
-                    JobDate = itemReq.JobDate.HasValue ? itemReq.JobDate.Value.UtcDateTime : (DateTime?)null,
+                    Wo = detail?.Header?.ProductionPlan?.Wo,
+                    WoNumber = detail?.Header?.ProductionPlan?.WoNumber,
+                    ProductNumber = detail?.Header?.ProductionPlan?.ProductNumber,
+                    ProductName = detail?.Header?.ProductionPlan?.ProductName,
+                    Gold = detail?.Gold,
+                    GoldSize = detail?.Header?.ProductionPlan?.TypeSize,
+                    JobDate = detail?.RequestDate,
                     GoldQtySend = detail?.GoldQtySend,
                     GoldWeightSend = detail?.GoldWeightSend,
                     GoldQtyCheck = detail?.GoldQtyCheck,
@@ -454,6 +456,7 @@ namespace Jewelry.Service.Worker
                     Kind = 1,
                     Name = line.Name,
                     Weight = line.Weight,
+                    CountInCalc = line.CountInCalc,
                     IsActive = true,
                 });
             }
@@ -465,6 +468,7 @@ namespace Jewelry.Service.Worker
                     Kind = 2,
                     Name = line.Name,
                     Weight = line.Weight,
+                    CountInCalc = line.CountInCalc,
                     IsActive = true,
                 });
             }
@@ -693,6 +697,7 @@ namespace Jewelry.Service.Worker
                     Kind = e.Kind,
                     Name = e.Name,
                     Weight = e.Weight,
+                    CountInCalc = e.CountInCalc,
                 }).ToList(),
                 ReturnedLines = returnedLines.Select(e => new GoldLossTangExtraLineResponse
                 {
@@ -700,6 +705,7 @@ namespace Jewelry.Service.Worker
                     Kind = e.Kind,
                     Name = e.Name,
                     Weight = e.Weight,
+                    CountInCalc = e.CountInCalc,
                 }).ToList(),
                 TypeSummaries = BuildTypeSummaries(items.Where(i => i.IsActive).ToList()),
             };

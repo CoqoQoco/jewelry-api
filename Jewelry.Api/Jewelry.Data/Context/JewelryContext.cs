@@ -4491,6 +4491,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("name");
             entity.Property(e => e.Weight).HasColumnName("weight");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CountInCalc).HasColumnName("count_in_calc");
 
             entity.HasOne(d => d.Header)
                 .WithMany(p => p.TbtGoldLossTangSlipExtra)

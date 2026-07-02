@@ -16,5 +16,7 @@ public partial class TbtGoldLossTangSlipExtra
 
     public bool IsActive { get; set; }
 
+    public bool CountInCalc { get; set; }
+
     public virtual TbtGoldLossTangSlip Header { get; set; } = null!;
 }

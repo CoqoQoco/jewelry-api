@@ -56,6 +56,7 @@ namespace jewelry.Model.Worker.GoldLossTangSlip
         public int Kind { get; set; }
         public string? Name { get; set; }
         public decimal? Weight { get; set; }
+        public bool CountInCalc { get; set; }
     }
 
     public class GoldLossTangTypeSummaryResponse
