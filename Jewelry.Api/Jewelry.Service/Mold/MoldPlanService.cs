@@ -54,6 +54,9 @@ namespace Jewelry.Service.Mold
 
         Task<string> PlanMoldCode(PlanMoldCodeRequest request);
         Task<string> PlanStageImage(PlanStageImageRequest request);
+
+        Task<string> UpdatePlanDesign(UpdatePlanDesignRequest request);
+        Task<string> UpdatePlanStore(UpdatePlanStoreRequest request);
     }
     public class MoldPlanService : BaseService, IMoldPlanService
     {
@@ -1932,6 +1935,83 @@ namespace Jewelry.Service.Mold
                 }
 
                 await _jewelryContext.SaveChangesAsync();
+                scope.Complete();
+            }
+
+            return "success";
+        }
+
+        public async Task<string> UpdatePlanDesign(UpdatePlanDesignRequest request)
+        {
+            var design = (from item in _jewelryContext.TbtProductMoldPlanDesign
+                          where item.PlanId == request.PlanId
+                          select item).FirstOrDefault();
+
+            if (design == null)
+            {
+                throw new HandleException("ไม่พบข้อมูลออกแบบแม่พิมพ์ กรุณาลองใหม่อีกครั้ง");
+            }
+
+            if (request.Catagory != null) design.CategoryCode = request.Catagory;
+            if (request.DesignBy != null) design.DesignBy = request.DesignBy;
+            if (request.ResinBy != null) design.ResinBy = request.ResinBy;
+            if (request.QtyReceive.HasValue) design.QtyReceive = request.QtyReceive.Value;
+            if (request.QtySend.HasValue) design.QtySend = request.QtySend.Value;
+            design.Remark = request.Remark;
+            design.UpdateBy = CurrentUsername;
+            design.UpdateDate = DateTime.UtcNow;
+
+            _jewelryContext.TbtProductMoldPlanDesign.Update(design);
+            await _jewelryContext.SaveChangesAsync();
+
+            return "success";
+        }
+
+        public async Task<string> UpdatePlanStore(UpdatePlanStoreRequest request)
+        {
+            var store = (from item in _jewelryContext.TbtProductMoldPlanStore
+                         where item.PlanId == request.PlanId
+                         && item.Code == request.Code
+                         select item).FirstOrDefault();
+
+            if (store == null)
+            {
+                throw new HandleException("ไม่พบข้อมูลจัดเก็บแม่พิมพ์ กรุณาลองใหม่อีกครั้ง");
+            }
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                if (request.Location != null) store.Location = request.Location;
+                if (request.WorkerBy != null) store.WorkerBy = request.WorkerBy;
+                if (request.PrintBy != null) store.PrintBy = request.PrintBy;
+                if (request.CuttingBy != null) store.CuttingBy = request.CuttingBy;
+                if (request.QtyReceive.HasValue) store.QtyReceive = request.QtyReceive;
+                if (request.QtySend.HasValue) store.QtySend = request.QtySend;
+                if (request.QtyResin.HasValue) store.QtyResin = request.QtyResin;
+                if (request.QtySilverCast.HasValue) store.QtySilvercast = request.QtySilverCast;
+                store.Remark = request.Remark;
+                store.UpdateBy = CurrentUsername;
+                store.UpdateDate = DateTime.UtcNow;
+
+                _jewelryContext.TbtProductMoldPlanStore.Update(store);
+                await _jewelryContext.SaveChangesAsync();
+
+                var mold = (from item in _jewelryContext.TbtProductMold
+                            where item.Code == request.Code
+                            && item.IsActive == true
+                            select item).FirstOrDefault();
+
+                if (mold != null)
+                {
+                    mold.Description = request.Remark;
+                    mold.MoldBy = request.WorkerBy ?? mold.MoldBy;
+                    mold.UpdateBy = CurrentUsername;
+                    mold.UpdateDate = DateTime.UtcNow;
+
+                    _jewelryContext.TbtProductMold.Update(mold);
+                    await _jewelryContext.SaveChangesAsync();
+                }
+
                 scope.Complete();
             }
 
