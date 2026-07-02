@@ -20,4 +20,5 @@ public interface ITicketService
     Task<int> CountOpen();
     Task<TicketDashboardResponse> GetTicketDashboard(TicketDashboardRequest request);
     Task MarkTicketAsRead(long ticketId);
+    Task<int> CountMyUnread();
 }

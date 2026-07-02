@@ -665,6 +665,39 @@ public class TicketService : BaseService, ITicketService
         await _jewelryContext.SaveChangesAsync();
     }
 
+    public async Task<int> CountMyUnread()
+    {
+        var username = CurrentUsername;
+
+        var ticketIds = await _jewelryContext.TbtTicket
+            .AsNoTracking()
+            .Where(x => x.CreateBy == username)
+            .Select(x => x.Id)
+            .ToListAsync();
+
+        if (ticketIds.Count == 0) return 0;
+
+        var readByTicket = (await _jewelryContext.TbtTicketReadStatus
+            .AsNoTracking()
+            .Where(x => ticketIds.Contains(x.TicketId) && x.Username == username)
+            .ToListAsync())
+            .ToDictionary(x => x.TicketId, x => x.LastReadDate);
+
+        var latestDevByTicket = (await _jewelryContext.TbtTicketComment
+            .AsNoTracking()
+            .Where(x => ticketIds.Contains(x.TicketId) && x.IsActive && x.AuthorRole != "user")
+            .GroupBy(x => x.TicketId)
+            .Select(g => new { TicketId = g.Key, MaxDate = g.Max(c => c.CreateDate) })
+            .ToListAsync())
+            .ToDictionary(x => x.TicketId, x => x.MaxDate);
+
+        return ticketIds.Count(id =>
+        {
+            var lastRead = readByTicket.TryGetValue(id, out var lr) ? lr : DateTime.MinValue;
+            return latestDevByTicket.TryGetValue(id, out var maxDev) && maxDev > lastRead;
+        });
+    }
+
     private TbtTicketLog BuildLog(long ticketId, string action, string? detail, string? oldVal, string? newVal) => new TbtTicketLog
     {
         TicketId = ticketId,

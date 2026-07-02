@@ -224,6 +224,14 @@ namespace Jewelry.Api.Controllers.Ticket
             return Ok(await _service.CountOpen());
         }
 
+        [Route("CountMyUnread")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(int))]
+        public async Task<IActionResult> CountMyUnread()
+        {
+            return Ok(await _service.CountMyUnread());
+        }
+
         [Route("Dashboard")]
         [HttpPost]
         [RequirePermission("ticket:manage")]
