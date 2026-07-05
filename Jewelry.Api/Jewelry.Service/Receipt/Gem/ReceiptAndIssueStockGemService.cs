@@ -50,6 +50,11 @@ namespace Jewelry.Service.Receipt.Gem
         private readonly bool _valPass = true;
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
+
+        private static bool IsChainOrSpring(TbtStockGem g) =>
+            string.Equals(g.Shape, "CHAIN", StringComparison.OrdinalIgnoreCase)
+            || (g.GroupName?.Contains("สร้อย") ?? false)
+            || (g.GroupName?.Contains("สปริง") ?? false);
         private readonly IRunningNumber _runningNumberService;
         public ReceiptAndIssueStockGemService(JewelryContext JewelryContext,
             IHostEnvironment HostingEnvironment,
@@ -1180,45 +1185,45 @@ namespace Jewelry.Service.Receipt.Gem
                     var groupOutbound = getOutbound.GroupBy(x => new { x.ProductionPlanWo, x.ProductionPlanWoNumber }).ToList();
                     foreach (var group in groupOutbound)
                     {
-                        var headerId = 0;
                         var matchPlanGroup = plan.FirstOrDefault(x => x.Wo == group.Key.ProductionPlanWo && x.WoNumber == group.Key.ProductionPlanWoNumber);
                         if (matchPlanGroup == null)
                         {
                             throw new HandleException(ErrorMessage.NotFound);
                         }
 
-                        var planGemPick = matchPlanGroup.TbtProductionPlanStatusHeader.FirstOrDefault(x => x.Status == ProductionPlanStatus.Gems);
-                        if (planGemPick == null)
+                        var headerByStatus = new Dictionary<int, int>();
+                        async Task<int> GetOrCreateHeaderId(int targetStatus)
                         {
+                            if (headerByStatus.TryGetValue(targetStatus, out var cachedId))
+                                return cachedId;
+
+                            var existing = matchPlanGroup.TbtProductionPlanStatusHeader.FirstOrDefault(x => x.Status == targetStatus);
+                            if (existing != null)
+                            {
+                                existing.UpdateDate = DateTime.UtcNow;
+                                existing.UpdateBy = CurrentUsername;
+                                updatePlanHeader.Add(existing);
+                                headerByStatus[targetStatus] = existing.Id;
+                                return existing.Id;
+                            }
+
                             var addStatusHeader = new TbtProductionPlanStatusHeader
                             {
                                 ProductionPlanId = matchPlanGroup.Id,
-                                Status = ProductionPlanStatus.Gems,
+                                Status = targetStatus,
                                 IsActive = true,
-
-                                //SendDate = request.RequestDate.UtcDateTime,
-                                //CheckDate = request.RequestDate.UtcDateTime,
-
                                 Remark1 = request.Remark,
-
                                 CreateDate = DateTime.UtcNow,
                                 CreateBy = CurrentUsername,
                                 UpdateDate = DateTime.UtcNow,
                                 UpdateBy = CurrentUsername,
-
                                 WagesTotal = 0,
                             };
                             _jewelryContext.TbtProductionPlanStatusHeader.Add(addStatusHeader);
                             await _jewelryContext.SaveChangesAsync();
-
-                            headerId = addStatusHeader.Id;
                             updatePlanHeader.Add(addStatusHeader);
-                        }
-                        else
-                        {
-                            headerId = planGemPick.Id;
-                            planGemPick.UpdateDate = DateTime.UtcNow;
-                            planGemPick.UpdateBy = CurrentUsername;
+                            headerByStatus[targetStatus] = addStatusHeader.Id;
+                            return addStatusHeader.Id;
                         }
 
                         foreach (var gem in group)
@@ -1228,11 +1233,15 @@ namespace Jewelry.Service.Receipt.Gem
                             {
                                 throw new HandleException(ErrorMessage.NotFound);
                             }
+
+                            var targetStatus = IsChainOrSpring(gemData) ? ProductionPlanStatus.Casting : ProductionPlanStatus.Gems;
+                            var headerId = await GetOrCreateHeaderId(targetStatus);
+
                             var newGem = new TbtProductionPlanStatusDetailGem()
                             {
                                 HeaderId = headerId,
                                 ProductionPlanId = matchPlanGroup.Id,
-                                ItemNo = await _runningNumberService.GenerateRunningNumberForGold($"G-{matchPlanGroup.Id}-{ProductionPlanStatus.Gems}"),
+                                ItemNo = await _runningNumberService.GenerateRunningNumberForGold($"G-{matchPlanGroup.Id}-{targetStatus}"),
                                 IsActive = true,
 
                                 GemId = gemData.Id,
@@ -1246,7 +1255,7 @@ namespace Jewelry.Service.Receipt.Gem
                             };
                             addStatusDetailGem.Add(newGem);
 
-                            if (matchPlanGroup.Status == ProductionPlanStatus.Designed)
+                            if (targetStatus == ProductionPlanStatus.Gems && matchPlanGroup.Status == ProductionPlanStatus.Designed)
                             {
                                 matchPlanGroup.Status = ProductionPlanStatus.Gems;
                                 matchPlanGroup.UpdateDate = DateTime.UtcNow;
