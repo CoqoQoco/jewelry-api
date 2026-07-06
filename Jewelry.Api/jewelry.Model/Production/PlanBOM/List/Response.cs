@@ -32,6 +32,7 @@ namespace jewelry.Model.Production.PlanBOM.List
         public string ProductName { get; set; }
         public string ProductType { get; set; }
         public string ProductTypeName { get; set; }
+        public int? ProductQty { get; set; }
 
         public string ProductNumber { get; set; }
         public string CustomerCode { get; set; }

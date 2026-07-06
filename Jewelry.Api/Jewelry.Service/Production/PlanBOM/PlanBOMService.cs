@@ -406,6 +406,7 @@ namespace Jewelry.Service.Production.PlanBOM
                 ProductNumber = b.Production.ProductNumber,
                 ProductType = b.Production.ProductType,
                 ProductTypeName = b.Production.ProductTypeNavigation.NameTh,
+                ProductQty = b.Production.ProductQty,
 
             });
         }
