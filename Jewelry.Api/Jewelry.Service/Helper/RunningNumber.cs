@@ -18,6 +18,7 @@ namespace Jewelry.Service.Helper
         Task<string> GenerateRunningNumberForStockProductHash(string key);
         Task<string> GenerateQuotationNumber();
         Task<string> GeneratePrePlanNumber();
+        Task<string> GenerateBillingNoteNumber();
     }
     public class RunningNumber : IRunningNumber
     {
@@ -104,6 +105,14 @@ namespace Jewelry.Service.Helper
             var key = $"PP{dateStr}";
             var jobRunning = await Next(key);
             return $"PP-{dateStr}-{jobRunning.ToString("000")}";
+        }
+
+        public async Task<string> GenerateBillingNoteNumber()
+        {
+            var dateStr = DateTime.UtcNow.ToString("yyMMdd");
+            var key = $"BILLNOTE{dateStr}";
+            var jobRunning = await Next(key);
+            return $"BN{dateStr}{jobRunning.ToString("000")}";
         }
 
         private string ToBase36(int number)

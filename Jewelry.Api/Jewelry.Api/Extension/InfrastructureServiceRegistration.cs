@@ -18,6 +18,7 @@ using Jewelry.Service.Sale.SaleDocument;
 using Jewelry.Service.Sale.SaleDocumentCatalog;
 using Jewelry.Service.Sale.SaleOrder;
 using Jewelry.Service.Sale.Invoice;
+using Jewelry.Service.Sale.BillingNote;
 using Jewelry.Service.Sale.StockBasket;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
@@ -96,6 +97,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IQuotationService, QuotationService>();
             services.AddScoped<ISaleOrderService, SaleOrderService>();
             services.AddScoped<IInvoiceService, InvoiceService>();
+            services.AddScoped<IBillingNoteService, BillingNoteService>();
             services.AddScoped<ISaleDocumentService, SaleDocumentService>();
             services.AddScoped<ISaleDocumentCatalogService, SaleDocumentCatalogService>();
             services.AddScoped<IOldStockService, OldStockService>();

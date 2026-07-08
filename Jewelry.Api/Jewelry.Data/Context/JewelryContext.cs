@@ -118,6 +118,12 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleInvoiceVersion> TbtSaleInvoiceVersion { get; set; }
 
+    public virtual DbSet<TbtSaleBillingNoteHeader> TbtSaleBillingNoteHeader { get; set; }
+
+    public virtual DbSet<TbtSaleBillingNoteItem> TbtSaleBillingNoteItem { get; set; }
+
+    public virtual DbSet<TbtSaleBillingNoteProduct> TbtSaleBillingNoteProduct { get; set; }
+
     public virtual DbSet<TbtSaleOrder> TbtSaleOrder { get; set; }
 
     public virtual DbSet<TbtSaleOrderProduct> TbtSaleOrderProduct { get; set; }
@@ -2148,6 +2154,139 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => new { d.InvoiceRunning, d.SoRunning })
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_sale_invoice_payment_item_fk");
+        });
+
+        modelBuilder.Entity<TbtSaleBillingNoteHeader>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_sale_billing_note_header_pk");
+
+            entity.ToTable("tbt_sale_billing_note_header");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.DocumentDate).HasColumnName("document_date");
+            entity.Property(e => e.CustomerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_code");
+            entity.Property(e => e.CustomerName)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_name");
+            entity.Property(e => e.CustomerAddress)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_address");
+            entity.Property(e => e.CustomerTel)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_tel");
+            entity.Property(e => e.BillCount).HasColumnName("bill_count");
+            entity.Property(e => e.GoldResizeQty).HasColumnName("gold_resize_qty");
+            entity.Property(e => e.GoldResizeAmount).HasColumnName("gold_resize_amount");
+            entity.Property(e => e.SilverResizeQty).HasColumnName("silver_resize_qty");
+            entity.Property(e => e.SilverResizeAmount).HasColumnName("silver_resize_amount");
+            entity.Property(e => e.SubTotal).HasColumnName("sub_total");
+            entity.Property(e => e.VatPercent).HasColumnName("vat_percent");
+            entity.Property(e => e.VatAmount).HasColumnName("vat_amount");
+            entity.Property(e => e.GrandTotal).HasColumnName("grand_total");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.IsDelete).HasColumnName("is_delete");
+            entity.Property(e => e.DeleteReason)
+                .HasColumnType("character varying")
+                .HasColumnName("delete_reason");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtSaleBillingNoteItem>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_sale_billing_note_item_pk");
+
+            entity.ToTable("tbt_sale_billing_note_item");
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+            entity.Property(e => e.BillingNoteRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("billing_note_running");
+            entity.Property(e => e.Seq).HasColumnName("seq");
+            entity.Property(e => e.InvoiceRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_running");
+            entity.Property(e => e.InvoiceDate).HasColumnName("invoice_date");
+            entity.Property(e => e.AmountBeforeVat).HasColumnName("amount_before_vat");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.BillingNoteRunningNavigation).WithMany(p => p.TbtSaleBillingNoteItem)
+                .HasForeignKey(d => d.BillingNoteRunning)
+                .HasConstraintName("tbt_sale_billing_note_item_header_fk");
+        });
+
+        modelBuilder.Entity<TbtSaleBillingNoteProduct>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_sale_billing_note_product_pk");
+
+            entity.ToTable("tbt_sale_billing_note_product");
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+            entity.Property(e => e.BillingNoteRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("billing_note_running");
+            entity.Property(e => e.InvoiceRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_running");
+            entity.Property(e => e.ProductNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("product_number");
+            entity.Property(e => e.ProductType)
+                .HasColumnType("character varying")
+                .HasColumnName("product_type");
+            entity.Property(e => e.ProductTypeName)
+                .HasColumnType("character varying")
+                .HasColumnName("product_type_name");
+            entity.Property(e => e.ProductionType)
+                .HasColumnType("character varying")
+                .HasColumnName("production_type");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasOne(d => d.BillingNoteRunningNavigation).WithMany(p => p.TbtSaleBillingNoteProduct)
+                .HasForeignKey(d => d.BillingNoteRunning)
+                .HasConstraintName("tbt_sale_billing_note_product_header_fk");
         });
 
         modelBuilder.Entity<TbtSaleInvoiceVersion>(entity =>
