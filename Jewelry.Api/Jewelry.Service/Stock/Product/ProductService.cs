@@ -88,6 +88,11 @@ namespace Jewelry.Service.Stock.Product
                 var goldSizeArray = request.GoldSize.ToArray();
                 pieces = pieces.Where(x => goldSizeArray.Contains(x.SkuCodeNavigation.ProductionTypeSize));
             }
+            if (request.LocationCodes != null && request.LocationCodes.Any())
+            {
+                var locationArray = request.LocationCodes.ToArray();
+                pieces = pieces.Where(x => locationArray.Contains(x.LocationCode));
+            }
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
                 pieces = pieces.Where(x => x.ProductCode.Contains(request.ProductNumber));
