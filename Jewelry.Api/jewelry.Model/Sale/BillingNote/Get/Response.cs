@@ -20,6 +20,12 @@ namespace jewelry.Model.Sale.BillingNote.Get
         public int SilverResizeQty { get; set; }
         public decimal SilverResizeAmount { get; set; }
 
+        public decimal GoldResizePerUnit { get; set; }
+        public decimal SilverResizePerUnit { get; set; }
+        public bool HasSupport { get; set; }
+        public decimal SupportPercent { get; set; }
+        public decimal SupportAmount { get; set; }
+
         public decimal SubTotal { get; set; }
         public decimal VatPercent { get; set; }
         public decimal VatAmount { get; set; }
@@ -35,6 +41,12 @@ namespace jewelry.Model.Sale.BillingNote.Get
         public string? UpdateBy { get; set; }
         public DateTime? UpdateDate { get; set; }
 
+        // payment summary (header level)
+        public decimal TotalBilled { get; set; }
+        public decimal TotalReceived { get; set; }
+        public decimal TotalOutstanding { get; set; }
+        public string PaymentStatus { get; set; } = "Unpaid";
+
         public List<Item> Items { get; set; } = new List<Item>();
         public List<Product> Products { get; set; } = new List<Product>();
     }
@@ -46,6 +58,11 @@ namespace jewelry.Model.Sale.BillingNote.Get
         public DateTime? InvoiceDate { get; set; }
         public decimal AmountBeforeVat { get; set; }
         public string? Remark { get; set; }
+
+        public decimal InvoiceGrandTotal { get; set; }
+        public decimal ReceivedAmount { get; set; }
+        public decimal OutstandingAmount { get; set; }
+        public string PaymentStatus { get; set; } = "Unpaid";
     }
 
     public class Product

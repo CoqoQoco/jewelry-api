@@ -27,6 +27,16 @@ public partial class TbtSaleBillingNoteHeader
 
     public decimal SilverResizeAmount { get; set; }
 
+    public decimal GoldResizePerUnit { get; set; }
+
+    public decimal SilverResizePerUnit { get; set; }
+
+    public bool HasSupport { get; set; }
+
+    public decimal SupportPercent { get; set; }
+
+    public decimal SupportAmount { get; set; }
+
     public decimal SubTotal { get; set; }
 
     public decimal VatPercent { get; set; }

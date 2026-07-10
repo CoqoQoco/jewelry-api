@@ -153,6 +153,9 @@ namespace Jewelry.Service.Sale.BillingNote
             var running = await _runningNumberService.GenerateBillingNoteNumber();
 
             var subTotal = invoices.Sum(x => x.SubTotal ?? 0);
+            var goldResizeAmount = request.GoldResizeQty * request.GoldResizePerUnit;
+            var silverResizeAmount = request.SilverResizeQty * request.SilverResizePerUnit;
+            var supportAmount = request.HasSupport ? subTotal * request.SupportPercent / 100m : 0m;
             var vatAmount = subTotal * request.VatPercent / 100m;
             var grandTotal = subTotal + vatAmount;
 
@@ -169,9 +172,14 @@ namespace Jewelry.Service.Sale.BillingNote
                 BillCount = invoices.Count,
 
                 GoldResizeQty = request.GoldResizeQty,
-                GoldResizeAmount = request.GoldResizeAmount,
+                GoldResizePerUnit = request.GoldResizePerUnit,
+                GoldResizeAmount = goldResizeAmount,
                 SilverResizeQty = request.SilverResizeQty,
-                SilverResizeAmount = request.SilverResizeAmount,
+                SilverResizePerUnit = request.SilverResizePerUnit,
+                SilverResizeAmount = silverResizeAmount,
+                HasSupport = request.HasSupport,
+                SupportPercent = request.HasSupport ? request.SupportPercent : 0m,
+                SupportAmount = supportAmount,
 
                 SubTotal = subTotal,
                 VatPercent = request.VatPercent,
@@ -236,6 +244,51 @@ namespace Jewelry.Service.Sale.BillingNote
             return running;
         }
 
+        public async Task<string> Update(jewelry.Model.Sale.BillingNote.Update.Request request)
+        {
+            if (string.IsNullOrEmpty(request.Running))
+            {
+                throw new HandleException("Running is Required.");
+            }
+
+            var header = await _jewelryContext.TbtSaleBillingNoteHeader
+                .FirstOrDefaultAsync(x => x.Running == request.Running && x.IsDelete == false);
+
+            if (header == null)
+            {
+                throw new HandleException($"Billing Note not found: {request.Running}");
+            }
+
+            var subTotal = header.SubTotal;   // invoice ไม่เปลี่ยน — คงเดิม
+
+            header.DocumentDate = request.DocumentDate.UtcDateTime;
+
+            header.GoldResizeQty = request.GoldResizeQty;
+            header.GoldResizePerUnit = request.GoldResizePerUnit;
+            header.GoldResizeAmount = request.GoldResizeQty * request.GoldResizePerUnit;
+            header.SilverResizeQty = request.SilverResizeQty;
+            header.SilverResizePerUnit = request.SilverResizePerUnit;
+            header.SilverResizeAmount = request.SilverResizeQty * request.SilverResizePerUnit;
+
+            header.HasSupport = request.HasSupport;
+            header.SupportPercent = request.HasSupport ? request.SupportPercent : 0m;
+            header.SupportAmount = request.HasSupport ? header.SubTotal * request.SupportPercent / 100m : 0m;
+
+            header.VatPercent = request.VatPercent;
+            header.VatAmount = subTotal * request.VatPercent / 100m;
+            header.GrandTotal = subTotal + header.VatAmount;
+
+            header.Remark = request.Remark;
+
+            header.UpdateBy = CurrentUsername;
+            header.UpdateDate = DateTime.UtcNow;
+
+            _jewelryContext.TbtSaleBillingNoteHeader.Update(header);
+            await _jewelryContext.SaveChangesAsync();
+
+            return header.Running;
+        }
+
         public async Task<jewelry.Model.Sale.BillingNote.Get.Response> Get(jewelry.Model.Sale.BillingNote.Get.Request request)
         {
             if (string.IsNullOrEmpty(request.Running))
@@ -252,6 +305,53 @@ namespace Jewelry.Service.Sale.BillingNote
             {
                 throw new HandleException($"Billing Note not found: {request.Running}");
             }
+
+            static string PayStatus(decimal owed, decimal received)
+            {
+                if (owed <= 0) return "Paid";
+                if (received <= 0) return "Unpaid";
+                return received >= owed ? "Paid" : "Partial";
+            }
+
+            var invoiceRunnings = header.TbtSaleBillingNoteItem.Select(x => x.InvoiceRunning).Distinct().ToList();
+
+            var invoiceOwed = await _jewelryContext.TbtSaleInvoiceHeader
+                .Where(x => invoiceRunnings.Contains(x.Running))
+                .Select(x => new { x.Running, Owed = x.GrandTotalRounded ?? x.GrandTotalRaw ?? x.SubTotal ?? 0m })
+                .ToListAsync();
+            var owedMap = invoiceOwed.ToDictionary(x => x.Running, x => x.Owed);
+
+            var receivedList = await _jewelryContext.TbtSaleInvoicePaymentItem
+                .Where(p => invoiceRunnings.Contains(p.InvoiceRunning) && p.IsDelete == false)
+                .GroupBy(p => p.InvoiceRunning)
+                .Select(g => new { InvoiceRunning = g.Key, Received = g.Sum(x => x.Amount) })
+                .ToListAsync();
+            var receivedMap = receivedList.ToDictionary(x => x.InvoiceRunning, x => x.Received);
+
+            var items = header.TbtSaleBillingNoteItem
+                .OrderBy(x => x.Seq)
+                .Select(x =>
+                {
+                    var invoiceGrandTotal = owedMap.GetValueOrDefault(x.InvoiceRunning, 0m);
+                    var receivedAmount = receivedMap.GetValueOrDefault(x.InvoiceRunning, 0m);
+                    return new jewelry.Model.Sale.BillingNote.Get.Item
+                    {
+                        Seq = x.Seq,
+                        InvoiceRunning = x.InvoiceRunning,
+                        InvoiceDate = x.InvoiceDate,
+                        AmountBeforeVat = x.AmountBeforeVat,
+                        Remark = x.Remark,
+
+                        InvoiceGrandTotal = invoiceGrandTotal,
+                        ReceivedAmount = receivedAmount,
+                        OutstandingAmount = invoiceGrandTotal - receivedAmount,
+                        PaymentStatus = PayStatus(invoiceGrandTotal, receivedAmount)
+                    };
+                }).ToList();
+
+            var totalBilled = items.Sum(x => x.InvoiceGrandTotal);
+            var totalReceived = items.Sum(x => x.ReceivedAmount);
+            var totalOutstanding = totalBilled - totalReceived;
 
             return new jewelry.Model.Sale.BillingNote.Get.Response
             {
@@ -270,6 +370,12 @@ namespace Jewelry.Service.Sale.BillingNote
                 SilverResizeQty = header.SilverResizeQty,
                 SilverResizeAmount = header.SilverResizeAmount,
 
+                GoldResizePerUnit = header.GoldResizePerUnit,
+                SilverResizePerUnit = header.SilverResizePerUnit,
+                HasSupport = header.HasSupport,
+                SupportPercent = header.SupportPercent,
+                SupportAmount = header.SupportAmount,
+
                 SubTotal = header.SubTotal,
                 VatPercent = header.VatPercent,
                 VatAmount = header.VatAmount,
@@ -285,16 +391,12 @@ namespace Jewelry.Service.Sale.BillingNote
                 UpdateBy = header.UpdateBy,
                 UpdateDate = header.UpdateDate,
 
-                Items = header.TbtSaleBillingNoteItem
-                    .OrderBy(x => x.Seq)
-                    .Select(x => new jewelry.Model.Sale.BillingNote.Get.Item
-                    {
-                        Seq = x.Seq,
-                        InvoiceRunning = x.InvoiceRunning,
-                        InvoiceDate = x.InvoiceDate,
-                        AmountBeforeVat = x.AmountBeforeVat,
-                        Remark = x.Remark
-                    }).ToList(),
+                TotalBilled = totalBilled,
+                TotalReceived = totalReceived,
+                TotalOutstanding = totalOutstanding,
+                PaymentStatus = PayStatus(totalBilled, totalReceived),
+
+                Items = items,
 
                 Products = header.TbtSaleBillingNoteProduct
                     .Select(x => new jewelry.Model.Sale.BillingNote.Get.Product

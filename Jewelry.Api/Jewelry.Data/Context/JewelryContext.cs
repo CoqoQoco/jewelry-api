@@ -2183,6 +2183,11 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GoldResizeAmount).HasColumnName("gold_resize_amount");
             entity.Property(e => e.SilverResizeQty).HasColumnName("silver_resize_qty");
             entity.Property(e => e.SilverResizeAmount).HasColumnName("silver_resize_amount");
+            entity.Property(e => e.GoldResizePerUnit).HasColumnName("gold_resize_per_unit");
+            entity.Property(e => e.SilverResizePerUnit).HasColumnName("silver_resize_per_unit");
+            entity.Property(e => e.HasSupport).HasColumnName("has_support");
+            entity.Property(e => e.SupportPercent).HasColumnName("support_percent");
+            entity.Property(e => e.SupportAmount).HasColumnName("support_amount");
             entity.Property(e => e.SubTotal).HasColumnName("sub_total");
             entity.Property(e => e.VatPercent).HasColumnName("vat_percent");
             entity.Property(e => e.VatAmount).HasColumnName("vat_amount");

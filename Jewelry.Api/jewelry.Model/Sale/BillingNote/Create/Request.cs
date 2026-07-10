@@ -10,9 +10,12 @@ namespace jewelry.Model.Sale.BillingNote.Create
         public List<string> InvoiceRunnings { get; set; } = new List<string>();
 
         public int GoldResizeQty { get; set; }
-        public decimal GoldResizeAmount { get; set; }
+        public decimal GoldResizePerUnit { get; set; }
         public int SilverResizeQty { get; set; }
-        public decimal SilverResizeAmount { get; set; }
+        public decimal SilverResizePerUnit { get; set; }
+
+        public bool HasSupport { get; set; }
+        public decimal SupportPercent { get; set; }
 
         public decimal VatPercent { get; set; }
 

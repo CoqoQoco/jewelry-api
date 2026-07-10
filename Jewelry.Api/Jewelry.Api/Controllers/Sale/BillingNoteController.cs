@@ -113,6 +113,27 @@ namespace Jewelry.Api.Controllers.Sale
             }
         }
 
+        [HttpPost("Update")]
+        public async Task<IActionResult> Update(jewelry.Model.Sale.BillingNote.Update.Request request)
+        {
+            try
+            {
+                var result = await _service.Update(request);
+                return Ok(new { running = result, message = "Billing note updated successfully" });
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error updating billing note");
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error updating billing note");
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while updating billing note" });
+            }
+        }
+
         [HttpPost("Get")]
         public async Task<IActionResult> Get(jewelry.Model.Sale.BillingNote.Get.Request request)
         {
