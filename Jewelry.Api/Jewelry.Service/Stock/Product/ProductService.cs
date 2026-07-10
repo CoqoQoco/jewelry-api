@@ -148,6 +148,7 @@ namespace Jewelry.Service.Stock.Product
                                ProductPrice = item.SkuCodeNavigation.DefaultPrice ?? 0,
 
                                ProductNumber = item.SkuCodeNavigation.ProductNumber,
+                               ProductCode = item.ProductCode,
                                ProductNameTh = item.SkuCodeNavigation.ProductNameTh,
                                ProductNameEn = item.SkuCodeNavigation.ProductNameEn,
 

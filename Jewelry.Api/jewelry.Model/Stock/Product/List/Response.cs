@@ -16,6 +16,7 @@ namespace jewelry.Model.Stock.Product.List
         public DateTime ReceiptDate { get; set; }
 
         public string ProductNumber { get; set; }
+        public string? ProductCode { get; set; }
         public string ProductNameEn { get; set; }
         public string ProductNameTh { get; set; }
 
