@@ -743,7 +743,10 @@ namespace Jewelry.Service.Receipt.Production
             }
 
             receiptPlan.JsonDraft = request.MapToTbtStockProductReceiptPlanJson();
-            receiptPlan.JsonBreakdown = request.MapToTbtStockProductReceiptPlanBreakdownJson();
+            if (request.BreakDown != null)
+            {
+                receiptPlan.JsonBreakdown = request.MapToTbtStockProductReceiptPlanBreakdownJson();
+            }
             receiptPlan.UpdateBy = CurrentUsername;
             receiptPlan.UpdateDate = DateTime.UtcNow;
 
