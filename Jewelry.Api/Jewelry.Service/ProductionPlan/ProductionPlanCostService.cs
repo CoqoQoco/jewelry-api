@@ -510,6 +510,45 @@ namespace Jewelry.Service.ProductionPlan
                             //getPlan.Status = ProductionPlanStatus.WaitCasting;
                             //updateproductionPlans.Add(getPlan);
                         }
+                        else if (getPlan.Status != ProductionPlanStatus.Designed
+                                 && getPlan.Status != ProductionPlanStatus.Completed)
+                        {
+                            var currentHeader = _jewelryContext.TbtProductionPlanStatusHeader
+                                .Include(x => x.TbtProductionPlanStatusDetail)
+                                .Where(h => h.ProductionPlanId == item.Id
+                                            && h.Status == getPlan.Status
+                                            && h.IsActive)
+                                .FirstOrDefault();
+
+                            if (currentHeader != null)
+                            {
+                                bool goldExists = currentHeader.TbtProductionPlanStatusDetail
+                                    .Any(d => d.IsActive && d.Gold == request.GoldCode);
+
+                                if (!goldExists)
+                                {
+                                    var appendDetail = new TbtProductionPlanStatusDetail()
+                                    {
+                                        HeaderId = currentHeader.Id,
+                                        ProductionPlanId = item.Id,
+                                        ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{item.Id}-{getPlan.Status}"),
+                                        IsActive = true,
+                                        RequestDate = DateTime.UtcNow,
+                                        Gold = request.GoldCode,
+                                        GoldQtySend = item.ReturnQTY,
+                                        GoldWeightSend = item.ReturnWeight,
+                                        GoldQtyCheck = null,
+                                        GoldWeightCheck = null,
+                                        Worker = null,
+                                        WorkerSub = null,
+                                        Description = request.Remark,
+                                        Wages = 0,
+                                        TotalWages = 0,
+                                    };
+                                    _jewelryContext.TbtProductionPlanStatusDetail.Add(appendDetail);
+                                }
+                            }
+                        }
 
                         #region --- old  method ---
                         //if (getPlan != null)
@@ -762,6 +801,45 @@ namespace Jewelry.Service.ProductionPlan
                                 WoNumber = getPlan.WoNumber
                             };
                             requestTransfer.Plans.Add(createheaderPlan);
+                        }
+                        else if (getPlan.Status != ProductionPlanStatus.Designed
+                                 && getPlan.Status != ProductionPlanStatus.Completed)
+                        {
+                            var currentHeader = _jewelryContext.TbtProductionPlanStatusHeader
+                                .Include(x => x.TbtProductionPlanStatusDetail)
+                                .Where(h => h.ProductionPlanId == item.Id
+                                            && h.Status == getPlan.Status
+                                            && h.IsActive)
+                                .FirstOrDefault();
+
+                            if (currentHeader != null)
+                            {
+                                bool goldExists = currentHeader.TbtProductionPlanStatusDetail
+                                    .Any(d => d.IsActive && d.Gold == request.GoldCode);
+
+                                if (!goldExists)
+                                {
+                                    var appendDetail = new TbtProductionPlanStatusDetail()
+                                    {
+                                        HeaderId = currentHeader.Id,
+                                        ProductionPlanId = item.Id,
+                                        ItemNo = await _runningNumberService.GenerateRunningNumber($"S-{item.Id}-{getPlan.Status}"),
+                                        IsActive = true,
+                                        RequestDate = DateTime.UtcNow,
+                                        Gold = request.GoldCode,
+                                        GoldQtySend = item.ReturnQTY,
+                                        GoldWeightSend = item.ReturnWeight,
+                                        GoldQtyCheck = null,
+                                        GoldWeightCheck = null,
+                                        Worker = null,
+                                        WorkerSub = null,
+                                        Description = request.Remark,
+                                        Wages = 0,
+                                        TotalWages = 0,
+                                    };
+                                    _jewelryContext.TbtProductionPlanStatusDetail.Add(appendDetail);
+                                }
+                            }
                         }
                     }
                 }
