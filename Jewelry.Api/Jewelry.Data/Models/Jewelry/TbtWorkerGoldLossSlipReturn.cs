@@ -18,6 +18,8 @@ public partial class TbtWorkerGoldLossSlipReturn
 
     public decimal Amount { get; set; }
 
+    public bool CountInCalc { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;

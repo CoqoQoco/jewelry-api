@@ -3564,6 +3564,7 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Weight).HasColumnName("weight");
             entity.Property(e => e.PricePerGram).HasColumnName("price_per_gram");
             entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.CountInCalc).HasColumnName("count_in_calc");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")

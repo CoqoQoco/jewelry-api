@@ -35,6 +35,7 @@ namespace jewelry.Model.Worker.GoldLossSlip
         public decimal Weight { get; set; }
         public decimal PricePerGram { get; set; }
         public decimal Amount { get; set; }
+        public bool CountInCalc { get; set; }
     }
 
     public class GoldLossTypeSummaryResponse

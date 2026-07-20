@@ -43,16 +43,17 @@ namespace Jewelry.Service.Worker
                 .Select(r => new TbtWorkerGoldLossSlipReturn
                 {
                     GoldSize = r.GoldSize,
-                    Gold = null,
+                    Gold = r.Gold,
                     Weight = r.Weight,
                     PricePerGram = r.PricePerGram,
                     Amount = r.Weight * r.PricePerGram,
+                    CountInCalc = r.CountInCalc,
                     CreateDate = DateTime.UtcNow,
                     CreateBy = CurrentUsername,
                 }).ToList();
 
-            var totalGoldReturnAmount = returnItems.Sum(r => r.Amount);
-            var totalReturnWeight = returnItems.Sum(r => r.Weight);
+            var totalGoldReturnAmount = returnItems.Where(r => r.CountInCalc).Sum(r => r.Amount);
+            var totalReturnWeight = returnItems.Where(r => r.CountInCalc).Sum(r => r.Weight);
             var netWeightLoss = totalWeightLoss - totalReturnWeight;
 
             var documentNo = await GenerateGlsDocumentNo();
@@ -323,41 +324,44 @@ namespace Jewelry.Service.Worker
                     Weight = r.Weight,
                     PricePerGram = r.PricePerGram,
                     Amount = r.Amount,
+                    CountInCalc = r.CountInCalc,
                 }).ToList(),
                 TypeSummaries = BuildTypeSummaries(items, returnItems),
             };
         }
 
         private static string PurityKey(string? gold, string? goldSize)
-            => gold == "SV" ? "SILVER" : (!string.IsNullOrEmpty(goldSize) ? goldSize : (gold ?? ""));
+            => gold == "SV" ? "SILVER" : $"{gold ?? ""}|{goldSize ?? ""}";
 
         private List<GoldLossTypeSummaryResponse> BuildTypeSummaries(List<TbtWorkerGoldLossSlipItem> items, List<TbtWorkerGoldLossSlipReturn> returnItems)
         {
+            var countedReturnItems = returnItems.Where(r => r.CountInCalc).ToList();
+
             var purityKeys = items.Select(i => PurityKey(i.Gold, i.GoldSize))
-                .Concat(returnItems.Select(r => PurityKey(r.Gold, r.GoldSize)))
+                .Concat(countedReturnItems.Select(r => PurityKey(r.Gold, r.GoldSize)))
                 .Distinct()
                 .OrderBy(k => k)
                 .ToList();
 
             return purityKeys.Select(purity =>
             {
-                var totalWeightLoss = items
-                    .Where(i => PurityKey(i.Gold, i.GoldSize) == purity)
-                    .Sum(i => i.WeightLossActual ?? 0);
-                var totalMoneyLoss = items
-                    .Where(i => PurityKey(i.Gold, i.GoldSize) == purity)
-                    .Sum(i => i.MoneyDiff ?? 0);
-                var returnWeight = returnItems
-                    .Where(r => PurityKey(r.Gold, r.GoldSize) == purity)
-                    .Sum(r => r.Weight);
-                var returnAmount = returnItems
-                    .Where(r => PurityKey(r.Gold, r.GoldSize) == purity)
-                    .Sum(r => r.Amount);
+                var matchingItems = items.Where(i => PurityKey(i.Gold, i.GoldSize) == purity).ToList();
+                var matchingReturns = countedReturnItems.Where(r => PurityKey(r.Gold, r.GoldSize) == purity).ToList();
+
+                var totalWeightLoss = matchingItems.Sum(i => i.WeightLossActual ?? 0);
+                var totalMoneyLoss = matchingItems.Sum(i => i.MoneyDiff ?? 0);
+                var returnWeight = matchingReturns.Sum(r => r.Weight);
+                var returnAmount = matchingReturns.Sum(r => r.Amount);
+
+                var gold = purity == "SILVER" ? "SV" : matchingItems.Select(i => i.Gold).FirstOrDefault(g => !string.IsNullOrEmpty(g))
+                    ?? matchingReturns.Select(r => r.Gold).FirstOrDefault(g => !string.IsNullOrEmpty(g));
+                var goldSize = purity == "SILVER" ? null : matchingItems.Select(i => i.GoldSize).FirstOrDefault(g => !string.IsNullOrEmpty(g))
+                    ?? matchingReturns.Select(r => r.GoldSize).FirstOrDefault(g => !string.IsNullOrEmpty(g));
 
                 return new GoldLossTypeSummaryResponse
                 {
-                    Gold = null,
-                    GoldSize = purity == "" ? null : purity,
+                    Gold = gold,
+                    GoldSize = goldSize,
                     TotalWeightLoss = totalWeightLoss,
                     TotalMoneyLoss = totalMoneyLoss,
                     ReturnWeight = returnWeight,
