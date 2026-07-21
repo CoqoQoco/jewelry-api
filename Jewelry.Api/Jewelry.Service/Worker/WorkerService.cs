@@ -31,6 +31,7 @@ namespace Jewelry.Service.Worker
         SearchWorkerWagesResponse SearchWorkerWages(SearchWorkerWagesRequest request);
         SearchWorkerWagesResponse SearchWorkerActiveStatus(SearchWorkerWagesRequest request);
         IQueryable<ReportWorkerWagesResponse> Report(ReportWorkerWages request);
+        IQueryable<ReportWorkerWagesByWorkerResponse> ReportByWorker(ReportWorkerWages request);
         ReportWorkerSummeryResponse SummeryReport(ReportWorkerWages request);
         IQueryable<TrackingWorkerResponse> TrackingWorker(TrackingWorker request);
     }
@@ -472,6 +473,20 @@ namespace Jewelry.Service.Worker
 
             return query;
 
+        }
+
+        public IQueryable<ReportWorkerWagesByWorkerResponse> ReportByWorker(ReportWorkerWages request)
+        {
+            return this.Report(request)
+                .GroupBy(x => new { x.WorkerCode, x.WorkerName })
+                .Select(g => new ReportWorkerWagesByWorkerResponse
+                {
+                    WorkerCode = g.Key.WorkerCode,
+                    WorkerName = g.Key.WorkerName,
+                    JobCount = g.Count(),
+                    TotalQty = g.Sum(x => x.GoldQtyCheck ?? x.GoldQtySend),
+                    TotalWages = g.Sum(x => x.TotalWages)
+                });
         }
 
         public IQueryable<TrackingWorkerResponse> TrackingWorker(TrackingWorker request)

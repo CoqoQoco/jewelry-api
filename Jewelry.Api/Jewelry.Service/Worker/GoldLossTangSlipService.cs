@@ -22,6 +22,7 @@ namespace Jewelry.Service.Worker
         List<GoldLossTangSlipSummaryResponse> ListSlips(ListGoldLossTangSlipRequest request);
         GoldLossTangSlipResponse GetSlip(long id);
         Task CancelSlip(long id);
+        IQueryable<ReportGoldLossTangByWorkerResponse> ReportByWorker(ReportGoldLossTangByWorkerSearch request);
     }
 
     public class GoldLossTangSlipService : BaseService, IGoldLossTangSlipService
@@ -619,6 +620,44 @@ namespace Jewelry.Service.Worker
             }
 
             await _jewelryContext.SaveChangesAsync();
+        }
+
+        public IQueryable<ReportGoldLossTangByWorkerResponse> ReportByWorker(ReportGoldLossTangByWorkerSearch request)
+        {
+            var query = _jewelryContext.TbtGoldLossTangSlip
+                .Where(x => x.IsActive);
+
+            if (request.RequestDateStart.HasValue)
+            {
+                var startUtc = request.RequestDateStart.Value.StartOfDayUtc();
+                query = query.Where(x => x.CreateDate >= startUtc.UtcDateTime);
+            }
+
+            if (request.RequestDateEnd.HasValue)
+            {
+                var endUtc = request.RequestDateEnd.Value.EndOfDayUtc();
+                query = query.Where(x => x.CreateDate <= endUtc.UtcDateTime);
+            }
+
+            if (!string.IsNullOrEmpty(request.WorkerCode))
+            {
+                query = query.Where(x => x.WorkerCode == request.WorkerCode.ToUpper());
+            }
+
+            return query
+                .GroupBy(x => new { x.WorkerCode, x.WorkerName })
+                .Select(g => new ReportGoldLossTangByWorkerResponse
+                {
+                    WorkerCode = g.Key.WorkerCode,
+                    WorkerName = g.Key.WorkerName,
+                    SlipCount = g.Count(),
+                    TotalIssued = g.Sum(x => x.IssuedTotal),
+                    TotalReturned = g.Sum(x => x.ReturnedTotal),
+                    TotalRawLoss = g.Sum(x => x.RawLoss),
+                    TotalAllowedLoss = g.Sum(x => x.AllowedLoss),
+                    TotalDiffLoss = g.Sum(x => x.DiffLoss),
+                    TotalMoneyDiff = g.Sum(x => x.TotalMoneyDiff),
+                });
         }
 
         private async Task<string> GenerateGltDocumentNo()

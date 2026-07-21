@@ -172,6 +172,25 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("ReportWorkerWagesByWorker")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ReportWorkerWagesByWorkerResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ReportByWorker([FromBody] ReportWorkerWagesRequest request)
+        {
+            try
+            {
+                var report = _service.ReportByWorker(request.Search);
+                return report.ToDataSource(request);
+
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
         [Route("ReportWorkerSummeryReportWages")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(ReportWorkerSummeryResponse))]
@@ -334,6 +353,24 @@ namespace Jewelry.Api.Controllers
             catch (HandleException ex)
             {
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ReportGoldLossTangByWorker")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ReportGoldLossTangByWorkerResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ReportGoldLossTangByWorker([FromBody] ReportGoldLossTangByWorkerRequest request)
+        {
+            try
+            {
+                var report = _goldLossTangSlipService.ReportByWorker(request.Search);
+                return report.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
 
