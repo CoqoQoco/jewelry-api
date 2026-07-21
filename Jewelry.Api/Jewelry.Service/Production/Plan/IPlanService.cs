@@ -21,5 +21,7 @@ namespace Jewelry.Service.Production.Plan
 
         Task<jewelry.Model.Production.Plan.GoldLossByStageReport.SearchResponse> GetGoldLossByStageReport(jewelry.Model.Production.Plan.GoldLossByStageReport.SearchRequest request);
 
+        Task<jewelry.Model.Production.Plan.LeadTimeReport.SearchResponse> GetLeadTimeReport(jewelry.Model.Production.Plan.LeadTimeReport.SearchRequest request);
+
     }
 }

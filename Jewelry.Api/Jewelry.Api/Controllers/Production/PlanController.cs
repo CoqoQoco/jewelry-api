@@ -193,5 +193,23 @@ namespace Jewelry.Api.Controllers.Production
             }
         }
 
+        [Route("LeadTimeReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.LeadTimeReport.SearchResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetLeadTimeReport([FromBody] jewelry.Model.Production.Plan.LeadTimeReport.SearchRequest request)
+        {
+            try
+            {
+                var response = await _planService.GetLeadTimeReport(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
     }
 }

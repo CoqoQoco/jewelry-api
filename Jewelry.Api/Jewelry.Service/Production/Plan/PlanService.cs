@@ -1628,5 +1628,122 @@ namespace Jewelry.Service.Production.Plan
             };
         }
         #endregion
+
+        #region --- lead time report ---
+        public async Task<jewelry.Model.Production.Plan.LeadTimeReport.SearchResponse> GetLeadTimeReport(jewelry.Model.Production.Plan.LeadTimeReport.SearchRequest request)
+        {
+            var query = _jewelryContext.TbtProductionPlan
+                .Where(x => x.IsActive == true
+                    && x.Status == jewelry.Model.Constant.ProductionPlanStatus.Completed
+                    && x.CompletedDate != null);
+
+            if (request.CompletedStart.HasValue)
+            {
+                var start = request.CompletedStart.Value.StartOfDayUtc();
+                query = query.Where(x => x.CompletedDate >= start);
+            }
+            if (request.CompletedEnd.HasValue)
+            {
+                var end = request.CompletedEnd.Value.EndOfDayUtc();
+                query = query.Where(x => x.CompletedDate <= end);
+            }
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+            if (request.CustomerType != null && request.CustomerType.Any())
+            {
+                query = query.Where(x => request.CustomerType.Contains(x.CustomerType));
+            }
+
+            var data = await query
+                .Select(x => new
+                {
+                    x.ProductType,
+                    x.CustomerType,
+                    x.RequestDate,
+                    x.CompletedDate
+                })
+                .ToListAsync();
+
+            var groupByCustomerType = string.Equals(request.GroupBy, "customerType", StringComparison.OrdinalIgnoreCase);
+
+            var invalidCount = data.Count(x => (x.CompletedDate!.Value - x.RequestDate).TotalDays < 0);
+            var validData = data
+                .Select(x => new
+                {
+                    x.ProductType,
+                    x.CustomerType,
+                    LeadDays = (x.CompletedDate!.Value - x.RequestDate).TotalDays
+                })
+                .Where(x => x.LeadDays >= 0)
+                .ToList();
+
+            var groups = groupByCustomerType
+                ? validData.GroupBy(x => x.CustomerType)
+                : validData.GroupBy(x => x.ProductType);
+
+            var productTypeMaster = await _jewelryContext.TbmProductType.ToListAsync();
+            var customerTypeMaster = await _jewelryContext.TbmCustomerType.ToListAsync();
+
+            var rows = groups.Select(g =>
+            {
+                var leadDaysList = g.Select(x => x.LeadDays).ToList();
+                var groupCode = g.Key ?? string.Empty;
+                var groupName = groupByCustomerType
+                    ? customerTypeMaster.FirstOrDefault(m => m.Code == groupCode)?.NameTh ?? groupCode
+                    : productTypeMaster.FirstOrDefault(m => m.Code == groupCode)?.NameTh ?? groupCode;
+
+                return new jewelry.Model.Production.Plan.LeadTimeReport.LeadTimeRow
+                {
+                    GroupCode = groupCode,
+                    GroupName = groupName,
+                    Count = leadDaysList.Count,
+                    AvgDays = Math.Round((decimal)leadDaysList.Average(), 1),
+                    MedianDays = Math.Round((decimal)GetMedian(leadDaysList), 1),
+                    B0_30 = leadDaysList.Count(d => d <= 30),
+                    B31_90 = leadDaysList.Count(d => d > 30 && d <= 90),
+                    B91_180 = leadDaysList.Count(d => d > 90 && d <= 180),
+                    B181_365 = leadDaysList.Count(d => d > 180 && d <= 365),
+                    BGt365 = leadDaysList.Count(d => d > 365)
+                };
+            }).OrderByDescending(x => x.Count).ToList();
+
+            var allLeadDays = validData.Select(x => x.LeadDays).ToList();
+            var summary = new jewelry.Model.Production.Plan.LeadTimeReport.LeadTimeSummary
+            {
+                TotalCount = allLeadDays.Count,
+                AvgDays = allLeadDays.Any() ? Math.Round((decimal)allLeadDays.Average(), 1) : 0,
+                MedianDays = allLeadDays.Any() ? Math.Round((decimal)GetMedian(allLeadDays), 1) : 0,
+                InvalidCount = invalidCount
+            };
+
+            return new jewelry.Model.Production.Plan.LeadTimeReport.SearchResponse
+            {
+                GroupBy = groupByCustomerType ? "customerType" : "productType",
+                Rows = rows,
+                Summary = summary
+            };
+        }
+
+        private static double GetMedian(List<double> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return 0;
+            }
+
+            var sorted = values.OrderBy(x => x).ToList();
+            var count = sorted.Count;
+            var mid = count / 2;
+
+            if (count % 2 == 0)
+            {
+                return (sorted[mid - 1] + sorted[mid]) / 2.0;
+            }
+
+            return sorted[mid];
+        }
+        #endregion
     }
 }
