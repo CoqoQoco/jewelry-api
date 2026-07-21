@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
+using SearchModel = jewelry.Model.Stock.Movement.Search;
 
 namespace Jewelry.Api.Controllers.Stock
 {
@@ -51,6 +52,16 @@ namespace Jewelry.Api.Controllers.Stock
             {
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
+        }
+
+        [Route("Search")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(IQueryable<SearchModel.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public DataSourceResult Search([FromBody] SearchModel.Request request)
+        {
+            var response = _service.Search(request);
+            return response.ToDataSource(request);
         }
     }
 }

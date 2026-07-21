@@ -3,11 +3,13 @@ using jewelry.Model.Stock.Movement.Move;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
+using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using SearchModel = jewelry.Model.Stock.Movement.Search;
 
 namespace Jewelry.Service.Stock.Movement
 {
@@ -24,6 +26,55 @@ namespace Jewelry.Service.Stock.Movement
         public IQueryable<object> List()
         {
             return Enumerable.Empty<object>().AsQueryable();
+        }
+
+        public IQueryable<SearchModel.Response> Search(SearchModel.Request request)
+        {
+            var query = _jewelryContext.TbtStockMovement
+                .Where(x => x.RefDocType == "MoveLocation")
+                .AsQueryable();
+
+            if (request.DateFrom.HasValue)
+            {
+                var from = request.DateFrom.Value.StartOfDayUtc();
+                query = query.Where(x => x.MovementDate >= from);
+            }
+
+            if (request.DateTo.HasValue)
+            {
+                var to = request.DateTo.Value.EndOfDayUtc();
+                query = query.Where(x => x.MovementDate <= to);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.FromLocation))
+            {
+                query = query.Where(x => x.FromLocation == request.FromLocation);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ToLocation))
+            {
+                query = query.Where(x => x.ToLocation == request.ToLocation);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.StockNumber))
+            {
+                query = query.Where(x => x.StockNumber != null && x.StockNumber.Contains(request.StockNumber));
+            }
+
+            return query
+                .OrderByDescending(x => x.MovementDate)
+                .Select(x => new SearchModel.Response
+                {
+                    MovementDate = x.MovementDate,
+                    StockNumber = x.StockNumber,
+                    ProductCode = x.ProductCode,
+                    FromLocation = x.FromLocation,
+                    FromLocationName = x.FromLocationNavigation != null ? x.FromLocationNavigation.NameTh : null,
+                    ToLocation = x.ToLocation,
+                    ToLocationName = x.ToLocationNavigation != null ? x.ToLocationNavigation.NameTh : null,
+                    CreateBy = x.CreateBy,
+                    Remark = x.Remark
+                });
         }
 
         public async Task<Response> MoveLocation(Request req)
