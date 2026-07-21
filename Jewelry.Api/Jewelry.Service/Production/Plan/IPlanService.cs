@@ -19,5 +19,7 @@ namespace Jewelry.Service.Production.Plan
         Task<jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchResponse> GetGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchRequest request);
         Task<string> SaveGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SaveRequest request);
 
+        Task<jewelry.Model.Production.Plan.GoldLossByStageReport.SearchResponse> GetGoldLossByStageReport(jewelry.Model.Production.Plan.GoldLossByStageReport.SearchRequest request);
+
     }
 }

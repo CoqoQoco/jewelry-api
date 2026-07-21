@@ -175,5 +175,23 @@ namespace Jewelry.Api.Controllers.Production
             }
         }
 
+        [Route("GoldLossByStageReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.GoldLossByStageReport.SearchResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetGoldLossByStageReport([FromBody] jewelry.Model.Production.Plan.GoldLossByStageReport.SearchRequest request)
+        {
+            try
+            {
+                var response = await _planService.GetGoldLossByStageReport(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
     }
 }

@@ -1561,5 +1561,72 @@ namespace Jewelry.Service.Production.Plan
             return "success";
         }
         #endregion
+
+        #region --- gold loss by stage report ---
+        public async Task<jewelry.Model.Production.Plan.GoldLossByStageReport.SearchResponse> GetGoldLossByStageReport(jewelry.Model.Production.Plan.GoldLossByStageReport.SearchRequest request)
+        {
+            var startDate = new DateTimeOffset(new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc));
+            var endDate = startDate.AddMonths(1).AddSeconds(-1);
+
+            var liveData = await (from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                                  join header in _jewelryContext.TbtProductionPlanStatusHeader
+                                      on detail.HeaderId equals header.Id
+                                  where header.IsActive == true
+                                      && detail.IsActive == true
+                                      && header.CreateDate >= startDate
+                                      && header.CreateDate <= endDate
+                                  group new { detail, header } by header.Status into g
+                                  select new
+                                  {
+                                      StatusCode = g.Key,
+                                      SumGoldWeightSend = g.Sum(x => x.detail.GoldWeightSend ?? 0),
+                                      SumGoldWeightCheck = g.Sum(x => x.detail.GoldWeightCheck ?? 0),
+                                      JobCount = g.Select(x => x.header.Id).Distinct().Count()
+                                  }).ToListAsync();
+
+            var statusMaster = await _jewelryContext.TbmProductionPlanStatus.ToListAsync();
+
+            var rows = liveData.Select(item =>
+            {
+                var master = statusMaster.FirstOrDefault(m => m.Id == item.StatusCode);
+                var rawLoss = item.SumGoldWeightSend - item.SumGoldWeightCheck;
+                var rawLossPercent = item.SumGoldWeightSend > 0
+                    ? Math.Round(rawLoss / item.SumGoldWeightSend * 100, 2)
+                    : 0;
+
+                return new jewelry.Model.Production.Plan.GoldLossByStageReport.GoldLossByStageRow
+                {
+                    StatusCode = item.StatusCode,
+                    StatusName = master?.NameTh ?? string.Empty,
+                    SumGoldWeightSend = item.SumGoldWeightSend,
+                    SumGoldWeightCheck = item.SumGoldWeightCheck,
+                    RawLoss = rawLoss,
+                    RawLossPercent = rawLossPercent,
+                    JobCount = item.JobCount
+                };
+            }).OrderBy(x => x.StatusCode).ToList();
+
+            var totalSend = rows.Sum(x => x.SumGoldWeightSend);
+            var totalCheck = rows.Sum(x => x.SumGoldWeightCheck);
+            var totalRawLoss = totalSend - totalCheck;
+
+            var total = new jewelry.Model.Production.Plan.GoldLossByStageReport.TotalRow
+            {
+                SumGoldWeightSend = totalSend,
+                SumGoldWeightCheck = totalCheck,
+                RawLoss = totalRawLoss,
+                RawLossPercent = totalSend > 0 ? Math.Round(totalRawLoss / totalSend * 100, 2) : 0,
+                JobCount = rows.Sum(x => x.JobCount)
+            };
+
+            return new jewelry.Model.Production.Plan.GoldLossByStageReport.SearchResponse
+            {
+                Year = request.Year,
+                Month = request.Month,
+                Rows = rows,
+                Total = total
+            };
+        }
+        #endregion
     }
 }
