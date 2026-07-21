@@ -54,7 +54,7 @@ namespace Jewelry.Service.ProductionPlan
 
         TbtProductionPlan ProductionPlanGet(int id);
         ProductionPlanGetResponse NewProductionPlanGet(int id);
-        IQueryable<ProductionPlanGetResponse> ReportProductionPlan(ProductionPlanReport request);
+        IQueryable<ProductionPlanReportResponse> ReportProductionPlan(ProductionPlanReport request);
 
         IQueryable<TbtProductionPlanMaterial> ProductionPlanMateriaGet(ProductionPlanTrackingMaterialRequest request);
         IQueryable<ProductionPlanStatusListResponse> ListProductionPlanStatus(ProductionPlanStatusList request);
@@ -806,7 +806,7 @@ namespace Jewelry.Service.ProductionPlan
 
             return response;
         }
-        public IQueryable<ProductionPlanGetResponse> ReportProductionPlan(ProductionPlanReport request)
+        public IQueryable<ProductionPlanReportResponse> ReportProductionPlan(ProductionPlanReport request)
         {
             var response = (from item in _jewelryContext.TbtProductionPlan
                          .Include(x => x.ProductTypeNavigation)
@@ -827,7 +827,7 @@ namespace Jewelry.Service.ProductionPlan
                             //&& item.WoText.Contains(request.WoText.ToUpper())
                             //&& item.Id == id
                             //&& item.TbtProductionPlanStatusDetail.Any(x => x.IsActive == true)
-                            select new ProductionPlanGetResponse
+                            select new ProductionPlanReportResponse
                             {
                                 Id = item.Id,
                                 Wo = item.Wo,
@@ -836,8 +836,6 @@ namespace Jewelry.Service.ProductionPlan
 
                                 CreateDate = item.CreateDate,
                                 CreateBy = item.CreateBy,
-                                UpdateBy = item.UpdateBy,
-                                UpdateDate = item.UpdateDate,
 
                                 RequestDate = item.RequestDate,
                                 Mold = item.Mold,
@@ -859,10 +857,16 @@ namespace Jewelry.Service.ProductionPlan
                                 //CustomerTypeName = cj != null ? cj.NameTh : null,
                                 CustomerName = customer.NameTh,
 
-                                IsActive = item.IsActive,
-                                //Status = item.Status,
-                                //StatusName = item.StatusNavigation.NameTh,
                                 Remark = item.Remark,
+
+                                TotalPrice = _jewelryContext.TbtProductionPlanPrice
+                                    .Where(p => p.ProductionId == item.Id)
+                                    .Sum(p => (decimal?)p.TotalPrice) ?? 0,
+                                PriceItemCount = _jewelryContext.TbtProductionPlanPrice
+                                    .Count(p => p.ProductionId == item.Id),
+                                PriceUpdateDate = _jewelryContext.TbtProductionPlanPrice
+                                    .Where(p => p.ProductionId == item.Id)
+                                    .Max(p => (DateTime?)p.UpdateDate),
                             });
 
             if (!string.IsNullOrEmpty(request.WoText))
@@ -870,10 +874,6 @@ namespace Jewelry.Service.ProductionPlan
                 response = response.Where(x => x.WoText.Contains(request.WoText.ToUpper()));
             }
 
-            if (response.Any())
-            {
-                var test = response.ToList();
-            }
             return response;
         }
 
