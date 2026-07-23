@@ -410,6 +410,42 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("WagesByProcess")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Worker.WagesByProcess.SearchResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult WagesByProcess([FromBody] jewelry.Model.Worker.WagesByProcess.SearchRequest request)
+        {
+            try
+            {
+                var response = _service.WagesByProcess(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("WagesMonthlyTrend")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Worker.WagesMonthlyTrend.SearchResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult WagesMonthlyTrend([FromBody] jewelry.Model.Worker.WagesMonthlyTrend.SearchRequest request)
+        {
+            try
+            {
+                var response = _service.WagesMonthlyTrend(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("UpdateGoldLossTangSlip")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossTangSlipResponse))]

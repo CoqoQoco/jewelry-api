@@ -34,6 +34,8 @@ namespace Jewelry.Service.Worker
         IQueryable<ReportWorkerWagesByWorkerResponse> ReportByWorker(ReportWorkerWages request);
         ReportWorkerSummeryResponse SummeryReport(ReportWorkerWages request);
         IQueryable<TrackingWorkerResponse> TrackingWorker(TrackingWorker request);
+        jewelry.Model.Worker.WagesByProcess.SearchResponse WagesByProcess(jewelry.Model.Worker.WagesByProcess.SearchRequest request);
+        jewelry.Model.Worker.WagesMonthlyTrend.SearchResponse WagesMonthlyTrend(jewelry.Model.Worker.WagesMonthlyTrend.SearchRequest request);
     }
     public class WorkerService : BaseService, IWorkerService
     {
@@ -652,6 +654,131 @@ namespace Jewelry.Service.Worker
                 TotalWages = query.Sum(x => x.TotalWages),
             };
 
+        }
+
+        public jewelry.Model.Worker.WagesByProcess.SearchResponse WagesByProcess(jewelry.Model.Worker.WagesByProcess.SearchRequest request)
+        {
+            var query = from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                        join header in _jewelryContext.TbtProductionPlanStatusHeader
+                            on detail.HeaderId equals header.Id
+                        join status in _jewelryContext.TbmProductionPlanStatus
+                            on header.Status equals status.Id
+                        where detail.IsActive == true
+                        && header.IsActive == true
+                        select new { detail, header, status };
+
+            if (request.Start.HasValue)
+            {
+                var start = request.Start.Value.StartOfDayUtc();
+                query = query.Where(x => x.detail.RequestDate >= start);
+            }
+            if (request.End.HasValue)
+            {
+                var end = request.End.Value.EndOfDayUtc();
+                query = query.Where(x => x.detail.RequestDate <= end);
+            }
+            if (request.Status != null && request.Status.Any())
+            {
+                query = query.Where(x => request.Status.Contains(x.header.Status));
+            }
+
+            var grouped = query
+                .GroupBy(x => new { x.header.Status, x.status.NameTh })
+                .Select(g => new
+                {
+                    StatusCode = g.Key.Status,
+                    StatusName = g.Key.NameTh,
+                    JobCount = g.Count(),
+                    TotalWages = g.Sum(x => x.detail.TotalWages ?? 0)
+                })
+                .ToList();
+
+            var rows = grouped
+                .Select(x => new jewelry.Model.Worker.WagesByProcess.WagesByProcessRow
+                {
+                    StatusCode = x.StatusCode,
+                    StatusName = x.StatusName ?? string.Empty,
+                    JobCount = x.JobCount,
+                    TotalWages = x.TotalWages,
+                    AvgWagesPerJob = x.JobCount > 0 ? Math.Round(x.TotalWages / x.JobCount, 2) : 0
+                })
+                .OrderByDescending(x => x.TotalWages)
+                .ToList();
+
+            var totalJobCount = rows.Sum(x => x.JobCount);
+            var totalWages = rows.Sum(x => x.TotalWages);
+
+            var total = new jewelry.Model.Worker.WagesByProcess.WagesByProcessTotal
+            {
+                JobCount = totalJobCount,
+                TotalWages = totalWages,
+                AvgWagesPerJob = totalJobCount > 0 ? Math.Round(totalWages / totalJobCount, 2) : 0
+            };
+
+            return new jewelry.Model.Worker.WagesByProcess.SearchResponse
+            {
+                Rows = rows,
+                Total = total
+            };
+        }
+
+        public jewelry.Model.Worker.WagesMonthlyTrend.SearchResponse WagesMonthlyTrend(jewelry.Model.Worker.WagesMonthlyTrend.SearchRequest request)
+        {
+            var query = _jewelryContext.TbtProductionPlanStatusDetail
+                .Where(x => x.IsActive && x.RequestDate != null)
+                .AsQueryable();
+
+            if (request.Start.HasValue)
+            {
+                var start = request.Start.Value.StartOfDayUtc();
+                query = query.Where(x => x.RequestDate >= start);
+            }
+            if (request.End.HasValue)
+            {
+                var end = request.End.Value.EndOfDayUtc();
+                query = query.Where(x => x.RequestDate <= end);
+            }
+
+            var grouped = query
+                .GroupBy(x => new { x.RequestDate.Value.Year, x.RequestDate.Value.Month })
+                .Select(g => new
+                {
+                    g.Key.Year,
+                    g.Key.Month,
+                    JobCount = g.Count(),
+                    TotalWages = g.Sum(x => x.TotalWages ?? 0)
+                })
+                .ToList();
+
+            var rows = grouped
+                .Select(x => new jewelry.Model.Worker.WagesMonthlyTrend.WagesMonthlyTrendRow
+                {
+                    Year = x.Year,
+                    Month = x.Month,
+                    Ym = $"{x.Year:D4}-{x.Month:D2}",
+                    JobCount = x.JobCount,
+                    TotalWages = x.TotalWages,
+                    AvgWagesPerJob = x.JobCount > 0 ? Math.Round(x.TotalWages / x.JobCount, 2) : 0
+                })
+                .OrderBy(x => x.Year)
+                .ThenBy(x => x.Month)
+                .ToList();
+
+            var totalJobCount = rows.Sum(x => x.JobCount);
+            var totalWages = rows.Sum(x => x.TotalWages);
+
+            var total = new jewelry.Model.Worker.WagesMonthlyTrend.WagesMonthlyTrendTotal
+            {
+                JobCount = totalJobCount,
+                TotalWages = totalWages,
+                AvgWagesPerJob = totalJobCount > 0 ? Math.Round(totalWages / totalJobCount, 2) : 0
+            };
+
+            return new jewelry.Model.Worker.WagesMonthlyTrend.SearchResponse
+            {
+                Rows = rows,
+                Total = total
+            };
         }
 
     }
