@@ -6,6 +6,7 @@ using jewelry.Model.ProductionPlanCost.GoldCostList;
 using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
 using jewelry.Model.ProductionPlanCost.ScrapWeightDashboard;
+using jewelry.Model.ProductionPlanCost.CastLossTrend;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
@@ -36,6 +37,7 @@ namespace Jewelry.Service.ProductionPlan
 
         IQueryable<GoldCostItemResponse> ListGoldCostItem(GoldCostItemSearch request);
         ScrapWeightDashboardResponse GetScrapWeightDashboard();
+        Task<jewelry.Model.ProductionPlanCost.CastLossTrend.SearchResponse> GetCastLossTrend(jewelry.Model.ProductionPlanCost.CastLossTrend.SearchRequest request);
     }
     public class ProductionPlanCostService : BaseService, IProductionPlanCostService
     {
@@ -1038,6 +1040,75 @@ namespace Jewelry.Service.ProductionPlan
             }
 
             return response;
+        }
+
+        public async Task<jewelry.Model.ProductionPlanCost.CastLossTrend.SearchResponse> GetCastLossTrend(jewelry.Model.ProductionPlanCost.CastLossTrend.SearchRequest request)
+        {
+            var query = _jewelryContext.TbtProductionPlanCostGold.Where(x => x.IsActive).AsQueryable();
+
+            if (request.Start.HasValue)
+            {
+                query = query.Where(x => x.CreateDate >= request.Start.Value.StartOfDayUtc());
+            }
+            if (request.End.HasValue)
+            {
+                query = query.Where(x => x.CreateDate <= request.End.Value.EndOfDayUtc());
+            }
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Gold));
+            }
+
+            var grouped = await query
+                .GroupBy(x => new { x.CreateDate.Year, x.CreateDate.Month })
+                .Select(g => new
+                {
+                    g.Key.Year,
+                    g.Key.Month,
+                    BookCount = g.Count(),
+                    SumCastWeight = g.Sum(x => x.CastWeight ?? 0),
+                    SumCastLoss = g.Sum(x => x.CastWeightLoss ?? 0),
+                    SumCastOver = g.Sum(x => x.CastWeightOver ?? 0),
+                })
+                .ToListAsync();
+
+            var rows = grouped
+                .Select(g => new CastLossTrendRow()
+                {
+                    Year = g.Year,
+                    Month = g.Month,
+                    Ym = $"{g.Year:D4}-{g.Month:D2}",
+                    BookCount = g.BookCount,
+                    SumCastWeight = g.SumCastWeight,
+                    SumCastLoss = g.SumCastLoss,
+                    CastLossPct = g.SumCastWeight > 0 ? Math.Round(g.SumCastLoss / g.SumCastWeight * 100, 2) : 0,
+                    SumCastOver = g.SumCastOver,
+                    CastOverPct = g.SumCastWeight > 0 ? Math.Round(g.SumCastOver / g.SumCastWeight * 100, 2) : 0,
+                })
+                .OrderBy(x => x.Year)
+                .ThenBy(x => x.Month)
+                .ToList();
+
+            var totalBookCount = rows.Sum(x => x.BookCount);
+            var totalCastWeight = rows.Sum(x => x.SumCastWeight);
+            var totalCastLoss = rows.Sum(x => x.SumCastLoss);
+            var totalCastOver = rows.Sum(x => x.SumCastOver);
+
+            var total = new CastLossTrendTotal()
+            {
+                BookCount = totalBookCount,
+                SumCastWeight = totalCastWeight,
+                SumCastLoss = totalCastLoss,
+                CastLossPct = totalCastWeight > 0 ? Math.Round(totalCastLoss / totalCastWeight * 100, 2) : 0,
+                SumCastOver = totalCastOver,
+                CastOverPct = totalCastWeight > 0 ? Math.Round(totalCastOver / totalCastWeight * 100, 2) : 0,
+            };
+
+            return new jewelry.Model.ProductionPlanCost.CastLossTrend.SearchResponse()
+            {
+                Rows = rows,
+                Total = total,
+            };
         }
     }
 }

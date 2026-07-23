@@ -6,6 +6,7 @@ using jewelry.Model.ProductionPlanCost.GoldCostList;
 using jewelry.Model.ProductionPlanCost.GoldCostReport;
 using jewelry.Model.ProductionPlanCost.GoldCostUpdate;
 using jewelry.Model.ProductionPlanCost.ScrapWeightDashboard;
+using jewelry.Model.ProductionPlanCost.CastLossTrend;
 using Jewelry.Api.Controllers.Production;
 using Jewelry.Api.Extension;
 using Jewelry.Service.ProductionPlan;
@@ -153,6 +154,23 @@ namespace Jewelry.Api.Controllers
             try
             {
                 var report = _IProductionPlanCostService.GetScrapWeightDashboard();
+                return Ok(report);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("CastLossTrend")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(SearchResponse))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CastLossTrend([FromBody] SearchRequest request)
+        {
+            try
+            {
+                var report = await _IProductionPlanCostService.GetCastLossTrend(request);
                 return Ok(report);
             }
             catch (HandleException ex)
