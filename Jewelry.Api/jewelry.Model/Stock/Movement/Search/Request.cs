@@ -10,5 +10,8 @@ namespace jewelry.Model.Stock.Movement.Search
         public string? FromLocation { get; set; }
         public string? ToLocation { get; set; }
         public string? StockNumber { get; set; }
+        public string? CurrentLocation { get; set; }
+        public string? MovedBy { get; set; }
+        public string? StockNumberOrigin { get; set; }
     }
 }

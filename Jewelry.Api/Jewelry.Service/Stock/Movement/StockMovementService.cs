@@ -61,12 +61,20 @@ namespace Jewelry.Service.Stock.Movement
                 query = query.Where(x => x.StockNumber != null && x.StockNumber.Contains(request.StockNumber));
             }
 
+            if (!string.IsNullOrWhiteSpace(request.CurrentLocation))
+                query = query.Where(x => x.StockNumberNavigation != null && x.StockNumberNavigation.LocationCode == request.CurrentLocation);
+            if (!string.IsNullOrWhiteSpace(request.MovedBy))
+                query = query.Where(x => x.CreateBy != null && x.CreateBy.Contains(request.MovedBy));
+            if (!string.IsNullOrWhiteSpace(request.StockNumberOrigin))
+                query = query.Where(x => x.StockNumberNavigation != null && x.StockNumberNavigation.StockNumberOrigin != null && x.StockNumberNavigation.StockNumberOrigin.Contains(request.StockNumberOrigin));
+
             return query
                 .OrderByDescending(x => x.MovementDate)
                 .Select(x => new SearchModel.Response
                 {
                     MovementDate = x.MovementDate,
                     StockNumber = x.StockNumber,
+                    StockNumberOrigin = x.StockNumberNavigation != null ? x.StockNumberNavigation.StockNumberOrigin : null,
                     ProductCode = x.ProductCode,
                     FromLocation = x.FromLocation,
                     FromLocationName = x.FromLocationNavigation != null ? x.FromLocationNavigation.NameTh : null,

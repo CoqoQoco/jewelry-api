@@ -131,6 +131,95 @@ namespace Jewelry.Service.Stock.Product
                 pieces = pieces.Where(x => x.Status == request.PieceStatus);
             }
 
+            if (request.IncludeLastMovement == true)
+            {
+                var responseWithMovement = from item in pieces
+                               select new jewelry.Model.Stock.Product.List.Response()
+                               {
+                                   StockNumber = item.StockNumber,
+                                   StockNumberOrigin = item.StockNumberOrigin,
+                                   Status = item.Status,
+
+                                   ReceiptNumber = item.ReceiptNumber,
+                                   ReceiptDate = item.ReceiptDate ?? item.CreateDate,
+                                   ReceiptType = item.ReceiptType,
+
+                                   Mold = item.SkuCodeNavigation.MoldDesign ?? item.SkuCodeNavigation.Mold,
+
+                                   Qty = 1,
+                                   ProductPrice = item.SkuCodeNavigation.DefaultPrice ?? 0,
+
+                                   ProductNumber = item.SkuCodeNavigation.ProductNumber,
+                                   ProductCode = item.ProductCode,
+                                   ProductNameTh = item.SkuCodeNavigation.ProductNameTh,
+                                   ProductNameEn = item.SkuCodeNavigation.ProductNameEn,
+
+                                   ProductType = item.SkuCodeNavigation.ProductType,
+                                   ProductTypeName = item.SkuCodeNavigation.ProductTypeName,
+
+                                   ImageName = item.SkuCodeNavigation.ImageName,
+                                   ImagePath = item.SkuCodeNavigation.ImagePath,
+
+                                   Wo = item.Wo,
+                                   WoNumber = item.WoNumber,
+                                   WoText = string.IsNullOrEmpty(item.Wo) ? null : $"{item.Wo}{item.WoNumber.ToString()}",
+
+                                   ProductionDate = item.ProductionDate ?? item.CreateDate,
+                                   ProductionType = item.SkuCodeNavigation.ProductionType,
+                                   ProductionTypeSize = item.SkuCodeNavigation.ProductionTypeSize,
+
+                                   Size = item.SizeActual ?? item.SkuCodeNavigation.Size,
+                                   EarringStemSize = item.SkuCodeNavigation.EarringStemSize,
+                                   Location = item.LocationCode,
+                                   Remark = item.Remark,
+
+                                   CreateBy = item.CreateBy,
+                                   CreateDate = item.CreateDate,
+                                   UpdateDate = item.UpdateDate,
+                                   UpdateBy = item.UpdateBy,
+
+                                   TagPriceMultiplier = item.SkuCodeNavigation.TagPriceMultiplier ?? 1,
+
+                                   Materials = item.TbtStockPieceMaterial.Any()
+                                       ? (from material in item.TbtStockPieceMaterial
+                                          select new jewelry.Model.Stock.Product.List.Material()
+                                          {
+                                              Type = material.Type,
+                                              TypeName = material.TypeName,
+                                              TypeCode = material.TypeCode,
+                                              TypeBarcode = material.TypeBarcode,
+                                              TypeOrigin = material.TypeOrigin,
+                                              Qty = material.Qty,
+                                              QtyUnit = material.QtyUnit,
+                                              Weight = material.Weight,
+                                              WeightUnit = material.WeightUnit,
+                                              Size = material.Size,
+                                              Region = material.Region,
+                                              Price = material.Price
+                                          }).ToList()
+                                       : new List<jewelry.Model.Stock.Product.List.Material>(),
+
+                                   LastMoveFromLocation = item.TbtStockMovement
+                                       .Where(m => m.RefDocType == "MoveLocation")
+                                       .OrderByDescending(m => m.MovementDate)
+                                       .Select(m => m.FromLocation).FirstOrDefault(),
+                                   LastMoveFromLocationName = item.TbtStockMovement
+                                       .Where(m => m.RefDocType == "MoveLocation")
+                                       .OrderByDescending(m => m.MovementDate)
+                                       .Select(m => m.FromLocationNavigation != null ? m.FromLocationNavigation.NameTh : null).FirstOrDefault(),
+                                   LastMoveDate = item.TbtStockMovement
+                                       .Where(m => m.RefDocType == "MoveLocation")
+                                       .OrderByDescending(m => m.MovementDate)
+                                       .Select(m => (DateTime?)m.MovementDate).FirstOrDefault(),
+                                   LastMoveBy = item.TbtStockMovement
+                                       .Where(m => m.RefDocType == "MoveLocation")
+                                       .OrderByDescending(m => m.MovementDate)
+                                       .Select(m => m.CreateBy).FirstOrDefault(),
+                               };
+
+                return responseWithMovement;
+            }
+
             var response = from item in pieces
                            select new jewelry.Model.Stock.Product.List.Response()
                            {

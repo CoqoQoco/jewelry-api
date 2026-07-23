@@ -54,6 +54,11 @@ namespace jewelry.Model.Stock.Product.List
 
         public List<Material> Materials { get; set; } = new List<Material>();
         public List<PriceTransection>? PriceTransection { get; set; } = new List<PriceTransection>();
+
+        public string? LastMoveFromLocation { get; set; }
+        public string? LastMoveFromLocationName { get; set; }
+        public DateTime? LastMoveDate { get; set; }
+        public string? LastMoveBy { get; set; }
     }
 
     public class Material

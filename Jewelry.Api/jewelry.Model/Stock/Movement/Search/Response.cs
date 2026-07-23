@@ -6,6 +6,7 @@ namespace jewelry.Model.Stock.Movement.Search
     {
         public DateTime MovementDate { get; set; }
         public string? StockNumber { get; set; }
+        public string? StockNumberOrigin { get; set; }
         public string? ProductCode { get; set; }
         public string? FromLocation { get; set; }
         public string? FromLocationName { get; set; }
