@@ -462,6 +462,7 @@ namespace Jewelry.Service.Stock.Product
 
                 sku.ProductNameEn = request.ProductNameEn;
                 sku.ProductNameTh = request.ProductNameTh;
+                sku.ProductNumber = request.ProductNumber;
                 sku.MoldDesign = request.Mold;
                 sku.DefaultPrice = request.ProductPrice;
                 sku.ImageName = request.ImageName;

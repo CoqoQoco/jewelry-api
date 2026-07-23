@@ -13,6 +13,7 @@ namespace jewelry.Model.Stock.Product.Update
 
         public string ProductNameEn { get; set; }
         public string ProductNameTh { get; set; }
+        public string? ProductNumber { get; set; }
 
         public string Mold { get; set; }
         public decimal ProductPrice { get; set; }
