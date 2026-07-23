@@ -39,6 +39,7 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Transactions;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
@@ -101,6 +102,29 @@ namespace Jewelry.Service.ProductionPlan
             _planService = planService;
             _azureBlobService = azureBlobService;
             _prePlanService = prePlanService;
+        }
+
+        private static readonly Regex _goldFindingKeyword = new Regex(
+            "สร้อย|ตะขอ|ก้ามปู|ก้ามกุ้ง|แป้น|สปริง|กำไล|ลูกบอล|ตุ๊กตา|เดือย|เข็มกลัด|โซ่|ห่วง|ตัวล็อก|ตัวจับ|จานมุก|จานมุ๊ก|ผ่ากลาง|งานเงิน|เนื้อเงิน|Chain|CHAIN|BANGLES|Spring|Bead|BEAD",
+            RegexOptions.Compiled);
+        private static readonly Regex _goldKaratToken = new Regex(
+            @"(^|[^A-Za-z])(9K|10K|14K|18K)([^A-Za-z]|$)",
+            RegexOptions.Compiled);
+        private static readonly Regex _goldColorToken = new Regex(
+            @"(SV|WG|YG|PG)( |$)",
+            RegexOptions.Compiled);
+
+        private bool IsGoldFinding(string groupName, string shape, string unitCode)
+        {
+            if (!string.IsNullOrWhiteSpace(unitCode) && unitCode.ToUpperInvariant().Contains("GMS"))
+                return true;
+            if (!string.IsNullOrWhiteSpace(shape) && shape.Trim().Equals("CHAIN", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (string.IsNullOrWhiteSpace(groupName))
+                return false;
+            return _goldFindingKeyword.IsMatch(groupName)
+                || _goldKaratToken.IsMatch(groupName)
+                || _goldColorToken.IsMatch(groupName);
         }
 
         #region ----- Production Plan -----
@@ -2714,7 +2738,7 @@ namespace Jewelry.Service.ProductionPlan
 
 
             //group 4 --> get gem
-            var transectionGem = (from item in _jewelryContext.TbtProductionPlanStatusDetailGem
+            var transectionGemRaw = (from item in _jewelryContext.TbtProductionPlanStatusDetailGem
                                      .Include(x => x.Header)
                                      .ThenInclude(x => x.ProductionPlan)
                                      .ThenInclude(x => x.StatusNavigation)
@@ -2726,35 +2750,52 @@ namespace Jewelry.Service.ProductionPlan
                                   && item.IsActive == true
                                   && item.Header.IsActive == true
 
-                                  select new TransectionItem()
+                                  select new
                                   {
-                                      Name = item.GemName ?? item.GemCode,
-                                      NameDescription = item.GemName ?? item.GemCode,
-                                      NameGroup = TypeofPrice.Gem,
+                                      Item = new TransectionItem()
+                                      {
+                                          Name = item.GemName ?? item.GemCode,
+                                          NameDescription = item.GemName ?? item.GemCode,
+                                          NameGroup = TypeofPrice.Gem,
 
-                                      Date = item.RequestDate,
+                                          Date = item.RequestDate,
 
-                                      Qty = item.GemQty,
-                                      QtyPrice = gem.PriceQty,
+                                          Qty = item.GemQty,
+                                          QtyPrice = gem.PriceQty,
 
-                                      Length = item.GemLength,
-                                      LengthUnit = item.GemLengthUnit,
+                                          Length = item.GemLength,
+                                          LengthUnit = item.GemLengthUnit,
 
-                                      QtyWeight = item.GemWeight,
-                                      QtyWeightPrice = gem.Price,
+                                          QtyWeight = item.GemWeight,
+                                          QtyWeightPrice = gem.Price,
 
+                                      },
+                                      GroupName = gem.GroupName,
+                                      Shape = gem.Shape,
+                                      UnitCode = gem.UnitCode,
                                   }).ToList();
 
+            var transectionGem = new List<TransectionItem>();
+            var transectionGoldFinding = new List<TransectionItem>();
 
-
-            if (transectionGem.Any())
+            foreach (var row in transectionGemRaw)
             {
-                foreach (var item in transectionGem)
+                if (IsGoldFinding(row.GroupName, row.Shape, row.UnitCode))
                 {
-                    if (item.Length.HasValue && item.Length.Value > 0)
-                    {
-                        item.NameDescription = $"{item.NameDescription} [ความยาว {item.Length} {item.LengthUnit}]";
-                    }
+                    row.Item.NameGroup = TypeofPrice.Gold;
+                    transectionGoldFinding.Add(row.Item);
+                }
+                else
+                {
+                    transectionGem.Add(row.Item);
+                }
+            }
+
+            foreach (var item in transectionGem.Concat(transectionGoldFinding))
+            {
+                if (item.Length.HasValue && item.Length.Value > 0)
+                {
+                    item.NameDescription = $"{item.NameDescription} [ความยาว {item.Length} {item.LengthUnit}]";
                 }
             }
 
@@ -2815,6 +2856,11 @@ namespace Jewelry.Service.ProductionPlan
             if (transectionGem.Any())
             {
                 response.Items.AddRange(transectionGem);
+            }
+
+            if (transectionGoldFinding.Any())
+            {
+                response.Items.AddRange(transectionGoldFinding);
             }
 
             //step 5 get etc
