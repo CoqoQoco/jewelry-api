@@ -1381,6 +1381,61 @@ namespace Jewelry.Service.Stock.Product
 
             }
         }
+
+        public async Task<jewelry.Model.Stock.Product.MaterialValuationSummary.Response> GetMaterialValuationSummary(jewelry.Model.Stock.Product.MaterialValuationSummary.Request request)
+        {
+            var query = _jewelryContext.TbtStockPieceMaterial.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrEmpty(request.Region))
+            {
+                query = query.Where(x => x.Region == request.Region);
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductType))
+            {
+                query = query.Where(x => x.StockPieceNavigation.SkuCodeNavigation.ProductType == request.ProductType);
+            }
+
+            var summary = await query
+                .GroupBy(x => 1)
+                .Select(g => new jewelry.Model.Stock.Product.MaterialValuationSummary.SummaryItem
+                {
+                    TotalCount = g.Count(),
+                    TotalWeight = g.Sum(x => x.Weight ?? 0),
+                    TotalValue = g.Sum(x => x.Price ?? 0)
+                })
+                .FirstOrDefaultAsync() ?? new jewelry.Model.Stock.Product.MaterialValuationSummary.SummaryItem();
+
+            var byType = await query
+                .GroupBy(x => x.Type.Trim().ToUpper())
+                .Select(g => new jewelry.Model.Stock.Product.MaterialValuationSummary.ByTypeItem
+                {
+                    Type = g.Key,
+                    Count = g.Count(),
+                    TotalWeight = g.Sum(x => x.Weight ?? 0),
+                    TotalValue = g.Sum(x => x.Price ?? 0)
+                })
+                .ToListAsync();
+
+            foreach (var item in byType)
+            {
+                item.Type = ToDisplayMaterialType(item.Type);
+            }
+
+            return new jewelry.Model.Stock.Product.MaterialValuationSummary.Response
+            {
+                Summary = summary,
+                ByType = byType.OrderByDescending(x => x.TotalValue).ToList()
+            };
+        }
+
+        private static string ToDisplayMaterialType(string normalizedType)
+        {
+            if (string.IsNullOrEmpty(normalizedType))
+                return normalizedType;
+
+            return char.ToUpper(normalizedType[0]) + normalizedType.Substring(1).ToLower();
+        }
     }
 
     internal class StockDashboardItem

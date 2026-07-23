@@ -330,5 +330,22 @@ namespace Jewelry.Api.Controllers.Stock
         }
 
         #endregion
+
+        [Route("MaterialValuationSummary")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.MaterialValuationSummary.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetMaterialValuationSummary([FromBody] jewelry.Model.Stock.Product.MaterialValuationSummary.Request request)
+        {
+            try
+            {
+                var response = await _service.GetMaterialValuationSummary(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }

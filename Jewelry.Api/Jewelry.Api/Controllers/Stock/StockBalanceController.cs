@@ -38,5 +38,13 @@ namespace Jewelry.Api.Controllers.Stock
             var result = await _service.ListByStockNumbersAsync(request.StockNumbers, ct);
             return Ok(result);
         }
+
+        [Route("Summary")]
+        [HttpPost]
+        public async Task<IActionResult> Summary([FromBody] jewelry.Model.Stock.Balance.Summary.Request request)
+        {
+            var result = await _service.GetSummary(request);
+            return Ok(result);
+        }
     }
 }

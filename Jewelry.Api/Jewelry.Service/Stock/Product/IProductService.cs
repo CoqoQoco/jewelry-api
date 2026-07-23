@@ -27,5 +27,7 @@ namespace Jewelry.Service.Stock.Product
         Task<TodayReportResponse> GetTodayReport(DashboardRequest request);
         Task<WeeklyReportResponse> GetWeeklyReport(DashboardRequest request);
         Task<MonthlyReportResponse> GetMonthlyReport(DashboardRequest request);
+
+        Task<jewelry.Model.Stock.Product.MaterialValuationSummary.Response> GetMaterialValuationSummary(jewelry.Model.Stock.Product.MaterialValuationSummary.Request request);
     }
 }

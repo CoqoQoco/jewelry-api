@@ -489,10 +489,10 @@ namespace Jewelry.Service.Stock
             var transactionQuery = _jewelryContext.TbtStockGemTransection
                 .Where(x => x.CreateDate >= startDate.StartOfDayUtc() && x.CreateDate < endDate.EndOfDayUtc());
 
-            if (!string.IsNullOrEmpty(request.GroupName))
+            if (request.GroupName != null && request.GroupName.Length > 0)
             {
                 var gemCodes = await _jewelryContext.TbtStockGem
-                    .Where(x => x.GroupName == request.GroupName)
+                    .Where(x => request.GroupName.Contains(x.GroupName))
                     .Select(x => x.Code)
                     .ToListAsync();
                 transactionQuery = transactionQuery.Where(x => gemCodes.Contains(x.Code));
@@ -522,9 +522,9 @@ namespace Jewelry.Service.Stock
 
             return await (from trans in transactionQuery
                           join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                          where (string.IsNullOrEmpty(request.GroupName) || gem.GroupName == request.GroupName) &&
-                                (string.IsNullOrEmpty(request.Shape) || gem.Shape == request.Shape) &&
-                                (string.IsNullOrEmpty(request.Grade) || gem.Grade == request.Grade)
+                          where (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName)) &&
+                                (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape)) &&
+                                (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
                           group new { trans, gem } by new { gem.Code, gem.GroupName, gem.Shape, gem.Grade, gem.Size } into g
                           select new TopGemMovement
                           {
@@ -552,9 +552,9 @@ namespace Jewelry.Service.Stock
 
             return await (from price in priceChangeQuery
                           join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
-                          where (string.IsNullOrEmpty(request.GroupName) || gem.GroupName == request.GroupName) &&
-                                (string.IsNullOrEmpty(request.Shape) || gem.Shape == request.Shape) &&
-                                (string.IsNullOrEmpty(request.Grade) || gem.Grade == request.Grade)
+                          where (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName)) &&
+                                (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape)) &&
+                                (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
                           select new PriceChangeAlert
                           {
                               Code = price.Code,
@@ -577,10 +577,10 @@ namespace Jewelry.Service.Stock
         {
             var query = _jewelryContext.TbtStockGemTransection.AsQueryable();
 
-            if (!string.IsNullOrEmpty(request.GroupName))
+            if (request.GroupName != null && request.GroupName.Length > 0)
             {
                 var gemCodes = await _jewelryContext.TbtStockGem
-                    .Where(x => x.GroupName == request.GroupName)
+                    .Where(x => request.GroupName.Contains(x.GroupName))
                     .Select(x => x.Code)
                     .ToListAsync();
                 query = query.Where(x => gemCodes.Contains(x.Code));
@@ -588,8 +588,8 @@ namespace Jewelry.Service.Stock
 
             return await (from trans in query
                           join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
-                          where (string.IsNullOrEmpty(request.Shape) || gem.Shape == request.Shape) &&
-                                (string.IsNullOrEmpty(request.Grade) || gem.Grade == request.Grade)
+                          where (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape)) &&
+                                (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
                           orderby trans.CreateDate descending
                           select new LastActivity
                           {
@@ -619,14 +619,14 @@ namespace Jewelry.Service.Stock
         {
             var query = _jewelryContext.TbtStockGem.AsQueryable();
 
-            if (!string.IsNullOrEmpty(request.GroupName))
-                query = query.Where(x => x.GroupName == request.GroupName);
+            if (request.GroupName != null && request.GroupName.Length > 0)
+                query = query.Where(x => request.GroupName.Contains(x.GroupName));
 
-            if (!string.IsNullOrEmpty(request.Shape))
-                query = query.Where(x => x.Shape == request.Shape);
+            if (request.Shape != null && request.Shape.Length > 0)
+                query = query.Where(x => request.Shape.Contains(x.Shape));
 
-            if (!string.IsNullOrEmpty(request.Grade))
-                query = query.Where(x => x.Grade == request.Grade);
+            if (request.Grade != null && request.Grade.Length > 0)
+                query = query.Where(x => request.Grade.Contains(x.Grade));
 
             return query;
         }
