@@ -446,6 +446,24 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("GetGoldLossTangLineOptions")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossTangLineOptionsResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult GetGoldLossTangLineOptions()
+        {
+            try
+            {
+                var response = _goldLossTangSlipService.GetLineOptions();
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("UpdateGoldLossTangSlip")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossTangSlipResponse))]

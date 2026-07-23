@@ -23,6 +23,7 @@ namespace Jewelry.Service.Worker
         GoldLossTangSlipResponse GetSlip(long id);
         Task CancelSlip(long id);
         IQueryable<ReportGoldLossTangByWorkerResponse> ReportByWorker(ReportGoldLossTangByWorkerSearch request);
+        GoldLossTangLineOptionsResponse GetLineOptions();
     }
 
     public class GoldLossTangSlipService : BaseService, IGoldLossTangSlipService
@@ -658,6 +659,23 @@ namespace Jewelry.Service.Worker
                     TotalDiffLoss = g.Sum(x => x.DiffLoss),
                     TotalMoneyDiff = g.Sum(x => x.TotalMoneyDiff),
                 });
+        }
+
+        public GoldLossTangLineOptionsResponse GetLineOptions()
+        {
+            var issued = _jewelryContext.TbtGoldLossTangSlipExtra
+                .Where(x => x.IsActive && x.Kind == 1 && x.Name != null && x.Name != "")
+                .GroupBy(x => x.Name)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key!)
+                .ToList();
+            var returned = _jewelryContext.TbtGoldLossTangSlipExtra
+                .Where(x => x.IsActive && x.Kind == 2 && x.Name != null && x.Name != "")
+                .GroupBy(x => x.Name)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key!)
+                .ToList();
+            return new GoldLossTangLineOptionsResponse { Issued = issued, Returned = returned };
         }
 
         private async Task<string> GenerateGltDocumentNo()
