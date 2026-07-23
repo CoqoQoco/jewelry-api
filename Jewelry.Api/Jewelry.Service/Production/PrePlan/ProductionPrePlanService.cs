@@ -1,4 +1,5 @@
 using jewelry.Model.Production.PrePlan;
+using FunnelReport = jewelry.Model.Production.PrePlan.FunnelReport;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
@@ -570,6 +571,99 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                             && i.LinkedProductionPlanId == null
                             && i.IsCancelled == false
                       select i.Id).CountAsync();
+    }
+
+    private static readonly string[] FunnelStatusOrder =
+    {
+        "Draft", "Submitted", "Approved", "PartiallyConsumed", "Consumed", "Rejected", "Cancelled",
+    };
+
+    public async Task<FunnelReport.SearchResponse> GetFunnelReport(FunnelReport.SearchRequest request)
+    {
+        var query = _jewelryContext.TbtProductionPrePlan.AsQueryable();
+
+        if (request.Start.HasValue)
+            query = query.Where(x => x.CreateDate.HasValue && x.CreateDate >= request.Start.Value.StartOfDayUtc().UtcDateTime);
+
+        if (request.End.HasValue)
+            query = query.Where(x => x.CreateDate.HasValue && x.CreateDate <= request.End.Value.EndOfDayUtc().UtcDateTime);
+
+        if (request.JobType != null && request.JobType.Any())
+            query = query.Where(x => request.JobType.Contains(x.JobType));
+
+        if (request.JobLocation != null && request.JobLocation.Any())
+            query = query.Where(x => request.JobLocation.Contains(x.JobLocation));
+
+        var records = await query
+            .Select(x => new { x.Status, x.OrderDate, x.SubmitDate, x.ApproveDate })
+            .ToListAsync();
+
+        var total = records.Count;
+
+        var statusCounts = records
+            .GroupBy(x => x.Status)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var statusRows = new List<FunnelReport.FunnelStatusRow>();
+        var orderIndex = 0;
+        foreach (var status in FunnelStatusOrder)
+        {
+            var count = statusCounts.TryGetValue(status, out var c) ? c : 0;
+            statusRows.Add(new FunnelReport.FunnelStatusRow
+            {
+                Status = status,
+                OrderIndex = orderIndex,
+                Count = count,
+                Percent = total > 0 ? Math.Round((decimal)count / total * 100, 1) : 0,
+            });
+            orderIndex++;
+        }
+
+        foreach (var status in statusCounts.Keys.Where(s => !FunnelStatusOrder.Contains(s)))
+        {
+            statusRows.Add(new FunnelReport.FunnelStatusRow
+            {
+                Status = status,
+                OrderIndex = orderIndex,
+                Count = statusCounts[status],
+                Percent = total > 0 ? Math.Round((decimal)statusCounts[status] / total * 100, 1) : 0,
+            });
+            orderIndex++;
+        }
+
+        int CountOf(string status) => statusCounts.TryGetValue(status, out var c) ? c : 0;
+
+        var approvedBeyond = CountOf("Approved") + CountOf("PartiallyConsumed") + CountOf("Consumed");
+        var submittedBeyond = total - CountOf("Draft");
+        var approvalRate = submittedBeyond > 0 ? Math.Round((decimal)approvedBeyond / submittedBeyond * 100, 1) : 0;
+        var cancelRate = total > 0 ? Math.Round((decimal)CountOf("Cancelled") / total * 100, 1) : 0;
+
+        var orderToSubmitDays = records
+            .Where(x => x.SubmitDate.HasValue)
+            .Select(x => (x.SubmitDate!.Value - x.OrderDate).TotalDays)
+            .Where(d => d >= 0)
+            .ToList();
+        var avgOrderToSubmitDays = orderToSubmitDays.Any() ? Math.Round((decimal)orderToSubmitDays.Average(), 1) : 0;
+
+        var submitToApproveDays = records
+            .Where(x => x.SubmitDate.HasValue && x.ApproveDate.HasValue)
+            .Select(x => (x.ApproveDate!.Value - x.SubmitDate!.Value).TotalDays)
+            .Where(d => d >= 0)
+            .ToList();
+        var avgSubmitToApproveDays = submitToApproveDays.Any() ? Math.Round((decimal)submitToApproveDays.Average(), 1) : 0;
+
+        return new FunnelReport.SearchResponse
+        {
+            StatusRows = statusRows,
+            Summary = new FunnelReport.FunnelSummary
+            {
+                Total = total,
+                ApprovalRate = approvalRate,
+                CancelRate = cancelRate,
+                AvgOrderToSubmitDays = avgOrderToSubmitDays,
+                AvgSubmitToApproveDays = avgSubmitToApproveDays,
+            },
+        };
     }
 
     public async Task LinkProductionPlan(int prePlanItemId, TbtProductionPlan plan)

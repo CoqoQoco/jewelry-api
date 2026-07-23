@@ -1,4 +1,5 @@
 using jewelry.Model.Production.PrePlan;
+using FunnelReport = jewelry.Model.Production.PrePlan.FunnelReport;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Production.PrePlan;
 using Kendo.DynamicLinqCore;
@@ -257,6 +258,23 @@ public class ProductionPrePlanController : ApiControllerBase
     {
         var count = await _service.GetWaitingCount();
         return Ok(new { count });
+    }
+
+    [Route("FunnelReport")]
+    [HttpPost]
+    [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(FunnelReport.SearchResponse))]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<IActionResult> FunnelReport([FromBody] FunnelReport.SearchRequest request)
+    {
+        try
+        {
+            var response = await _service.GetFunnelReport(request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
     }
 
     [Route("MasterJobType")]

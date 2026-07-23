@@ -1,4 +1,5 @@
 using jewelry.Model.Production.PrePlan;
+using FunnelReport = jewelry.Model.Production.PrePlan.FunnelReport;
 using Jewelry.Data.Models.Jewelry;
 using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Http;
@@ -24,4 +25,5 @@ public interface IProductionPrePlanService
     Task<string> UploadProductImageAsync(IFormFile file);
     Task<string> CopyMoldDesignAsProductImageAsync(string moldDesignFilename);
     Task<int> GetWaitingCount();
+    Task<FunnelReport.SearchResponse> GetFunnelReport(FunnelReport.SearchRequest request);
 }
