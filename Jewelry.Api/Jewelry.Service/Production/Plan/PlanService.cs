@@ -1274,6 +1274,53 @@ namespace Jewelry.Service.Production.Plan
         }
         #endregion
 
+        #region --- completed daily series ---
+        public async Task<jewelry.Model.Production.Plan.CompletedDailySeries.Response> GetCompletedDailySeries(jewelry.Model.Production.Plan.CompletedDailySeries.Request request)
+        {
+            var utcNow = DateTime.UtcNow;
+
+            var start = request.Start ?? new DateTimeOffset(new DateTime(utcNow.Year, utcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc));
+            var end = request.End ?? new DateTimeOffset(utcNow.Date.AddDays(1), TimeSpan.Zero);
+
+            var query = _jewelryContext.TbtProductionPlan
+                .Where(x => x.IsActive == true
+                       && x.Status == ProductionPlanStatus.Completed
+                       && x.CompletedDate.HasValue
+                       && x.CompletedDate >= start.StartOfDayUtc()
+                       && x.CompletedDate <= end.EndOfDayUtc());
+
+            var grouped = await query
+                .GroupBy(x => x.CompletedDate.Value.AddHours(7).Date)
+                .Select(g => new { Date = g.Key, Count = g.Count() })
+                .OrderBy(x => x.Date)
+                .ToListAsync();
+
+            var rows = grouped.Select(x => new jewelry.Model.Production.Plan.CompletedDailySeries.Row
+            {
+                Date = x.Date.ToString("yyyy-MM-dd"),
+                Count = x.Count
+            }).ToList();
+
+            var total = grouped.Sum(x => x.Count);
+
+            var today = utcNow.Date;
+            var startDate = start.UtcDateTime.Date;
+            var endDate = end.UtcDateTime.Date;
+            var elapsedEndDate = endDate < today ? endDate : today;
+
+            var daysElapsed = elapsedEndDate >= startDate ? (elapsedEndDate - startDate).Days + 1 : 0;
+            var daysInPeriod = endDate >= startDate ? (endDate - startDate).Days + 1 : 0;
+
+            return new jewelry.Model.Production.Plan.CompletedDailySeries.Response
+            {
+                Rows = rows,
+                Total = total,
+                DaysElapsed = daysElapsed,
+                DaysInPeriod = daysInPeriod
+            };
+        }
+        #endregion
+
         #region --- monthly success report ---
         public async Task<jewelry.Model.Production.Plan.MonthlyReport.Response> GetPlanSuccessMonthlyReport(jewelry.Model.Production.Plan.MonthlyReport.Criteria request)
         {

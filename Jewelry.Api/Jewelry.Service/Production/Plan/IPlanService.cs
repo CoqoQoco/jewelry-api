@@ -23,5 +23,7 @@ namespace Jewelry.Service.Production.Plan
 
         Task<jewelry.Model.Production.Plan.LeadTimeReport.SearchResponse> GetLeadTimeReport(jewelry.Model.Production.Plan.LeadTimeReport.SearchRequest request);
 
+        Task<jewelry.Model.Production.Plan.CompletedDailySeries.Response> GetCompletedDailySeries(jewelry.Model.Production.Plan.CompletedDailySeries.Request request);
+
     }
 }

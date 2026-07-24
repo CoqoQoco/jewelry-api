@@ -193,6 +193,24 @@ namespace Jewelry.Api.Controllers.Production
             }
         }
 
+        [Route("CompletedDailySeries")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.CompletedDailySeries.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetCompletedDailySeries([FromBody] jewelry.Model.Production.Plan.CompletedDailySeries.Request request)
+        {
+            try
+            {
+                var response = await _planService.GetCompletedDailySeries(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("LeadTimeReport")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.LeadTimeReport.SearchResponse))]
