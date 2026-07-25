@@ -186,12 +186,12 @@ namespace Jewelry.Service.Worker
             decimal issuedTotal = issuedFromJobs + issuedFromCustom;
             decimal returnedTotal = returnedFromJobs + returnedFromCustom;
 
-            // Formula (ToPositiveInfinity, matching stage-80 pattern)
+            // Formula (round-half-up, matching frontend Math.round)
             decimal rawLoss = issuedTotal - returnedTotal;
             // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) ไม่รวม add-on
-            decimal allowedLoss = Math.Round(returnedFromJobs * request.LossPercent / 100m, 4, MidpointRounding.ToPositiveInfinity);
-            decimal diffLoss = Math.Round(allowedLoss - rawLoss, 4, MidpointRounding.ToPositiveInfinity);
-            decimal totalMoneyDiff = Math.Round(diffLoss, 2, MidpointRounding.ToPositiveInfinity) * request.PricePerGram;
+            decimal allowedLoss = RoundHalfUp(returnedFromJobs * request.LossPercent / 100m, 4);
+            decimal diffLoss = RoundHalfUp(allowedLoss - rawLoss, 4);
+            decimal totalMoneyDiff = RoundHalfUp(diffLoss, 2) * request.PricePerGram;
 
             var documentNo = await GenerateGltDocumentNo();
 
@@ -388,9 +388,9 @@ namespace Jewelry.Service.Worker
 
             decimal rawLoss = issuedTotal - returnedTotal;
             // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) ไม่รวม add-on
-            decimal allowedLoss = Math.Round(returnedFromJobs * request.LossPercent / 100m, 4, MidpointRounding.ToPositiveInfinity);
-            decimal diffLoss = Math.Round(allowedLoss - rawLoss, 4, MidpointRounding.ToPositiveInfinity);
-            decimal totalMoneyDiff = Math.Round(diffLoss, 2, MidpointRounding.ToPositiveInfinity) * request.PricePerGram;
+            decimal allowedLoss = RoundHalfUp(returnedFromJobs * request.LossPercent / 100m, 4);
+            decimal diffLoss = RoundHalfUp(allowedLoss - rawLoss, 4);
+            decimal totalMoneyDiff = RoundHalfUp(diffLoss, 2) * request.PricePerGram;
 
             // Update header fields
             slip.WorkerCode = request.WorkerCode;
@@ -766,6 +766,13 @@ namespace Jewelry.Service.Worker
                 }).ToList(),
                 TypeSummaries = BuildTypeSummaries(items.Where(i => i.IsActive).ToList()),
             };
+        }
+
+        private static decimal RoundHalfUp(decimal value, int decimals)
+        {
+            decimal factor = 1m;
+            for (int i = 0; i < decimals; i++) factor *= 10m;
+            return Math.Floor(value * factor + 0.5m) / factor;
         }
 
         private static string PurityKey(string? gold, string? goldSize)
