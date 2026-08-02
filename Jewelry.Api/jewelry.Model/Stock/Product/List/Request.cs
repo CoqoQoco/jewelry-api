@@ -37,5 +37,10 @@ namespace jewelry.Model.Stock.Product.List
         public string? PieceStatus { get; set; }
 
         public bool? IncludeLastMovement { get; set; }
+
+        public string[]? LastMoveFromLocations { get; set; }
+        public string? LastMoveBy { get; set; }
+        public DateTimeOffset? LastMoveDateFrom { get; set; }
+        public DateTimeOffset? LastMoveDateTo { get; set; }
     }
 }
