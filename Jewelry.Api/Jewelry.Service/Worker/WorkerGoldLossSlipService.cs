@@ -331,7 +331,11 @@ namespace Jewelry.Service.Worker
         }
 
         private static string PurityKey(string? gold, string? goldSize)
-            => gold == "SV" ? "SILVER" : $"{gold ?? ""}|{goldSize ?? ""}";
+        {
+            if (gold == "SV") return "SILVER";
+            if (!string.IsNullOrEmpty(goldSize) && goldSize.Equals("silver", StringComparison.OrdinalIgnoreCase)) return "SILVER";
+            return !string.IsNullOrEmpty(goldSize) ? goldSize : (gold ?? "");
+        }
 
         private List<GoldLossTypeSummaryResponse> BuildTypeSummaries(List<TbtWorkerGoldLossSlipItem> items, List<TbtWorkerGoldLossSlipReturn> returnItems)
         {
@@ -353,15 +357,10 @@ namespace Jewelry.Service.Worker
                 var returnWeight = matchingReturns.Sum(r => r.Weight);
                 var returnAmount = matchingReturns.Sum(r => r.Amount);
 
-                var gold = purity == "SILVER" ? "SV" : matchingItems.Select(i => i.Gold).FirstOrDefault(g => !string.IsNullOrEmpty(g))
-                    ?? matchingReturns.Select(r => r.Gold).FirstOrDefault(g => !string.IsNullOrEmpty(g));
-                var goldSize = purity == "SILVER" ? null : matchingItems.Select(i => i.GoldSize).FirstOrDefault(g => !string.IsNullOrEmpty(g))
-                    ?? matchingReturns.Select(r => r.GoldSize).FirstOrDefault(g => !string.IsNullOrEmpty(g));
-
                 return new GoldLossTypeSummaryResponse
                 {
-                    Gold = gold,
-                    GoldSize = goldSize,
+                    Gold = null,
+                    GoldSize = purity == "" ? null : purity,
                     TotalWeightLoss = totalWeightLoss,
                     TotalMoneyLoss = totalMoneyLoss,
                     ReturnWeight = returnWeight,
