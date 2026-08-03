@@ -217,6 +217,24 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("Dashboard/Aging")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(AgingReportResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetAgingReport([FromBody] DashboardWrapperRequest request)
+        {
+            try
+            {
+                var response = await _service.GetAgingReport(request.Dashboard);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         #endregion
     }
 }

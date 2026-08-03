@@ -51,6 +51,8 @@ namespace jewelry.Model.Stock.Gem.Dashboard
         public decimal TotalQuantityWeightOut { get; set; }
         public decimal NetQuantityChange { get; set; }
         public decimal NetQuantityWeightChange { get; set; }
+        public decimal TotalQuantityConsumed { get; set; }
+        public decimal TotalQuantityWeightConsumed { get; set; }
     }
 
     public class TopGemMovement

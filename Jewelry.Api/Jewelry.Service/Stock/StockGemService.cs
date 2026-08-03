@@ -37,6 +37,8 @@ namespace Jewelry.Service.Stock
         Task<MonthlyReportResponse> GetMonthlyReport(DashboardRequest request);
 
         Task<List<TransactionTypeCategorySummary>> GetTransactionSummariesByType(DashboardRequest request);
+
+        Task<AgingReportResponse> GetAgingReport(DashboardRequest request);
     }
     public class StockGemService : IStockGemService
     {
@@ -44,6 +46,22 @@ namespace Jewelry.Service.Stock
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly bool _valPass = false;
+        private static readonly int[] InboundTypes = { 1, 2, 3, 6 };
+        private static readonly int[] OutboundTypes = { 4, 5, 7 };
+        private static readonly int[] ConsumedTypes = { 4, 7 };
+        private const int LowStockThreshold = 10;
+        private const decimal InventoryDaysLowThreshold = 30;
+        private const decimal InventoryDaysExcessThreshold = 90;
+
+        private static readonly (string Key, int SortOrder)[] AgingBucketDefinitions = new[]
+        {
+            ("d0_30", 1),
+            ("d31_90", 2),
+            ("d91_180", 3),
+            ("d181_365", 4),
+            ("over365", 5),
+            ("never", 6)
+        };
         public StockGemService(JewelryContext JewelryContext, IHostEnvironment HostingEnvironment)
         {
             _jewelryContext = JewelryContext;
@@ -444,12 +462,13 @@ namespace Jewelry.Service.Stock
                     TotalGemTypes = g.Count(),
                     TotalQuantity = g.Sum(x => x.Quantity),
                     TotalQuantityWeight = g.Sum(x => x.QuantityWeight),
-                    TotalValue = g.Sum(x => x.Quantity * x.Price),
+                    TotalValue = g.Sum(x => x.PriceQty > 0 ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price)),
                     TotalOnProcessQuantity = g.Sum(x => x.QuantityOnProcess),
                     TotalOnProcessQuantityWeight = g.Sum(x => x.QuantityWeightOnProcess),
-                    AvailableQuantity = g.Sum(x => x.Quantity - x.QuantityOnProcess),
-                    AvailableQuantityWeight = g.Sum(x => x.QuantityWeight - x.QuantityWeightOnProcess),
-                    LowStockCount = g.Count(x => x.Quantity <= 10), // Assuming 10 as low stock threshold
+                    // Quantity ถูกหัก QuantityOnProcess ออกไปแล้วตั้งแต่ตอน PickOff จึงไม่ต้องลบซ้ำ
+                    AvailableQuantity = g.Sum(x => x.Quantity),
+                    AvailableQuantityWeight = g.Sum(x => x.QuantityWeight),
+                    LowStockCount = g.Count(x => x.Quantity > 0 && x.Quantity <= LowStockThreshold),
                     ZeroStockCount = g.Count(x => x.Quantity == 0)
                 })
                 .FirstOrDefaultAsync();
@@ -461,21 +480,58 @@ namespace Jewelry.Service.Stock
         {
             var query = BuildStockQuery(request);
 
-            var group = query.GroupBy(x => new { x.GroupName })
+            var groupBy = string.IsNullOrEmpty(request.GroupBy) ? "group" : request.GroupBy.ToLower();
+
+            IQueryable<GemCategoryBreakdown> group;
+
+            if (groupBy == "shape")
+            {
+                group = query.GroupBy(x => new { x.Shape })
                              .Select(g => new GemCategoryBreakdown
                              {
-                                 GroupName = g.Key.GroupName,
-                                 //Shape = g.Key.Shape,
-                                 //Grade = g.Key.Grade,
+                                 Shape = g.Key.Shape,
                                  Count = g.Count(),
                                  TotalQuantity = g.Sum(x => x.Quantity),
                                  TotalOnProcessQuantity = g.Sum(x => x.QuantityOnProcess),
                                  TotalQuantityWeight = g.Sum(x => x.QuantityWeight),
                                  TotalOnProcessQuantityWeight = g.Sum(x => x.QuantityWeightOnProcess),
-                                 TotalValue = g.Sum(x => x.UnitCode == "Q" ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price)),
+                                 TotalValue = g.Sum(x => x.PriceQty > 0 ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price)),
+                                 AveragePrice = g.Any() ? g.Average(x => x.Price) : 0
+                             })
+                             .OrderByDescending(x => x.Shape);
+            }
+            else if (groupBy == "grade")
+            {
+                group = query.GroupBy(x => new { x.Grade })
+                             .Select(g => new GemCategoryBreakdown
+                             {
+                                 Grade = g.Key.Grade,
+                                 Count = g.Count(),
+                                 TotalQuantity = g.Sum(x => x.Quantity),
+                                 TotalOnProcessQuantity = g.Sum(x => x.QuantityOnProcess),
+                                 TotalQuantityWeight = g.Sum(x => x.QuantityWeight),
+                                 TotalOnProcessQuantityWeight = g.Sum(x => x.QuantityWeightOnProcess),
+                                 TotalValue = g.Sum(x => x.PriceQty > 0 ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price)),
+                                 AveragePrice = g.Any() ? g.Average(x => x.Price) : 0
+                             })
+                             .OrderByDescending(x => x.Grade);
+            }
+            else
+            {
+                group = query.GroupBy(x => new { x.GroupName })
+                             .Select(g => new GemCategoryBreakdown
+                             {
+                                 GroupName = g.Key.GroupName,
+                                 Count = g.Count(),
+                                 TotalQuantity = g.Sum(x => x.Quantity),
+                                 TotalOnProcessQuantity = g.Sum(x => x.QuantityOnProcess),
+                                 TotalQuantityWeight = g.Sum(x => x.QuantityWeight),
+                                 TotalOnProcessQuantityWeight = g.Sum(x => x.QuantityWeightOnProcess),
+                                 TotalValue = g.Sum(x => x.PriceQty > 0 ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price)),
                                  AveragePrice = g.Any() ? g.Average(x => x.Price) : 0
                              })
                              .OrderByDescending(x => x.GroupName);
+            }
 
             return await group.Where(x => x.TotalQuantity > 0
                                        || x.TotalQuantityWeight > 0
@@ -504,12 +560,14 @@ namespace Jewelry.Service.Stock
                 {
                     Date = g.Key,
                     TransactionCount = g.Count(),
-                    TotalQuantityIn = g.Where(x => x.Type == 1).Sum(x => x.Qty), // Assuming Type 1 = IN
-                    TotalQuantityOut = g.Where(x => x.Type == 2).Sum(x => x.Qty), // Assuming Type 2 = OUT
-                    TotalQuantityWeightIn = g.Where(x => x.Type == 1).Sum(x => x.QtyWeight),
-                    TotalQuantityWeightOut = g.Where(x => x.Type == 2).Sum(x => x.QtyWeight),
-                    NetQuantityChange = g.Where(x => x.Type == 1).Sum(x => x.Qty) - g.Where(x => x.Type == 2).Sum(x => x.Qty),
-                    NetQuantityWeightChange = g.Where(x => x.Type == 1).Sum(x => x.QtyWeight) - g.Where(x => x.Type == 2).Sum(x => x.QtyWeight)
+                    TotalQuantityIn = g.Where(x => InboundTypes.Contains(x.Type)).Sum(x => x.Qty),
+                    TotalQuantityOut = g.Where(x => OutboundTypes.Contains(x.Type)).Sum(x => x.Qty),
+                    TotalQuantityWeightIn = g.Where(x => InboundTypes.Contains(x.Type)).Sum(x => x.QtyWeight),
+                    TotalQuantityWeightOut = g.Where(x => OutboundTypes.Contains(x.Type)).Sum(x => x.QtyWeight),
+                    NetQuantityChange = g.Where(x => InboundTypes.Contains(x.Type)).Sum(x => x.Qty) - g.Where(x => OutboundTypes.Contains(x.Type)).Sum(x => x.Qty),
+                    NetQuantityWeightChange = g.Where(x => InboundTypes.Contains(x.Type)).Sum(x => x.QtyWeight) - g.Where(x => OutboundTypes.Contains(x.Type)).Sum(x => x.QtyWeight),
+                    TotalQuantityConsumed = g.Where(x => ConsumedTypes.Contains(x.Type)).Sum(x => x.Qty),
+                    TotalQuantityWeightConsumed = g.Where(x => ConsumedTypes.Contains(x.Type)).Sum(x => x.QtyWeight)
                 })
                 .OrderBy(x => x.Date)
                 .ToListAsync();
@@ -654,15 +712,19 @@ namespace Jewelry.Service.Stock
             var newStockQuery = _jewelryContext.TbtStockGem
                 .Where(x => x.CreateDate >= today.StartOfDayUtc() && x.CreateDate < tomorrow.EndOfDayUtc());
 
+            var lowStockAlerts = await BuildStockQuery(request)
+                .CountAsync(x => x.Quantity > 0 && x.Quantity <= LowStockThreshold);
+
             return new TodayStockSummary
             {
                 TotalTransactions = await transactionQuery.CountAsync(),
                 PriceChanges = await priceChangeQuery.CountAsync(),
                 NewStockItems = await newStockQuery.CountAsync(),
-                TotalQuantityIn = await transactionQuery.Where(x => x.Type == 1).SumAsync(x => x.Qty),
-                TotalQuantityOut = await transactionQuery.Where(x => x.Type == 2).SumAsync(x => x.Qty),
-                TotalQuantityWeightIn = await transactionQuery.Where(x => x.Type == 1).SumAsync(x => x.QtyWeight),
-                TotalQuantityWeightOut = await transactionQuery.Where(x => x.Type == 2).SumAsync(x => x.QtyWeight)
+                LowStockAlerts = lowStockAlerts,
+                TotalQuantityIn = await transactionQuery.Where(x => InboundTypes.Contains(x.Type)).SumAsync(x => x.Qty),
+                TotalQuantityOut = await transactionQuery.Where(x => OutboundTypes.Contains(x.Type)).SumAsync(x => x.Qty),
+                TotalQuantityWeightIn = await transactionQuery.Where(x => InboundTypes.Contains(x.Type)).SumAsync(x => x.QtyWeight),
+                TotalQuantityWeightOut = await transactionQuery.Where(x => OutboundTypes.Contains(x.Type)).SumAsync(x => x.QtyWeight)
             };
         }
 
@@ -679,7 +741,7 @@ namespace Jewelry.Service.Stock
                               Shape = gem.Shape,
                               Grade = gem.Grade,
                               Type = trans.Type,
-                              TypeName = trans.Type == 1 ? "IN" : trans.Type == 2 ? "OUT" : "OTHER",
+                              TypeName = InboundTypes.Contains(trans.Type) ? "IN" : OutboundTypes.Contains(trans.Type) ? "OUT" : "OTHER",
                               Qty = trans.Qty,
                               QtyWeight = trans.QtyWeight,
                               JobOrPo = trans.JobOrPo,
@@ -738,7 +800,7 @@ namespace Jewelry.Service.Stock
             var query = BuildStockQuery(request);
 
             return await query
-                .Where(x => x.Quantity <= 10) // Assuming 10 as low stock threshold
+                .Where(x => x.Quantity > 0 && x.Quantity <= LowStockThreshold)
                 .Select(x => new TodayLowStock
                 {
                     Code = x.Code,
@@ -747,8 +809,8 @@ namespace Jewelry.Service.Stock
                     Grade = x.Grade,
                     CurrentQuantity = x.Quantity,
                     CurrentQuantityWeight = x.QuantityWeight,
-                    MinimumLevel = 10, // This should come from a configuration table
-                    AlertLevel = x.Quantity == 0 ? "ZERO" : x.Quantity <= 5 ? "CRITICAL" : "LOW"
+                    MinimumLevel = LowStockThreshold, // This should come from a configuration table
+                    AlertLevel = x.Quantity <= 5 ? "CRITICAL" : "LOW"
                 })
                 .OrderBy(x => x.CurrentQuantity)
                 .ToListAsync();
@@ -759,32 +821,321 @@ namespace Jewelry.Service.Stock
 
         private async Task<WeeklyStockSummary> GetWeeklySummary(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
-            // Implementation similar to daily but aggregated for week
-            return new WeeklyStockSummary();
+            var transactionQuery = from trans in _jewelryContext.TbtStockGemTransection
+                                    join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                    where trans.CreateDate >= startOfWeek.StartOfDayUtc() && trans.CreateDate < endOfWeek.EndOfDayUtc()
+                                          && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                          && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                          && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                                    select new { trans, gem };
+
+            var transactions = await transactionQuery.ToListAsync();
+
+            var totalTransactions = transactions.Count;
+
+            var totalPriceChanges = await _jewelryContext.TbtStockGemTransectionPrice
+                .Where(x => x.CreateDate >= startOfWeek.StartOfDayUtc() && x.CreateDate < endOfWeek.EndOfDayUtc())
+                .CountAsync();
+
+            var newStockItems = await _jewelryContext.TbtStockGem
+                .Where(x => x.CreateDate >= startOfWeek.StartOfDayUtc() && x.CreateDate < endOfWeek.EndOfDayUtc())
+                .CountAsync();
+
+            var inbound = transactions.Where(x => InboundTypes.Contains(x.trans.Type)).ToList();
+            var outbound = transactions.Where(x => OutboundTypes.Contains(x.trans.Type)).ToList();
+
+            var totalQtyIn = inbound.Sum(x => x.trans.Qty);
+            var totalQtyOut = outbound.Sum(x => x.trans.Qty);
+            var totalQtyWeightIn = inbound.Sum(x => x.trans.QtyWeight);
+            var totalQtyWeightOut = outbound.Sum(x => x.trans.QtyWeight);
+
+            const int daysInWeek = 7;
+            var averageTransactionsPerDay = (decimal)totalTransactions / daysInWeek;
+
+            var dayGroups = transactions
+                .GroupBy(x => (int)x.trans.CreateDate.DayOfWeek)
+                .Select(g => new { Day = g.Key, Count = g.Count() })
+                .OrderByDescending(g => g.Count)
+                .ToList();
+
+            // PeakTransactionDay/LowestTransactionDay ใช้ค่า DayOfWeek แบบ .NET (0=Sunday...6=Saturday)
+            var peakTransactionDay = dayGroups.Any() ? dayGroups.First().Day : 0;
+            var lowestTransactionDay = dayGroups.Any() ? dayGroups.Last().Day : 0;
+
+            var weekClosingValue = await BuildStockQuery(request)
+                .Select(x => x.PriceQty > 0 ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price))
+                .SumAsync();
+
+            var inboundValue = inbound.Sum(x => x.gem.PriceQty > 0 ? (x.trans.Qty * x.gem.PriceQty) : (x.trans.QtyWeight * x.gem.Price));
+            var outboundValue = outbound.Sum(x => x.gem.PriceQty > 0 ? (x.trans.Qty * x.gem.PriceQty) : (x.trans.QtyWeight * x.gem.Price));
+            var netValueChange = inboundValue - outboundValue;
+
+            // WeekOpeningValue เป็นค่าประมาณ: มูลค่าคลังปัจจุบันหักด้วยการเปลี่ยนแปลงสุทธิของสัปดาห์ (ไม่มี historical snapshot รายวันให้ใช้ยอดยกมาจริง)
+            var weekOpeningValue = weekClosingValue - netValueChange;
+
+            return new WeeklyStockSummary
+            {
+                TotalTransactions = totalTransactions,
+                TotalPriceChanges = totalPriceChanges,
+                NewStockItems = newStockItems,
+                WeekOpeningValue = weekOpeningValue,
+                WeekClosingValue = weekClosingValue,
+                NetValueChange = netValueChange,
+                TotalQuantityIn = totalQtyIn,
+                TotalQuantityOut = totalQtyOut,
+                TotalQuantityWeightIn = totalQtyWeightIn,
+                TotalQuantityWeightOut = totalQtyWeightOut,
+                AverageTransactionsPerDay = averageTransactionsPerDay,
+                PeakTransactionDay = peakTransactionDay,
+                LowestTransactionDay = lowestTransactionDay
+            };
         }
 
         private async Task<List<DailyMovement>> GetDailyMovements(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
-            // Implementation for daily breakdown within the week
-            return new List<DailyMovement>();
+            var transactionQuery = from trans in _jewelryContext.TbtStockGemTransection
+                                    join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                    where trans.CreateDate >= startOfWeek.StartOfDayUtc() && trans.CreateDate < endOfWeek.EndOfDayUtc()
+                                          && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                          && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                          && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                                    select new { trans, gem };
+
+            var transactions = await transactionQuery.ToListAsync();
+
+            var priceChangeCounts = await _jewelryContext.TbtStockGemTransectionPrice
+                .Where(x => x.CreateDate >= startOfWeek.StartOfDayUtc() && x.CreateDate < endOfWeek.EndOfDayUtc())
+                .GroupBy(x => x.CreateDate.Date)
+                .Select(g => new { Date = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            var result = new List<DailyMovement>();
+            var weekStartDate = startOfWeek.Date;
+
+            for (int i = 0; i < 7; i++)
+            {
+                var date = weekStartDate.AddDays(i);
+                var dayTransactions = transactions.Where(x => x.trans.CreateDate.Date == date).ToList();
+                var inbound = dayTransactions.Where(x => InboundTypes.Contains(x.trans.Type)).ToList();
+                var outbound = dayTransactions.Where(x => OutboundTypes.Contains(x.trans.Type)).ToList();
+
+                var totalQtyIn = inbound.Sum(x => x.trans.Qty);
+                var totalQtyOut = outbound.Sum(x => x.trans.Qty);
+                var totalQtyWeightIn = inbound.Sum(x => x.trans.QtyWeight);
+                var totalQtyWeightOut = outbound.Sum(x => x.trans.QtyWeight);
+
+                var totalValue = dayTransactions.Sum(x => x.gem.PriceQty > 0 ? (x.trans.Qty * x.gem.PriceQty) : (x.trans.QtyWeight * x.gem.Price));
+                var priceChangeCount = priceChangeCounts.FirstOrDefault(x => x.Date == date)?.Count ?? 0;
+
+                result.Add(new DailyMovement
+                {
+                    Date = date,
+                    DayOfWeek = date.DayOfWeek.ToString(),
+                    TransactionCount = dayTransactions.Count,
+                    TotalQuantityIn = totalQtyIn,
+                    TotalQuantityOut = totalQtyOut,
+                    TotalQuantityWeightIn = totalQtyWeightIn,
+                    TotalQuantityWeightOut = totalQtyWeightOut,
+                    NetQuantityChange = totalQtyIn - totalQtyOut,
+                    NetQuantityWeightChange = totalQtyWeightIn - totalQtyWeightOut,
+                    PriceChanges = priceChangeCount,
+                    TotalValue = totalValue
+                });
+            }
+
+            return result;
         }
 
         private async Task<List<WeeklyTopMovement>> GetWeeklyTopMovements(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
-            // Implementation for weekly top movements
-            return new List<WeeklyTopMovement>();
+            var transactionQuery = from trans in _jewelryContext.TbtStockGemTransection
+                                    join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                    where trans.CreateDate >= startOfWeek.StartOfDayUtc() && trans.CreateDate < endOfWeek.EndOfDayUtc()
+                                          && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                          && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                          && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                                    orderby trans.CreateDate
+                                    select new { trans, gem };
+
+            var transactions = await transactionQuery.ToListAsync();
+
+            var movements = transactions
+                .GroupBy(x => new { x.gem.Code, x.gem.GroupName, x.gem.Shape, x.gem.Grade })
+                .Select(g =>
+                {
+                    var totalIn = g.Where(x => InboundTypes.Contains(x.trans.Type)).Sum(x => x.trans.Qty);
+                    var totalOut = g.Where(x => OutboundTypes.Contains(x.trans.Type)).Sum(x => x.trans.Qty);
+                    var totalConsumed = g.Where(x => ConsumedTypes.Contains(x.trans.Type)).Sum(x => x.trans.Qty);
+
+                    string movementType;
+                    if (totalIn >= totalOut)
+                        movementType = "HIGH_IN";
+                    else if (totalConsumed * 2 >= totalOut)
+                        movementType = "HIGH_USAGE";
+                    else
+                        movementType = "HIGH_OUT";
+
+                    var weekStartQuantity = g.First().trans.PreviousRemainQty ?? 0;
+                    var weekEndQuantity = g.Last().trans.PointRemianQty ?? 0;
+
+                    return new WeeklyTopMovement
+                    {
+                        Code = g.Key.Code,
+                        GroupName = g.Key.GroupName,
+                        Shape = g.Key.Shape,
+                        Grade = g.Key.Grade,
+                        TransactionCount = g.Count(),
+                        TotalQuantityMoved = g.Sum(x => x.trans.Qty),
+                        TotalQuantityWeightMoved = g.Sum(x => x.trans.QtyWeight),
+                        WeekStartQuantity = weekStartQuantity,
+                        WeekEndQuantity = weekEndQuantity,
+                        QuantityChange = weekEndQuantity - weekStartQuantity,
+                        MovementType = movementType
+                    };
+                })
+                .OrderByDescending(x => x.TotalQuantityMoved + x.TotalQuantityWeightMoved)
+                .Take(10)
+                .ToList();
+
+            return movements;
         }
 
         private async Task<List<WeeklyPerformance>> GetWeeklyPerformance(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
-            // Implementation for weekly performance metrics
-            return new List<WeeklyPerformance>();
+            var transactionQuery = from trans in _jewelryContext.TbtStockGemTransection
+                                    join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                    where trans.CreateDate >= startOfWeek.StartOfDayUtc() && trans.CreateDate < endOfWeek.EndOfDayUtc()
+                                          && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                          && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                          && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                                    select new { trans, gem };
+
+            var transactions = await transactionQuery.ToListAsync();
+
+            var priceChangeQuery = from price in _jewelryContext.TbtStockGemTransectionPrice
+                                    join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
+                                    where price.CreateDate >= startOfWeek.StartOfDayUtc() && price.CreateDate < endOfWeek.EndOfDayUtc()
+                                          && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                          && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                          && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                                    select new { price, gem };
+
+            var priceChanges = await priceChangeQuery.ToListAsync();
+
+            var priceChangesByGroup = priceChanges
+                .GroupBy(x => x.gem.GroupName)
+                .ToDictionary(g => g.Key, g => new
+                {
+                    Count = g.Count(),
+                    AverageChangePercent = g.Average(x => x.price.PreviousPrice > 0 ? ((x.price.NewPrice - x.price.PreviousPrice) / x.price.PreviousPrice) * 100 : 0)
+                });
+
+            var performance = transactions
+                .GroupBy(x => x.gem.GroupName)
+                .Select(g =>
+                {
+                    var transactionCount = g.Count();
+                    var totalValue = g.Sum(x => x.gem.PriceQty > 0 ? (x.trans.Qty * x.gem.PriceQty) : (x.trans.QtyWeight * x.gem.Price));
+                    var totalQtyIn = g.Where(x => InboundTypes.Contains(x.trans.Type)).Sum(x => x.trans.Qty);
+                    var totalQtyOut = g.Where(x => OutboundTypes.Contains(x.trans.Type)).Sum(x => x.trans.Qty);
+                    var totalQtyWeightIn = g.Where(x => InboundTypes.Contains(x.trans.Type)).Sum(x => x.trans.QtyWeight);
+                    var totalQtyWeightOut = g.Where(x => OutboundTypes.Contains(x.trans.Type)).Sum(x => x.trans.QtyWeight);
+
+                    priceChangesByGroup.TryGetValue(g.Key, out var priceInfo);
+
+                    return new WeeklyPerformance
+                    {
+                        GroupName = g.Key,
+                        TransactionCount = transactionCount,
+                        TotalValue = totalValue,
+                        AverageTransactionValue = transactionCount > 0 ? totalValue / transactionCount : 0,
+                        QuantityTurnover = totalQtyIn + totalQtyOut,
+                        QuantityWeightTurnover = totalQtyWeightIn + totalQtyWeightOut,
+                        PriceChanges = priceInfo?.Count ?? 0,
+                        AveragePriceChange = priceInfo?.AverageChangePercent ?? 0
+                    };
+                })
+                .OrderByDescending(x => x.TotalValue)
+                .ToList();
+
+            return performance;
         }
 
         private async Task<List<WeeklyTrendAnalysis>> GetWeeklyTrendAnalysis(DateTimeOffset startOfWeek, DateTimeOffset endOfWeek, DashboardRequest request)
         {
-            // Implementation for weekly trend analysis
-            return new List<WeeklyTrendAnalysis>();
+            var previousStart = startOfWeek.AddDays(-7);
+            var previousEnd = startOfWeek;
+
+            var currentQuery = from trans in _jewelryContext.TbtStockGemTransection
+                                join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                where trans.CreateDate >= startOfWeek.StartOfDayUtc() && trans.CreateDate < endOfWeek.EndOfDayUtc()
+                                      && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                      && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                      && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                                select new { trans, gem };
+
+            var previousQuery = from trans in _jewelryContext.TbtStockGemTransection
+                                 join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                 where trans.CreateDate >= previousStart.StartOfDayUtc() && trans.CreateDate < previousEnd.EndOfDayUtc()
+                                       && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                       && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                       && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                                 select new { trans, gem };
+
+            var currentTransactions = await currentQuery.ToListAsync();
+            var previousTransactions = await previousQuery.ToListAsync();
+
+            var currentByGroup = currentTransactions
+                .GroupBy(x => x.gem.GroupName)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.trans.Qty) + g.Sum(x => x.trans.QtyWeight));
+
+            var previousByGroup = previousTransactions
+                .GroupBy(x => x.gem.GroupName)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.trans.Qty) + g.Sum(x => x.trans.QtyWeight));
+
+            var groupNames = currentByGroup.Keys.Union(previousByGroup.Keys).Distinct();
+
+            var result = new List<WeeklyTrendAnalysis>();
+            foreach (var groupName in groupNames)
+            {
+                var currentVolume = currentByGroup.TryGetValue(groupName, out var cv) ? cv : 0;
+                var previousVolume = previousByGroup.TryGetValue(groupName, out var pv) ? pv : 0;
+
+                decimal changePercentage;
+                if (previousVolume > 0)
+                    changePercentage = ((currentVolume - previousVolume) / previousVolume) * 100;
+                else if (currentVolume > 0)
+                    changePercentage = 100;
+                else
+                    changePercentage = 0;
+
+                string trendDirection;
+                if (Math.Abs(changePercentage) < 5)
+                    trendDirection = "STABLE";
+                else if (changePercentage > 0)
+                    trendDirection = "UP";
+                else
+                    trendDirection = "DOWN";
+
+                var trendIndicator = trendDirection switch
+                {
+                    "UP" => "INCREASING_DEMAND",
+                    "DOWN" => "DECREASING_DEMAND",
+                    _ => "STABLE_DEMAND"
+                };
+
+                result.Add(new WeeklyTrendAnalysis
+                {
+                    Category = "GROUP",
+                    CategoryValue = groupName,
+                    TrendDirection = trendDirection,
+                    ChangePercentage = changePercentage,
+                    TrendIndicator = trendIndicator,
+                    WeekOverWeekChange = currentVolume - previousVolume
+                });
+            }
+
+            return result.OrderByDescending(x => Math.Abs(x.ChangePercentage)).ToList();
         }
 
         private async Task<MonthlyStockSummary> GetMonthlySummary(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
@@ -801,8 +1152,8 @@ namespace Jewelry.Service.Stock
                 .Where(x => x.CreateDate >= startOfMonth.StartOfDayUtc() && x.CreateDate < endOfMonth.EndOfDayUtc());
 
             // Calculate totals from completed transactions only
-            var inboundTransactions = completedTransactions.Where(x => x.Type == 1 || x.Type == 2 || x.Type == 3 || x.Type == 6);
-            var outboundTransactions = completedTransactions.Where(x => x.Type == 4 || x.Type == 5 || x.Type == 7);
+            var inboundTransactions = completedTransactions.Where(x => InboundTypes.Contains(x.Type));
+            var outboundTransactions = completedTransactions.Where(x => OutboundTypes.Contains(x.Type));
 
             var totalQtyIn = await inboundTransactions.SumAsync(x => x.Qty);
             var totalQtyOut = await outboundTransactions.SumAsync(x => x.Qty);
@@ -861,8 +1212,8 @@ namespace Jewelry.Service.Stock
                     .Where(x => x.CreateDate >= current && x.CreateDate < weekEnd && x.Stastus == "completed")
                     .ToListAsync();
 
-                var inboundTransactions = weeklyTransactions.Where(x => x.Type == 1 || x.Type == 2 || x.Type == 3 || x.Type == 6);
-                var outboundTransactions = weeklyTransactions.Where(x => x.Type == 4 || x.Type == 5 || x.Type == 7);
+                var inboundTransactions = weeklyTransactions.Where(x => InboundTypes.Contains(x.Type));
+                var outboundTransactions = weeklyTransactions.Where(x => OutboundTypes.Contains(x.Type));
 
                 var priceChanges = await _jewelryContext.TbtStockGemTransectionPrice
                     .Where(x => x.CreateDate >= current && x.CreateDate < weekEnd)
@@ -941,25 +1292,51 @@ namespace Jewelry.Service.Stock
                                                select new { trans, gem })
                                               .ToListAsync();
 
+            var daysInMonth = (endOfMonth - startOfMonth).Days;
+
             // Group by gem characteristics and calculate inventory metrics
             var inventoryAnalysis = completedTransactions
                 .GroupBy(x => new { x.gem.GroupName, x.gem.Shape, x.gem.Grade })
-                .Select(g => new MonthlyInventoryAnalysis
+                .Select(g =>
                 {
-                    GroupName = g.Key.GroupName,
-                    Shape = g.Key.Shape,
-                    Grade = g.Key.Grade,
-                    ItemCount = g.Select(x => x.gem.Code).Distinct().Count(),
-                    TotalQuantity = g.Sum(x => x.trans.Qty),
-                    TotalQuantityWeight = g.Sum(x => x.trans.QtyWeight),
-                    TotalValue = g.Sum(x => x.trans.SupplierCost ?? 0),
-                    AverageQuantityPerItem = g.Select(x => x.gem.Code).Distinct().Count() > 0 ?
-                        g.Sum(x => x.trans.Qty) / g.Select(x => x.gem.Code).Distinct().Count() : 0,
-                    AveragePricePerUnit = g.Where(x => x.gem.Price > 0).Any() ? g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price) : 0,
-                    InventoryDays = 30, // TODO: Calculate based on usage rate
-                    InventoryStatus = "OPTIMAL", // TODO: Determine based on business rules
-                    RecommendedOrderQuantity = 0, // TODO: Calculate based on demand
-                    MonthOverMonthChange = 0 // TODO: Calculate month-over-month change
+                    var currentStockQuantity = g.GroupBy(x => x.gem.Code).Select(gg => gg.First().gem.Quantity).Sum();
+                    var outboundQuantity = g.Where(x => OutboundTypes.Contains(x.trans.Type)).Sum(x => x.trans.Qty);
+                    var usageRatePerDay = daysInMonth > 0 ? outboundQuantity / daysInMonth : 0;
+
+                    decimal inventoryDays;
+                    string inventoryStatus;
+                    if (usageRatePerDay <= 0)
+                    {
+                        inventoryDays = 0;
+                        inventoryStatus = "STAGNANT"; // ไม่มีการเบิกใช้ในเดือนนี้ คำนวณจำนวนวันคงคลังไม่ได้
+                    }
+                    else
+                    {
+                        inventoryDays = currentStockQuantity / usageRatePerDay;
+                        inventoryStatus = inventoryDays < InventoryDaysLowThreshold
+                            ? "LOW"
+                            : inventoryDays <= InventoryDaysExcessThreshold
+                                ? "OPTIMAL"
+                                : "EXCESS";
+                    }
+
+                    return new MonthlyInventoryAnalysis
+                    {
+                        GroupName = g.Key.GroupName,
+                        Shape = g.Key.Shape,
+                        Grade = g.Key.Grade,
+                        ItemCount = g.Select(x => x.gem.Code).Distinct().Count(),
+                        TotalQuantity = g.Sum(x => x.trans.Qty),
+                        TotalQuantityWeight = g.Sum(x => x.trans.QtyWeight),
+                        TotalValue = g.Sum(x => x.trans.SupplierCost ?? 0),
+                        AverageQuantityPerItem = g.Select(x => x.gem.Code).Distinct().Count() > 0 ?
+                            g.Sum(x => x.trans.Qty) / g.Select(x => x.gem.Code).Distinct().Count() : 0,
+                        AveragePricePerUnit = g.Where(x => x.gem.Price > 0).Any() ? g.Where(x => x.gem.Price > 0).Average(x => x.gem.Price) : 0,
+                        InventoryDays = inventoryDays,
+                        InventoryStatus = inventoryStatus,
+                        RecommendedOrderQuantity = 0, // TODO: Calculate based on demand
+                        MonthOverMonthChange = 0 // TODO: Calculate month-over-month change
+                    };
                 })
                 .OrderByDescending(x => x.TotalValue)
                 .ToList();
@@ -969,14 +1346,115 @@ namespace Jewelry.Service.Stock
 
         private async Task<List<MonthlyPriceAnalysis>> GetMonthlyPriceAnalysis(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
-            // Implementation for monthly price analysis
-            return new List<MonthlyPriceAnalysis>();
+            var priceQuery = from price in _jewelryContext.TbtStockGemTransectionPrice
+                              join gem in _jewelryContext.TbtStockGem on price.Code equals gem.Code
+                              where price.CreateDate >= startOfMonth.StartOfDayUtc() && price.CreateDate < endOfMonth.EndOfDayUtc()
+                                    && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                    && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                    && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                              select new { price, gem };
+
+            var priceChanges = await priceQuery.ToListAsync();
+
+            var analysis = priceChanges
+                .GroupBy(x => new { x.gem.GroupName, x.gem.Shape, x.gem.Grade })
+                .Select(g =>
+                {
+                    var changePercentages = g
+                        .Where(x => x.price.PreviousPrice > 0)
+                        .Select(x => ((x.price.NewPrice - x.price.PreviousPrice) / x.price.PreviousPrice) * 100)
+                        .ToList();
+
+                    var averageChange = changePercentages.Any() ? changePercentages.Average() : 0;
+                    var variance = changePercentages.Any()
+                        ? changePercentages.Sum(x => (x - averageChange) * (x - averageChange)) / changePercentages.Count
+                        : 0;
+                    var standardDeviation = (decimal)Math.Sqrt((double)variance);
+
+                    string priceTrend;
+                    if (standardDeviation > 15)
+                        priceTrend = "VOLATILE";
+                    else if (averageChange > 5)
+                        priceTrend = "INCREASING";
+                    else if (averageChange < -5)
+                        priceTrend = "DECREASING";
+                    else
+                        priceTrend = "STABLE";
+
+                    return new MonthlyPriceAnalysis
+                    {
+                        GroupName = g.Key.GroupName,
+                        Shape = g.Key.Shape,
+                        Grade = g.Key.Grade,
+                        PriceChangeCount = g.Count(),
+                        AveragePriceStart = g.Average(x => x.price.PreviousPrice),
+                        AveragePriceEnd = g.Average(x => x.price.NewPrice),
+                        PriceVolatility = standardDeviation,
+                        MaxPriceIncrease = changePercentages.Any() ? changePercentages.Max() : 0,
+                        MaxPriceDecrease = changePercentages.Any() ? changePercentages.Min() : 0,
+                        PriceTrend = priceTrend,
+                        StandardDeviation = standardDeviation,
+                        MostRecentPriceChange = g.Max(x => x.price.CreateDate)
+                    };
+                })
+                .OrderByDescending(x => x.PriceChangeCount)
+                .ToList();
+
+            return analysis;
         }
 
         private async Task<List<MonthlySupplierAnalysis>> GetMonthlySupplierAnalysis(DateTimeOffset startOfMonth, DateTimeOffset endOfMonth, DashboardRequest request)
         {
-            // Implementation for monthly supplier analysis
-            return new List<MonthlySupplierAnalysis>();
+            // ข้อมูลจริงมีแต่ type 1 (รับเข้าคลัง [พลอยใหม่]) เท่านั้นที่กรอก SubpplierName ต้อง filter type 1 + ชื่อ supplier ไม่ว่าง
+            // มิฉะนั้นจะได้ group ก้อนยักษ์ที่ชื่อ supplier ว่างจาก type อื่นทั้งหมด
+            var transactionQuery = from trans in _jewelryContext.TbtStockGemTransection
+                                    join gem in _jewelryContext.TbtStockGem on trans.Code equals gem.Code
+                                    where trans.CreateDate >= startOfMonth.StartOfDayUtc() && trans.CreateDate < endOfMonth.EndOfDayUtc()
+                                          && trans.Type == 1
+                                          && !string.IsNullOrEmpty(trans.SubpplierName)
+                                          && (request.GroupName == null || request.GroupName.Length == 0 || request.GroupName.Contains(gem.GroupName))
+                                          && (request.Shape == null || request.Shape.Length == 0 || request.Shape.Contains(gem.Shape))
+                                          && (request.Grade == null || request.Grade.Length == 0 || request.Grade.Contains(gem.Grade))
+                                    select new { trans, gem };
+
+            var transactions = await transactionQuery.ToListAsync();
+
+            var supplierAnalysis = transactions
+                .GroupBy(x => x.trans.SubpplierName)
+                .Select(g =>
+                {
+                    var totalCost = g.Sum(x => x.trans.SupplierCost ?? 0);
+                    var totalQuantity = g.Sum(x => x.trans.Qty);
+                    var totalQuantityWeight = g.Sum(x => x.trans.QtyWeight);
+                    var transactionCount = g.Count();
+
+                    var preferredGemCategory = g
+                        .GroupBy(x => x.gem.GroupName)
+                        .OrderByDescending(gg => gg.Sum(x => x.trans.Qty) + gg.Sum(x => x.trans.QtyWeight))
+                        .Select(gg => gg.Key)
+                        .FirstOrDefault() ?? string.Empty;
+
+                    return new MonthlySupplierAnalysis
+                    {
+                        SupplierName = g.Key,
+                        TransactionCount = transactionCount,
+                        TotalQuantity = totalQuantity,
+                        TotalQuantityWeight = totalQuantityWeight,
+                        TotalCost = totalCost,
+                        AverageCostPerUnit = totalQuantity > 0 ? totalCost / totalQuantity : 0,
+                        AverageCostPerWeight = totalQuantityWeight > 0 ? totalCost / totalQuantityWeight : 0,
+                        GemTypes = g.Select(x => x.gem.GroupName).Distinct().ToList(),
+                        PreferredGemCategory = preferredGemCategory,
+                        DeliveryCount = transactionCount,
+                        // ไม่มี data source สำหรับ performance score / reliability rating ในระบบ ปล่อยเป็นค่า default
+                        SupplierPerformanceScore = 0,
+                        ReliabilityRating = string.Empty
+                    };
+                })
+                .OrderByDescending(x => x.TotalCost)
+                .ToList();
+
+            return supplierAnalysis;
         }
 
         // New method that categorizes results by transaction type (not inbound/outbound)
@@ -1100,6 +1578,84 @@ namespace Jewelry.Service.Stock
             }
 
             return transactionTypeSummaries.OrderBy(x => x.Type).ToList();
+        }
+
+        public async Task<AgingReportResponse> GetAgingReport(DashboardRequest request)
+        {
+            var stockQuery = BuildStockQuery(request)
+                .Where(x => x.Quantity > 0 || x.QuantityWeight > 0);
+
+            var lastTxQuery = _jewelryContext.TbtStockGemTransection
+                .GroupBy(x => x.Code)
+                .Select(g => new { Code = g.Key, LastTx = g.Max(x => x.CreateDate) });
+
+            var raw = await (from s in stockQuery
+                             join t in lastTxQuery on s.Code equals t.Code into txGroup
+                             from t in txGroup.DefaultIfEmpty()
+                             select new
+                             {
+                                 s.Quantity,
+                                 s.QuantityWeight,
+                                 s.Price,
+                                 s.PriceQty,
+                                 LastTx = (DateTime?)t.LastTx
+                             }).ToListAsync();
+
+            var now = DateTime.UtcNow;
+
+            var items = raw.Select(x => new
+            {
+                x.Quantity,
+                x.QuantityWeight,
+                Value = x.PriceQty > 0 ? (x.Quantity * x.PriceQty) : (x.QuantityWeight * x.Price),
+                BucketKey = GetAgingBucketKey(x.LastTx, now)
+            }).ToList();
+
+            var grouped = items
+                .GroupBy(x => x.BucketKey)
+                .ToDictionary(g => g.Key, g => new AgingBucket
+                {
+                    BucketKey = g.Key,
+                    GemCodes = g.Count(),
+                    TotalQuantity = g.Sum(x => x.Quantity),
+                    TotalQuantityWeight = g.Sum(x => x.QuantityWeight),
+                    TotalValue = g.Sum(x => x.Value)
+                });
+
+            var buckets = AgingBucketDefinitions
+                .Select(def =>
+                {
+                    var bucket = grouped.TryGetValue(def.Key, out var found) ? found : new AgingBucket { BucketKey = def.Key };
+                    bucket.SortOrder = def.SortOrder;
+                    return bucket;
+                })
+                .OrderBy(b => b.SortOrder)
+                .ToList();
+
+            var deadStock = buckets.First(b => b.BucketKey == "over365");
+
+            return new AgingReportResponse
+            {
+                Buckets = buckets,
+                TotalGemCodes = items.Count,
+                TotalValue = items.Sum(x => x.Value),
+                DeadStockCodes = deadStock.GemCodes,
+                DeadStockValue = deadStock.TotalValue
+            };
+        }
+
+        private static string GetAgingBucketKey(DateTime? lastTx, DateTime now)
+        {
+            if (!lastTx.HasValue)
+                return "never";
+
+            var days = (now - lastTx.Value).TotalDays;
+
+            if (days <= 30) return "d0_30";
+            if (days <= 90) return "d31_90";
+            if (days <= 180) return "d91_180";
+            if (days <= 365) return "d181_365";
+            return "over365";
         }
 
         #endregion
