@@ -134,33 +134,36 @@ namespace Jewelry.Service.Stock.Product
             if (request.LastMoveFromLocations != null && request.LastMoveFromLocations.Any())
             {
                 var lastMoveFromLocationArray = request.LastMoveFromLocations.ToArray();
-                pieces = pieces.Where(x => lastMoveFromLocationArray.Contains(x.TbtStockMovement
-                    .Where(m => m.RefDocType == "MoveLocation")
-                    .OrderByDescending(m => m.MovementDate)
-                    .Select(m => m.FromLocation).FirstOrDefault()));
+                pieces = pieces.Where(x => x.TbtStockMovement.Any(m =>
+                    m.RefDocType == "MoveLocation"
+                    && m.FromLocation != null
+                    && lastMoveFromLocationArray.Contains(m.FromLocation)
+                    && m.MovementDate == x.TbtStockMovement
+                        .Where(mm => mm.RefDocType == "MoveLocation")
+                        .Max(mm => mm.MovementDate)));
             }
             if (!string.IsNullOrEmpty(request.LastMoveBy))
             {
-                pieces = pieces.Where(x => x.TbtStockMovement
-                    .Where(m => m.RefDocType == "MoveLocation")
-                    .OrderByDescending(m => m.MovementDate)
-                    .Select(m => m.CreateBy).FirstOrDefault().Contains(request.LastMoveBy));
+                pieces = pieces.Where(x => x.TbtStockMovement.Any(m =>
+                    m.RefDocType == "MoveLocation"
+                    && m.CreateBy.Contains(request.LastMoveBy)
+                    && m.MovementDate == x.TbtStockMovement
+                        .Where(mm => mm.RefDocType == "MoveLocation")
+                        .Max(mm => mm.MovementDate)));
             }
             if (request.LastMoveDateFrom.HasValue)
             {
                 var lastMoveDateFrom = request.LastMoveDateFrom.Value.StartOfDayUtc();
                 pieces = pieces.Where(x => x.TbtStockMovement
                     .Where(m => m.RefDocType == "MoveLocation")
-                    .OrderByDescending(m => m.MovementDate)
-                    .Select(m => (DateTime?)m.MovementDate).FirstOrDefault() >= lastMoveDateFrom);
+                    .Max(m => (DateTime?)m.MovementDate) >= lastMoveDateFrom);
             }
             if (request.LastMoveDateTo.HasValue)
             {
                 var lastMoveDateTo = request.LastMoveDateTo.Value.EndOfDayUtc();
                 pieces = pieces.Where(x => x.TbtStockMovement
                     .Where(m => m.RefDocType == "MoveLocation")
-                    .OrderByDescending(m => m.MovementDate)
-                    .Select(m => (DateTime?)m.MovementDate).FirstOrDefault() <= lastMoveDateTo);
+                    .Max(m => (DateTime?)m.MovementDate) <= lastMoveDateTo);
             }
 
             if (request.IncludeLastMovement == true)
