@@ -51,10 +51,14 @@ namespace Jewelry.Service.Receipt.Gem
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
 
-        private static bool IsChainOrSpring(TbtStockGem g) =>
+        private static readonly string[] CastingMaterialKeywords = new[]
+        {
+            "สร้อย", "สปริง", "ก้ามปู", "กำไล", "ลูกบอล", "ลุกบอล"
+        };
+
+        private static bool IsCastingMaterial(TbtStockGem g) =>
             string.Equals(g.Shape, "CHAIN", StringComparison.OrdinalIgnoreCase)
-            || (g.GroupName?.Contains("สร้อย") ?? false)
-            || (g.GroupName?.Contains("สปริง") ?? false);
+            || (g.GroupName != null && CastingMaterialKeywords.Any(k => g.GroupName.Contains(k, StringComparison.OrdinalIgnoreCase)));
         private readonly IRunningNumber _runningNumberService;
         public ReceiptAndIssueStockGemService(JewelryContext JewelryContext,
             IHostEnvironment HostingEnvironment,
@@ -1234,7 +1238,7 @@ namespace Jewelry.Service.Receipt.Gem
                                 throw new HandleException(ErrorMessage.NotFound);
                             }
 
-                            var targetStatus = IsChainOrSpring(gemData) ? ProductionPlanStatus.Casting : ProductionPlanStatus.Gems;
+                            var targetStatus = IsCastingMaterial(gemData) ? ProductionPlanStatus.Casting : ProductionPlanStatus.Gems;
                             var headerId = await GetOrCreateHeaderId(targetStatus);
 
                             var newGem = new TbtProductionPlanStatusDetailGem()
