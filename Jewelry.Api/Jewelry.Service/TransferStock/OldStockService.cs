@@ -14,6 +14,7 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Transactions;
 
@@ -42,69 +43,90 @@ namespace Jewelry.Service.TransferStock
 
         private TbmProductType GetProductType(List<TbmProductType> master, string check)
         {
+            string code;
+
             if (string.IsNullOrEmpty(check))
             {
-                // ถ้าไม่มีข้อมูลประเภทสินค้า ให้ใช้ค่าเริ่มต้น (DK)
-                return master.FirstOrDefault(x => x.Code == "N/A") ?? master.FirstOrDefault();
+                code = "N/A";
             }
+            else
+            {
+                var checkText = check.ToUpper().Trim();
 
-            var checkText = check.ToUpper().Trim();
-
-            // ตรวจสอบแต่ละประเภทตามลำดับความสำคัญ
-            if (checkText.Contains("RING"))
-            {
-                return master.FirstOrDefault(x => x.Code == "R");
-            }
-            else if (checkText.Contains("PENDANT"))
-            {
-                return master.FirstOrDefault(x => x.Code == "P");
-            }
-            else if (checkText.Contains("EARRING") || checkText.Contains("LOCK") || checkText.Contains("STDU") || checkText.Contains("STUD"))
-            {
-                if (checkText.Contains("STUD") || checkText.Contains("STUD"))
+                // ตรวจสอบตระกูลต่างหูก่อนเสมอ (ต้องมาก่อน RING เพราะ "EARRING" มีคำว่า RING อยู่ในตัว)
+                if (checkText.Contains("EARRI"))
                 {
-                    return master.FirstOrDefault(x => x.Code == "ES");
+                    if (checkText.Contains("STUD") || checkText.Contains("STDU"))
+                    {
+                        code = "ES";
+                    }
+                    else if (checkText.Contains("HOOK"))
+                    {
+                        code = "EH";
+                    }
+                    else if (checkText.Contains("LOCK"))
+                    {
+                        code = "EL";
+                    }
+                    else
+                    {
+                        code = "E";
+                    }
                 }
-                else if (checkText.Contains("HOOK"))
+                else if (checkText.Contains("LOCKET"))
                 {
-                    return master.FirstOrDefault(x => x.Code == "EH");
+                    code = "LK";
                 }
-                else if (checkText.Contains("LOCK"))
+                else if (checkText.Contains("PENDANT"))
                 {
-                    return master.FirstOrDefault(x => x.Code == "EL");
+                    code = "P";
+                }
+                else if (checkText.Contains("RING"))
+                {
+                    code = "R";
+                }
+                else if (checkText.Contains("BRACELET"))
+                {
+                    code = "B";
+                }
+                else if (checkText.Contains("NECKLACE") || checkText.Contains("NECKALCE"))
+                {
+                    code = "N";
+                }
+                else if (checkText.Contains("BANGLE"))
+                {
+                    code = "G";
+                }
+                else if (checkText.Contains("BROOCH"))
+                {
+                    code = "T";
+                }
+                else if (checkText.Contains("CHARM"))
+                {
+                    code = "C";
+                }
+                else if (checkText.Contains("BUTTON") || checkText.Contains("BOTTON"))
+                {
+                    code = "V";
+                }
+                else if (checkText.Contains("CHAIN"))
+                {
+                    code = "CH";
                 }
                 else
                 {
-                    return master.FirstOrDefault(x => x.Code == "E");
+                    code = "N/A";
                 }
             }
-            else if (checkText.Contains("BRACELET"))
-            {
-                return master.FirstOrDefault(x => x.Code == "B");
-            }
-            else if (checkText.Contains("NECKLACE"))
-            {
-                return master.FirstOrDefault(x => x.Code == "N");
-            }
-            else if (checkText.Contains("BANGLE"))
-            {
-                return master.FirstOrDefault(x => x.Code == "G");
-            }
-            else if (checkText.Contains("BROOCH"))
-            {
-                return master.FirstOrDefault(x => x.Code == "T");
-            }
-            else if (checkText.Contains("BUTTON"))
-            {
-                return master.FirstOrDefault(x => x.Code == "V");
-            }
-            else if (checkText.Contains("CHAIN"))
-            {
-                return master.FirstOrDefault(x => x.Code == "CH");
-            }
 
-            // หากยังไม่พบ ให้ใช้ค่าเริ่มต้น
-            return master.FirstOrDefault(x => x.Code == "N/A") ?? master.FirstOrDefault();
+            return ResolveProductType(master, code);
+        }
+
+        private TbmProductType ResolveProductType(List<TbmProductType> master, string code)
+        {
+            return master.FirstOrDefault(x => x.Code == code)
+                ?? master.FirstOrDefault(x => x.Code == "N/A")
+                ?? master.FirstOrDefault();
         }
         private DateTime GetProductionDate(string productionDateCode)
         {
@@ -151,32 +173,56 @@ namespace Jewelry.Service.TransferStock
                 return DateTime.UtcNow;
             }
         }
-        private string ProducttionType(List<TbmGold> master, string check)
+        private string ProducttionType(List<TbmGold> master, string? typeg, string? productName)
         {
-            if (string.IsNullOrEmpty(check))
+            string? code = null;
+
+            var nameText = (productName ?? string.Empty).ToUpper();
+
+            // 1. เช็คจากชื่อสินค้าก่อน — ต้องเป็น word-boundary จริง ห้าม Contains ธรรมดา
+            if (Regex.IsMatch(nameText, @"(?<![A-Z])WG(?![A-Z])"))
             {
-                // ถ้าไม่มีข้อมูลประเภทสินค้า ให้ใช้ค่าเริ่มต้น (DK)
-                return master.FirstOrDefault(x => x.Code == "WG").NameEn;
+                code = "WG";
+            }
+            else if (Regex.IsMatch(nameText, @"(?<![A-Z])YG(?![A-Z])"))
+            {
+                code = "YG";
+            }
+            else if (Regex.IsMatch(nameText, @"(?<![A-Z])PG(?![A-Z])"))
+            {
+                code = "PG";
             }
 
-            var checkText = check.ToUpper().Trim();
+            // 2. ถ้าชื่อไม่มี token → ดู typeg (WHITE/PINK ต้องมาก่อน GOLD เพราะ "Whitegold" มีคำว่า GOLD อยู่ด้วย)
+            if (code == null)
+            {
+                var typeText = (typeg ?? string.Empty).ToUpper().Trim();
 
-            if (checkText.Contains("PG"))
-            {
-                return master.FirstOrDefault(x => x.Code == "PG").NameEn;
+                if (typeText.Contains("WHITE") || typeText.Contains("WG"))
+                {
+                    code = "WG";
+                }
+                else if (typeText.Contains("PINK") || typeText.Contains("ROSE") || typeText.Contains("PG"))
+                {
+                    code = "PG";
+                }
+                else if (typeText.Contains("SIL") || typeText.Contains("SV"))
+                {
+                    code = "SV";
+                }
+                else if (typeText.Contains("GOLD") || typeText.Contains("YG") || typeText == "G")
+                {
+                    code = "YG";
+                }
             }
-            else if (checkText.Contains("YG"))
-            {
-                return master.FirstOrDefault(x => x.Code == "YG").NameEn;
-            }
-            else if (checkText.Contains("SI"))
-            {
-                return master.FirstOrDefault(x => x.Code == "SV").NameEn;
-            }
-            else
-            {
-                return master.FirstOrDefault(x => x.Code == "WG").NameEn;
-            }
+
+            // 3. ไม่เข้าเงื่อนไขไหนเลย → WG (คงพฤติกรรม default เดิม)
+            code ??= "WG";
+
+            return master.FirstOrDefault(x => x.Code == code)?.NameEn
+                ?? master.FirstOrDefault(x => x.Code == "WG")?.NameEn
+                ?? master.FirstOrDefault()?.NameEn
+                ?? string.Empty;
         }
         private string ProducttionTypeSize(List<TbmGoldSize> master, string check)
         {
@@ -720,7 +766,7 @@ namespace Jewelry.Service.TransferStock
                 }
 
                 newProduct.ProductionDate = GetProductionDate(stock.Dateproduct);
-                newProduct.ProductionType = ProducttionType(masterGold, stock.Typeg);
+                newProduct.ProductionType = ProducttionType(masterGold, stock.Typeg, stock.Productname);
                 newProduct.ProductionTypeSize = ProducttionTypeSize(masterGoldSize, stock.Productname);
                 newProduct.WoOrigin = stock.Jobno;
                 newProduct.Wo = GetWO(stock.Jobno);
