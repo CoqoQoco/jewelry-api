@@ -124,6 +124,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleBillingNoteProduct> TbtSaleBillingNoteProduct { get; set; }
 
+    public virtual DbSet<TbtSaleMaterialHeader> TbtSaleMaterialHeader { get; set; }
+
+    public virtual DbSet<TbtSaleMaterialItem> TbtSaleMaterialItem { get; set; }
+
     public virtual DbSet<TbtSaleOrder> TbtSaleOrder { get; set; }
 
     public virtual DbSet<TbtSaleOrderProduct> TbtSaleOrderProduct { get; set; }
@@ -510,6 +514,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
             entity.Property(e => e.Discount).HasColumnName("discount");
+            entity.Property(e => e.TaxId)
+                .HasColumnType("character varying")
+                .HasColumnName("tax_id");
 
             entity.HasOne(d => d.TypeCodeNavigation).WithMany(p => p.TbmCustomer)
                 .HasForeignKey(d => d.TypeCode)
@@ -4643,6 +4650,127 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.SlipId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_gold_loss_tang_slip_extra_slip_fk");
+        });
+
+        modelBuilder.Entity<TbtSaleMaterialHeader>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_sale_material_header_pk");
+
+            entity.ToTable("tbt_sale_material_header");
+
+            entity.HasIndex(e => e.DocumentNo).HasDatabaseName("idx_tbt_sale_material_header_document_no");
+            entity.HasIndex(e => e.CustomerCode).HasDatabaseName("idx_tbt_sale_material_header_customer_code");
+            entity.HasIndex(e => e.DocumentDate).HasDatabaseName("idx_tbt_sale_material_header_document_date");
+            entity.HasIndex(e => e.Status).HasDatabaseName("idx_tbt_sale_material_header_status");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.DocumentNo)
+                .HasColumnType("character varying")
+                .HasColumnName("document_no");
+            entity.Property(e => e.DocumentDate).HasColumnName("document_date");
+            entity.Property(e => e.CustomerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_code");
+            entity.Property(e => e.CustomerName)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_name");
+            entity.Property(e => e.CustomerAddress)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_address");
+            entity.Property(e => e.CustomerTel)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_tel");
+            entity.Property(e => e.CustomerEmail)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_email");
+            entity.Property(e => e.CustomerTaxId)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_tax_id");
+            entity.Property(e => e.SubTotal).HasColumnName("sub_total");
+            entity.Property(e => e.VatPercent).HasColumnName("vat_percent");
+            entity.Property(e => e.VatAmount).HasColumnName("vat_amount");
+            entity.Property(e => e.GrandTotal).HasColumnName("grand_total");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.ConfirmDate).HasColumnName("confirm_date");
+            entity.Property(e => e.ConfirmBy)
+                .HasColumnType("character varying")
+                .HasColumnName("confirm_by");
+            entity.Property(e => e.CancelDate).HasColumnName("cancel_date");
+            entity.Property(e => e.CancelBy)
+                .HasColumnType("character varying")
+                .HasColumnName("cancel_by");
+            entity.Property(e => e.CancelReason)
+                .HasColumnType("character varying")
+                .HasColumnName("cancel_reason");
+            entity.Property(e => e.IsDelete).HasColumnName("is_delete");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtSaleMaterialItem>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_sale_material_item_pk");
+
+            entity.ToTable("tbt_sale_material_item");
+
+            entity.HasIndex(e => e.Running).HasDatabaseName("idx_tbt_sale_material_item_running");
+            entity.HasIndex(e => e.GemCode).HasDatabaseName("idx_tbt_sale_material_item_gem_code");
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.ItemNo).HasColumnName("item_no");
+            entity.Property(e => e.GemCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_code");
+            entity.Property(e => e.GemName)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_name");
+            entity.Property(e => e.GemGroup)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_group");
+            entity.Property(e => e.GemShape)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_shape");
+            entity.Property(e => e.GemSize)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_size");
+            entity.Property(e => e.GemGrade)
+                .HasColumnType("character varying")
+                .HasColumnName("gem_grade");
+            entity.Property(e => e.Description)
+                .HasColumnType("character varying")
+                .HasColumnName("description");
+            entity.Property(e => e.QtyPiece).HasColumnName("qty_piece");
+            entity.Property(e => e.QtyWeight).HasColumnName("qty_weight");
+            entity.Property(e => e.PriceInclVat).HasColumnName("price_incl_vat");
+            entity.Property(e => e.PriceExclVat).HasColumnName("price_excl_vat");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.RefStockPrice).HasColumnName("ref_stock_price");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+
+            entity.HasOne(d => d.RunningNavigation).WithMany(p => p.TbtSaleMaterialItem)
+                .HasForeignKey(d => d.Running)
+                .HasConstraintName("tbt_sale_material_item_running_fk");
         });
 
         OnModelCreatingPartial(modelBuilder);
