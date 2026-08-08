@@ -11,7 +11,7 @@ public class PrintLayoutService : BaseService, IPrintLayoutService
 {
     private static readonly HashSet<string> AllowedKeys = new(StringComparer.OrdinalIgnoreCase)
     {
-        "bill", "vat"
+        "bill", "vat", "company"
     };
 
     private readonly JewelryContext _jewelryContext;
@@ -72,7 +72,7 @@ public class PrintLayoutService : BaseService, IPrintLayoutService
     {
         if (!AllowedKeys.Contains(key))
         {
-            throw new ArgumentException($"Invalid layout key '{key}'. Allowed keys: bill, vat.");
+            throw new ArgumentException($"Invalid layout key '{key}'. Allowed keys: {string.Join(", ", AllowedKeys)}.");
         }
     }
 }
