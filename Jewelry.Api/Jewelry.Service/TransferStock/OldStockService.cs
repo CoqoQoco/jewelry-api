@@ -758,12 +758,12 @@ namespace Jewelry.Service.TransferStock
                     CreateDate = DateTime.UtcNow
                 };
 
-                if (!string.IsNullOrEmpty(stock.Typep))
-                {
-                    var productType = GetProductType(masterProductType, stock.Typep);
-                    newProduct.ProductType = productType.Code;
-                    newProduct.ProductTypeName = productType.NameTh;
-                }
+                // ถ้าระบบเก่าไม่กรอกช่องประเภท ให้ fallback ไปอ่านจากชื่อสินค้าแทน
+                // (GetProductType เช็คคำ EARRING/PENDANT/BRACELET/NECKLACE/BANGLE/RING ซึ่งเป็นคำเดียวกับที่อยู่ในชื่อสินค้า)
+                var typeSource = !string.IsNullOrWhiteSpace(stock.Typep) ? stock.Typep : stock.Productname;
+                var productType = GetProductType(masterProductType, typeSource);
+                newProduct.ProductType = productType.Code;
+                newProduct.ProductTypeName = productType.NameTh;
 
                 newProduct.ProductionDate = GetProductionDate(stock.Dateproduct);
                 newProduct.ProductionType = ProducttionType(masterGold, stock.Typeg, stock.Productname);
