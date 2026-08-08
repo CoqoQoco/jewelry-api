@@ -42,5 +42,8 @@ namespace jewelry.Model.Stock.Gem.Search
         public string CreateBy { get; set; } = null!;
         public DateTime? UpdateDate { get; set; }
         public string? UpdateBy { get; set; }
+
+        public DateTime? LastMovementDate { get; set; }
+        public int? DaysSinceLastMovement { get; set; }
     }
 }

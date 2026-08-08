@@ -4,6 +4,7 @@ using jewelry.Model.Stock.Gem.Price;
 using jewelry.Model.Stock.Gem.PriceEdit;
 using jewelry.Model.Stock.Gem.Search;
 using jewelry.Model.Stock.Gem.Dashboard;
+using jewelry.Model.Stock.Gem.Report;
 using jewelry.Model.Stock.Mold.Return;
 using Jewelry.Api.Extension;
 using Jewelry.Service.Stock;
@@ -62,8 +63,7 @@ namespace Jewelry.Api.Controllers.Stock
         {
             try
             {
-                var report = _service.SearchGemData(request.Search);
-                return report.ToDataSource(request);
+                return _service.SearchGemData(request);
 
             }
             catch (HandleException ex)
@@ -236,5 +236,23 @@ namespace Jewelry.Api.Controllers.Stock
         }
 
         #endregion
+
+        [Route("Report/Movement")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(List<MovementReportResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult GetMovementReport([FromBody] MovementReportWrapperRequest request)
+        {
+            try
+            {
+                var report = _service.GetMovementReport(request.Search ?? new MovementReportRequest());
+                return report.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
     }
 }

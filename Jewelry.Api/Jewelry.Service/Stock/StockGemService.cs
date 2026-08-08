@@ -4,9 +4,11 @@ using jewelry.Model.Stock.Gem.Price;
 using jewelry.Model.Stock.Gem.PriceEdit;
 using jewelry.Model.Stock.Gem.Search;
 using jewelry.Model.Stock.Gem.Dashboard;
+using jewelry.Model.Stock.Gem.Report;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Helper;
+using Kendo.DynamicLinqCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NetTopologySuite.Index.HPRtree;
@@ -24,7 +26,7 @@ namespace Jewelry.Service.Stock
     public interface IStockGemService
     {
         List<SearchGemResponse> SearchGem(SearchGem request);
-        IQueryable<SearchGemResponse> SearchGemData(SearchGem request);
+        DataSourceResult SearchGemData(SearchGemRequest request);
         IQueryable<OptionResponse> GroupGemData(OptionRequest request);
 
         Task<string> Price(PriceEditRequest request);
@@ -39,6 +41,8 @@ namespace Jewelry.Service.Stock
         Task<List<TransactionTypeCategorySummary>> GetTransactionSummariesByType(DashboardRequest request);
 
         Task<AgingReportResponse> GetAgingReport(DashboardRequest request);
+
+        List<MovementReportResponse> GetMovementReport(MovementReportRequest request);
     }
     public class StockGemService : IStockGemService
     {
@@ -99,51 +103,53 @@ namespace Jewelry.Service.Stock
             return query;
         }
 
-        public IQueryable<SearchGemResponse> SearchGemData(SearchGem request)
+        public DataSourceResult SearchGemData(SearchGemRequest request)
         {
+            var search = request.Search ?? new SearchGem();
+
             var query = (from item in _jewelryContext.TbtStockGem
                          select item).AsNoTracking();
 
-            if (request.Id.HasValue)
+            if (search.Id.HasValue)
             {
                 query = (from item in query
-                         where item.Id == request.Id.Value
+                         where item.Id == search.Id.Value
                          select item);
             }
-            if (!string.IsNullOrEmpty(request.Code))
+            if (!string.IsNullOrEmpty(search.Code))
             {
                 query = (from item in query
-                         where item.Code.Contains(request.Code.ToUpper())
+                         where item.Code.Contains(search.Code.ToUpper())
                          select item);
             }
-            if (request.GroupName != null && request.GroupName.Length > 0)
+            if (search.GroupName != null && search.GroupName.Length > 0)
             {
                 query = (from item in query
-                         where request.GroupName.Contains(item.GroupName)
+                         where search.GroupName.Contains(item.GroupName)
                          select item);
             }
-            if (request.Size != null && request.Size.Length > 0)
+            if (search.Size != null && search.Size.Length > 0)
             {
                 query = (from item in query
-                         where request.Size.Contains(item.Size)
+                         where search.Size.Contains(item.Size)
                          select item);
             }
-            if (request.Shape != null && request.Shape.Length > 0)
+            if (search.Shape != null && search.Shape.Length > 0)
             {
                 query = (from item in query
-                         where request.Shape.Contains(item.Shape)
+                         where search.Shape.Contains(item.Shape)
                          select item);
             }
-            if (request.Grade != null && request.Grade.Length > 0)
+            if (search.Grade != null && search.Grade.Length > 0)
             {
                 query = (from item in query
-                         where request.Grade.Contains(item.Grade)
+                         where search.Grade.Contains(item.Grade)
                          select item);
             }
 
-            if (request.TypeCheck != null && request.TypeCheck.Length > 0)
+            if (search.TypeCheck != null && search.TypeCheck.Length > 0)
             {
-                var typeCheckLower = request.TypeCheck.Select(tc => tc.ToLower()).ToArray();
+                var typeCheckLower = search.TypeCheck.Select(tc => tc.ToLower()).ToArray();
 
                 if (typeCheckLower.Contains("qty-remain"))
                 {
@@ -194,7 +200,29 @@ namespace Jewelry.Service.Stock
                                 Region = item.Region
                             });
 
-            return response;
+            var dataSource = response.ToDataSourceResult(request);
+            var pageItems = dataSource.Data.Cast<SearchGemResponse>().ToList();
+
+            var pageCodes = pageItems.Select(x => x.Code).Distinct().ToList();
+            var lastMovements = _jewelryContext.TbtStockGemTransection
+                .Where(x => pageCodes.Contains(x.Code))
+                .GroupBy(x => x.Code)
+                .Select(g => new { Code = g.Key, Last = g.Max(x => x.RequestDate) })
+                .ToList();
+            var lastMovementByCode = lastMovements.ToDictionary(x => x.Code, x => x.Last);
+
+            var now = DateTime.UtcNow;
+            foreach (var item in pageItems)
+            {
+                if (lastMovementByCode.TryGetValue(item.Code, out var lastMovementDate))
+                {
+                    item.LastMovementDate = lastMovementDate;
+                    item.DaysSinceLastMovement = (int)(now - lastMovementDate).TotalDays;
+                }
+            }
+
+            dataSource.Data = pageItems;
+            return dataSource;
         }
         public IQueryable<OptionResponse> GroupGemData(OptionRequest request)
         {
@@ -1656,6 +1684,165 @@ namespace Jewelry.Service.Stock
             if (days <= 180) return "d91_180";
             if (days <= 365) return "d181_365";
             return "over365";
+        }
+
+        public List<MovementReportResponse> GetMovementReport(MovementReportRequest request)
+        {
+            var nowOffset = DateTimeOffset.UtcNow;
+            var rangeStart = (request.StartDate ?? nowOffset.AddDays(-90)).StartOfDayUtc().UtcDateTime;
+            var rangeEnd = (request.EndDate ?? nowOffset).EndOfDayUtc().UtcDateTime;
+            var daysInRange = Math.Max(1, (rangeEnd.Date - rangeStart.Date).Days + 1);
+            var monthsInRange = Math.Max(1m, (decimal)daysInRange / 30m);
+
+            var stockQuery = _jewelryContext.TbtStockGem.AsNoTracking().AsQueryable();
+
+            if (request.GroupName != null && request.GroupName.Length > 0)
+                stockQuery = stockQuery.Where(x => request.GroupName.Contains(x.GroupName));
+
+            if (request.Shape != null && request.Shape.Length > 0)
+                stockQuery = stockQuery.Where(x => request.Shape.Contains(x.Shape));
+
+            if (request.Grade != null && request.Grade.Length > 0)
+                stockQuery = stockQuery.Where(x => request.Grade.Contains(x.Grade));
+
+            if (!string.IsNullOrEmpty(request.Code))
+                stockQuery = stockQuery.Where(x => x.Code.Contains(request.Code.ToUpper()));
+
+            var stocks = stockQuery.ToList();
+            var stockCodes = stocks.Select(x => x.Code).Distinct().ToList();
+
+            // Materialize raw transactions for the candidate codes only (bounded set), then compute
+            // both the all-time last movement date and the in-range aggregates in memory.
+            // EF Core 8 cannot be trusted to translate a coalesce(RequestDate, CreateDate) inside a
+            // grouped aggregate/left-join reliably, so classification happens after materialization.
+            var rawTransactions = _jewelryContext.TbtStockGemTransection
+                .AsNoTracking()
+                .Where(x => stockCodes.Contains(x.Code))
+                .Select(x => new
+                {
+                    x.Code,
+                    x.RequestDate,
+                    x.CreateDate,
+                    x.Type,
+                    x.Qty,
+                    x.QtyWeight
+                })
+                .ToList();
+
+            var txByCode = rawTransactions
+                .Select(x => new
+                {
+                    x.Code,
+                    MoveDate = x.RequestDate != default(DateTime) ? x.RequestDate : x.CreateDate,
+                    x.Type,
+                    x.Qty,
+                    x.QtyWeight
+                })
+                .GroupBy(x => x.Code)
+                .ToDictionary(g => g.Key, g => new
+                {
+                    LastMovementDate = g.Max(x => x.MoveDate),
+                    InRange = g.Where(x => x.MoveDate >= rangeStart && x.MoveDate <= rangeEnd).ToList()
+                });
+
+            var now = DateTime.UtcNow;
+            var result = new List<MovementReportResponse>();
+
+            foreach (var stock in stocks)
+            {
+                var onHandQuantity = stock.Quantity + stock.QuantityOnProcess;
+                var onHandQuantityWeight = stock.QuantityWeight + stock.QuantityWeightOnProcess;
+
+                var hasTxInfo = txByCode.TryGetValue(stock.Code, out var txInfo);
+
+                // Exclude junk rows: no on-hand stock and no transaction has ever existed for this code
+                if (onHandQuantity == 0 && onHandQuantityWeight == 0 && !hasTxInfo)
+                    continue;
+
+                var transactionCount = hasTxInfo ? txInfo.InRange.Count : 0;
+                var quantityIn = hasTxInfo ? txInfo.InRange.Where(x => InboundTypes.Contains(x.Type)).Sum(x => x.Qty) : 0m;
+                var quantityWeightIn = hasTxInfo ? txInfo.InRange.Where(x => InboundTypes.Contains(x.Type)).Sum(x => x.QtyWeight) : 0m;
+                var quantityOut = hasTxInfo ? txInfo.InRange.Where(x => ConsumedTypes.Contains(x.Type)).Sum(x => x.Qty) : 0m;
+                var quantityWeightOut = hasTxInfo ? txInfo.InRange.Where(x => ConsumedTypes.Contains(x.Type)).Sum(x => x.QtyWeight) : 0m;
+
+                DateTime? lastMovementDate = hasTxInfo ? txInfo.LastMovementDate : (DateTime?)null;
+                int? daysSinceLastMovement = lastMovementDate.HasValue ? (int)(now - lastMovementDate.Value).TotalDays : (int?)null;
+
+                var avgDailyConsumption = quantityOut / daysInRange;
+                decimal? daysOfSupply = avgDailyConsumption > 0 ? onHandQuantity / avgDailyConsumption : (decimal?)null;
+
+                string movementStatus;
+                if (transactionCount == 0 || (daysSinceLastMovement.HasValue && daysSinceLastMovement.Value > request.DeadDays))
+                {
+                    movementStatus = "DEAD";
+                }
+                else if ((decimal)transactionCount / monthsInRange >= request.FastTxPerMonth)
+                {
+                    movementStatus = "FAST";
+                }
+                else
+                {
+                    movementStatus = "SLOW";
+                }
+
+                string stockAlertLevel;
+                if (onHandQuantity == 0 && onHandQuantityWeight == 0)
+                {
+                    stockAlertLevel = "OUT";
+                }
+                else if (daysOfSupply.HasValue && daysOfSupply.Value < request.CriticalDaysOfSupply)
+                {
+                    stockAlertLevel = "CRITICAL";
+                }
+                else if (daysOfSupply.HasValue && daysOfSupply.Value < request.LowDaysOfSupply)
+                {
+                    stockAlertLevel = "LOW";
+                }
+                else
+                {
+                    stockAlertLevel = "OK";
+                }
+
+                result.Add(new MovementReportResponse
+                {
+                    Code = stock.Code,
+                    GroupName = stock.GroupName,
+                    Shape = stock.Shape,
+                    Grade = stock.Grade,
+                    Size = stock.Size,
+                    Quantity = onHandQuantity,
+                    QuantityWeight = onHandQuantityWeight,
+                    TransactionCount = transactionCount,
+                    QuantityIn = quantityIn,
+                    QuantityWeightIn = quantityWeightIn,
+                    QuantityOut = quantityOut,
+                    QuantityWeightOut = quantityWeightOut,
+                    LastMovementDate = lastMovementDate,
+                    DaysSinceLastMovement = daysSinceLastMovement,
+                    AvgDailyConsumption = avgDailyConsumption,
+                    DaysOfSupply = daysOfSupply,
+                    MovementStatus = movementStatus,
+                    StockAlertLevel = stockAlertLevel,
+                    Price = stock.Price,
+                    PriceQty = stock.PriceQty
+                });
+            }
+
+            if (request.MovementStatus != null && request.MovementStatus.Length > 0)
+            {
+                var statusFilters = request.MovementStatus.Select(x => x.ToUpper()).ToList();
+
+                var movementFilters = statusFilters.Where(x => x == "FAST" || x == "SLOW" || x == "DEAD").ToList();
+                var alertFilters = statusFilters.Where(x => x == "LOW" || x == "OUT").ToList();
+
+                result = result.Where(x =>
+                    movementFilters.Contains(x.MovementStatus) ||
+                    (alertFilters.Contains("LOW") && (x.StockAlertLevel == "CRITICAL" || x.StockAlertLevel == "LOW")) ||
+                    (alertFilters.Contains("OUT") && x.StockAlertLevel == "OUT")
+                ).ToList();
+            }
+
+            return result;
         }
 
         #endregion
