@@ -23,6 +23,7 @@ namespace jewelry.Model.Customer
         public string? ContactName { get; set; }
         public string? Remark { get; set; }
         public int? Discount { get; set; }
+        public string? TaxId { get; set; }
     }
 
     public class UpdateCustomerRequest
@@ -38,5 +39,6 @@ namespace jewelry.Model.Customer
         public string? ContactName { get; set; }
         public string? Remark { get; set; }
         public int? Discount { get; set; }
+        public string? TaxId { get; set; }
     }
 }

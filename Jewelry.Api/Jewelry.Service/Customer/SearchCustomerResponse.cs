@@ -31,6 +31,8 @@ namespace Jewelry.Service.Customer
 
         public int Discount { get; set; }
 
+        public string? TaxId { get; set; }
+
         public int ProductionPlanCount { get; set; } = 0;
     }
 

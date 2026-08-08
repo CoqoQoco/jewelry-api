@@ -27,6 +27,8 @@ public partial class TbmCustomer
 
     public int Discount { get; set; }
 
+    public string? TaxId { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;

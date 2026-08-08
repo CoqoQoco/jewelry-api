@@ -90,6 +90,7 @@ namespace Jewelry.Service.Customer
                     TypeCode = customer.TypeCode,
                     TypeName = customer.TypeCodeNavigation.NameTh,
                     Discount = customer.Discount,
+                    TaxId = customer.TaxId,
                     ProductionPlanCount = plans.Count()
                 });
 
@@ -116,6 +117,7 @@ namespace Jewelry.Service.Customer
                                 TypeCode = item.TypeCode,
                                 TypeName = item.TypeCodeNavigation.NameTh,
                                 Discount = item.Discount,
+                                TaxId = item.TaxId,
                             });
 
             return response;
@@ -148,6 +150,7 @@ namespace Jewelry.Service.Customer
                 Email = request.Email,
                 Remark = request.Remark,
                 Discount = request.Discount ?? 0,
+                TaxId = request.TaxId,
 
                 CreateDate = DateTime.UtcNow,
                 CreateBy = CurrentUsername
@@ -180,6 +183,7 @@ namespace Jewelry.Service.Customer
             if (request.ContactName != null) customer.ContactName = request.ContactName;
             if (request.Remark != null) customer.Remark = request.Remark;
             if (request.Discount.HasValue) customer.Discount = request.Discount.Value;
+            if (request.TaxId != null) customer.TaxId = request.TaxId;
 
             customer.UpdateDate = DateTime.UtcNow;
             customer.UpdateBy = CurrentUsername;
