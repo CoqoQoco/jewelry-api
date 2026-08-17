@@ -51,14 +51,15 @@ namespace Jewelry.Service.Receipt.Gem
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
 
-        private static readonly string[] CastingMaterialKeywords = new[]
+        private static readonly string[] DefaultCastingMaterialKeywords = new[]
         {
-            "สร้อย", "สปริง", "ก้ามปู", "กำไล", "ลูกบอล", "ลุกบอล"
+            "CHAIN", "สร้อย", "สปริง", "ก้ามปู", "กำไล", "ลูกบอล", "ลุกบอล", "แป้น", "ก้ามกุ้ง", "ตะขอ", "เนื้อเงิน"
         };
 
-        private static bool IsCastingMaterial(TbtStockGem g) =>
-            string.Equals(g.Shape, "CHAIN", StringComparison.OrdinalIgnoreCase)
-            || (g.GroupName != null && CastingMaterialKeywords.Any(k => g.GroupName.Contains(k, StringComparison.OrdinalIgnoreCase)));
+        private static bool IsCastingMaterial(TbtStockGem g, IReadOnlyCollection<string> keywords) =>
+            keywords.Any(k =>
+                (g.Shape != null && g.Shape.Contains(k, StringComparison.OrdinalIgnoreCase))
+                || (g.GroupName != null && g.GroupName.Contains(k, StringComparison.OrdinalIgnoreCase)));
         private readonly IRunningNumber _runningNumberService;
         public ReceiptAndIssueStockGemService(JewelryContext JewelryContext,
             IHostEnvironment HostingEnvironment,
@@ -1186,6 +1187,15 @@ namespace Jewelry.Service.Receipt.Gem
                 var getOutbound = newTransection.Where(x => x.Type == 7).ToList();
                 if (getOutbound.Any())
                 {
+                    var castingKeywords = await _jewelryContext.TbmCastingMaterial
+                        .Where(x => x.IsActive)
+                        .Select(x => x.Code)
+                        .ToListAsync();
+                    if (!castingKeywords.Any())
+                    {
+                        castingKeywords = DefaultCastingMaterialKeywords.ToList();
+                    }
+
                     var groupOutbound = getOutbound.GroupBy(x => new { x.ProductionPlanWo, x.ProductionPlanWoNumber }).ToList();
                     foreach (var group in groupOutbound)
                     {
@@ -1238,7 +1248,7 @@ namespace Jewelry.Service.Receipt.Gem
                                 throw new HandleException(ErrorMessage.NotFound);
                             }
 
-                            var targetStatus = IsCastingMaterial(gemData) ? ProductionPlanStatus.Casting : ProductionPlanStatus.Gems;
+                            var targetStatus = IsCastingMaterial(gemData, castingKeywords) ? ProductionPlanStatus.Casting : ProductionPlanStatus.Gems;
                             var headerId = await GetOrCreateHeaderId(targetStatus);
 
                             var newGem = new TbtProductionPlanStatusDetailGem()

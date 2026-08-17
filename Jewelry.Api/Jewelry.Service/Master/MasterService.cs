@@ -346,6 +346,31 @@ namespace Jewelry.Service.Master
                 return response;
             }
 
+            else if (request.Type.ToUpper() == "CASTING-MATERIAL")
+            {
+                var response = (from item in _jewelryContext.TbmCastingMaterial
+                                where item.IsActive == true
+                                select new MasterModel()
+                                {
+                                    Id = item.Id,
+                                    NameEn = item.NameEn,
+                                    NameTh = item.NameTh,
+                                    Code = item.Code,
+                                    Description = $"{item.Code}: {item.NameTh}"
+                                });
+
+                if (!string.IsNullOrEmpty(request.Text))
+                {
+                    response = (from item in response
+                                where item.Code.Contains(request.Text.ToUpper())
+                                || item.NameTh.Contains(request.Text.ToUpper())
+                                || item.NameEn.Contains(request.Text.ToUpper())
+                                select item);
+                }
+
+                return response.OrderBy(x => x.Code);
+            }
+
             throw new HandleException("Type is required.");
 
         }
@@ -457,6 +482,28 @@ namespace Jewelry.Service.Master
                 await _jewelryContext.SaveChangesAsync();
             }
 
+            if (request.Type.ToUpper() == "CASTING-MATERIAL")
+            {
+                var castingMaterial = (from item in _jewelryContext.TbmCastingMaterial
+                                       where item.Id == request.Id
+                                       && item.Code == request.Code.ToUpper()
+                                       select item).SingleOrDefault();
+
+                if (castingMaterial == null)
+                {
+                    throw new HandleException($"ไม่พบข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                castingMaterial.NameEn = request.NameEn;
+                castingMaterial.NameTh = request.NameTh;
+
+                castingMaterial.UpdateBy = CurrentUsername;
+                castingMaterial.UpdateDate = DateTime.UtcNow;
+
+                _jewelryContext.TbmCastingMaterial.Update(castingMaterial);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
 
             return "success";
         }
@@ -525,6 +572,22 @@ namespace Jewelry.Service.Master
                 }
 
                 _jewelryContext.TbmProductType.Remove(productType);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            else if (request.Type.ToUpper() == "CASTING-MATERIAL")
+            {
+                var castingMaterial = (from item in _jewelryContext.TbmCastingMaterial
+                                       where item.Id == request.Id
+                                       && item.Code == request.Code.ToUpper()
+                                       select item).SingleOrDefault();
+
+                if (castingMaterial == null)
+                {
+                    throw new HandleException($"ไม่พบข้อมูลรหัส {request.Code.ToUpper()}");
+                }
+
+                _jewelryContext.TbmCastingMaterial.Remove(castingMaterial);
                 await _jewelryContext.SaveChangesAsync();
             }
 
@@ -705,6 +768,37 @@ namespace Jewelry.Service.Master
                 };
 
                 _jewelryContext.TbmDiamondGrade.Add(newZill);
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            else if (request.Type.ToUpper() == "CASTING-MATERIAL")
+            {
+                var castingMaterial = (from item in _jewelryContext.TbmCastingMaterial
+                                       where item.Code == request.Code.ToUpper()
+                                       select item).SingleOrDefault();
+
+                if (castingMaterial != null)
+                {
+                    throw new HandleException($"มีข้อมูลรหัส {request.Code.ToUpper()} อยู่เเล้ว ไม่สามารถสร้างรายการซ้ำได้");
+                }
+
+                var newCastingMaterial = new TbmCastingMaterial()
+                {
+                    Code = request.Code.ToUpper(),
+                    NameEn = request.NameEn,
+                    NameTh = request.NameTh,
+
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = CurrentUsername,
+
+                    UpdateBy = CurrentUsername,
+                    UpdateDate = DateTime.UtcNow,
+
+                    IsActive = true,
+
+                };
+
+                _jewelryContext.TbmCastingMaterial.Add(newCastingMaterial);
                 await _jewelryContext.SaveChangesAsync();
             }
 

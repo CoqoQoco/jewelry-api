@@ -26,6 +26,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbmAccount> TbmAccount { get; set; }
 
+    public virtual DbSet<TbmCastingMaterial> TbmCastingMaterial { get; set; }
+
     public virtual DbSet<TbmCustomer> TbmCustomer { get; set; }
 
     public virtual DbSet<TbmCustomerType> TbmCustomerType { get; set; }
@@ -467,6 +469,39 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(10)
                 .HasColumnName("username");
+        });
+
+        modelBuilder.Entity<TbmCastingMaterial>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbm_casting_material_pk");
+
+            entity.ToTable("tbm_casting_material");
+
+            entity.HasIndex(e => e.Code, "tbm_casting_material_code_uq").IsUnique();
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
         });
 
         modelBuilder.Entity<TbmCustomer>(entity =>
