@@ -203,6 +203,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleDocumentCatalogItemImage> TbtSaleDocumentCatalogItemImage { get; set; }
 
+    public virtual DbSet<TbtExportShipment> TbtExportShipment { get; set; }
+
+    public virtual DbSet<TbtExportShipmentItem> TbtExportShipmentItem { get; set; }
+
     public virtual DbSet<TbmTicketStatus> TbmTicketStatus { get; set; }
 
     public virtual DbSet<TbtTicket> TbtTicket { get; set; }
@@ -4324,6 +4328,134 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("blob_path");
             entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+        });
+
+        modelBuilder.Entity<TbtExportShipment>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_export_shipment_pk");
+            entity.ToTable("tbt_export_shipment");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.DocumentNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("document_number");
+            entity.Property(e => e.CustomNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("custom_number");
+            entity.Property(e => e.DocumentDate).HasColumnName("document_date");
+            entity.Property(e => e.ConsigneeName)
+                .HasColumnType("character varying")
+                .HasColumnName("consignee_name");
+            entity.Property(e => e.ConsigneeAddress)
+                .HasColumnType("character varying")
+                .HasColumnName("consignee_address");
+            entity.Property(e => e.EventName)
+                .HasColumnType("character varying")
+                .HasColumnName("event_name");
+            entity.Property(e => e.BoothNo)
+                .HasColumnType("character varying")
+                .HasColumnName("booth_no");
+            entity.Property(e => e.AttnName)
+                .HasColumnType("character varying")
+                .HasColumnName("attn_name");
+            entity.Property(e => e.AttnPassport)
+                .HasColumnType("character varying")
+                .HasColumnName("attn_passport");
+            entity.Property(e => e.AttnTel)
+                .HasColumnType("character varying")
+                .HasColumnName("attn_tel");
+            entity.Property(e => e.Incoterm)
+                .HasColumnType("character varying")
+                .HasColumnName("incoterm");
+            entity.Property(e => e.OriginCountry)
+                .HasColumnType("character varying")
+                .HasColumnName("origin_country");
+            entity.Property(e => e.Currency)
+                .HasColumnType("character varying")
+                .HasColumnName("currency");
+            entity.Property(e => e.ExchangeRate).HasColumnName("exchange_rate");
+            entity.Property(e => e.PricePercent).HasColumnName("price_percent");
+            entity.Property(e => e.ParcelCount).HasColumnName("parcel_count");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.StatusName)
+                .HasColumnType("character varying")
+                .HasColumnName("status_name");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasMany(e => e.TbtExportShipmentItem)
+                .WithOne(e => e.ShipmentRunningNavigation)
+                .HasForeignKey(e => e.ShipmentRunning)
+                .HasConstraintName("tbt_export_shipment_item_shipment_fk");
+        });
+
+        modelBuilder.Entity<TbtExportShipmentItem>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_export_shipment_item_pk");
+            entity.ToTable("tbt_export_shipment_item");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.ShipmentRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("shipment_running");
+            entity.Property(e => e.ItemNo).HasColumnName("item_no");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
+            entity.Property(e => e.ProductNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("product_number");
+            entity.Property(e => e.Description)
+                .HasColumnType("character varying")
+                .HasColumnName("description");
+            entity.Property(e => e.GoldWeight).HasColumnName("gold_weight");
+            entity.Property(e => e.StoneWeight).HasColumnName("stone_weight");
+            entity.Property(e => e.DiamondWeight).HasColumnName("diamond_weight");
+            entity.Property(e => e.NetWeight).HasColumnName("net_weight");
+            entity.Property(e => e.Qty).HasColumnName("qty");
+            entity.Property(e => e.TagPrice).HasColumnName("tag_price");
+            entity.Property(e => e.UnitPrice).HasColumnName("unit_price");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.ImagePath)
+                .HasColumnType("character varying")
+                .HasColumnName("image_path");
+            entity.Property(e => e.ParcelNo).HasColumnName("parcel_no");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+
+            entity.HasIndex(e => e.ShipmentRunning).HasDatabaseName("idx_export_shipment_item_shipment_running");
+            entity.HasIndex(e => new { e.ShipmentRunning, e.StockNumber })
+                .IsUnique()
+                .HasDatabaseName("tbt_export_shipment_item_shipment_stock_uq");
+
+            entity.HasOne(e => e.ShipmentRunningNavigation)
+                .WithMany(e => e.TbtExportShipmentItem)
+                .HasForeignKey(e => e.ShipmentRunning)
+                .HasConstraintName("tbt_export_shipment_item_shipment_fk");
         });
 
         modelBuilder.Entity<TbmTicketStatus>(entity =>
