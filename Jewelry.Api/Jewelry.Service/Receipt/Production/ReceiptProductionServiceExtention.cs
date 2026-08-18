@@ -207,6 +207,11 @@ namespace Jewelry.Service.Receipt.Production
 
             foreach (var item in confirm.Materials)
             {
+                var weight = (item.QtyWeight.HasValue && item.QtyWeight.Value != 0) ? item.QtyWeight : item.Weight;
+                var weightUnit = !string.IsNullOrWhiteSpace(item.QtyWeightUnit) ? item.QtyWeightUnit : item.WeightUnit;
+                var total = ((item.Qty ?? 0) * (item.QtyPrice ?? 0)) + ((weight ?? 0) * (item.QtyWeightPrice ?? 0));
+                var price = total > 0 ? total : item.Price;
+
                 response.Add(new TbtStockPieceMaterial
                 {
                     StockNumber = stockRunning,
@@ -219,12 +224,12 @@ namespace Jewelry.Service.Receipt.Production
 
                     Qty = item.Qty,
                     QtyUnit = item.QtyUnit,
-                    Weight = item.Weight,
-                    WeightUnit = item.WeightUnit,
+                    Weight = weight,
+                    WeightUnit = weightUnit,
 
                     Size = item.Size,
                     Region = item.Region,
-                    Price = item.Price,
+                    Price = price,
 
                     CreateBy = operatorBy,
                     CreateDate = DateTime.UtcNow

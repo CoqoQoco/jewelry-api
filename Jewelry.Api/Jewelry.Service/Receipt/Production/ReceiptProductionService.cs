@@ -582,9 +582,9 @@ namespace Jewelry.Service.Receipt.Production
                         draft.MoldDesign = newProduct.MoldDesign;
                         draft.Materials = new List<jewelry.Model.Receipt.Production.PlanGet.Material>();
 
-                        if (newProductMaterial.Any())
+                        if (stock.Materials != null && stock.Materials.Any())
                         {
-                            foreach (var _newMat in newProductMaterial)
+                            foreach (var _newMat in stock.Materials)
                             {
                                 draft.Materials.Add(new jewelry.Model.Receipt.Production.PlanGet.Material
                                 {
@@ -593,6 +593,15 @@ namespace Jewelry.Service.Receipt.Production
                                     TypeCode = _newMat.TypeCode,
                                     TypeBarcode = _newMat.TypeBarcode,
 
+                                    Qty = _newMat.Qty,
+                                    QtyUnit = _newMat.QtyUnit,
+                                    QtyPrice = _newMat.QtyPrice,
+
+                                    QtyWeight = _newMat.QtyWeight,
+                                    QtyWeightUnit = _newMat.QtyWeightUnit,
+                                    QtyWeightPrice = _newMat.QtyWeightPrice,
+
+                                    Size = _newMat.Size,
                                     Region = _newMat.Region,
                                 });
                             }

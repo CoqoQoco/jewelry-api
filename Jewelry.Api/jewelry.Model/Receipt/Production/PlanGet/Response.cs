@@ -92,15 +92,15 @@ namespace jewelry.Model.Receipt.Production.PlanGet
         public string? TypeCodeName { get; set; }
         public string? TypeBarcode { get; set; }
 
-        public decimal Qty { get; set; }
+        public decimal? Qty { get; set; }
         public string? QtyUnit { get; set; }
-        public decimal QtyPrice { get; set; }
+        public decimal? QtyPrice { get; set; }
 
-        public decimal QtyWeight { get; set; }
+        public decimal? QtyWeight { get; set; }
         public string? QtyWeightUnit { get; set; }
-        public decimal QtyWeightPrice { get; set; }
+        public decimal? QtyWeightPrice { get; set; }
 
-        //public string? Size { get; set; }
+        public string? Size { get; set; }
         public string? Region { get; set; }
         public bool IsOrigin { get; set; } = false;
     }
