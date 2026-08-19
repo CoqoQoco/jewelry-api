@@ -2620,6 +2620,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.SpecialAddition).HasColumnName("special_addition");
             entity.Property(e => e.Vat).HasColumnName("vat");
             entity.Property(e => e.GoldPerOz).HasColumnName("gold_per_oz");
+            entity.Property(e => e.GoldSpotPrice).HasColumnName("gold_spot_price");
+            entity.Property(e => e.GoldPremium).HasColumnName("gold_premium");
+            entity.Property(e => e.GoldMarkup).HasColumnName("gold_markup");
             entity.Property(e => e.MarkUp).HasColumnName("mark_up");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")

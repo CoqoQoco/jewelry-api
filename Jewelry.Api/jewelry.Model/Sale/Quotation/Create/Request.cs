@@ -27,6 +27,9 @@ namespace jewelry.Model.Sale.Quotation.Create
         public decimal? SpecialAddition { get; set; }
         public decimal? Vat { get; set; }
         public decimal? GoldPerOz { get; set; }
+        public decimal? GoldSpotPrice { get; set; }
+        public decimal? GoldPremium { get; set; }
+        public decimal? GoldMarkup { get; set; }
 
         public string? Remark { get; set; }
         public string Data { get; set; }

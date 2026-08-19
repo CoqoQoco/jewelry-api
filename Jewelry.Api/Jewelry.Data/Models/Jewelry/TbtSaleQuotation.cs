@@ -49,6 +49,12 @@ public partial class TbtSaleQuotation
 
     public decimal? GoldPerOz { get; set; }
 
+    public decimal? GoldSpotPrice { get; set; }
+
+    public decimal? GoldPremium { get; set; }
+
+    public decimal? GoldMarkup { get; set; }
+
     public string? CustomerCode { get; set; }
 
     public decimal? SubTotal { get; set; }

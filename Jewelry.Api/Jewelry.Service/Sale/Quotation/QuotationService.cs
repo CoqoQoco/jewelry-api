@@ -79,6 +79,9 @@ namespace Jewelry.Service.Sale.Quotation
                     SpecialAddition = request.SpecialAddition,
                     Vat = request.Vat,
                     GoldPerOz = request.GoldPerOz,
+                    GoldSpotPrice = request.GoldSpotPrice,
+                    GoldPremium = request.GoldPremium,
+                    GoldMarkup = request.GoldMarkup,
                     Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow,
 
                     SubTotal = tCreate.subTotal,
@@ -115,6 +118,9 @@ namespace Jewelry.Service.Sale.Quotation
             quotation.SpecialAddition = request.SpecialAddition;
             quotation.Vat = request.Vat;
             quotation.GoldPerOz = request.GoldPerOz;
+            quotation.GoldSpotPrice = request.GoldSpotPrice;
+            quotation.GoldPremium = request.GoldPremium;
+            quotation.GoldMarkup = request.GoldMarkup;
 
             quotation.Data = request.Data;
             quotation.Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow;
@@ -183,6 +189,9 @@ namespace Jewelry.Service.Sale.Quotation
                 SpecialAddition = quotation.SpecialAddition,
                 Vat = quotation.Vat,
                 GoldPerOz = quotation.GoldPerOz,
+                GoldSpotPrice = quotation.GoldSpotPrice,
+                GoldPremium = quotation.GoldPremium,
+                GoldMarkup = quotation.GoldMarkup,
                 Date = quotation.Date.HasValue ? quotation.Date.Value : null,
 
                 SubTotal = quotation.SubTotal,

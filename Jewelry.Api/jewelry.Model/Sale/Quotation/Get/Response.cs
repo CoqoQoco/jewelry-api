@@ -31,6 +31,9 @@ namespace jewelry.Model.Sale.Quotation.Get
         public decimal? SpecialAddition { get; set; }
         public decimal? Vat { get; set; }
         public decimal? GoldPerOz { get; set; }
+        public decimal? GoldSpotPrice { get; set; }
+        public decimal? GoldPremium { get; set; }
+        public decimal? GoldMarkup { get; set; }
         public DateTimeOffset? Date { get; set; }
 
         public decimal? SubTotal { get; set; }
