@@ -9,5 +9,6 @@ namespace jewelry.Model.Stock.OldStock._9K
     public class Request
     {
         public int Take { get; set; }
+        public string? Location { get; set; }
     }
 }

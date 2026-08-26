@@ -599,7 +599,8 @@ namespace Jewelry.Service.TransferStock
                 x => x.NoProduct,
                 x => x.IsTransfer,
                 x => x.IsTransfer = true,
-                request.Take);
+                request.Take,
+                request.Location);
 
         public Task<string> TransferStock14K(jewelry.Model.Stock.OldStock._9K.Request request) =>
             TransferStockCore<Stock14k>(
@@ -608,7 +609,8 @@ namespace Jewelry.Service.TransferStock
                 x => x.NoProduct,
                 x => x.IsTransfer,
                 x => x.IsTransfer = true,
-                request.Take);
+                request.Take,
+                request.Location);
 
         public Task<string> TransferStock18K(jewelry.Model.Stock.OldStock._9K.Request request) =>
             TransferStockCore<Stock18k>(
@@ -617,7 +619,8 @@ namespace Jewelry.Service.TransferStock
                 x => x.NoProduct,
                 x => x.IsTransfer,
                 x => x.IsTransfer = true,
-                request.Take);
+                request.Take,
+                request.Location);
 
         #endregion
 
@@ -636,10 +639,21 @@ namespace Jewelry.Service.TransferStock
             Expression<Func<TStock, string?>> noProductSelector,
             Expression<Func<TStock, bool>> isTransferSelector,
             Action<TStock> markTransfer,
-            int take)
+            int take,
+            string? location)
             where TStock : class
         {
             const int batchSize = 500;
+
+            if (!string.IsNullOrWhiteSpace(location))
+            {
+                var locationExists = await _jewelryContext.TbmStockLocation
+                    .AnyAsync(x => x.Code == location.ToUpper());
+                if (!locationExists)
+                {
+                    throw new HandleException($"Location '{location}' not found.");
+                }
+            }
 
             // Build negated expression: item => !item.IsTransfer
             var notTransferred = Not(isTransferSelector);
@@ -753,6 +767,7 @@ namespace Jewelry.Service.TransferStock
                     Size = stock.Ringsize,
                     Remark = stock.Remark,
                     TagPriceMultiplier = 1,
+                    Location = location,
 
                     CreateBy = CurrentUsername ?? "system",
                     CreateDate = DateTime.UtcNow
