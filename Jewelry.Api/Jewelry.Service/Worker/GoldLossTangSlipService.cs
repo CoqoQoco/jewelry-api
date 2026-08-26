@@ -645,6 +645,26 @@ namespace Jewelry.Service.Worker
                 query = query.Where(x => x.WorkerCode == request.WorkerCode.ToUpper());
             }
 
+            if (request.GroupByMonth)
+            {
+                return query
+                    .GroupBy(x => new { x.WorkerCode, x.WorkerName, Year = x.CreateDate.Year, Month = x.CreateDate.Month })
+                    .Select(g => new ReportGoldLossTangByWorkerResponse
+                    {
+                        WorkerCode = g.Key.WorkerCode,
+                        WorkerName = g.Key.WorkerName,
+                        Year = g.Key.Year,
+                        Month = g.Key.Month,
+                        SlipCount = g.Count(),
+                        TotalIssued = g.Sum(x => x.IssuedTotal),
+                        TotalReturned = g.Sum(x => x.ReturnedTotal),
+                        TotalRawLoss = g.Sum(x => x.RawLoss),
+                        TotalAllowedLoss = g.Sum(x => x.AllowedLoss),
+                        TotalDiffLoss = g.Sum(x => x.DiffLoss),
+                        TotalMoneyDiff = g.Sum(x => x.TotalMoneyDiff),
+                    });
+            }
+
             return query
                 .GroupBy(x => new { x.WorkerCode, x.WorkerName })
                 .Select(g => new ReportGoldLossTangByWorkerResponse

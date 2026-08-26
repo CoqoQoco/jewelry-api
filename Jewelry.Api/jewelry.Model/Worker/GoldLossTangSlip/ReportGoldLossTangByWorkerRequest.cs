@@ -13,5 +13,6 @@ namespace jewelry.Model.Worker.GoldLossTangSlip
         public DateTimeOffset? RequestDateStart { get; set; }
         public DateTimeOffset? RequestDateEnd { get; set; }
         public string? WorkerCode { get; set; }
+        public bool GroupByMonth { get; set; } = false;
     }
 }
