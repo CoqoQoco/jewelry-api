@@ -3,6 +3,7 @@ using Jewelry.Service.Sale.SaleReport;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 using System.Net;
 
 namespace Jewelry.Api.Controllers.Sale
@@ -30,6 +31,24 @@ namespace Jewelry.Api.Controllers.Sale
             try
             {
                 var response = await _service.PipelineSummary(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("CustomerProductionStatus")]
+        [HttpPost]
+        [RequirePermission("sale:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Sale.SaleReport.CustomerProductionStatus.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CustomerProductionStatus([FromBody] jewelry.Model.Sale.SaleReport.CustomerProductionStatus.Request request)
+        {
+            try
+            {
+                var response = await _service.CustomerProductionStatus(request);
                 return Ok(response);
             }
             catch (Exception ex)

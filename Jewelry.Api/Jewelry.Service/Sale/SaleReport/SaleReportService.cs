@@ -1,6 +1,9 @@
 using Jewelry.Data.Context;
+using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using jewelry.Model.Constant;
 using jewelry.Model.Sale.SaleReport.PipelineSummary;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -9,11 +12,12 @@ using System.Threading.Tasks;
 
 namespace Jewelry.Service.Sale.SaleReport
 {
-    public class SaleReportService : ISaleReportService
+    public class SaleReportService : BaseService, ISaleReportService
     {
         private readonly JewelryContext _jewelryContext;
 
-        public SaleReportService(JewelryContext jewelryContext)
+        public SaleReportService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor)
+            : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
         }
@@ -146,6 +150,120 @@ namespace Jewelry.Service.Sale.SaleReport
                 return fallback!;
 
             return customerCode;
+        }
+
+        public async Task<List<jewelry.Model.Sale.SaleReport.CustomerProductionStatus.Response>> CustomerProductionStatus(
+            jewelry.Model.Sale.SaleReport.CustomerProductionStatus.Request request)
+        {
+            var customerCodes = new List<string>();
+
+            if (request.OnlyMyCustomers)
+            {
+                var quotationCustomers = await _jewelryContext.TbtSaleQuotation
+                    .Where(x => x.CreateBy == CurrentUsername && x.CustomerCode != null)
+                    .Select(x => x.CustomerCode!)
+                    .Distinct()
+                    .ToListAsync();
+
+                var orderCustomers = await _jewelryContext.TbtSaleOrder
+                    .Where(x => x.CreateBy == CurrentUsername)
+                    .Select(x => x.CustomerCode)
+                    .Distinct()
+                    .ToListAsync();
+
+                customerCodes = quotationCustomers
+                    .Union(orderCustomers)
+                    .Distinct()
+                    .ToList();
+
+                if (!customerCodes.Any())
+                {
+                    return new List<jewelry.Model.Sale.SaleReport.CustomerProductionStatus.Response>();
+                }
+            }
+
+            var planQuery = _jewelryContext.TbtProductionPlan
+                .AsNoTracking()
+                .Where(x => x.IsActive == true);
+
+            if (request.OnlyMyCustomers)
+            {
+                planQuery = planQuery.Where(x => customerCodes.Contains(x.CustomerNumber));
+            }
+
+            var successStatus = new List<int>
+            {
+                ProductionPlanStatus.Completed,
+                ProductionPlanStatus.Melted,
+                ProductionPlanStatus.WaitCVD,
+                ProductionPlanStatus.CVD,
+            };
+
+            // Aggregation (Count/Min) + OrderBy/Skip/Take all translate to SQL —
+            // only the paged rows come back from the database.
+            var groups = await planQuery
+                .GroupBy(x => x.CustomerNumber)
+                .Select(g => new
+                {
+                    CustomerCode = g.Key,
+                    TotalPlans = g.Count(),
+                    Completed = g.Count(x => successStatus.Contains(x.Status)),
+                    InProgress = g.Count(x => !successStatus.Contains(x.Status)),
+                    NearestRequestDate = g.Min(x => x.RequestDate)
+                })
+                .OrderBy(x => x.NearestRequestDate)
+                .Skip(request.Skip)
+                .Take(request.Take)
+                .ToListAsync();
+
+            if (!groups.Any())
+            {
+                return new List<jewelry.Model.Sale.SaleReport.CustomerProductionStatus.Response>();
+            }
+
+            var codes = groups.Select(x => x.CustomerCode).ToList();
+
+            // Greatest-n-per-group doesn't translate — but this query is scoped to
+            // only the already-paged customer codes (at most request.Take), not the whole table.
+            var latestCandidates = await _jewelryContext.TbtProductionPlan
+                .AsNoTracking()
+                .Where(x => x.IsActive == true && codes.Contains(x.CustomerNumber))
+                .Select(x => new
+                {
+                    x.CustomerNumber,
+                    x.Status,
+                    EffectiveDate = x.UpdateDate ?? x.CreateDate
+                })
+                .ToListAsync();
+
+            var latestStatusByCustomer = latestCandidates
+                .GroupBy(x => x.CustomerNumber)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.EffectiveDate).First().Status);
+
+            var customerNames = await _jewelryContext.TbmCustomer
+                .AsNoTracking()
+                .Where(c => codes.Contains(c.Code))
+                .ToDictionaryAsync(c => c.Code, c => c.NameTh);
+
+            var statusIds = latestStatusByCustomer.Values.Distinct().ToList();
+            var statusNames = await _jewelryContext.TbmProductionPlanStatus
+                .AsNoTracking()
+                .Where(s => statusIds.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, s => s.NameTh);
+
+            return groups.Select(x => new jewelry.Model.Sale.SaleReport.CustomerProductionStatus.Response
+            {
+                CustomerCode = x.CustomerCode,
+                CustomerName = customerNames.TryGetValue(x.CustomerCode, out var name) ? name : x.CustomerCode,
+                TotalPlans = x.TotalPlans,
+                InProgress = x.InProgress,
+                Completed = x.Completed,
+                NearestRequestDate = x.NearestRequestDate,
+                LatestStatusName = latestStatusByCustomer.TryGetValue(x.CustomerCode, out var latestStatus)
+                    && statusNames.TryGetValue(latestStatus, out var statusName)
+                        ? statusName
+                        : string.Empty
+            }).ToList();
         }
     }
 }
