@@ -374,6 +374,24 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("ReportGoldLossTangMonthly")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(ReportGoldLossTangMonthlyResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult ReportGoldLossTangMonthly([FromBody] ReportGoldLossTangMonthlyRequest request)
+        {
+            try
+            {
+                var response = _goldLossTangSlipService.ReportMonthly(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("GetGoldLossTangSlip")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(GoldLossTangSlipResponse))]
