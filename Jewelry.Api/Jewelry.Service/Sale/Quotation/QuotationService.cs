@@ -82,6 +82,8 @@ namespace Jewelry.Service.Sale.Quotation
                     GoldSpotPrice = request.GoldSpotPrice,
                     GoldPremium = request.GoldPremium,
                     GoldMarkup = request.GoldMarkup,
+                    ProfitPercent = request.ProfitPercent,
+                    GoldLossPercent = request.GoldLossPercent,
                     Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow,
 
                     SubTotal = tCreate.subTotal,
@@ -121,6 +123,8 @@ namespace Jewelry.Service.Sale.Quotation
             quotation.GoldSpotPrice = request.GoldSpotPrice;
             quotation.GoldPremium = request.GoldPremium;
             quotation.GoldMarkup = request.GoldMarkup;
+            quotation.ProfitPercent = request.ProfitPercent;
+            quotation.GoldLossPercent = request.GoldLossPercent;
 
             quotation.Data = request.Data;
             quotation.Date = request.Date.HasValue ? request.Date.Value.UtcDateTime : DateTime.UtcNow;
@@ -192,6 +196,8 @@ namespace Jewelry.Service.Sale.Quotation
                 GoldSpotPrice = quotation.GoldSpotPrice,
                 GoldPremium = quotation.GoldPremium,
                 GoldMarkup = quotation.GoldMarkup,
+                ProfitPercent = quotation.ProfitPercent,
+                GoldLossPercent = quotation.GoldLossPercent,
                 Date = quotation.Date.HasValue ? quotation.Date.Value : null,
 
                 SubTotal = quotation.SubTotal,

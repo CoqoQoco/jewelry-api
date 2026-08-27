@@ -30,6 +30,8 @@ namespace jewelry.Model.Sale.Quotation.Create
         public decimal? GoldSpotPrice { get; set; }
         public decimal? GoldPremium { get; set; }
         public decimal? GoldMarkup { get; set; }
+        public decimal? ProfitPercent { get; set; }
+        public decimal? GoldLossPercent { get; set; }
 
         public string? Remark { get; set; }
         public string Data { get; set; }

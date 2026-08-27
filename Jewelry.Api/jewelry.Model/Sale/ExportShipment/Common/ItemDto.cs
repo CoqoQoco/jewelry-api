@@ -6,6 +6,7 @@ public class ItemDto
     public int ItemNo { get; set; }
     public int SortOrder { get; set; }
     public string StockNumber { get; set; }
+    public string? StockNumberOrigin { get; set; }
     public string? ProductCode { get; set; }
     public string? ProductNumber { get; set; }
     public string? Description { get; set; }

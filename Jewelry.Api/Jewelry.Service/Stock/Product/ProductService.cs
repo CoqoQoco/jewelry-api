@@ -115,6 +115,21 @@ namespace Jewelry.Service.Stock.Product
             {
                 pieces = pieces.Where(x => x.SkuCodeNavigation.Size != null && x.SkuCodeNavigation.Size.Contains(request.Size));
             }
+            if (!string.IsNullOrEmpty(request.ReceiptNumber))
+            {
+                pieces = pieces.Where(x => x.ReceiptNumber != null && x.ReceiptNumber.Contains(request.ReceiptNumber));
+            }
+            if (!string.IsNullOrEmpty(request.Keyword))
+            {
+                var keyword = request.Keyword;
+                pieces = pieces.Where(x =>
+                    x.StockNumber.Contains(keyword) ||
+                    x.ProductCode.Contains(keyword) ||
+                    (x.SkuCodeNavigation.ProductNumber != null && x.SkuCodeNavigation.ProductNumber.Contains(keyword)) ||
+                    x.SkuCodeNavigation.ProductNameEn.Contains(keyword) ||
+                    x.SkuCodeNavigation.ProductNameTh.Contains(keyword) ||
+                    (x.StockNumberOrigin != null && x.StockNumberOrigin.Contains(keyword)));
+            }
             if (request.HasCostDetail.HasValue)
             {
                 if (request.HasCostDetail.Value)

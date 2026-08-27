@@ -2623,6 +2623,8 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GoldSpotPrice).HasColumnName("gold_spot_price");
             entity.Property(e => e.GoldPremium).HasColumnName("gold_premium");
             entity.Property(e => e.GoldMarkup).HasColumnName("gold_markup");
+            entity.Property(e => e.ProfitPercent).HasColumnName("profit_percent");
+            entity.Property(e => e.GoldLossPercent).HasColumnName("gold_loss_percent");
             entity.Property(e => e.MarkUp).HasColumnName("mark_up");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")

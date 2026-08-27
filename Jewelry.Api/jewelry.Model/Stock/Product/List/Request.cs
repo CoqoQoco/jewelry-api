@@ -34,6 +34,9 @@ namespace jewelry.Model.Stock.Product.List
 
         public bool? HasCostDetail { get; set; }
 
+        public string? ReceiptNumber { get; set; }
+        public string? Keyword { get; set; }
+
         public string? PieceStatus { get; set; }
 
         public bool? IncludeLastMovement { get; set; }

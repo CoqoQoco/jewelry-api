@@ -277,7 +277,8 @@ public class ExportShipmentService : BaseService, IExportShipmentService
                         p.ProductCode.Contains(keyword) ||
                         (p.SkuCodeNavigation.ProductNumber != null && p.SkuCodeNavigation.ProductNumber.Contains(keyword)) ||
                         p.SkuCodeNavigation.ProductNameEn.Contains(keyword) ||
-                        p.SkuCodeNavigation.ProductNameTh.Contains(keyword));
+                        p.SkuCodeNavigation.ProductNameTh.Contains(keyword) ||
+                        (p.StockNumberOrigin != null && p.StockNumberOrigin.Contains(keyword)));
                 }
             }
 
@@ -618,7 +619,7 @@ public class ExportShipmentService : BaseService, IExportShipmentService
 
     private async Task<List<jewelry.Model.Sale.ExportShipment.Common.ItemDto>> GetItemDtos(string running)
     {
-        return await _jewelryContext.TbtExportShipmentItem
+        var items = await _jewelryContext.TbtExportShipmentItem
             .Where(x => x.ShipmentRunning == running)
             .OrderBy(x => x.SortOrder)
             .Select(x => new jewelry.Model.Sale.ExportShipment.Common.ItemDto
@@ -642,5 +643,22 @@ public class ExportShipmentService : BaseService, IExportShipmentService
                 ParcelNo = x.ParcelNo
             })
             .ToListAsync();
+
+        var stockNumbers = items.Select(x => x.StockNumber).Distinct().ToList();
+
+        var stockNumberOriginByStock = (await _jewelryContext.TbtStockPiece
+                .Where(p => stockNumbers.Contains(p.StockNumber))
+                .Select(p => new { p.StockNumber, p.StockNumberOrigin })
+                .ToListAsync())
+            .GroupBy(p => p.StockNumber)
+            .ToDictionary(g => g.Key, g => g.First().StockNumberOrigin);
+
+        foreach (var item in items)
+        {
+            stockNumberOriginByStock.TryGetValue(item.StockNumber, out var stockNumberOrigin);
+            item.StockNumberOrigin = stockNumberOrigin;
+        }
+
+        return items;
     }
 }

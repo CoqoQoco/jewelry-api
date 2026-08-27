@@ -55,6 +55,10 @@ public partial class TbtSaleQuotation
 
     public decimal? GoldMarkup { get; set; }
 
+    public decimal? ProfitPercent { get; set; }
+
+    public decimal? GoldLossPercent { get; set; }
+
     public string? CustomerCode { get; set; }
 
     public decimal? SubTotal { get; set; }
