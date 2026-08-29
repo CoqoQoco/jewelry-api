@@ -19,7 +19,7 @@ namespace Jewelry.Service.Worker
         List<SearchGoldLossTangJobsResponse> SearchJobs(SearchGoldLossTangJobsRequest request);
         Task<GoldLossTangSlipResponse> CreateSlip(CreateGoldLossTangSlipRequest request);
         Task<GoldLossTangSlipResponse> UpdateSlip(UpdateGoldLossTangSlipRequest request);
-        List<GoldLossTangSlipSummaryResponse> ListSlips(ListGoldLossTangSlipRequest request);
+        IQueryable<GoldLossTangSlipSummaryResponse> ListSlips(ListGoldLossTangSlipSearch search);
         GoldLossTangSlipResponse GetSlip(long id);
         Task CancelSlip(long id);
         IQueryable<ReportGoldLossTangByWorkerResponse> ReportByWorker(ReportGoldLossTangByWorkerSearch request);
@@ -150,12 +150,32 @@ namespace Jewelry.Service.Worker
                     throw new HandleException($"น้ำหนักรายการคืน '{line.Name}' ต้องไม่ติดลบ");
             }
 
+            var allItems = request.Items ?? new List<CreateGoldLossTangSlipItem>();
+            var planItems = allItems.Where(i => i.ProductionPlanId.HasValue && !string.IsNullOrEmpty(i.ItemNo)).ToList();
+            var manualItems = allItems.Where(i => !i.ProductionPlanId.HasValue).ToList();
+
+            // Validate manual (self-added) job items
+            foreach (var itemReq in manualItems)
+            {
+                if (string.IsNullOrWhiteSpace(itemReq.Wo))
+                    throw new HandleException("กรุณาระบุเลขที่งาน/ชื่องาน ของงานที่เพิ่มเอง");
+                if (string.IsNullOrWhiteSpace(itemReq.Gold))
+                    throw new HandleException($"กรุณาระบุประเภททอง ของงานที่เพิ่มเอง '{itemReq.Wo}'");
+                if (string.IsNullOrWhiteSpace(itemReq.GoldSize))
+                    throw new HandleException($"กรุณาระบุขนาดทอง ของงานที่เพิ่มเอง '{itemReq.Wo}'");
+                if (!itemReq.JobDate.HasValue)
+                    throw new HandleException($"กรุณาระบุวันที่ ของงานที่เพิ่มเอง '{itemReq.Wo}'");
+                if (!itemReq.GoldWeightSend.HasValue || itemReq.GoldWeightSend.Value < 0
+                    || !itemReq.GoldWeightCheck.HasValue || itemReq.GoldWeightCheck.Value < 0)
+                    throw new HandleException($"น้ำหนักของงานที่เพิ่มเอง '{itemReq.Wo}' ต้องไม่ติดลบ");
+            }
+
             // Re-read job data from DB — do NOT trust request weights
             List<TbtProductionPlanStatusDetail> loadedDetails = new List<TbtProductionPlanStatusDetail>();
-            if (hasItems)
+            if (planItems.Any())
             {
-                var planIds = request.Items.Select(x => x.ProductionPlanId).Distinct().ToList();
-                var itemNos = request.Items.Select(x => x.ItemNo).Distinct().ToList();
+                var planIds = planItems.Select(x => x.ProductionPlanId!.Value).Distinct().ToList();
+                var itemNos = planItems.Select(x => x.ItemNo!).Distinct().ToList();
 
                 loadedDetails = _jewelryContext.TbtProductionPlanStatusDetail
                     .Include(d => d.Header)
@@ -164,7 +184,7 @@ namespace Jewelry.Service.Worker
                     .ToList();
 
                 // Guard: reject if any detail already assigned to a tang slip
-                foreach (var itemReq in request.Items)
+                foreach (var itemReq in planItems)
                 {
                     var detail = loadedDetails.FirstOrDefault(d =>
                         d.ProductionPlanId == itemReq.ProductionPlanId && d.ItemNo == itemReq.ItemNo);
@@ -175,9 +195,12 @@ namespace Jewelry.Service.Worker
                 }
             }
 
-            // Compute totals from re-read DB values
-            decimal issuedFromJobs = loadedDetails.Sum(d => d.GoldWeightSend ?? 0);
-            decimal returnedFromJobs = loadedDetails.Sum(d => d.GoldWeightCheck ?? 0);
+            // Compute totals from re-read DB values + manual (self-added) jobs
+            decimal issuedFromManual = manualItems.Sum(i => i.GoldWeightSend ?? 0);
+            decimal returnedFromManual = manualItems.Sum(i => i.GoldWeightCheck ?? 0);
+
+            decimal issuedFromJobs = loadedDetails.Sum(d => d.GoldWeightSend ?? 0) + issuedFromManual;
+            decimal returnedFromJobs = loadedDetails.Sum(d => d.GoldWeightCheck ?? 0) + returnedFromManual;
 
             decimal issuedFromCustom = (request.IssuedLines ?? new List<GoldLossTangExtraLine>())
                 .Where(l => l.CountInCalc).Sum(l => l.Weight);
@@ -222,7 +245,7 @@ namespace Jewelry.Service.Worker
 
             // Insert item snapshots
             var items = new List<TbtGoldLossTangSlipItem>();
-            foreach (var itemReq in request.Items ?? new List<CreateGoldLossTangSlipItem>())
+            foreach (var itemReq in planItems)
             {
                 var detail = loadedDetails.FirstOrDefault(d =>
                     d.ProductionPlanId == itemReq.ProductionPlanId && d.ItemNo == itemReq.ItemNo);
@@ -245,6 +268,30 @@ namespace Jewelry.Service.Worker
                     GoldWeightCheck = detail?.GoldWeightCheck,
                     IsActive = true,
                 });
+            }
+
+            var manualItemNo = 1;
+            foreach (var itemReq in manualItems)
+            {
+                items.Add(new TbtGoldLossTangSlipItem
+                {
+                    SlipId = header.Id,
+                    ProductionPlanId = null,
+                    ItemNo = $"MANUAL-{manualItemNo}",
+                    Wo = itemReq.Wo,
+                    WoNumber = itemReq.WoNumber,
+                    ProductNumber = itemReq.ProductNumber,
+                    ProductName = itemReq.ProductName,
+                    Gold = itemReq.Gold,
+                    GoldSize = itemReq.GoldSize,
+                    JobDate = itemReq.JobDate?.UtcDateTime,
+                    GoldQtySend = null,
+                    GoldWeightSend = itemReq.GoldWeightSend,
+                    GoldQtyCheck = itemReq.GoldQtyCheck,
+                    GoldWeightCheck = itemReq.GoldWeightCheck,
+                    IsActive = true,
+                });
+                manualItemNo++;
             }
 
             if (items.Any())
@@ -288,7 +335,7 @@ namespace Jewelry.Service.Worker
 
             // Stamp GoldLossTangSlipId on status details
             var detailsToStamp = new List<TbtProductionPlanStatusDetail>();
-            foreach (var itemReq in request.Items ?? new List<CreateGoldLossTangSlipItem>())
+            foreach (var itemReq in planItems)
             {
                 var detail = loadedDetails.FirstOrDefault(d =>
                     d.ProductionPlanId == itemReq.ProductionPlanId && d.ItemNo == itemReq.ItemNo);
@@ -340,6 +387,26 @@ namespace Jewelry.Service.Worker
                     throw new HandleException($"น้ำหนักรายการคืน '{line.Name}' ต้องไม่ติดลบ");
             }
 
+            var allItems = request.Items ?? new List<CreateGoldLossTangSlipItem>();
+            var planItems = allItems.Where(i => i.ProductionPlanId.HasValue && !string.IsNullOrEmpty(i.ItemNo)).ToList();
+            var manualItems = allItems.Where(i => !i.ProductionPlanId.HasValue).ToList();
+
+            // Validate manual (self-added) job items
+            foreach (var itemReq in manualItems)
+            {
+                if (string.IsNullOrWhiteSpace(itemReq.Wo))
+                    throw new HandleException("กรุณาระบุเลขที่งาน/ชื่องาน ของงานที่เพิ่มเอง");
+                if (string.IsNullOrWhiteSpace(itemReq.Gold))
+                    throw new HandleException($"กรุณาระบุประเภททอง ของงานที่เพิ่มเอง '{itemReq.Wo}'");
+                if (string.IsNullOrWhiteSpace(itemReq.GoldSize))
+                    throw new HandleException($"กรุณาระบุขนาดทอง ของงานที่เพิ่มเอง '{itemReq.Wo}'");
+                if (!itemReq.JobDate.HasValue)
+                    throw new HandleException($"กรุณาระบุวันที่ ของงานที่เพิ่มเอง '{itemReq.Wo}'");
+                if (!itemReq.GoldWeightSend.HasValue || itemReq.GoldWeightSend.Value < 0
+                    || !itemReq.GoldWeightCheck.HasValue || itemReq.GoldWeightCheck.Value < 0)
+                    throw new HandleException($"น้ำหนักของงานที่เพิ่มเอง '{itemReq.Wo}' ต้องไม่ติดลบ");
+            }
+
             // Un-stamp all details currently linked to this slip (restore)
             var oldStampedDetails = await _jewelryContext.TbtProductionPlanStatusDetail
                 .Where(d => d.GoldLossTangSlipId == slip.Id)
@@ -352,10 +419,10 @@ namespace Jewelry.Service.Worker
 
             // Re-read new selected details from DB
             List<TbtProductionPlanStatusDetail> loadedDetails = new List<TbtProductionPlanStatusDetail>();
-            if (hasItems)
+            if (planItems.Any())
             {
-                var planIds = request.Items.Select(x => x.ProductionPlanId).Distinct().ToList();
-                var itemNos = request.Items.Select(x => x.ItemNo).Distinct().ToList();
+                var planIds = planItems.Select(x => x.ProductionPlanId!.Value).Distinct().ToList();
+                var itemNos = planItems.Select(x => x.ItemNo!).Distinct().ToList();
 
                 loadedDetails = _jewelryContext.TbtProductionPlanStatusDetail
                     .Include(d => d.Header)
@@ -364,7 +431,7 @@ namespace Jewelry.Service.Worker
                     .ToList();
 
                 // Guard: reject if any detail is stamped to ANOTHER slip (un-stamp above already cleared this slip's own)
-                foreach (var itemReq in request.Items)
+                foreach (var itemReq in planItems)
                 {
                     var detail = loadedDetails.FirstOrDefault(d =>
                         d.ProductionPlanId == itemReq.ProductionPlanId && d.ItemNo == itemReq.ItemNo);
@@ -375,9 +442,12 @@ namespace Jewelry.Service.Worker
                 }
             }
 
-            // Compute totals from re-read DB values
-            decimal issuedFromJobs = loadedDetails.Sum(d => d.GoldWeightSend ?? 0);
-            decimal returnedFromJobs = loadedDetails.Sum(d => d.GoldWeightCheck ?? 0);
+            // Compute totals from re-read DB values + manual (self-added) jobs
+            decimal issuedFromManual = manualItems.Sum(i => i.GoldWeightSend ?? 0);
+            decimal returnedFromManual = manualItems.Sum(i => i.GoldWeightCheck ?? 0);
+
+            decimal issuedFromJobs = loadedDetails.Sum(d => d.GoldWeightSend ?? 0) + issuedFromManual;
+            decimal returnedFromJobs = loadedDetails.Sum(d => d.GoldWeightCheck ?? 0) + returnedFromManual;
 
             decimal issuedFromCustom = (request.IssuedLines ?? new List<GoldLossTangExtraLine>())
                 .Where(l => l.CountInCalc).Sum(l => l.Weight);
@@ -424,7 +494,7 @@ namespace Jewelry.Service.Worker
 
             // Build new item snapshots
             var newItems = new List<TbtGoldLossTangSlipItem>();
-            foreach (var itemReq in request.Items ?? new List<CreateGoldLossTangSlipItem>())
+            foreach (var itemReq in planItems)
             {
                 var detail = loadedDetails.FirstOrDefault(d =>
                     d.ProductionPlanId == itemReq.ProductionPlanId && d.ItemNo == itemReq.ItemNo);
@@ -447,6 +517,30 @@ namespace Jewelry.Service.Worker
                     GoldWeightCheck = detail?.GoldWeightCheck,
                     IsActive = true,
                 });
+            }
+
+            var manualItemNo = 1;
+            foreach (var itemReq in manualItems)
+            {
+                newItems.Add(new TbtGoldLossTangSlipItem
+                {
+                    SlipId = slip.Id,
+                    ProductionPlanId = null,
+                    ItemNo = $"MANUAL-{manualItemNo}",
+                    Wo = itemReq.Wo,
+                    WoNumber = itemReq.WoNumber,
+                    ProductNumber = itemReq.ProductNumber,
+                    ProductName = itemReq.ProductName,
+                    Gold = itemReq.Gold,
+                    GoldSize = itemReq.GoldSize,
+                    JobDate = itemReq.JobDate?.UtcDateTime,
+                    GoldQtySend = null,
+                    GoldWeightSend = itemReq.GoldWeightSend,
+                    GoldQtyCheck = itemReq.GoldQtyCheck,
+                    GoldWeightCheck = itemReq.GoldWeightCheck,
+                    IsActive = true,
+                });
+                manualItemNo++;
             }
 
             // Build new extra lines
@@ -489,7 +583,7 @@ namespace Jewelry.Service.Worker
 
             // Re-stamp new details
             var detailsToStamp = new List<TbtProductionPlanStatusDetail>();
-            foreach (var itemReq in request.Items ?? new List<CreateGoldLossTangSlipItem>())
+            foreach (var itemReq in planItems)
             {
                 var detail = loadedDetails.FirstOrDefault(d =>
                     d.ProductionPlanId == itemReq.ProductionPlanId && d.ItemNo == itemReq.ItemNo);
@@ -509,30 +603,32 @@ namespace Jewelry.Service.Worker
             return MapToResponse(slip, newItems, newExtras);
         }
 
-        public List<GoldLossTangSlipSummaryResponse> ListSlips(ListGoldLossTangSlipRequest request)
+        public IQueryable<GoldLossTangSlipSummaryResponse> ListSlips(ListGoldLossTangSlipSearch search)
         {
+            search ??= new ListGoldLossTangSlipSearch();
+
             var query = _jewelryContext.TbtGoldLossTangSlip
                 .Where(x => x.IsActive);
 
-            if (!string.IsNullOrEmpty(request.WorkerCode))
+            if (!string.IsNullOrEmpty(search.WorkerCode))
             {
-                query = query.Where(x => x.WorkerCode == request.WorkerCode.ToUpper());
+                query = query.Where(x => x.WorkerCode == search.WorkerCode.ToUpper());
             }
 
-            if (!string.IsNullOrEmpty(request.DocumentNo))
+            if (!string.IsNullOrEmpty(search.DocumentNo))
             {
-                query = query.Where(x => x.DocumentNo.Contains(request.DocumentNo.ToUpper()));
+                query = query.Where(x => x.DocumentNo.Contains(search.DocumentNo.ToUpper()));
             }
 
-            if (request.RequestDateStart.HasValue)
+            if (search.RequestDateStart.HasValue)
             {
-                var startUtc = request.RequestDateStart.Value.StartOfDayUtc();
+                var startUtc = search.RequestDateStart.Value.StartOfDayUtc();
                 query = query.Where(x => x.RequestDateEnd >= startUtc.UtcDateTime);
             }
 
-            if (request.RequestDateEnd.HasValue)
+            if (search.RequestDateEnd.HasValue)
             {
-                var endUtc = request.RequestDateEnd.Value.EndOfDayUtc();
+                var endUtc = search.RequestDateEnd.Value.EndOfDayUtc();
                 query = query.Where(x => x.RequestDateStart <= endUtc.UtcDateTime);
             }
 
@@ -560,17 +656,7 @@ namespace Jewelry.Service.Worker
                     UpdateBy = x.UpdateBy,
                 });
 
-            if (request.Skip.HasValue)
-            {
-                result = result.Skip(request.Skip.Value);
-            }
-
-            if (request.Take.HasValue)
-            {
-                result = result.Take(request.Take.Value);
-            }
-
-            return result.ToList();
+            return result;
         }
 
         public GoldLossTangSlipResponse GetSlip(long id)

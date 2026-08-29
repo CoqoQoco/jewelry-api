@@ -19,8 +19,8 @@ namespace jewelry.Model.Worker.GoldLossTangSlip
 
     public class CreateGoldLossTangSlipItem
     {
-        public int ProductionPlanId { get; set; }
-        public string ItemNo { get; set; }
+        public int? ProductionPlanId { get; set; }
+        public string? ItemNo { get; set; }
         public string? Wo { get; set; }
         public int? WoNumber { get; set; }
         public string? ProductNumber { get; set; }
@@ -28,6 +28,9 @@ namespace jewelry.Model.Worker.GoldLossTangSlip
         public string? Gold { get; set; }
         public string? GoldSize { get; set; }
         public DateTimeOffset? JobDate { get; set; }
+        public decimal? GoldWeightSend { get; set; }
+        public decimal? GoldWeightCheck { get; set; }
+        public decimal? GoldQtyCheck { get; set; }
     }
 
     public class GoldLossTangExtraLine

@@ -340,19 +340,19 @@ namespace Jewelry.Api.Controllers
 
         [Route("ListGoldLossTangSlip")]
         [HttpPost]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(List<GoldLossTangSlipSummaryResponse>))]
-        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<GoldLossTangSlipSummaryResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public IActionResult ListGoldLossTangSlip([FromBody] ListGoldLossTangSlipRequest request)
+        public DataSourceResult ListGoldLossTangSlip([FromBody] ListGoldLossTangSlipRequest request)
         {
             try
             {
-                var response = _goldLossTangSlipService.ListSlips(request);
-                return Ok(response);
+                var result = _goldLossTangSlipService.ListSlips(request.Search);
+                return result.ToDataSource(request);
             }
             catch (HandleException ex)
             {
-                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
             }
         }
 
