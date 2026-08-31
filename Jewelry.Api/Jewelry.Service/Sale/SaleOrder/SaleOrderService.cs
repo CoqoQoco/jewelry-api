@@ -577,12 +577,66 @@ namespace Jewelry.Service.Sale.SaleOrder
             //    throw new HandleException($"Cannot confirm stock items for Sale Order {request.SoNumber}. Invalid status: {saleOrder.StatusName}.");
             //}
 
-            var confirmedStockNumbers = new List<string>();
-            var errors = new List<string>();
+            ValidateStockItemConfirmations(request.StockItems);
+
             var confirmedDate = DateTime.UtcNow;
 
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
+            {
+                var confirmedStockNumbers = await ConfirmStockItemsCore(saleOrder, request.StockItems, confirmedDate);
+
+                // Save all changes
+                await _jewelryContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return new jewelry.Model.Sale.SaleOrder.ConfirmStock.Response
+                {
+                    Success = true,
+                    Message = $"Successfully confirmed {confirmedStockNumbers.Count} stock items.",
+                    ConfirmedItemsCount = confirmedStockNumbers.Count,
+                    ConfirmedStockNumbers = confirmedStockNumbers,
+                    ConfirmedDate = confirmedDate
+                };
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"Error confirming stock items: {ex.Message}");
+            }
+        }
+
+        public async Task<List<string>> ConfirmStockItemsForPos(string soNumber, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems, DateTime confirmedDate)
+        {
+            if (string.IsNullOrEmpty(soNumber))
+            {
+                throw new HandleException("Sale Order Number is required.");
+            }
+
+            if (stockItems == null || !stockItems.Any())
+            {
+                throw new HandleException("No stock items provided for confirmation.");
+            }
+
+            var saleOrder = await _jewelryContext.TbtSaleOrder
+                .FirstOrDefaultAsync(so => so.SoNumber == soNumber.ToUpper());
+
+            if (saleOrder == null)
+            {
+                throw new HandleException($"Sale Order {soNumber} not found.");
+            }
+
+            ValidateStockItemConfirmations(stockItems);
+
+            return await ConfirmStockItemsCore(saleOrder, stockItems, confirmedDate);
+        }
+
+        private void ValidateStockItemConfirmations(List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems)
+        {
+            var errors = new List<string>();
+
             // Validate each stock item before processing
-            foreach (var stockItem in request.StockItems)
+            foreach (var stockItem in stockItems)
             {
                 // Required field validation
                 if (string.IsNullOrEmpty(stockItem.StockNumber))
@@ -623,88 +677,73 @@ namespace Jewelry.Service.Sale.SaleOrder
             {
                 throw new HandleException($"Validation errors: {string.Join("; ", errors)}");
             }
+        }
 
-            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
-            try
+        private async Task<List<string>> ConfirmStockItemsCore(TbtSaleOrder saleOrder, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems, DateTime confirmedDate)
+        {
+            var confirmedStockNumbers = new List<string>();
+
+            foreach (var stockItem in stockItems)
             {
-                foreach (var stockItem in request.StockItems)
+                // Create new confirmed product entry
+                var newProduct = new TbtSaleOrderProduct
                 {
-                    // Create new confirmed product entry
-                    var newProduct = new TbtSaleOrderProduct
+                    Running = saleOrder.Running,
+                    SoNumber = saleOrder.SoNumber,
+                    StockNumber = stockItem.StockNumber,
+                    Stocknumberorigin = stockItem.ProductNumber ?? stockItem.StockNumber,
+
+                    Qty = stockItem.Qty,
+                    PriceOrigin = stockItem.AppraisalPrice,
+                    Discount = stockItem.Discount,
+                    NetPrice = stockItem.AppraisalPrice * (1 - (stockItem.Discount) / 100),
+
+                    CreateDate = confirmedDate,
+                    CreateBy = CurrentUsername
+                };
+
+                _jewelryContext.TbtSaleOrderProduct.Add(newProduct);
+
+                var piece = await _jewelryContext.TbtStockPiece
+                    .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
+
+                if (piece != null)
+                {
+                    var balance = await _jewelryContext.TbtStockBalance
+                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                    if (balance != null)
                     {
-                        Running = saleOrder.Running,
-                        SoNumber = saleOrder.SoNumber,
-                        StockNumber = stockItem.StockNumber,
-                        Stocknumberorigin = stockItem.ProductNumber ?? stockItem.StockNumber,
-
-                        Qty = stockItem.Qty,
-                        PriceOrigin = stockItem.AppraisalPrice,
-                        Discount = stockItem.Discount,
-                        NetPrice = stockItem.AppraisalPrice * (1 - (stockItem.Discount) / 100),
-
-                        CreateDate = confirmedDate,
-                        CreateBy = CurrentUsername
-                    };
-
-                    _jewelryContext.TbtSaleOrderProduct.Add(newProduct);
-
-                    var piece = await _jewelryContext.TbtStockPiece
-                        .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
-
-                    if (piece != null)
-                    {
-                        var balance = await _jewelryContext.TbtStockBalance
-                            .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
-
-                        if (balance != null)
-                        {
-                            balance.QtyReserved += stockItem.Qty;
-                            balance.LastMovementAt = confirmedDate;
-                            _jewelryContext.TbtStockBalance.Update(balance);
-                        }
-
-                        piece.Status = "RESERVED";
-                        piece.UpdateDate = confirmedDate;
-                        piece.UpdateBy = CurrentUsername;
-                        _jewelryContext.TbtStockPiece.Update(piece);
-
-                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                        {
-                            MovementDate = confirmedDate,
-                            MovementType = "RESERVE",
-                            SkuCode = piece.SkuCode,
-                            StockNumber = piece.StockNumber,
-                            ProductCode = piece.ProductCode,
-                            FromLocation = piece.LocationCode,
-                            Qty = stockItem.Qty,
-                            RefDocType = "SO",
-                            RefDocNo = saleOrder.SoNumber,
-                            CreateDate = confirmedDate,
-                            CreateBy = CurrentUsername
-                        });
+                        balance.QtyReserved += stockItem.Qty;
+                        balance.LastMovementAt = confirmedDate;
+                        _jewelryContext.TbtStockBalance.Update(balance);
                     }
 
-                    confirmedStockNumbers.Add(stockItem.StockNumber);
+                    piece.Status = "RESERVED";
+                    piece.UpdateDate = confirmedDate;
+                    piece.UpdateBy = CurrentUsername;
+                    _jewelryContext.TbtStockPiece.Update(piece);
+
+                    _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                    {
+                        MovementDate = confirmedDate,
+                        MovementType = "RESERVE",
+                        SkuCode = piece.SkuCode,
+                        StockNumber = piece.StockNumber,
+                        ProductCode = piece.ProductCode,
+                        FromLocation = piece.LocationCode,
+                        Qty = stockItem.Qty,
+                        RefDocType = "SO",
+                        RefDocNo = saleOrder.SoNumber,
+                        CreateDate = confirmedDate,
+                        CreateBy = CurrentUsername
+                    });
                 }
 
-                // Save all changes
-                await _jewelryContext.SaveChangesAsync();
-                await transaction.CommitAsync();
+                confirmedStockNumbers.Add(stockItem.StockNumber);
+            }
 
-                return new jewelry.Model.Sale.SaleOrder.ConfirmStock.Response
-                {
-                    Success = true,
-                    Message = $"Successfully confirmed {confirmedStockNumbers.Count} stock items.",
-                    ConfirmedItemsCount = confirmedStockNumbers.Count,
-                    ConfirmedStockNumbers = confirmedStockNumbers,
-                    ConfirmedDate = confirmedDate
-                };
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                throw new HandleException($"Error confirming stock items: {ex.Message}");
-            }
+            return confirmedStockNumbers;
         }
 
         public async Task<bool> Inactive(jewelry.Model.Sale.SaleOrder.Inactive.Request request)

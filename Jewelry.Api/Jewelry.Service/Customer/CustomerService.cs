@@ -10,10 +10,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using NetTopologySuite.Index.HPRtree;
 using NPOI.XWPF.UserModel;
+using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Jewelry.Service.Customer
@@ -24,6 +26,7 @@ namespace Jewelry.Service.Customer
         IQueryable<SearchCustomerResponse> SearchCustomer(SearchCustomer request);
         Task<string> CreateCustomer(CreateCustomerRequest request);
         Task<string> UpdateCustomer(UpdateCustomerRequest request);
+        Task<NextCustomerCodeResponse> GetNextCode(string prefix);
     }
     public class CustomerService : BaseService, ICustomerService
     {
@@ -55,12 +58,21 @@ namespace Jewelry.Service.Customer
                 var searchText = request.Text.Trim();
                 var searchTextUpper = searchText.ToUpper();
 
+                var searchTextDigits = searchText
+                    .Replace(" ", "").Replace("-", "").Replace("+", "")
+                    .Replace("(", "").Replace(")", "").Replace(".", "");
+                var isPhoneSearch = searchTextDigits.Length >= 6 && searchTextDigits.All(char.IsDigit);
+
                 query = query.Where(item =>
                     item.Code.Contains(searchTextUpper) ||
                     (item.NameEn != null && item.NameEn.Contains(searchText)) ||
                     (item.NameTh != null && item.NameTh.Contains(searchText)) ||
                     (item.Email != null && item.Email.Contains(searchText)) ||
-                    (item.ContactName != null && item.ContactName.Contains(searchText))
+                    (item.ContactName != null && item.ContactName.Contains(searchText)) ||
+                    (isPhoneSearch && item.Telephone1 != null && item.Telephone1 != "" &&
+                        item.Telephone1.Replace(" ", "").Replace("-", "").Replace("+", "").Replace("(", "").Replace(")", "").Replace(".", "").Contains(searchTextDigits)) ||
+                    (isPhoneSearch && item.Telephone2 != null && item.Telephone2 != "" &&
+                        item.Telephone2.Replace(" ", "").Replace("-", "").Replace("+", "").Replace("(", "").Replace(")", "").Replace(".", "").Contains(searchTextDigits))
                 );
             }
 
@@ -125,6 +137,11 @@ namespace Jewelry.Service.Customer
 
         public async Task<string> CreateCustomer(CreateCustomerRequest request)
         {
+            if (request.AutoCode == true)
+            {
+                return await CreateCustomerWithAutoCode(request);
+            }
+
             var checkDub = (from item in _jewelryContext.TbmCustomer
                             where item.Code == request.Code
                             select item).SingleOrDefault();
@@ -160,6 +177,126 @@ namespace Jewelry.Service.Customer
             await _jewelryContext.SaveChangesAsync();
 
             return $"{request.Code} - {request.NameTH}";
+        }
+
+        private const int AutoCodeMaxAttempts = 5;
+
+        private async Task<string> CreateCustomerWithAutoCode(CreateCustomerRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.CodePrefix))
+            {
+                throw new HandleException("กรุณาระบุ CodePrefix สำหรับออกรหัสลูกค้าอัตโนมัติ");
+            }
+
+            for (var attempt = 1; attempt <= AutoCodeMaxAttempts; attempt++)
+            {
+                var code = await GenerateNextCode(request.CodePrefix);
+
+                var add = new TbmCustomer()
+                {
+                    Code = code,
+                    NameTh = request.NameTH,
+                    NameEn = request.NameEN,
+
+                    Address = request.Address,
+                    TypeCode = request.Type,
+
+                    Telephone1 = request.Tel1,
+                    Telephone2 = request.Tel2,
+
+                    ContactName = request.ContactName,
+                    Email = request.Email,
+                    Remark = request.Remark,
+                    Discount = request.Discount ?? 0,
+                    TaxId = request.TaxId,
+
+                    CreateDate = DateTime.UtcNow,
+                    CreateBy = CurrentUsername
+                };
+
+                _jewelryContext.TbmCustomer.Add(add);
+
+                try
+                {
+                    await _jewelryContext.SaveChangesAsync();
+                    return $"{code} - {request.NameTH}";
+                }
+                catch (DbUpdateException ex) when (IsCustomerCodeUniqueViolation(ex))
+                {
+                    _jewelryContext.Entry(add).State = EntityState.Detached;
+
+                    if (attempt == AutoCodeMaxAttempts)
+                    {
+                        throw new HandleException($"ไม่สามารถออกรหัสลูกค้าอัตโนมัติ (prefix {request.CodePrefix}) ได้ กรุณาลองใหม่อีกครั้ง");
+                    }
+                }
+            }
+
+            throw new HandleException($"ไม่สามารถออกรหัสลูกค้าอัตโนมัติ (prefix {request.CodePrefix}) ได้ กรุณาลองใหม่อีกครั้ง");
+        }
+
+        private static bool IsCustomerCodeUniqueViolation(DbUpdateException ex)
+        {
+            return ex.InnerException is PostgresException pgEx
+                && pgEx.SqlState == "23505"
+                && (pgEx.ConstraintName == null || pgEx.ConstraintName == "tbm_customer_pk");
+        }
+
+        public async Task<NextCustomerCodeResponse> GetNextCode(string prefix)
+        {
+            var code = await GenerateNextCode(prefix);
+            return new NextCustomerCodeResponse() { Code = code };
+        }
+
+        private async Task<string> GenerateNextCode(string prefix)
+        {
+            if (string.IsNullOrWhiteSpace(prefix))
+            {
+                throw new HandleException("กรุณาระบุ Prefix รหัสลูกค้า");
+            }
+
+            var prefixUpper = prefix.Trim().ToUpperInvariant();
+
+            if (!Regex.IsMatch(prefixUpper, "^[A-Z]{1,5}$"))
+            {
+                throw new HandleException($"รูปแบบ Prefix ไม่ถูกต้อง ({prefix}) ต้องเป็นตัวอักษร A-Z ความยาว 1-5 ตัวอักษร");
+            }
+
+            // จำกัดขอบเขตด้วย StartsWith (แปลเป็น SQL LIKE ได้ใน EF Core + Npgsql)
+            // แล้วดึงเฉพาะคอลัมน์ Code ของ prefix นี้มา parse ฝั่ง client เพราะ regex ไม่ translate เป็น SQL ได้
+            var codes = await _jewelryContext.TbmCustomer
+                .Where(x => x.Code.StartsWith(prefixUpper))
+                .Select(x => x.Code)
+                .ToListAsync();
+
+            var pattern = new Regex($"^{Regex.Escape(prefixUpper)}(\\d+)$");
+            long maxValue = 0;
+            var digitLength = 3;
+
+            foreach (var code in codes)
+            {
+                var match = pattern.Match(code?.ToUpperInvariant() ?? string.Empty);
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                if (!long.TryParse(match.Groups[1].Value, out var value))
+                {
+                    continue;
+                }
+
+                if (value > maxValue)
+                {
+                    maxValue = value;
+                    digitLength = match.Groups[1].Value.Length;
+                }
+            }
+
+            var nextValue = maxValue + 1;
+            var numberPart = nextValue.ToString().PadLeft(digitLength, '0');
+
+            return $"{prefixUpper}{numberPart}";
         }
 
         public async Task<string> UpdateCustomer(UpdateCustomerRequest request)

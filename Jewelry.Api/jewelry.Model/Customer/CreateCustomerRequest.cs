@@ -24,6 +24,9 @@ namespace jewelry.Model.Customer
         public string? Remark { get; set; }
         public int? Discount { get; set; }
         public string? TaxId { get; set; }
+
+        public bool? AutoCode { get; set; }
+        public string? CodePrefix { get; set; }
     }
 
     public class UpdateCustomerRequest

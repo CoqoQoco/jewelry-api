@@ -67,6 +67,23 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("NextCode")]
+        [HttpGet]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(NextCustomerCodeResponse))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> NextCode([FromQuery] string prefix)
+        {
+            try
+            {
+                var response = await _service.GetNextCode(prefix);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("CreateCustomer")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
