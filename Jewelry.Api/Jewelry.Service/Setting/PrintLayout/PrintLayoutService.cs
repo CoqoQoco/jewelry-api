@@ -11,7 +11,7 @@ public class PrintLayoutService : BaseService, IPrintLayoutService
 {
     private static readonly HashSet<string> AllowedKeys = new(StringComparer.OrdinalIgnoreCase)
     {
-        "bill", "vat", "company", "breakdown"
+        "bill", "vat", "company", "breakdown", "breakdown-terms"
     };
 
     private readonly JewelryContext _jewelryContext;

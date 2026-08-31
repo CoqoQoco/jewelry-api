@@ -91,6 +91,7 @@ namespace jewelry.Model.Stock.Product.List
         public decimal QtyPrice { get; set; }
         public decimal QtyWeight { get; set; }
         public decimal QtyWeightPrice { get; set; }
+        public bool? ApplyGoldLoss { get; set; }
         public decimal TotalPrice => Math.Round((Qty * QtyPrice) + (QtyWeight * QtyWeightPrice), 2);
     }
 }
