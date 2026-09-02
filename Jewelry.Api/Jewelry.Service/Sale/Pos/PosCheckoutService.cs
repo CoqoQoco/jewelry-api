@@ -4,12 +4,14 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Sale.Invoice;
 using Jewelry.Service.Sale.SaleOrder;
+using Jewelry.Service.Stock.Product;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Jewelry.Service.Sale.Pos
@@ -19,14 +21,17 @@ namespace Jewelry.Service.Sale.Pos
         private readonly JewelryContext _jewelryContext;
         private readonly ISaleOrderService _saleOrderService;
         private readonly IInvoiceService _invoiceService;
+        private readonly IProductService _productService;
 
         public PosCheckoutService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor,
             ISaleOrderService saleOrderService,
-            IInvoiceService invoiceService) : base(jewelryContext, httpContextAccessor)
+            IInvoiceService invoiceService,
+            IProductService productService) : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _saleOrderService = saleOrderService;
             _invoiceService = invoiceService;
+            _productService = productService;
         }
 
         public async Task<jewelry.Model.Sale.Pos.Checkout.Response> Checkout(jewelry.Model.Sale.Pos.Checkout.Request request)
@@ -65,6 +70,10 @@ namespace Jewelry.Service.Sale.Pos
                 var subTotal = request.Items.Sum(i =>
                     i.AppraisalPrice * (1 - i.DiscountPercent / 100m) * i.Qty / request.CurrencyRate);
 
+                // ประกอบ Data (stockItems/copyItems/allItems/freight/copyFreight) เหมือนที่หน้าเว็บ (sale-order-view.vue)
+                // ส่งให้ SaleOrder.Upsert เก็บลง TbtSaleOrder.Data — ให้ SaleOrder/Invoice-Detail ฝั่งเว็บเปิดบิล POS แล้วเห็นรายการสินค้าครบเหมือนบิลที่สร้างจากเว็บ
+                var soData = await BuildSaleOrderData(request.Items, request.FreightAndInsurance);
+
                 var soRequest = new jewelry.Model.Sale.SaleOrder.Create.Request
                 {
                     SODate = DateTimeOffset.UtcNow,
@@ -81,7 +90,8 @@ namespace Jewelry.Service.Sale.Pos
                     Vat = request.Vat,
                     Freight = request.FreightAndInsurance,
                     SubTotal = subTotal,
-                    Remark = request.Remark
+                    Remark = request.Remark,
+                    Data = soData
                 };
 
                 var soNumber = await _saleOrderService.Upsert(soRequest);
@@ -271,6 +281,101 @@ namespace Jewelry.Service.Sale.Pos
                     throw new HandleException($"สินค้า {stockNumber} ถูกขายไปแล้วในบิล {soLabel} (โดย {sellerLabel})");
                 }
             }
+        }
+
+        private static readonly JsonSerializerOptions SaleOrderDataJsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        // ประกอบ SaleOrder.Data ให้ตรง contract เดียวกับที่หน้าเว็บสร้าง (sale-order-view.vue fetchSaveSaleOrder)
+        // reuse ProductService.Get (ตัวเดียวกับ StockProduct/Get) ต่อ 1 StockNumber — POS 1 บิลมีไม่กี่ชิ้น จึงไม่ทำ batch query เพิ่ม
+        private async Task<string> BuildSaleOrderData(List<jewelry.Model.Sale.Pos.Checkout.CheckoutItem> items, decimal freight)
+        {
+            var stockItems = new List<object>();
+
+            foreach (var item in items)
+            {
+                var product = await _productService.Get(new jewelry.Model.Stock.Product.Get.Request
+                {
+                    StockNumber = item.StockNumber
+                });
+
+                stockItems.Add(BuildStockItem(product, item));
+            }
+
+            var data = new
+            {
+                stockItems,
+                copyItems = new List<object>(),
+                allItems = stockItems,
+                freight,
+                copyFreight = 0m
+            };
+
+            return JsonSerializer.Serialize(data, SaleOrderDataJsonOptions);
+        }
+
+        // mapping เดียวกับที่ sale-order-view.vue ทำตอนเพิ่มสินค้าจาก StockProduct/Get (onSearchProduct)
+        // + ทับด้วยค่าจริงจากการขาย (appraisalPrice/qty) + isConfirm/isInvoice = true (POS confirm และออก invoice ในคราวเดียว)
+        private static object BuildStockItem(jewelry.Model.Stock.Product.Get.Response product, jewelry.Model.Sale.Pos.Checkout.CheckoutItem item)
+        {
+            var stockNumberOrigin = string.IsNullOrEmpty(product.StockNumberOrigin) ? product.StockNumber : product.StockNumberOrigin;
+
+            return new
+            {
+                stockNumber = product.StockNumber,
+                stockNumberOrigin,
+                receiptNumber = product.ReceiptNumber,
+                receiptType = product.ReceiptType,
+                receiptDate = product.ReceiptDate,
+
+                productNumber = product.ProductNumber,
+                productNameEn = product.ProductNameEn,
+                productNameTh = product.ProductNameTh,
+                productTypeName = product.ProductTypeName,
+                productType = product.ProductType,
+                productPrice = product.ProductPrice,
+
+                wo = product.Wo,
+                woNumber = product.WoNumber,
+                woText = product.WoText,
+
+                productionType = product.ProductionType,
+                productionTypeSize = product.ProductionTypeSize,
+                productionDate = product.ProductionDate,
+                mold = product.Mold,
+
+                imageName = product.ImageName,
+                imagePath = product.ImagePath,
+                imageBlobPath = (string?)null,
+
+                qty = item.Qty,
+                location = product.Location,
+                size = product.Size,
+                remark = product.Remark,
+
+                createDate = product.CreateDate,
+                createBy = product.CreateBy,
+                updateDate = product.UpdateDate,
+                updateBy = product.UpdateBy,
+
+                planQty = product.PlanQty ?? 1,
+                tagPriceMultiplier = product.TagPriceMultiplier,
+
+                materials = product.Materials,
+                priceTransactions = product.PriceTransactions,
+                planPriceItems = product.PlanPriceItems,
+
+                price = product.ProductPrice,
+                appraisalPrice = item.AppraisalPrice,
+                description = product.ProductNameEn,
+                group = "product",
+
+                isRemainProduct = true,
+                isConfirm = true,
+                isInvoice = true
+            };
         }
     }
 }
