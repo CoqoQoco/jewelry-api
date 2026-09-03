@@ -427,6 +427,7 @@ namespace Jewelry.Service.Stock.Product
                 Mold = sku.MoldDesign ?? sku.Mold,
                 ImageName = sku.ImageName,
                 ImagePath = sku.ImagePath,
+                Status = piece.Status,
                 Qty = 1,
                 Location = piece.LocationCode,
                 Size = piece.SizeActual ?? sku.Size,

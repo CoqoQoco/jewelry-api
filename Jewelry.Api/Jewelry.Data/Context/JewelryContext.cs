@@ -155,6 +155,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockGemTransectionPrice> TbtStockGemTransectionPrice { get; set; }
 
+    public virtual DbSet<TbtStockGold> TbtStockGold { get; set; }
+
+    public virtual DbSet<TbtStockGoldTransection> TbtStockGoldTransection { get; set; }
+
     public virtual DbSet<TbtStockProductImage> TbtStockProductImage { get; set; }
 
     public virtual DbSet<TbtStockProductReceiptItem> TbtStockProductReceiptItem { get; set; }
@@ -220,6 +224,8 @@ public partial class JewelryContext : DbContext
     public virtual DbSet<TbtTicketReadStatus> TbtTicketReadStatus { get; set; }
 
     public virtual DbSet<TbtSaleInvoicePrintLog> TbtSaleInvoicePrintLog { get; set; }
+
+    public virtual DbSet<TbtPrintJob> TbtPrintJob { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -2852,6 +2858,108 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
+        modelBuilder.Entity<TbtStockGold>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_gold_pk");
+
+            entity.ToTable("tbt_stock_gold");
+
+            entity.HasIndex(e => new { e.GoldCode, e.GoldSizeCode }).HasDatabaseName("tbt_stock_gold_code_size_uq").IsUnique();
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.GoldCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_code");
+            entity.Property(e => e.GoldSizeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_size_code");
+            entity.Property(e => e.Weight).HasColumnName("weight");
+            entity.Property(e => e.WeightOnProcess).HasColumnName("weight_on_process");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(e => e.GoldCodeNavigation)
+                .WithMany()
+                .HasForeignKey(e => e.GoldCode)
+                .HasConstraintName("tbt_stock_gold_gold_code_fk");
+
+            entity.HasOne(e => e.GoldSizeCodeNavigation)
+                .WithMany()
+                .HasForeignKey(e => e.GoldSizeCode)
+                .HasConstraintName("tbt_stock_gold_gold_size_code_fk");
+        });
+
+        modelBuilder.Entity<TbtStockGoldTransection>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_gold_transection_pk");
+
+            entity.ToTable("tbt_stock_gold_transection");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.GoldCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_code");
+            entity.Property(e => e.GoldSizeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("gold_size_code");
+            entity.Property(e => e.Type).HasColumnName("type");
+            entity.Property(e => e.Weight).HasColumnName("weight");
+            entity.Property(e => e.PreviousRemainWeight).HasColumnName("previous_remain_weight");
+            entity.Property(e => e.PointRemainWeight).HasColumnName("point_remain_weight");
+            entity.Property(e => e.RefDocType)
+                .HasColumnType("character varying")
+                .HasColumnName("ref_doc_type");
+            entity.Property(e => e.RefDocNo)
+                .HasColumnType("character varying")
+                .HasColumnName("ref_doc_no");
+            entity.Property(e => e.ProductionPlanWo)
+                .HasColumnType("character varying")
+                .HasColumnName("production_plan_wo");
+            entity.Property(e => e.ProductionPlanWoNumber).HasColumnName("production_plan_wo_number");
+            entity.Property(e => e.RefRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("ref_running");
+            entity.Property(e => e.RequestDate).HasColumnName("request_date");
+            entity.Property(e => e.ReturnDate).HasColumnName("return_date");
+            entity.Property(e => e.Status)
+                .HasColumnType("character varying")
+                .HasColumnName("status");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(e => e.GoldCodeNavigation)
+                .WithMany()
+                .HasForeignKey(e => e.GoldCode)
+                .HasConstraintName("tbt_stock_gold_transection_gold_code_fk");
+
+            entity.HasOne(e => e.GoldSizeCodeNavigation)
+                .WithMany()
+                .HasForeignKey(e => e.GoldSizeCode)
+                .HasConstraintName("tbt_stock_gold_transection_gold_size_code_fk");
+        });
+
         modelBuilder.Entity<TbtStockProductImage>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("tbt_stock_product_image_pk");
@@ -4943,6 +5051,42 @@ public partial class JewelryContext : DbContext
             entity.HasOne(d => d.RunningNavigation).WithMany(p => p.TbtSaleMaterialItem)
                 .HasForeignKey(d => d.Running)
                 .HasConstraintName("tbt_sale_material_item_running_fk");
+        });
+
+        modelBuilder.Entity<TbtPrintJob>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_print_job_pk");
+
+            entity.ToTable("tbt_print_job");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.InvoiceNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_number");
+            entity.Property(e => e.Payload)
+                .HasColumnType("text")
+                .HasColumnName("payload");
+            entity.Property(e => e.Status)
+                .HasColumnType("character varying")
+                .HasColumnName("status");
+            entity.Property(e => e.ErrorMessage)
+                .HasColumnType("text")
+                .HasColumnName("error_message");
+            entity.Property(e => e.RetryCount).HasColumnName("retry_count");
+            entity.Property(e => e.StationId)
+                .HasColumnType("character varying")
+                .HasColumnName("station_id");
+            entity.Property(e => e.ClaimToken)
+                .HasColumnType("character varying")
+                .HasColumnName("claim_token");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.ClaimedDate).HasColumnName("claimed_date");
+            entity.Property(e => e.PrintedDate).HasColumnName("printed_date");
         });
 
         OnModelCreatingPartial(modelBuilder);

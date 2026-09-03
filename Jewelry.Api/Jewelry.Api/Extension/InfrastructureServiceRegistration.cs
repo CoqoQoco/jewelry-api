@@ -30,6 +30,7 @@ using Jewelry.Service.Stock.Product;
 using Jewelry.Service.Stock.ProductImage;
 using Jewelry.Service.TransferStock;
 using Jewelry.Service.Permission;
+using Jewelry.Service.Print;
 using Jewelry.Service.Setting.PrintLayout;
 using Jewelry.Service.Stock.Balance;
 using Jewelry.Service.Stock.Location;
@@ -82,6 +83,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IGoldLossTangSlipService, GoldLossTangSlipService>();
             services.AddScoped<IProductionPlanCostService, ProductionPlanCostService>();
             services.AddScoped<IStockGemService, StockGemService>();
+            services.AddScoped<IStockGoldService, StockGoldService>();
             services.AddScoped<IMoldPlanService, MoldPlanService>();
             services.AddScoped<IStockMoldService, StockMoldService>();
             services.AddScoped<IReceiptAndIssueStockGemService, ReceiptAndIssueStockGemService>();
@@ -122,6 +124,8 @@ namespace Jewelry.Api.Extension
             services.AddScoped<ICatalogService, CatalogService>();
 
             services.AddScoped<ITicketService, TicketService>();
+
+            services.AddScoped<IPrintJobService, PrintJobService>();
 
             return services;
         }
