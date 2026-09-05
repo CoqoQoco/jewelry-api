@@ -128,12 +128,11 @@ namespace Jewelry.Service.Worker
             }
             if (!string.IsNullOrEmpty(request.Text))
             {
-                var textUpper = request.Text.ToUpper();
-                var text = request.Text;
+                var textPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
                 workers = workers.Where(w =>
-                    w.Code.Contains(textUpper)
-                    || w.NameTh.Contains(text)
-                    || (w.NameEn != null && w.NameEn.Contains(text)));
+                    EF.Functions.ILike(w.Code, textPattern)
+                    || EF.Functions.ILike(w.NameTh, textPattern)
+                    || (w.NameEn != null && EF.Functions.ILike(w.NameEn, textPattern)));
             }
             if (request.Type.HasValue)
             {
@@ -433,18 +432,20 @@ namespace Jewelry.Service.Worker
 
             if (!string.IsNullOrEmpty(request.Text))
             {
+                var textPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
                 query = (from item in query
-                         where item.WorkerCode.Contains(request.Text.ToUpper())
-                         || item.WorkerName.Contains(request.Text)
-                         || item.ProductNumber.Contains(request.Text)
-                         || item.ProductName.Contains(request.Text)
+                         where EF.Functions.ILike(item.WorkerCode, textPattern)
+                         || EF.Functions.ILike(item.WorkerName, textPattern)
+                         || EF.Functions.ILike(item.ProductNumber, textPattern)
+                         || EF.Functions.ILike(item.ProductName, textPattern)
                          //|| item.WoText.Contains(request.Text)
                          select item);
             }
             if (!string.IsNullOrEmpty(request.WoText))
             {
+                var woTextPattern = $"%{LikePattern.EscapeLikePattern(request.WoText)}%";
                 query = (from item in query
-                         where item.WoText.Contains(request.WoText.ToString())
+                         where EF.Functions.ILike(item.WoText, woTextPattern)
                          select item);
             }
             if (!string.IsNullOrEmpty(request.WorkerCode))
@@ -453,7 +454,8 @@ namespace Jewelry.Service.Worker
             }
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
-                query = query.Where(x => x.ProductNumber != null && x.ProductNumber.Contains(request.ProductNumber));
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
             }
             if (request.Gold != null && request.Gold.Any())
             {
@@ -469,7 +471,8 @@ namespace Jewelry.Service.Worker
             }
             if (!string.IsNullOrEmpty(request.Mold))
             {
-                query = query.Where(x => x.Mold != null && x.Mold.Contains(request.Mold));
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Mold, moldPattern));
             }
 
 
@@ -536,12 +539,13 @@ namespace Jewelry.Service.Worker
 
             if (!string.IsNullOrEmpty(request.Text))
             {
+                var textPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
                 query = (from item in query
-                         where item.WorkerCode.Contains(request.Text.ToUpper())
-                         || item.WorkerName.Contains(request.Text)
-                         || item.ProductNumber.Contains(request.Text)
-                         || item.ProductName.Contains(request.Text)
-                         || item.WoText.Contains(request.Text)
+                         where EF.Functions.ILike(item.WorkerCode, textPattern)
+                         || EF.Functions.ILike(item.WorkerName, textPattern)
+                         || EF.Functions.ILike(item.ProductNumber, textPattern)
+                         || EF.Functions.ILike(item.ProductName, textPattern)
+                         || EF.Functions.ILike(item.WoText, textPattern)
                          select item);
             }
 
@@ -606,18 +610,20 @@ namespace Jewelry.Service.Worker
 
             if (!string.IsNullOrEmpty(request.Text))
             {
+                var textPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
                 query = (from item in query
-                         where item.WorkerCode.Contains(request.Text.ToUpper())
-                         || item.WorkerName.Contains(request.Text)
-                         || item.ProductNumber.Contains(request.Text)
-                         || item.ProductName.Contains(request.Text)
+                         where EF.Functions.ILike(item.WorkerCode, textPattern)
+                         || EF.Functions.ILike(item.WorkerName, textPattern)
+                         || EF.Functions.ILike(item.ProductNumber, textPattern)
+                         || EF.Functions.ILike(item.ProductName, textPattern)
                          //|| item.WoText.Contains(request.Text)
                          select item);
             }
             if (!string.IsNullOrEmpty(request.WoText))
             {
+                var woTextPattern = $"%{LikePattern.EscapeLikePattern(request.WoText)}%";
                 query = (from item in query
-                         where item.WoText.Contains(request.WoText.ToString())
+                         where EF.Functions.ILike(item.WoText, woTextPattern)
                          select item);
             }
             if (!string.IsNullOrEmpty(request.WorkerCode))
@@ -626,7 +632,8 @@ namespace Jewelry.Service.Worker
             }
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
-                query = query.Where(x => x.ProductNumber != null && x.ProductNumber.Contains(request.ProductNumber));
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
             }
             if (request.Gold != null && request.Gold.Any())
             {
@@ -642,7 +649,8 @@ namespace Jewelry.Service.Worker
             }
             if (!string.IsNullOrEmpty(request.Mold))
             {
-                query = query.Where(x => x.Mold != null && x.Mold.Contains(request.Mold));
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Mold, moldPattern));
             }
 
            return new ReportWorkerSummeryResponse()

@@ -11,5 +11,14 @@ namespace jewelry.Model.Production.Plan.MonthlyReport
     {
         public DateTimeOffset StartDate { get; set; }
         public DateTimeOffset EndDate { get; set; }
+
+        public string[]? Gold { get; set; }
+        public string[]? GoldSize { get; set; }
+        public string[]? ProductType { get; set; }
+        public string[]? CustomerType { get; set; }
+        public string? CustomerCode { get; set; }
+        public string? Mold { get; set; }
+        public string? ProductNumber { get; set; }
+        public string? Text { get; set; }
     }
 }

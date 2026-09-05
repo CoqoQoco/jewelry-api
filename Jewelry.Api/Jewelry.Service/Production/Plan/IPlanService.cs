@@ -21,9 +21,15 @@ namespace Jewelry.Service.Production.Plan
 
         Task<jewelry.Model.Production.Plan.GoldLossByStageReport.SearchResponse> GetGoldLossByStageReport(jewelry.Model.Production.Plan.GoldLossByStageReport.SearchRequest request);
 
+        Task<jewelry.Model.Production.Plan.GoldLossByWorkerReport.Response> GetGoldLossByWorkerReport(jewelry.Model.Production.Plan.GoldLossByWorkerReport.Criteria request);
+
         Task<jewelry.Model.Production.Plan.LeadTimeReport.SearchResponse> GetLeadTimeReport(jewelry.Model.Production.Plan.LeadTimeReport.SearchRequest request);
 
-        Task<jewelry.Model.Production.Plan.CompletedDailySeries.Response> GetCompletedDailySeries(jewelry.Model.Production.Plan.CompletedDailySeries.Request request);
+        Task<jewelry.Model.Production.Plan.CompletedDailySeries.Response> GetCompletedDailySeries(jewelry.Model.Production.Plan.CompletedDailySeries.Criteria request);
+
+        Task<jewelry.Model.Production.Plan.CapacityReport.Response> GetCapacityReport(jewelry.Model.Production.Plan.CapacityReport.Criteria request);
+
+        Task<jewelry.Model.Production.Plan.StageLeadTimeReport.Response> GetStageLeadTimeReport(jewelry.Model.Production.Plan.StageLeadTimeReport.Criteria request);
 
     }
 }

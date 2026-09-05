@@ -19,6 +19,7 @@ using NPOI.OpenXmlFormats.Dml;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -69,7 +70,7 @@ namespace Jewelry.Service.Production.Plan
                              WorkerCode = item.Worker,
                              WorkerName = worker != null ? worker.NameTh : "",
 
-                             Status = item.Header.ProductionPlan.Id,
+                             Status = item.Header.ProductionPlan.Status,
                              StatusName = item.Header.ProductionPlan.StatusNavigation.NameTh,
 
 
@@ -117,7 +118,8 @@ namespace Jewelry.Service.Production.Plan
             }
             if (!string.IsNullOrEmpty(request.WoText))
             {
-                query = query.Where(x => x.WoText.Contains(request.WoText.ToUpper()));
+                var woTextPattern = $"%{LikePattern.EscapeLikePattern(request.WoText)}%";
+                query = query.Where(x => EF.Functions.ILike(x.WoText, woTextPattern));
             }
             if (request.Gold != null && request.Gold.Any())
             {
@@ -125,7 +127,8 @@ namespace Jewelry.Service.Production.Plan
             }
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
-                query = query.Where(x => x.WoText.Contains(request.ProductNumber));
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
             }
 
             return query;
@@ -240,13 +243,12 @@ namespace Jewelry.Service.Production.Plan
             // Text search
             if (!string.IsNullOrEmpty(request.Text))
             {
-                var searchText = request.Text.ToUpper();
-                query = query.Where(x =>
-                    x.Wo.Contains(searchText) ||
-                    x.WoText.Contains(request.Text) ||
-                    x.Mold.Contains(request.Text) ||
-                    x.ProductNumber.Contains(request.Text) ||
-                    x.CustomerNumber.Contains(request.Text));
+                var searchPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Wo, searchPattern)
+                                    || EF.Functions.ILike(x.WoText, searchPattern)
+                                    || EF.Functions.ILike(x.Mold, searchPattern)
+                                    || EF.Functions.ILike(x.ProductNumber, searchPattern)
+                                    || EF.Functions.ILike(x.CustomerNumber, searchPattern));
             }
 
             // Status filter
@@ -258,7 +260,8 @@ namespace Jewelry.Service.Production.Plan
             // Other filters
             if (!string.IsNullOrEmpty(request.CustomerCode))
             {
-                query = query.Where(x => x.CustomerNumber.Contains(request.CustomerCode));
+                var customerCodePattern = $"%{LikePattern.EscapeLikePattern(request.CustomerCode)}%";
+                query = query.Where(x => EF.Functions.ILike(x.CustomerNumber, customerCodePattern));
             }
             if (request.Gold != null && request.Gold.Any())
             {
@@ -278,11 +281,13 @@ namespace Jewelry.Service.Production.Plan
             }
             if (!string.IsNullOrEmpty(request.Mold))
             {
-                query = query.Where(x => x.Mold.Contains(request.Mold));
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Mold, moldPattern));
             }
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
-                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
             }
 
             return query;
@@ -334,11 +339,13 @@ namespace Jewelry.Service.Production.Plan
 
             if (!string.IsNullOrEmpty(request.TransferNumber))
             {
-                query = query.Where(x => x.TransferNumber.Contains(request.TransferNumber));
+                var transferNumberPattern = $"%{LikePattern.EscapeLikePattern(request.TransferNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.TransferNumber, transferNumberPattern));
             }
             if (!string.IsNullOrEmpty(request.WoText))
             {
-                query = query.Where(x => x.WoText.Contains(request.WoText));
+                var woTextPattern = $"%{LikePattern.EscapeLikePattern(request.WoText)}%";
+                query = query.Where(x => EF.Functions.ILike(x.WoText, woTextPattern));
             }
 
             if (request.StatusFormer.HasValue)
@@ -365,12 +372,14 @@ namespace Jewelry.Service.Production.Plan
             }
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
-                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
             }
 
             if (!string.IsNullOrEmpty(request.Mold))
             {
-                query = query.Where(x => x.Mold.Contains(request.Mold));
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Mold, moldPattern));
             }
 
             return query;
@@ -938,8 +947,9 @@ namespace Jewelry.Service.Production.Plan
         public async Task<jewelry.Model.Production.Plan.DailyPlan.Response> GetDailyReport(jewelry.Model.Production.Plan.DailyPlan.Criteria request)
         {
             var utcNow = DateTime.UtcNow;
-            var yesterdayStart = utcNow.Date.AddDays(-1);
-            var yesterdayEnd = utcNow.Date.AddMilliseconds(-1);
+            var todayThaiStartUtc = utcNow.AddHours(7).Date.AddHours(-7);
+            var tomorrowThaiStartUtc = todayThaiStartUtc.AddDays(1);
+            var yesterdayThaiStartUtc = todayThaiStartUtc.AddDays(-1);
 
             // Define disabled status
             var disableStatus = new int[]
@@ -1067,12 +1077,12 @@ namespace Jewelry.Service.Production.Plan
 
             if (!string.IsNullOrEmpty(request.Text))
             {
-                var searchText = request.Text.ToUpper();
-                query = query.Where(x => x.Wo.Contains(searchText)
-                                    || x.WoText.Contains(request.Text)
-                                    || x.Mold.Contains(request.Text)
-                                    || x.ProductNumber.Contains(request.Text)
-                                    || x.CustomerNumber.Contains(request.Text));
+                var searchPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Wo, searchPattern)
+                                    || EF.Functions.ILike(x.WoText, searchPattern)
+                                    || EF.Functions.ILike(x.Mold, searchPattern)
+                                    || EF.Functions.ILike(x.ProductNumber, searchPattern)
+                                    || EF.Functions.ILike(x.CustomerNumber, searchPattern));
             }
 
             if (request.Status != null && request.Status.Any())
@@ -1082,7 +1092,8 @@ namespace Jewelry.Service.Production.Plan
 
             if (!string.IsNullOrEmpty(request.CustomerCode))
             {
-                query = query.Where(x => x.CustomerNumber.Contains(request.CustomerCode));
+                var customerCodePattern = $"%{LikePattern.EscapeLikePattern(request.CustomerCode)}%";
+                query = query.Where(x => EF.Functions.ILike(x.CustomerNumber, customerCodePattern));
             }
 
             if (request.Gold != null && request.Gold.Any())
@@ -1107,12 +1118,14 @@ namespace Jewelry.Service.Production.Plan
 
             if (!string.IsNullOrEmpty(request.Mold))
             {
-                query = query.Where(x => x.Mold.Contains(request.Mold));
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Mold, moldPattern));
             }
 
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
-                query = query.Where(x => x.ProductNumber.Contains(request.ProductNumber));
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
             }
 
             //ก่อน filter ทั้งหมด
@@ -1120,16 +1133,18 @@ namespace Jewelry.Service.Production.Plan
             var planCountCompletedYesterday = await _jewelryContext.TbtProductionPlan
                 .Where(x => x.IsActive == true
                        && x.Status == ProductionPlanStatus.Completed
-                       && x.CompletedDate >= yesterdayStart
-                       && x.CompletedDate <= yesterdayEnd)
+                       && x.CompletedDate >= yesterdayThaiStartUtc
+                       && x.CompletedDate < todayThaiStartUtc)
                 .CountAsync();
 
             var completedToday = await _jewelryContext.TbtProductionPlan
                 .Where(x => x.IsActive == true
                        && x.Status == ProductionPlanStatus.Completed
-                       && x.CompletedDate >= utcNow.Date
-                       && x.CompletedDate < utcNow.Date.AddDays(1))
+                       && x.CompletedDate >= todayThaiStartUtc
+                       && x.CompletedDate < tomorrowThaiStartUtc)
                 .CountAsync();
+
+            var scopedQuery = query;
 
             var removeStatus = new List<int>
             {
@@ -1137,7 +1152,7 @@ namespace Jewelry.Service.Production.Plan
                 ProductionPlanStatus.Melted,
                 ProductionPlanStatus.WaitCVD,
                 ProductionPlanStatus.CVD,
-                //ProductionPlanStatus.Price 
+                //ProductionPlanStatus.Price
             };
             //remove seccoss 100%, melted, wait cvd, cvd
             query = query.Where(x => !removeStatus.Contains(x.Status));
@@ -1208,8 +1223,10 @@ namespace Jewelry.Service.Production.Plan
             var planCountOverdue = query.Count(x => x.IsOverPlan && !successStatus.Contains(x.Status));
             var planCountTotal = query.Count();
 
-            var percentageCompleted = planCountTotal > 0
-                                        ? Math.Round((decimal)query.Count(x => x.Status == ProductionPlanStatus.Completed) * 100 / planCountTotal, 2)
+            var completedCount = scopedQuery.Count(x => x.Status == ProductionPlanStatus.Completed);
+            var totalPlanCount = scopedQuery.Count();
+            var percentageCompleted = totalPlanCount > 0
+                                        ? Math.Round((decimal)completedCount * 100 / totalPlanCount, 2)
                                         : 0;
 
             var pendingApproval = query.Count(x => x.Status == ProductionPlanStatus.Designed);
@@ -1266,6 +1283,8 @@ namespace Jewelry.Service.Production.Plan
                     OverduePlans = planCountOverdue,
                     PendingApproval = pendingApproval,
                     PercentageCompleted = percentageCompleted,
+                    CompletedCount = completedCount,
+                    TotalPlanCount = totalPlanCount,
                     StatusTrends = statusTrends.OrderBy(x => x.Status).ToList(),
                     ProductTypeSummary = productTypeSummary,
                     CustomerTypeSummary = customerTypeSummary
@@ -1275,7 +1294,7 @@ namespace Jewelry.Service.Production.Plan
         #endregion
 
         #region --- completed daily series ---
-        public async Task<jewelry.Model.Production.Plan.CompletedDailySeries.Response> GetCompletedDailySeries(jewelry.Model.Production.Plan.CompletedDailySeries.Request request)
+        public async Task<jewelry.Model.Production.Plan.CompletedDailySeries.Response> GetCompletedDailySeries(jewelry.Model.Production.Plan.CompletedDailySeries.Criteria request)
         {
             var utcNow = DateTime.UtcNow;
 
@@ -1288,6 +1307,54 @@ namespace Jewelry.Service.Production.Plan
                        && x.CompletedDate.HasValue
                        && x.CompletedDate >= start.StartOfDayUtc()
                        && x.CompletedDate <= end.EndOfDayUtc());
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Type));
+            }
+
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => request.GoldSize.Contains(x.TypeSize));
+            }
+
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+
+            if (request.CustomerType != null && request.CustomerType.Any())
+            {
+                query = query.Where(x => request.CustomerType.Contains(x.CustomerType));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                var customerCodePattern = $"%{LikePattern.EscapeLikePattern(request.CustomerCode)}%";
+                query = query.Where(x => EF.Functions.ILike(x.CustomerNumber, customerCodePattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Mold, moldPattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                var searchPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Wo, searchPattern)
+                                    || EF.Functions.ILike(x.WoText, searchPattern)
+                                    || EF.Functions.ILike(x.Mold, searchPattern)
+                                    || EF.Functions.ILike(x.ProductNumber, searchPattern)
+                                    || EF.Functions.ILike(x.CustomerNumber, searchPattern));
+            }
 
             var grouped = await query
                 .GroupBy(x => x.CompletedDate.Value.AddHours(7).Date)
@@ -1324,17 +1391,16 @@ namespace Jewelry.Service.Production.Plan
         #region --- monthly success report ---
         public async Task<jewelry.Model.Production.Plan.MonthlyReport.Response> GetPlanSuccessMonthlyReport(jewelry.Model.Production.Plan.MonthlyReport.Criteria request)
         {
-            var query = from statusHeader in _jewelryContext.TbtProductionPlanStatusHeader
-                        join productionPlan in _jewelryContext.TbtProductionPlan on statusHeader.ProductionPlanId equals productionPlan.Id
+            var query = from productionPlan in _jewelryContext.TbtProductionPlan
                         join productType in _jewelryContext.TbmProductType on productionPlan.ProductType equals productType.Code into productTypeJoin
                         from pt in productTypeJoin.DefaultIfEmpty()
                         join customerType in _jewelryContext.TbmCustomerType on productionPlan.CustomerType equals customerType.Code into customerTypeJoin
                         from ct in customerTypeJoin.DefaultIfEmpty()
-                        where statusHeader.Status == 100 // success status
-                        && statusHeader.CreateDate >= request.StartDate.StartOfDayUtc()
-                        && statusHeader.CreateDate <= request.EndDate.EndOfDayUtc()
-                        && statusHeader.IsActive == true
-                        && productionPlan.IsActive == true
+                        where productionPlan.IsActive == true
+                        && productionPlan.Status == ProductionPlanStatus.Completed
+                        && productionPlan.CompletedDate != null
+                        && productionPlan.CompletedDate >= request.StartDate.StartOfDayUtc()
+                        && productionPlan.CompletedDate <= request.EndDate.EndOfDayUtc()
                         select new
                         {
                             ProductionPlan = productionPlan,
@@ -1345,6 +1411,54 @@ namespace Jewelry.Service.Production.Plan
                             Type = !string.IsNullOrEmpty(productionPlan.Type) ? productionPlan.Type : "ไม่ระบุ",
                             TypeName = !string.IsNullOrEmpty(productionPlan.Type) ? productionPlan.Type : "ไม่ระบุ"
                         };
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.ProductionPlan.Type));
+            }
+
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => request.GoldSize.Contains(x.ProductionPlan.TypeSize));
+            }
+
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductionPlan.ProductType));
+            }
+
+            if (request.CustomerType != null && request.CustomerType.Any())
+            {
+                query = query.Where(x => request.CustomerType.Contains(x.ProductionPlan.CustomerType));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                var customerCodePattern = $"%{LikePattern.EscapeLikePattern(request.CustomerCode)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductionPlan.CustomerNumber, customerCodePattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductionPlan.Mold, moldPattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductionPlan.ProductNumber, productNumberPattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                var searchPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductionPlan.Wo, searchPattern)
+                                    || EF.Functions.ILike(x.ProductionPlan.WoText, searchPattern)
+                                    || EF.Functions.ILike(x.ProductionPlan.Mold, searchPattern)
+                                    || EF.Functions.ILike(x.ProductionPlan.ProductNumber, searchPattern)
+                                    || EF.Functions.ILike(x.ProductionPlan.CustomerNumber, searchPattern));
+            }
 
             var data = await query.ToListAsync();
             var totalCount = data.Count;
@@ -1676,6 +1790,287 @@ namespace Jewelry.Service.Production.Plan
         }
         #endregion
 
+        #region --- gold loss by worker report ---
+        public async Task<jewelry.Model.Production.Plan.GoldLossByWorkerReport.Response> GetGoldLossByWorkerReport(jewelry.Model.Production.Plan.GoldLossByWorkerReport.Criteria request)
+        {
+            var utcNow = DateTime.UtcNow;
+
+            var start = request.Start ?? new DateTimeOffset(utcNow.AddMonths(-12), TimeSpan.Zero);
+            var end = request.End ?? new DateTimeOffset(utcNow, TimeSpan.Zero);
+
+            var statuses = (request.Status != null && request.Status.Length > 0)
+                ? request.Status
+                : new[]
+                {
+                    jewelry.Model.Constant.ProductionPlanStatus.Casting,
+                    jewelry.Model.Constant.ProductionPlanStatus.Scrubb,
+                    jewelry.Model.Constant.ProductionPlanStatus.Gems,
+                    jewelry.Model.Constant.ProductionPlanStatus.Embedd,
+                    jewelry.Model.Constant.ProductionPlanStatus.Plated
+                };
+
+            var minJobCount = request.MinJobCount ?? 10;
+
+            var baseQuery = from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                            join header in _jewelryContext.TbtProductionPlanStatusHeader
+                                on detail.HeaderId equals header.Id
+                            where header.IsActive == true
+                                && detail.IsActive == true
+                                && detail.GoldWeightSend > 0
+                                && statuses.Contains(header.Status)
+                                && header.CreateDate >= start.StartOfDayUtc()
+                                && header.CreateDate <= end.EndOfDayUtc()
+                            select new
+                            {
+                                header.Id,
+                                header.Status,
+                                header.CreateDate,
+                                detail.Worker,
+                                detail.Gold,
+                                GoldWeightSend = detail.GoldWeightSend ?? 0,
+                                GoldWeightCheck = detail.GoldWeightCheck ?? 0
+                            };
+
+            if (request.Gold != null && request.Gold.Length > 0)
+            {
+                baseQuery = baseQuery.Where(x => x.Gold != null && request.Gold.Contains(x.Gold));
+            }
+
+            var fullRows = await baseQuery.ToListAsync();
+
+            var missingWorkerRows = fullRows.Where(x => string.IsNullOrWhiteSpace(x.Worker)).ToList();
+            var knownRowsAll = fullRows.Where(x => !string.IsNullOrWhiteSpace(x.Worker)).ToList();
+
+            var knownRowsFiltered = knownRowsAll;
+            if (!string.IsNullOrWhiteSpace(request.WorkerCode))
+            {
+                knownRowsFiltered = knownRowsAll
+                    .Where(x => string.Equals(x.Worker!.Trim(), request.WorkerCode!.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            var statusMaster = await _jewelryContext.TbmProductionPlanStatus.ToListAsync();
+            var workerMaster = await _jewelryContext.TbmWorker.ToListAsync();
+
+            string GetStatusName(int statusCode)
+            {
+                var master = statusMaster.FirstOrDefault(m => m.Id == statusCode);
+                return master?.NameTh ?? statusCode.ToString();
+            }
+
+            string GetWorkerName(string workerCode)
+            {
+                var master = workerMaster.FirstOrDefault(w => string.Equals(w.Code, workerCode, StringComparison.OrdinalIgnoreCase));
+                return master?.NameTh ?? workerCode;
+            }
+
+            // department (stage) level job volume — full department data set (worker known or not),
+            // independent of the WorkerCode drill-down filter.
+            var deptJobCounts = fullRows
+                .GroupBy(x => x.Status)
+                .Select(g => new
+                {
+                    StatusCode = g.Key,
+                    JobCount = g.Select(x => x.Id).Distinct().Count()
+                })
+                .ToList();
+
+            // department (stage) level loss average — worker-attributed rows only, so unattributed
+            // volume (tracked separately via RowsMissingWorker*) never inflates the benchmark a
+            // worker is compared against. Independent of the WorkerCode drill-down filter, so
+            // drilling into one worker still compares them against their whole department.
+            var deptWorkerAttributed = knownRowsAll
+                .GroupBy(x => x.Status)
+                .Select(g =>
+                {
+                    var sumSend = Math.Round(g.Sum(x => x.GoldWeightSend), 4);
+                    var sumCheck = Math.Round(g.Sum(x => x.GoldWeightCheck), 4);
+                    var rawLoss = sumSend - sumCheck;
+                    return new
+                    {
+                        StatusCode = g.Key,
+                        SumGoldWeightSend = sumSend,
+                        SumGoldWeightCheck = sumCheck,
+                        RawLoss = rawLoss,
+                        LossPercent = sumSend > 0 ? Math.Round(rawLoss / sumSend * 100, 2) : 0m,
+                        WorkerCount = g.Select(x => x.Worker!.Trim().ToUpperInvariant()).Distinct().Count()
+                    };
+                })
+                .ToList();
+
+            var stageAggregates = deptJobCounts
+                .Select(d =>
+                {
+                    var wa = deptWorkerAttributed.FirstOrDefault(w => w.StatusCode == d.StatusCode);
+                    return new
+                    {
+                        StatusCode = d.StatusCode,
+                        SumGoldWeightSend = wa?.SumGoldWeightSend ?? 0m,
+                        SumGoldWeightCheck = wa?.SumGoldWeightCheck ?? 0m,
+                        RawLoss = wa?.RawLoss ?? 0m,
+                        LossPercent = wa?.LossPercent ?? 0m,
+                        JobCount = d.JobCount,
+                        WorkerCount = wa?.WorkerCount ?? 0
+                    };
+                })
+                .ToList();
+
+            // per worker x department rows
+            var workerStageAggregates = knownRowsFiltered
+                .GroupBy(x => new { Worker = x.Worker!.Trim(), x.Status })
+                .Select(g =>
+                {
+                    var sumSend = Math.Round(g.Sum(x => x.GoldWeightSend), 4);
+                    var sumCheck = Math.Round(g.Sum(x => x.GoldWeightCheck), 4);
+                    var rawLoss = sumSend - sumCheck;
+                    return new
+                    {
+                        g.Key.Worker,
+                        g.Key.Status,
+                        SumGoldWeightSend = sumSend,
+                        SumGoldWeightCheck = sumCheck,
+                        RawLoss = rawLoss,
+                        LossPercent = sumSend > 0 ? Math.Round(rawLoss / sumSend * 100, 2) : 0m,
+                        JobCount = g.Select(x => x.Id).Distinct().Count()
+                    };
+                })
+                .ToList();
+
+            var rows = workerStageAggregates.Select(item =>
+            {
+                var stage = stageAggregates.FirstOrDefault(s => s.StatusCode == item.Status);
+                var stageAvg = stage?.LossPercent ?? 0m;
+                var isBelowMinJobs = item.JobCount < minJobCount;
+
+                return new jewelry.Model.Production.Plan.GoldLossByWorkerReport.WorkerStageRow
+                {
+                    WorkerCode = item.Worker,
+                    WorkerName = GetWorkerName(item.Worker),
+                    StatusCode = item.Status,
+                    StatusName = GetStatusName(item.Status),
+                    JobCount = item.JobCount,
+                    SumGoldWeightSend = item.SumGoldWeightSend,
+                    SumGoldWeightCheck = item.SumGoldWeightCheck,
+                    RawLoss = item.RawLoss,
+                    LossPercent = item.LossPercent,
+                    StageAvgLossPercent = stageAvg,
+                    DiffFromStageAvgPercent = Math.Round(item.LossPercent - stageAvg, 2),
+                    IsBelowMinJobs = isBelowMinJobs,
+                    RankInStage = 0
+                };
+            }).ToList();
+
+            foreach (var stageGroup in rows.GroupBy(x => x.StatusCode))
+            {
+                var ranked = stageGroup
+                    .Where(x => !x.IsBelowMinJobs)
+                    .OrderByDescending(x => x.LossPercent)
+                    .ToList();
+
+                for (var i = 0; i < ranked.Count; i++)
+                {
+                    ranked[i].RankInStage = i + 1;
+                }
+            }
+
+            rows = rows.OrderBy(x => x.StatusCode).ThenByDescending(x => x.LossPercent).ToList();
+
+            // monthly (Thai local time) worker x department aggregates
+            var monthlyAggregates = knownRowsFiltered
+                .GroupBy(x => new
+                {
+                    Year = x.CreateDate.AddHours(7).Year,
+                    Month = x.CreateDate.AddHours(7).Month,
+                    Worker = x.Worker!.Trim(),
+                    x.Status
+                })
+                .Select(g =>
+                {
+                    var sumSend = Math.Round(g.Sum(x => x.GoldWeightSend), 4);
+                    var sumCheck = Math.Round(g.Sum(x => x.GoldWeightCheck), 4);
+                    var rawLoss = sumSend - sumCheck;
+                    return new
+                    {
+                        g.Key.Year,
+                        g.Key.Month,
+                        g.Key.Worker,
+                        g.Key.Status,
+                        SumGoldWeightSend = sumSend,
+                        SumGoldWeightCheck = sumCheck,
+                        RawLoss = rawLoss,
+                        LossPercent = sumSend > 0 ? Math.Round(rawLoss / sumSend * 100, 2) : 0m,
+                        JobCount = g.Select(x => x.Id).Distinct().Count()
+                    };
+                })
+                .ToList();
+
+            var monthlyRows = monthlyAggregates
+                .OrderBy(x => x.Year).ThenBy(x => x.Month).ThenBy(x => x.Status).ThenByDescending(x => x.LossPercent)
+                .Select(item => new jewelry.Model.Production.Plan.GoldLossByWorkerReport.MonthlyRow
+                {
+                    Year = item.Year,
+                    Month = item.Month,
+                    WorkerCode = item.Worker,
+                    StatusCode = item.Status,
+                    LossPercent = item.LossPercent,
+                    JobCount = item.JobCount,
+                    SumGoldWeightSend = item.SumGoldWeightSend,
+                    SumGoldWeightCheck = item.SumGoldWeightCheck,
+                    RawLoss = item.RawLoss
+                }).ToList();
+
+            var monthlyTop = monthlyAggregates
+                .Where(x => x.JobCount >= minJobCount)
+                .GroupBy(x => new { x.Year, x.Month, x.Status })
+                .Select(g => g.OrderByDescending(x => x.LossPercent).First())
+                .OrderBy(x => x.Year).ThenBy(x => x.Month).ThenBy(x => x.Status)
+                .Select(item => new jewelry.Model.Production.Plan.GoldLossByWorkerReport.MonthlyTopRow
+                {
+                    Year = item.Year,
+                    Month = item.Month,
+                    StatusCode = item.Status,
+                    StatusName = GetStatusName(item.Status),
+                    WorkerCode = item.Worker,
+                    WorkerName = GetWorkerName(item.Worker),
+                    LossPercent = item.LossPercent,
+                    JobCount = item.JobCount
+                }).ToList();
+
+            var totalQualifyingCount = fullRows.Count;
+            var missingWorkerCount = missingWorkerRows.Count;
+
+            var summary = new jewelry.Model.Production.Plan.GoldLossByWorkerReport.SummaryRow
+            {
+                PeriodStart = start,
+                PeriodEnd = end,
+                WorkerCount = knownRowsAll.Select(x => x.Worker!.Trim().ToUpperInvariant()).Distinct().Count(),
+                JobCount = fullRows.Select(x => x.Id).Distinct().Count(),
+                RowsMissingWorkerCount = missingWorkerCount,
+                RowsMissingWorkerPercent = totalQualifyingCount > 0
+                    ? Math.Round((decimal)missingWorkerCount / totalQualifyingCount * 100, 2)
+                    : 0m,
+                StageSummaries = stageAggregates
+                    .OrderBy(x => x.StatusCode)
+                    .Select(x => new jewelry.Model.Production.Plan.GoldLossByWorkerReport.StageSummaryRow
+                    {
+                        StatusCode = x.StatusCode,
+                        StatusName = GetStatusName(x.StatusCode),
+                        AvgLossPercent = x.LossPercent,
+                        JobCount = x.JobCount,
+                        WorkerCount = x.WorkerCount
+                    }).ToList()
+            };
+
+            return new jewelry.Model.Production.Plan.GoldLossByWorkerReport.Response
+            {
+                Rows = rows,
+                MonthlyTop = monthlyTop,
+                MonthlyRows = monthlyRows,
+                Summary = summary
+            };
+        }
+        #endregion
+
         #region --- lead time report ---
         public async Task<jewelry.Model.Production.Plan.LeadTimeReport.SearchResponse> GetLeadTimeReport(jewelry.Model.Production.Plan.LeadTimeReport.SearchRequest request)
         {
@@ -1791,6 +2186,634 @@ namespace Jewelry.Service.Production.Plan
 
             return sorted[mid];
         }
+        #endregion
+
+        #region --- capacity report ---
+
+        private static readonly string[] ThaiMonthAbbr = new[]
+        {
+            "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+            "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+        };
+
+        public async Task<jewelry.Model.Production.Plan.CapacityReport.Response> GetCapacityReport(jewelry.Model.Production.Plan.CapacityReport.Criteria request)
+        {
+            var thaiOffset = TimeSpan.FromHours(7);
+            var bucket = string.Equals(request.Bucket, "week", StringComparison.OrdinalIgnoreCase) ? "week" : "month";
+
+            var validGroupBys = new[] { "gold", "goldSize", "productType", "customerType" };
+            var groupBy = !string.IsNullOrEmpty(request.GroupBy)
+                && validGroupBys.Any(x => string.Equals(x, request.GroupBy, StringComparison.OrdinalIgnoreCase))
+                ? validGroupBys.First(x => string.Equals(x, request.GroupBy, StringComparison.OrdinalIgnoreCase))
+                : "none";
+
+            var thaiNow = DateTimeOffset.UtcNow.ToOffset(thaiOffset);
+            var defaultEnd = new DateTimeOffset(thaiNow.Date, thaiOffset);
+            var defaultStartDate = new DateTime(thaiNow.Year, thaiNow.Month, 1).AddMonths(-11);
+            var defaultStart = new DateTimeOffset(defaultStartDate, thaiOffset);
+
+            var start = request.Start ?? defaultStart;
+            var end = request.End ?? defaultEnd;
+
+            var startUtc = start.StartOfDayUtc();
+            var endUtc = end.EndOfDayUtc();
+
+            var query = _jewelryContext.TbtProductionPlan
+                .Where(x => x.IsActive == true
+                       && x.Status == ProductionPlanStatus.Completed
+                       && x.CompletedDate.HasValue
+                       && x.CompletedDate >= startUtc
+                       && x.CompletedDate <= endUtc);
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                query = query.Where(x => request.Gold.Contains(x.Type));
+            }
+
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                query = query.Where(x => request.GoldSize.Contains(x.TypeSize));
+            }
+
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                query = query.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+
+            if (request.CustomerType != null && request.CustomerType.Any())
+            {
+                query = query.Where(x => request.CustomerType.Contains(x.CustomerType));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                var customerCodePattern = $"%{LikePattern.EscapeLikePattern(request.CustomerCode)}%";
+                query = query.Where(x => EF.Functions.ILike(x.CustomerNumber, customerCodePattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Mold, moldPattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                query = query.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                var searchPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
+                query = query.Where(x => EF.Functions.ILike(x.Wo, searchPattern)
+                                    || EF.Functions.ILike(x.WoText, searchPattern)
+                                    || EF.Functions.ILike(x.Mold, searchPattern)
+                                    || EF.Functions.ILike(x.ProductNumber, searchPattern)
+                                    || EF.Functions.ILike(x.CustomerNumber, searchPattern));
+            }
+
+            var data = await query
+                .Select(x => new
+                {
+                    x.CompletedDate,
+                    x.ProductQty,
+                    x.Type,
+                    x.TypeSize,
+                    x.ProductType,
+                    x.CustomerType
+                })
+                .ToListAsync();
+
+            var todayThaiDate = DateTimeOffset.UtcNow.ToOffset(thaiOffset).Date;
+
+            var thaiStartDate = startUtc.UtcDateTime.AddHours(7).Date;
+            var thaiEndDateRaw = endUtc.UtcDateTime.AddHours(7).Date;
+            var thaiEndDate = thaiEndDateRaw > todayThaiDate ? todayThaiDate : thaiEndDateRaw;
+
+            var anchors = BuildCapacityBucketAnchors(thaiStartDate, thaiEndDate, bucket, thaiOffset, todayThaiDate);
+
+            var rowsWithAnchor = data.Select(x =>
+            {
+                var thaiDate = x.CompletedDate!.Value.AddHours(7).Date;
+                var anchorDate = bucket == "week" ? GetIsoMonday(thaiDate) : new DateTime(thaiDate.Year, thaiDate.Month, 1);
+                string? raw = groupBy switch
+                {
+                    "gold" => x.Type,
+                    "goldSize" => x.TypeSize,
+                    "productType" => x.ProductType,
+                    "customerType" => x.CustomerType,
+                    _ => null
+                };
+
+                return new
+                {
+                    AnchorDate = anchorDate,
+                    x.ProductQty,
+                    GroupCode = string.IsNullOrEmpty(raw) ? string.Empty : raw
+                };
+            }).ToList();
+
+            var buckets = anchors.Select(a =>
+            {
+                var rowsInBucket = rowsWithAnchor.Where(x => x.AnchorDate == a.AnchorDate).ToList();
+                return new jewelry.Model.Production.Plan.CapacityReport.BucketPoint
+                {
+                    Key = a.Key,
+                    Label = a.Label,
+                    Start = a.Start,
+                    End = a.End,
+                    PlanCount = rowsInBucket.Count,
+                    PieceCount = rowsInBucket.Sum(x => x.ProductQty),
+                    IsPartial = a.IsPartial
+                };
+            }).ToList();
+
+            var series = new List<jewelry.Model.Production.Plan.CapacityReport.GroupSeries>();
+
+            if (groupBy != "none")
+            {
+                Func<string, string> resolveGroupName = code => code;
+
+                if (groupBy == "gold")
+                {
+                    var master = await _jewelryContext.TbmGold.ToListAsync();
+                    resolveGroupName = code => master.FirstOrDefault(m => m.Code == code)?.NameTh ?? code;
+                }
+                else if (groupBy == "goldSize")
+                {
+                    var master = await _jewelryContext.TbmGoldSize.ToListAsync();
+                    resolveGroupName = code => master.FirstOrDefault(m => m.Code == code)?.NameTh ?? code;
+                }
+                else if (groupBy == "productType")
+                {
+                    var master = await _jewelryContext.TbmProductType.ToListAsync();
+                    resolveGroupName = code => master.FirstOrDefault(m => m.Code == code)?.NameTh ?? code;
+                }
+                else if (groupBy == "customerType")
+                {
+                    var master = await _jewelryContext.TbmCustomerType.ToListAsync();
+                    resolveGroupName = code => master.FirstOrDefault(m => m.Code == code)?.NameTh ?? code;
+                }
+
+                series = rowsWithAnchor
+                    .GroupBy(x => x.GroupCode)
+                    .Select(g =>
+                    {
+                        var groupCode = g.Key;
+                        var groupName = string.IsNullOrEmpty(groupCode) ? "ไม่ระบุ" : resolveGroupName(groupCode);
+
+                        var points = anchors.Select(a =>
+                        {
+                            var rowsInBucket = g.Where(x => x.AnchorDate == a.AnchorDate).ToList();
+                            return new jewelry.Model.Production.Plan.CapacityReport.GroupPoint
+                            {
+                                BucketKey = a.Key,
+                                PlanCount = rowsInBucket.Count,
+                                PieceCount = rowsInBucket.Sum(x => x.ProductQty)
+                            };
+                        }).ToList();
+
+                        return new jewelry.Model.Production.Plan.CapacityReport.GroupSeries
+                        {
+                            GroupCode = groupCode,
+                            GroupName = groupName,
+                            Points = points
+                        };
+                    })
+                    .OrderByDescending(x => x.Points.Sum(p => p.PlanCount))
+                    .ToList();
+            }
+
+            var totalPlans = data.Count;
+            var totalPieces = data.Sum(x => x.ProductQty);
+            var completeBuckets = buckets.Where(x => !x.IsPartial).ToList();
+            var completeBucketCount = completeBuckets.Count;
+            var bestBucket = completeBuckets.OrderByDescending(x => x.PlanCount).FirstOrDefault();
+
+            var summary = new jewelry.Model.Production.Plan.CapacityReport.CapacitySummary
+            {
+                TotalPlans = totalPlans,
+                TotalPieces = totalPieces,
+                AvgPlansPerBucket = completeBucketCount > 0 ? Math.Round((decimal)completeBuckets.Sum(x => x.PlanCount) / completeBucketCount, 2) : 0,
+                AvgPiecesPerBucket = completeBucketCount > 0 ? Math.Round((decimal)completeBuckets.Sum(x => x.PieceCount) / completeBucketCount, 2) : 0,
+                BestBucketKey = bestBucket?.Key ?? string.Empty,
+                BestBucketLabel = bestBucket?.Label ?? string.Empty,
+                BestBucketPlans = bestBucket?.PlanCount ?? 0
+            };
+
+            return new jewelry.Model.Production.Plan.CapacityReport.Response
+            {
+                Bucket = bucket,
+                GroupBy = groupBy,
+                Buckets = buckets,
+                Series = series,
+                Summary = summary
+            };
+        }
+
+        private class CapacityBucketAnchor
+        {
+            public DateTime AnchorDate { get; set; }
+            public string Key { get; set; } = string.Empty;
+            public string Label { get; set; } = string.Empty;
+            public DateTimeOffset Start { get; set; }
+            public DateTimeOffset End { get; set; }
+            public bool IsPartial { get; set; }
+        }
+
+        private static List<CapacityBucketAnchor> BuildCapacityBucketAnchors(DateTime thaiStartDate, DateTime thaiEndDate, string bucket, TimeSpan thaiOffset, DateTime todayThaiDate)
+        {
+            var result = new List<CapacityBucketAnchor>();
+
+            if (bucket == "week")
+            {
+                var mondayCursor = GetIsoMonday(thaiStartDate);
+                var mondayEnd = GetIsoMonday(thaiEndDate);
+
+                while (mondayCursor <= mondayEnd)
+                {
+                    var sunday = mondayCursor.AddDays(6);
+                    var isoYear = ISOWeek.GetYear(mondayCursor);
+                    var weekNum = ISOWeek.GetWeekOfYear(mondayCursor);
+                    var isPartial = todayThaiDate >= mondayCursor && todayThaiDate <= sunday;
+
+                    result.Add(new CapacityBucketAnchor
+                    {
+                        AnchorDate = mondayCursor,
+                        Key = $"{isoYear}-W{weekNum:D2}",
+                        Label = FormatWeekLabel(mondayCursor, sunday),
+                        Start = new DateTimeOffset(mondayCursor, thaiOffset),
+                        End = new DateTimeOffset(sunday.AddHours(23).AddMinutes(59).AddSeconds(59), thaiOffset),
+                        IsPartial = isPartial
+                    });
+
+                    mondayCursor = mondayCursor.AddDays(7);
+                }
+            }
+            else
+            {
+                var monthCursor = new DateTime(thaiStartDate.Year, thaiStartDate.Month, 1);
+                var monthEnd = new DateTime(thaiEndDate.Year, thaiEndDate.Month, 1);
+
+                while (monthCursor <= monthEnd)
+                {
+                    var monthLastDay = monthCursor.AddMonths(1).AddSeconds(-1);
+                    var monthLastDate = monthCursor.AddMonths(1).AddDays(-1);
+                    var isPartial = todayThaiDate >= monthCursor && todayThaiDate <= monthLastDate;
+
+                    result.Add(new CapacityBucketAnchor
+                    {
+                        AnchorDate = monthCursor,
+                        Key = monthCursor.ToString("yyyy-MM"),
+                        Label = $"{ThaiMonthAbbr[monthCursor.Month]} {monthCursor.Year}",
+                        Start = new DateTimeOffset(monthCursor, thaiOffset),
+                        End = new DateTimeOffset(monthLastDay, thaiOffset),
+                        IsPartial = isPartial
+                    });
+
+                    monthCursor = monthCursor.AddMonths(1);
+                }
+            }
+
+            return result;
+        }
+
+        private static DateTime GetIsoMonday(DateTime date)
+        {
+            var diff = ((int)date.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+            return date.AddDays(-diff);
+        }
+
+        private static string FormatWeekLabel(DateTime monday, DateTime sunday)
+        {
+            if (monday.Year == sunday.Year && monday.Month == sunday.Month)
+            {
+                return $"{monday.Day}-{sunday.Day} {ThaiMonthAbbr[monday.Month]} {monday.Year}";
+            }
+
+            if (monday.Year == sunday.Year)
+            {
+                return $"{monday.Day} {ThaiMonthAbbr[monday.Month]}-{sunday.Day} {ThaiMonthAbbr[sunday.Month]} {sunday.Year}";
+            }
+
+            return $"{monday.Day} {ThaiMonthAbbr[monday.Month]} {monday.Year}-{sunday.Day} {ThaiMonthAbbr[sunday.Month]} {sunday.Year}";
+        }
+        #endregion
+
+        #region --- stage lead time report ---
+
+        public async Task<jewelry.Model.Production.Plan.StageLeadTimeReport.Response> GetStageLeadTimeReport(jewelry.Model.Production.Plan.StageLeadTimeReport.Criteria request)
+        {
+            var planQuery = _jewelryContext.TbtProductionPlan.AsQueryable();
+
+            if (request.Gold != null && request.Gold.Any())
+            {
+                planQuery = planQuery.Where(x => request.Gold.Contains(x.Type));
+            }
+
+            if (request.GoldSize != null && request.GoldSize.Any())
+            {
+                planQuery = planQuery.Where(x => request.GoldSize.Contains(x.TypeSize));
+            }
+
+            if (request.ProductType != null && request.ProductType.Any())
+            {
+                planQuery = planQuery.Where(x => request.ProductType.Contains(x.ProductType));
+            }
+
+            if (request.CustomerType != null && request.CustomerType.Any())
+            {
+                planQuery = planQuery.Where(x => request.CustomerType.Contains(x.CustomerType));
+            }
+
+            if (!string.IsNullOrEmpty(request.CustomerCode))
+            {
+                var customerCodePattern = $"%{LikePattern.EscapeLikePattern(request.CustomerCode)}%";
+                planQuery = planQuery.Where(x => EF.Functions.ILike(x.CustomerNumber, customerCodePattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.Mold))
+            {
+                var moldPattern = $"%{LikePattern.EscapeLikePattern(request.Mold)}%";
+                planQuery = planQuery.Where(x => EF.Functions.ILike(x.Mold, moldPattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.ProductNumber))
+            {
+                var productNumberPattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
+                planQuery = planQuery.Where(x => EF.Functions.ILike(x.ProductNumber, productNumberPattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.Text))
+            {
+                var searchPattern = $"%{LikePattern.EscapeLikePattern(request.Text)}%";
+                planQuery = planQuery.Where(x => EF.Functions.ILike(x.Wo, searchPattern)
+                                    || EF.Functions.ILike(x.WoText, searchPattern)
+                                    || EF.Functions.ILike(x.Mold, searchPattern)
+                                    || EF.Functions.ILike(x.ProductNumber, searchPattern)
+                                    || EF.Functions.ILike(x.CustomerNumber, searchPattern));
+            }
+
+            DateTimeOffset? completedStartFilter = request.CompletedStart;
+            DateTimeOffset? completedEndFilter = request.CompletedEnd;
+            if (!completedStartFilter.HasValue && !completedEndFilter.HasValue)
+            {
+                completedEndFilter = DateTimeOffset.UtcNow;
+                completedStartFilter = completedEndFilter.Value.AddMonths(-12);
+            }
+
+            var completedQuery = planQuery
+                .Where(x => x.IsActive == true
+                    && x.Status == jewelry.Model.Constant.ProductionPlanStatus.Completed
+                    && x.CompletedDate != null);
+
+            if (completedStartFilter.HasValue)
+            {
+                var start = completedStartFilter.Value.StartOfDayUtc();
+                completedQuery = completedQuery.Where(x => x.CompletedDate >= start);
+            }
+            if (completedEndFilter.HasValue)
+            {
+                var end = completedEndFilter.Value.EndOfDayUtc();
+                completedQuery = completedQuery.Where(x => x.CompletedDate <= end);
+            }
+
+            var completedPlans = await completedQuery
+                .Select(x => new
+                {
+                    x.Id,
+                    x.CompletedDate
+                })
+                .ToListAsync();
+
+            var completedPlanIds = completedPlans.Select(x => x.Id).ToList();
+
+            var completedHeaders = await _jewelryContext.TbtProductionPlanStatusHeader
+                .Where(h => h.IsActive == true && completedPlanIds.Contains(h.ProductionPlanId))
+                .Select(h => new
+                {
+                    h.ProductionPlanId,
+                    h.Status,
+                    h.CreateDate,
+                    h.UpdateDate
+                })
+                .ToListAsync();
+
+            var headersByPlan = completedHeaders
+                .GroupBy(h => h.ProductionPlanId)
+                .ToDictionary(g => g.Key, g => g.OrderBy(h => h.CreateDate).ToList());
+
+            var stageDwells = new Dictionary<int, List<double>>();
+            var stageWorkDays = new Dictionary<int, List<double>>();
+            var stageReliableCount = new Dictionary<int, int>();
+
+            var totalLeadDaysList = new List<double>();
+            var plansWithNoStageCount = 0;
+
+            foreach (var plan in completedPlans)
+            {
+                if (!headersByPlan.TryGetValue(plan.Id, out var headers) || headers.Count == 0)
+                {
+                    plansWithNoStageCount++;
+                    continue;
+                }
+
+                var workingStageCount = headers.Count(h => h.Status != jewelry.Model.Constant.ProductionPlanStatus.Price
+                    && h.Status != jewelry.Model.Constant.ProductionPlanStatus.Completed
+                    && h.Status != jewelry.Model.Constant.ProductionPlanStatus.Melted);
+                if (workingStageCount == 0)
+                {
+                    plansWithNoStageCount++;
+                }
+
+                var firstHeader = headers[0];
+                var leadDays = Math.Max(0, (plan.CompletedDate!.Value - firstHeader.CreateDate).TotalDays);
+                totalLeadDaysList.Add(leadDays);
+
+                for (var i = 0; i < headers.Count; i++)
+                {
+                    var current = headers[i];
+                    var stageExit = i + 1 < headers.Count ? headers[i + 1].CreateDate : plan.CompletedDate!.Value;
+                    var dwellDays = Math.Max(0, (stageExit - current.CreateDate).TotalDays);
+
+                    if (current.Status == jewelry.Model.Constant.ProductionPlanStatus.Melted)
+                    {
+                        continue;
+                    }
+
+                    if (!stageDwells.TryGetValue(current.Status, out var dwellList))
+                    {
+                        dwellList = new List<double>();
+                        stageDwells[current.Status] = dwellList;
+                        stageWorkDays[current.Status] = new List<double>();
+                        stageReliableCount[current.Status] = 0;
+                    }
+                    dwellList.Add(dwellDays);
+
+                    if (current.UpdateDate.HasValue && current.UpdateDate.Value > current.CreateDate)
+                    {
+                        stageWorkDays[current.Status].Add((current.UpdateDate.Value - current.CreateDate).TotalDays);
+
+                        if (current.UpdateDate.Value <= stageExit)
+                        {
+                            stageReliableCount[current.Status]++;
+                        }
+                    }
+                }
+            }
+
+            var statusMaster = await _jewelryContext.TbmProductionPlanStatus.ToListAsync();
+            var totalDwellSum = stageDwells.Values.Sum(list => list.Sum());
+
+            var rows = stageDwells
+                .Select(kvp =>
+                {
+                    var statusCode = kvp.Key;
+                    var dwellList = kvp.Value;
+                    var workDaysList = stageWorkDays[statusCode];
+                    var reliableCount = stageReliableCount[statusCode];
+                    var totalDaysRaw = dwellList.Sum();
+
+                    return new jewelry.Model.Production.Plan.StageLeadTimeReport.StageRow
+                    {
+                        StatusCode = statusCode,
+                        StatusName = statusMaster.FirstOrDefault(m => m.Id == statusCode)?.NameTh ?? statusCode.ToString(),
+                        VisitCount = dwellList.Count,
+                        AvgDays = Math.Round((decimal)dwellList.Average(), 1),
+                        MedianDays = Math.Round((decimal)GetMedian(dwellList), 1),
+                        P90Days = Math.Round((decimal)GetPercentile(dwellList, 90), 1),
+                        TotalDays = Math.Round((decimal)totalDaysRaw, 1),
+                        ShareOfTotalPercent = totalDwellSum > 0 ? Math.Round((decimal)(totalDaysRaw / totalDwellSum * 100), 2) : 0,
+                        MedianWorkDays = workDaysList.Any() ? Math.Round((decimal)GetMedian(workDaysList), 1) : 0,
+                        WorkDataReliabilityPercent = dwellList.Count > 0 ? Math.Round((decimal)reliableCount / dwellList.Count * 100, 2) : 0
+                    };
+                })
+                .OrderBy(x => x.StatusCode)
+                .ToList();
+
+            var bottleneck = rows.OrderByDescending(x => x.ShareOfTotalPercent).FirstOrDefault();
+
+            var summary = new jewelry.Model.Production.Plan.StageLeadTimeReport.StageLeadTimeSummary
+            {
+                CompletedPlanCount = completedPlans.Count,
+                AvgTotalLeadDays = totalLeadDaysList.Any() ? Math.Round((decimal)totalLeadDaysList.Average(), 1) : 0,
+                MedianTotalLeadDays = totalLeadDaysList.Any() ? Math.Round((decimal)GetMedian(totalLeadDaysList), 1) : 0,
+                BottleneckStatusCode = bottleneck?.StatusCode ?? 0,
+                BottleneckStatusName = bottleneck?.StatusName ?? string.Empty,
+                PlansWithNoStageCount = plansWithNoStageCount
+            };
+
+            var wipPlans = await planQuery
+                .Where(x => x.IsActive == true && x.Status != jewelry.Model.Constant.ProductionPlanStatus.Completed)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Status,
+                    x.WoText,
+                    x.ProductName,
+                    x.CustomerNumber,
+                    x.RequestDate
+                })
+                .ToListAsync();
+
+            var wipPlanIds = wipPlans.Select(x => x.Id).ToList();
+
+            var wipHeaders = await _jewelryContext.TbtProductionPlanStatusHeader
+                .Where(h => h.IsActive == true && wipPlanIds.Contains(h.ProductionPlanId))
+                .Select(h => new
+                {
+                    h.ProductionPlanId,
+                    h.Status,
+                    h.CreateDate
+                })
+                .ToListAsync();
+
+            var wipHeaderByPlanAndStatus = wipHeaders
+                .GroupBy(h => (h.ProductionPlanId, h.Status))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(h => h.CreateDate).First());
+
+            var nowUtc = DateTime.UtcNow;
+            var customerCodes = wipPlans.Select(x => x.CustomerNumber).Distinct().ToList();
+            var customerMaster = await _jewelryContext.TbmCustomer
+                .Where(c => customerCodes.Contains(c.Code))
+                .Select(c => new { c.Code, c.NameTh })
+                .ToListAsync();
+
+            var wipWithAge = new List<(int Id, int Status, string WoText, string ProductName, string? CustomerName, DateTime RequestDate, double AgeDays)>();
+
+            foreach (var plan in wipPlans)
+            {
+                if (!wipHeaderByPlanAndStatus.TryGetValue((plan.Id, plan.Status), out var header))
+                {
+                    continue;
+                }
+
+                var ageDays = Math.Max(0, (nowUtc - header.CreateDate).TotalDays);
+                var customerName = customerMaster.FirstOrDefault(c => c.Code == plan.CustomerNumber)?.NameTh;
+
+                wipWithAge.Add((plan.Id, plan.Status, plan.WoText, plan.ProductName, customerName, plan.RequestDate, ageDays));
+            }
+
+            var wipRows = wipWithAge
+                .GroupBy(x => x.Status)
+                .Select(g => new jewelry.Model.Production.Plan.StageLeadTimeReport.WipRow
+                {
+                    StatusCode = g.Key,
+                    StatusName = statusMaster.FirstOrDefault(m => m.Id == g.Key)?.NameTh ?? g.Key.ToString(),
+                    WipCount = g.Count(),
+                    AvgAgeDays = Math.Round((decimal)g.Average(x => x.AgeDays), 1),
+                    MaxAgeDays = Math.Round((decimal)g.Max(x => x.AgeDays), 1)
+                })
+                .OrderBy(x => x.StatusCode)
+                .ToList();
+
+            var topStuckJobs = wipWithAge
+                .OrderByDescending(x => x.AgeDays)
+                .Take(10)
+                .Select(x => new jewelry.Model.Production.Plan.StageLeadTimeReport.StuckJob
+                {
+                    ProductionPlanId = x.Id,
+                    WoText = x.WoText,
+                    StatusCode = x.Status,
+                    StatusName = statusMaster.FirstOrDefault(m => m.Id == x.Status)?.NameTh ?? x.Status.ToString(),
+                    AgeDays = Math.Round((decimal)x.AgeDays, 1),
+                    ProductName = x.ProductName,
+                    CustomerName = x.CustomerName,
+                    RequestDate = x.RequestDate
+                })
+                .ToList();
+
+            return new jewelry.Model.Production.Plan.StageLeadTimeReport.Response
+            {
+                Rows = rows,
+                WipRows = wipRows,
+                TopStuckJobs = topStuckJobs,
+                Summary = summary
+            };
+        }
+
+        private static double GetPercentile(List<double> values, double percentile)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return 0;
+            }
+
+            var sorted = values.OrderBy(x => x).ToList();
+            var rank = (percentile / 100.0) * (sorted.Count - 1);
+            var lowerIndex = (int)Math.Floor(rank);
+            var upperIndex = (int)Math.Ceiling(rank);
+
+            if (lowerIndex == upperIndex)
+            {
+                return sorted[lowerIndex];
+            }
+
+            var fraction = rank - lowerIndex;
+            return sorted[lowerIndex] + (sorted[upperIndex] - sorted[lowerIndex]) * fraction;
+        }
+
         #endregion
     }
 }

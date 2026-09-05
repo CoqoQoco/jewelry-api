@@ -1,6 +1,6 @@
 using System;
 
-namespace jewelry.Model.Production.Plan.CompletedDailySeries
+namespace jewelry.Model.Production.Plan.StageLeadTimeReport
 {
     public class Request
     {
@@ -9,8 +9,8 @@ namespace jewelry.Model.Production.Plan.CompletedDailySeries
 
     public class Criteria
     {
-        public DateTimeOffset? Start { get; set; }
-        public DateTimeOffset? End { get; set; }
+        public DateTimeOffset? CompletedStart { get; set; }
+        public DateTimeOffset? CompletedEnd { get; set; }
 
         public string[]? Gold { get; set; }
         public string[]? GoldSize { get; set; }

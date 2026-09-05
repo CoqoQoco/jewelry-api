@@ -26,6 +26,8 @@ namespace jewelry.Model.Production.Plan.DailyPlan
         public int OverduePlans { get; set; }
         public int PendingApproval { get; set; }
         public decimal PercentageCompleted { get; set; }
+        public int CompletedCount { get; set; }
+        public int TotalPlanCount { get; set; }
         public List<StatusTrend> StatusTrends { get; set; } = new List<StatusTrend>();
         public List<ProductTypeSummary> ProductTypeSummary { get; set; } = new List<ProductTypeSummary>();
         public List<CustomerTypeSummary> CustomerTypeSummary { get; set; } = new List<CustomerTypeSummary>();

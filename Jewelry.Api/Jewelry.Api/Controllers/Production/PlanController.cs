@@ -193,6 +193,24 @@ namespace Jewelry.Api.Controllers.Production
             }
         }
 
+        [Route("GoldLossByWorkerReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.GoldLossByWorkerReport.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetGoldLossByWorkerReport([FromBody] jewelry.Model.Production.Plan.GoldLossByWorkerReport.Request request)
+        {
+            try
+            {
+                var response = await _planService.GetGoldLossByWorkerReport(request.Search);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("CompletedDailySeries")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.CompletedDailySeries.Response))]
@@ -202,7 +220,7 @@ namespace Jewelry.Api.Controllers.Production
         {
             try
             {
-                var response = await _planService.GetCompletedDailySeries(request);
+                var response = await _planService.GetCompletedDailySeries(request.Search);
                 return Ok(response);
             }
             catch (HandleException ex)
@@ -221,6 +239,42 @@ namespace Jewelry.Api.Controllers.Production
             try
             {
                 var response = await _planService.GetLeadTimeReport(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("CapacityReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.CapacityReport.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetCapacityReport([FromBody] jewelry.Model.Production.Plan.CapacityReport.Request request)
+        {
+            try
+            {
+                var response = await _planService.GetCapacityReport(request.Search);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("StageLeadTimeReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.StageLeadTimeReport.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetStageLeadTimeReport([FromBody] jewelry.Model.Production.Plan.StageLeadTimeReport.Request request)
+        {
+            try
+            {
+                var response = await _planService.GetStageLeadTimeReport(request.Search);
                 return Ok(response);
             }
             catch (HandleException ex)

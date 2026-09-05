@@ -1,6 +1,6 @@
 using System;
 
-namespace jewelry.Model.Production.Plan.CompletedDailySeries
+namespace jewelry.Model.Production.Plan.CapacityReport
 {
     public class Request
     {
@@ -9,8 +9,10 @@ namespace jewelry.Model.Production.Plan.CompletedDailySeries
 
     public class Criteria
     {
+        public string Bucket { get; set; } = "month";
         public DateTimeOffset? Start { get; set; }
         public DateTimeOffset? End { get; set; }
+        public string GroupBy { get; set; } = "none";
 
         public string[]? Gold { get; set; }
         public string[]? GoldSize { get; set; }
