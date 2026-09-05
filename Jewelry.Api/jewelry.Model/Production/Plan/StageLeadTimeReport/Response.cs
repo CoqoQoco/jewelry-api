@@ -9,6 +9,27 @@ namespace jewelry.Model.Production.Plan.StageLeadTimeReport
         public List<WipRow> WipRows { get; set; } = new List<WipRow>();
         public List<StuckJob> TopStuckJobs { get; set; } = new List<StuckJob>();
         public StageLeadTimeSummary Summary { get; set; } = new StageLeadTimeSummary();
+        public string GroupBy { get; set; } = string.Empty;
+        public List<BreakdownGroup> Breakdown { get; set; } = new List<BreakdownGroup>();
+    }
+
+    public class BreakdownGroup
+    {
+        public string GroupCode { get; set; } = string.Empty;
+        public string GroupName { get; set; } = string.Empty;
+        public int PlanCount { get; set; }
+        public decimal AvgTotalDays { get; set; }
+        public decimal MedianTotalDays { get; set; }
+        public List<BreakdownStage> Stages { get; set; } = new List<BreakdownStage>();
+    }
+
+    public class BreakdownStage
+    {
+        public int StatusCode { get; set; }
+        public string StatusName { get; set; } = string.Empty;
+        public int VisitCount { get; set; }
+        public decimal AvgDays { get; set; }
+        public decimal MedianDays { get; set; }
     }
 
     public class StageRow

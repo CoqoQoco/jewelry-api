@@ -2517,6 +2517,12 @@ namespace Jewelry.Service.Production.Plan
 
         public async Task<jewelry.Model.Production.Plan.StageLeadTimeReport.Response> GetStageLeadTimeReport(jewelry.Model.Production.Plan.StageLeadTimeReport.Criteria request)
         {
+            var validLeadTimeGroupBys = new[] { "productType", "customerType", "gold", "goldSize" };
+            var groupBy = !string.IsNullOrEmpty(request.GroupBy)
+                && validLeadTimeGroupBys.Any(x => string.Equals(x, request.GroupBy, StringComparison.OrdinalIgnoreCase))
+                ? validLeadTimeGroupBys.First(x => string.Equals(x, request.GroupBy, StringComparison.OrdinalIgnoreCase))
+                : "none";
+
             var planQuery = _jewelryContext.TbtProductionPlan.AsQueryable();
 
             if (request.Gold != null && request.Gold.Any())
@@ -2595,7 +2601,11 @@ namespace Jewelry.Service.Production.Plan
                 .Select(x => new
                 {
                     x.Id,
-                    x.CompletedDate
+                    x.CompletedDate,
+                    x.ProductType,
+                    x.CustomerType,
+                    x.Type,
+                    x.TypeSize
                 })
                 .ToListAsync();
 
@@ -2622,6 +2632,7 @@ namespace Jewelry.Service.Production.Plan
 
             var totalLeadDaysList = new List<double>();
             var plansWithNoStageCount = 0;
+            var groupAccumulators = new Dictionary<string, LeadTimeGroupAccumulator>();
 
             foreach (var plan in completedPlans)
             {
@@ -2643,6 +2654,27 @@ namespace Jewelry.Service.Production.Plan
                 var leadDays = Math.Max(0, (plan.CompletedDate!.Value - firstHeader.CreateDate).TotalDays);
                 totalLeadDaysList.Add(leadDays);
 
+                LeadTimeGroupAccumulator? groupAcc = null;
+                if (groupBy != "none")
+                {
+                    var rawGroupCode = groupBy switch
+                    {
+                        "gold" => plan.Type,
+                        "goldSize" => plan.TypeSize,
+                        "productType" => plan.ProductType,
+                        "customerType" => plan.CustomerType,
+                        _ => null
+                    };
+                    var groupCode = string.IsNullOrEmpty(rawGroupCode) ? string.Empty : rawGroupCode;
+
+                    if (!groupAccumulators.TryGetValue(groupCode, out groupAcc))
+                    {
+                        groupAcc = new LeadTimeGroupAccumulator();
+                        groupAccumulators[groupCode] = groupAcc;
+                    }
+                    groupAcc.TotalLeadDays.Add(leadDays);
+                }
+
                 for (var i = 0; i < headers.Count; i++)
                 {
                     var current = headers[i];
@@ -2663,6 +2695,16 @@ namespace Jewelry.Service.Production.Plan
                         stageReliableCount[current.Status] = 0;
                     }
                     dwellList.Add(dwellDays);
+
+                    if (groupAcc != null)
+                    {
+                        if (!groupAcc.StageDwells.TryGetValue(current.Status, out var groupDwellList))
+                        {
+                            groupDwellList = new List<double>();
+                            groupAcc.StageDwells[current.Status] = groupDwellList;
+                        }
+                        groupDwellList.Add(dwellDays);
+                    }
 
                     if (current.UpdateDate.HasValue && current.UpdateDate.Value > current.CreateDate)
                     {
@@ -2716,6 +2758,66 @@ namespace Jewelry.Service.Production.Plan
                 BottleneckStatusName = bottleneck?.StatusName ?? string.Empty,
                 PlansWithNoStageCount = plansWithNoStageCount
             };
+
+            var breakdown = new List<jewelry.Model.Production.Plan.StageLeadTimeReport.BreakdownGroup>();
+
+            if (groupBy != "none")
+            {
+                Func<string, string> resolveGroupName = code => code;
+
+                if (groupBy == "gold")
+                {
+                    var master = await _jewelryContext.TbmGold.ToListAsync();
+                    resolveGroupName = code => master.FirstOrDefault(m => m.Code == code)?.NameTh ?? code;
+                }
+                else if (groupBy == "goldSize")
+                {
+                    var master = await _jewelryContext.TbmGoldSize.ToListAsync();
+                    resolveGroupName = code => master.FirstOrDefault(m => m.Code == code)?.NameTh ?? code;
+                }
+                else if (groupBy == "productType")
+                {
+                    var master = await _jewelryContext.TbmProductType.ToListAsync();
+                    resolveGroupName = code => master.FirstOrDefault(m => m.Code == code)?.NameTh ?? code;
+                }
+                else if (groupBy == "customerType")
+                {
+                    var master = await _jewelryContext.TbmCustomerType.ToListAsync();
+                    resolveGroupName = code => master.FirstOrDefault(m => m.Code == code)?.NameTh ?? code;
+                }
+
+                breakdown = groupAccumulators
+                    .Select(kvp =>
+                    {
+                        var groupCode = kvp.Key;
+                        var acc = kvp.Value;
+                        var groupName = string.IsNullOrEmpty(groupCode) ? "ไม่ระบุ" : resolveGroupName(groupCode);
+
+                        var stages = acc.StageDwells
+                            .Select(s => new jewelry.Model.Production.Plan.StageLeadTimeReport.BreakdownStage
+                            {
+                                StatusCode = s.Key,
+                                StatusName = statusMaster.FirstOrDefault(m => m.Id == s.Key)?.NameTh ?? s.Key.ToString(),
+                                VisitCount = s.Value.Count,
+                                AvgDays = Math.Round((decimal)s.Value.Average(), 1),
+                                MedianDays = Math.Round((decimal)GetMedian(s.Value), 1)
+                            })
+                            .OrderBy(x => x.StatusCode)
+                            .ToList();
+
+                        return new jewelry.Model.Production.Plan.StageLeadTimeReport.BreakdownGroup
+                        {
+                            GroupCode = groupCode,
+                            GroupName = groupName,
+                            PlanCount = acc.TotalLeadDays.Count,
+                            AvgTotalDays = acc.TotalLeadDays.Any() ? Math.Round((decimal)acc.TotalLeadDays.Average(), 1) : 0,
+                            MedianTotalDays = acc.TotalLeadDays.Any() ? Math.Round((decimal)GetMedian(acc.TotalLeadDays), 1) : 0,
+                            Stages = stages
+                        };
+                    })
+                    .OrderByDescending(x => x.PlanCount)
+                    .ToList();
+            }
 
             var wipPlans = await planQuery
                 .Where(x => x.IsActive == true
@@ -2804,8 +2906,16 @@ namespace Jewelry.Service.Production.Plan
                 Rows = rows,
                 WipRows = wipRows,
                 TopStuckJobs = topStuckJobs,
-                Summary = summary
+                Summary = summary,
+                GroupBy = groupBy,
+                Breakdown = breakdown
             };
+        }
+
+        private class LeadTimeGroupAccumulator
+        {
+            public List<double> TotalLeadDays { get; set; } = new List<double>();
+            public Dictionary<int, List<double>> StageDwells { get; set; } = new Dictionary<int, List<double>>();
         }
 
         private static double GetPercentile(List<double> values, double percentile)
