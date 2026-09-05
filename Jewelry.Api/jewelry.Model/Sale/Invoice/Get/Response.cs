@@ -59,7 +59,7 @@ namespace jewelry.Model.Sale.Invoice.Get
 
         // List of confirmed items with invoice info (like Sale Order's StockConfirm)
         public List<Item> ConfirmedItems { get; set; } = new List<Item>();
-        public List<Payment> Payments { get; set; } = new List<Payment>();
+        public List<InvoicePaymentItem> Payments { get; set; } = new List<InvoicePaymentItem>();
     }
 
     public class Item
@@ -73,7 +73,7 @@ namespace jewelry.Model.Sale.Invoice.Get
         public string? EarringStemSize { get; set; }
     }
 
-    public class Payment
+    public class InvoicePaymentItem
     {
         public string Running { get; set; } = null!;
 
@@ -82,6 +82,8 @@ namespace jewelry.Model.Sale.Invoice.Get
         public string CurrencyUnit { get; set; } = null!;
 
         public string PaymentMethod { get; set; } = null!;
+        public int Payment { get; set; }
+        public string? BankCode { get; set; }
         public string? ReferenceNumber { get; set; }
         public string? Remark { get; set; }
         public string ImagePath { get; set; } = null!;

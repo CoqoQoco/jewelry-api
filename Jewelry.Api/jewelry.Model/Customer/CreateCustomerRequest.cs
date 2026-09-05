@@ -8,7 +8,7 @@ namespace jewelry.Model.Customer
 {
     public class CreateCustomerRequest
     {
-        public string Code { get; set; }
+        public string? Code { get; set; }
 
         public string NameTH { get; set; }
         public string? NameEN { get; set; }

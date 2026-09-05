@@ -320,7 +320,7 @@ namespace Jewelry.Service.Sale.Invoice
             {
                 response.Payments = invoiceHeader.TbtSaleInvoicePaymentItem
                     .Where(x => x.IsDelete == false)
-                    .Select(x => new jewelry.Model.Sale.Invoice.Get.Payment
+                    .Select(x => new jewelry.Model.Sale.Invoice.Get.InvoicePaymentItem
                     {
                         Running = x.Running,
                         PaymentDate = x.PaymentDate,
@@ -329,6 +329,8 @@ namespace Jewelry.Service.Sale.Invoice
                         CurrencyUnit = x.CurrencyUnit,
 
                         PaymentMethod = x.PaymantName,
+                        Payment = x.Payment,
+                        BankCode = x.BankCode,
                         ReferenceNumber = x.ReferenceNumber1,
                         Remark = x.Remark,
                         ImagePath = x.ImagePath,

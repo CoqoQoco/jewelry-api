@@ -142,6 +142,11 @@ namespace Jewelry.Service.Customer
                 return await CreateCustomerWithAutoCode(request);
             }
 
+            if (string.IsNullOrWhiteSpace(request.Code))
+            {
+                throw new HandleException("กรุณาระบุรหัสลูกค้า");
+            }
+
             var checkDub = (from item in _jewelryContext.TbmCustomer
                             where item.Code == request.Code
                             select item).SingleOrDefault();
