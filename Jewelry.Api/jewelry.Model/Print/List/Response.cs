@@ -15,5 +15,8 @@ namespace jewelry.Model.Print.List
         public DateTime CreateDate { get; set; }
         public DateTime? ClaimedDate { get; set; }
         public DateTime? PrintedDate { get; set; }
+        public bool IsDeleted { get; set; }
+        public string? DeletedBy { get; set; }
+        public DateTime? DeletedDate { get; set; }
     }
 }

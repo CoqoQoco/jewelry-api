@@ -15,5 +15,6 @@ namespace jewelry.Model.Print.List
         public string? InvoiceNumber { get; set; }
         public string? CreateBy { get; set; }
         public string? Status { get; set; }
+        public bool IncludeDeleted { get; set; }
     }
 }

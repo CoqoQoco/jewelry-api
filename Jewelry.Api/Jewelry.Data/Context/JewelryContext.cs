@@ -5087,6 +5087,11 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.ClaimedDate).HasColumnName("claimed_date");
             entity.Property(e => e.PrintedDate).HasColumnName("printed_date");
+            entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+            entity.Property(e => e.DeletedBy)
+                .HasColumnType("character varying")
+                .HasColumnName("deleted_by");
+            entity.Property(e => e.DeletedDate).HasColumnName("deleted_date");
         });
 
         OnModelCreatingPartial(modelBuilder);

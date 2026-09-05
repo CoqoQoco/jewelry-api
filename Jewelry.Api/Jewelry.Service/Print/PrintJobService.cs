@@ -18,6 +18,7 @@ namespace Jewelry.Service.Print
         Task<jewelry.Model.Print.Claim.Response?> Claim(jewelry.Model.Print.Claim.Request request);
         Task<jewelry.Model.Print.Ack.Response> Ack(jewelry.Model.Print.Ack.Request request);
         Task<jewelry.Model.Print.Retry.Response> Retry(jewelry.Model.Print.Retry.Request request);
+        Task<jewelry.Model.Print.Delete.Response> Delete(jewelry.Model.Print.Delete.Request request);
     }
 
     public class PrintJobService : BaseService, IPrintJobService
@@ -69,6 +70,10 @@ namespace Jewelry.Service.Print
         {
             var query = _jewelryContext.TbtPrintJob.AsQueryable();
 
+            if (request?.IncludeDeleted != true)
+            {
+                query = query.Where(x => !x.IsDeleted);
+            }
             if (!string.IsNullOrEmpty(request?.InvoiceNumber))
             {
                 query = query.Where(x => x.InvoiceNumber == request.InvoiceNumber);
@@ -105,6 +110,9 @@ namespace Jewelry.Service.Print
                     CreateDate = x.CreateDate,
                     ClaimedDate = x.ClaimedDate,
                     PrintedDate = x.PrintedDate,
+                    IsDeleted = x.IsDeleted,
+                    DeletedBy = x.DeletedBy,
+                    DeletedDate = x.DeletedDate,
                 });
         }
 
@@ -122,7 +130,7 @@ namespace Jewelry.Service.Print
                 SET status = 'PRINTING', station_id = {request.StationId}, claim_token = {claimToken}, claimed_date = now()
                 WHERE id = (
                     SELECT id FROM tbt_print_job
-                    WHERE status = 'PENDING'
+                    WHERE status = 'PENDING' AND is_deleted = false
                     ORDER BY id
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
@@ -208,6 +216,28 @@ namespace Jewelry.Service.Print
                 Id = job.Id,
                 Status = job.Status,
                 RetryCount = job.RetryCount,
+            };
+        }
+
+        public async Task<jewelry.Model.Print.Delete.Response> Delete(jewelry.Model.Print.Delete.Request request)
+        {
+            var job = await _jewelryContext.TbtPrintJob.FirstOrDefaultAsync(x => x.Id == request.Id);
+            if (job == null)
+            {
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            job.IsDeleted = true;
+            job.DeletedBy = CurrentUsername;
+            job.DeletedDate = DateTime.UtcNow;
+
+            _jewelryContext.TbtPrintJob.Update(job);
+            await _jewelryContext.SaveChangesAsync();
+
+            return new jewelry.Model.Print.Delete.Response
+            {
+                Id = job.Id,
+                IsDeleted = job.IsDeleted,
             };
         }
     }

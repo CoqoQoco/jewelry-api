@@ -27,4 +27,10 @@ public partial class TbtPrintJob
     public DateTime? ClaimedDate { get; set; }
 
     public DateTime? PrintedDate { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public string? DeletedBy { get; set; }
+
+    public DateTime? DeletedDate { get; set; }
 }
