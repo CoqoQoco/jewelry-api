@@ -149,11 +149,11 @@ namespace Jewelry.Api.Controllers
         [HttpGet]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(ScrapWeightDashboardResponse))]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public IActionResult ScrapWeightDashboard()
+        public IActionResult ScrapWeightDashboard([FromQuery] int? year)
         {
             try
             {
-                var report = _IProductionPlanCostService.GetScrapWeightDashboard();
+                var report = _IProductionPlanCostService.GetScrapWeightDashboard(year);
                 return Ok(report);
             }
             catch (HandleException ex)

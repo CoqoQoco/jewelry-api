@@ -7,6 +7,7 @@ namespace jewelry.Model.ProductionPlanCost.ScrapWeightDashboard
     {
         public List<ScrapWeightMonthlyData> MeltScrapData { get; set; } = new List<ScrapWeightMonthlyData>();
         public List<ScrapWeightMonthlyData> CastScrapData { get; set; } = new List<ScrapWeightMonthlyData>();
+        public List<int> AvailableYears { get; set; } = new List<int>();
     }
 
     public class ScrapWeightMonthlyData

@@ -12,6 +12,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Production.Plan;
+using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -36,26 +37,56 @@ namespace Jewelry.Service.ProductionPlan
         Task<string> UpdateGoldCost(GoldCostUpdateRequest request);
 
         IQueryable<GoldCostItemResponse> ListGoldCostItem(GoldCostItemSearch request);
-        ScrapWeightDashboardResponse GetScrapWeightDashboard();
+        ScrapWeightDashboardResponse GetScrapWeightDashboard(int? year);
         Task<jewelry.Model.ProductionPlanCost.CastLossTrend.SearchResponse> GetCastLossTrend(jewelry.Model.ProductionPlanCost.CastLossTrend.SearchRequest request);
     }
     public class ProductionPlanCostService : BaseService, IProductionPlanCostService
     {
         //private readonly string _admin = "@ADMIN";
+        private const string GoldCostRefDocType = "GOLD_COST";
+
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
         private readonly IPlanService _planService;
+        private readonly IStockGoldService _stockGoldService;
         public ProductionPlanCostService(JewelryContext JewelryContext,
             IHostEnvironment HostingEnvironment,
             IHttpContextAccessor httpContextAccessor,
             IRunningNumber runningNumberService,
-            IPlanService planService) : base(JewelryContext, httpContextAccessor)
+            IPlanService planService,
+            IStockGoldService stockGoldService) : base(JewelryContext, httpContextAccessor)
         {
             _jewelryContext = JewelryContext;
             _hostingEnvironment = HostingEnvironment;
             _runningNumberService = runningNumberService;
             _planService = planService;
+            _stockGoldService = stockGoldService;
+        }
+
+        private async Task PostGoldCostMovementIfPositive(
+            string goldCode,
+            string goldSizeCode,
+            int type,
+            decimal? weight,
+            string refDocNo,
+            DateTimeOffset requestDate,
+            string remark)
+        {
+            if (!weight.HasValue || weight.Value <= 0)
+            {
+                return;
+            }
+
+            await _stockGoldService.PostMovement(
+                goldCode,
+                goldSizeCode,
+                type,
+                weight.Value,
+                refDocType: GoldCostRefDocType,
+                refDocNo: refDocNo,
+                requestDate: requestDate,
+                remark: remark);
         }
 
         public IQueryable<GoldCostListResponse> ListGoldCost(GoldCostList request)
@@ -669,6 +700,10 @@ namespace Jewelry.Service.ProductionPlan
                     _jewelryContext.TbtProductionPlanCostGoldItem.AddRange(createItems);
                 }
 
+                await PostGoldCostMovementIfPositive(request.GoldCode, request.GoldSizeCode, GoldStockTransactionType.Outbound, request.MeltWeight, running, request.AssignDateFormat, $"ใบเบิกผสมทอง {create.BookNo}-{create.No} : เบิกทองหลอม");
+                await PostGoldCostMovementIfPositive(request.GoldCode, request.GoldSizeCode, GoldStockTransactionType.Outbound, request.CastWeight, running, request.AssignDateFormat, $"ใบเบิกผสมทอง {create.BookNo}-{create.No} : เบิกทองหล่อ");
+                await PostGoldCostMovementIfPositive(request.GoldCode, request.GoldSizeCode, GoldStockTransactionType.ReturnIn, request.ReturnMeltWeight, running, request.AssignDateFormat, $"ใบเบิกผสมทอง {create.BookNo}-{create.No} : คืนทองหลอม");
+                await PostGoldCostMovementIfPositive(request.GoldCode, request.GoldSizeCode, GoldStockTransactionType.ReturnIn, request.ReturnCastWeight, running, request.AssignDateFormat, $"ใบเบิกผสมทอง {create.BookNo}-{create.No} : คืนทองหล่อ");
 
                 //throw new HandleException($"ไม่สามารถบันทึกรายการคืนตัวเรือนซ้ำได้");
                 await _jewelryContext.SaveChangesAsync();
@@ -701,6 +736,7 @@ namespace Jewelry.Service.ProductionPlan
 
             using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
+                await _stockGoldService.ReverseByRefDoc(GoldCostRefDocType, data.RunningNumber);
 
                 data.No = request.No.ToUpper();
                 data.BookNo = request.BookNo.ToUpper();
@@ -824,6 +860,11 @@ namespace Jewelry.Service.ProductionPlan
                     _jewelryContext.TbtProductionPlanCostGoldItem.AddRange(createItems);
                 }
 
+                await PostGoldCostMovementIfPositive(request.GoldCode, request.GoldSizeCode, GoldStockTransactionType.Outbound, request.MeltWeight, data.RunningNumber, request.AssignDateFormat, $"ใบเบิกผสมทอง {data.BookNo}-{data.No} : เบิกทองหลอม");
+                await PostGoldCostMovementIfPositive(request.GoldCode, request.GoldSizeCode, GoldStockTransactionType.Outbound, request.CastWeight, data.RunningNumber, request.AssignDateFormat, $"ใบเบิกผสมทอง {data.BookNo}-{data.No} : เบิกทองหล่อ");
+                await PostGoldCostMovementIfPositive(request.GoldCode, request.GoldSizeCode, GoldStockTransactionType.ReturnIn, request.ReturnMeltWeight, data.RunningNumber, request.AssignDateFormat, $"ใบเบิกผสมทอง {data.BookNo}-{data.No} : คืนทองหลอม");
+                await PostGoldCostMovementIfPositive(request.GoldCode, request.GoldSizeCode, GoldStockTransactionType.ReturnIn, request.ReturnCastWeight, data.RunningNumber, request.AssignDateFormat, $"ใบเบิกผสมทอง {data.BookNo}-{data.No} : คืนทองหล่อ");
+
                 await _jewelryContext.SaveChangesAsync();
 
                 scope.Complete();
@@ -899,19 +940,20 @@ namespace Jewelry.Service.ProductionPlan
             return query;
         }
 
-        public ScrapWeightDashboardResponse GetScrapWeightDashboard()
+        public ScrapWeightDashboardResponse GetScrapWeightDashboard(int? year)
         {
-            var currentYear = DateTime.UtcNow.Year;
-            var startOfYear = new DateTime(currentYear, 1, 1).ToUniversalTime();
-            var endOfYear = new DateTime(currentYear, 12, 31, 23, 59, 59).ToUniversalTime();
+            var thaiOffset = TimeSpan.FromHours(7);
+            var currentYear = year ?? DateTime.UtcNow.AddHours(7).Year;
+            var startOfYear = new DateTimeOffset(currentYear, 1, 1, 0, 0, 0, thaiOffset).UtcDateTime;
+            var startOfNextYear = new DateTimeOffset(currentYear + 1, 1, 1, 0, 0, 0, thaiOffset).UtcDateTime;
 
-            // Get all TbtProductionPlanCostGold data for current year
+            // Get all TbtProductionPlanCostGold data for current year (Thai time bucket)
             var query = (from item in _jewelryContext.TbtProductionPlanCostGold
                          .Include(x => x.GoldNavigation)
                          .Include(x => x.GoldSizeNavigation)
                          where item.IsActive == true
-                         && ((item.ReturnMeltScrapWeightDate.HasValue && item.ReturnMeltScrapWeightDate.Value >= startOfYear && item.ReturnMeltScrapWeightDate.Value <= endOfYear)
-                         || (item.ReturnCastScrapWeightDate.HasValue && item.ReturnCastScrapWeightDate.Value >= startOfYear && item.ReturnCastScrapWeightDate.Value <= endOfYear))
+                         && ((item.ReturnMeltScrapWeightDate.HasValue && item.ReturnMeltScrapWeightDate.Value >= startOfYear && item.ReturnMeltScrapWeightDate.Value < startOfNextYear)
+                         || (item.ReturnCastScrapWeightDate.HasValue && item.ReturnCastScrapWeightDate.Value >= startOfYear && item.ReturnCastScrapWeightDate.Value < startOfNextYear))
                          select item).ToList();
 
             var response = new ScrapWeightDashboardResponse();
@@ -941,7 +983,7 @@ namespace Jewelry.Service.ProductionPlan
             // Process Melt Scrap Weight Data
             var meltScrapData = query.Where(x => x.ReturnMeltScrapWeightDate.HasValue && x.ReturnMeltScrapWeight.HasValue && x.ReturnMeltScrapWeight.Value > 0)
                                    .GroupBy(x => new {
-                                       Month = x.ReturnMeltScrapWeightDate.Value.Month,
+                                       Month = x.ReturnMeltScrapWeightDate.Value.AddHours(7).Month,
                                        GoldCode = x.GoldNavigation.Code,
                                        GoldName = x.GoldNavigation.NameTh,
                                        GoldSizeCode = x.GoldSizeNavigation.Code,
@@ -978,7 +1020,7 @@ namespace Jewelry.Service.ProductionPlan
             // Process Cast Scrap Weight Data
             var castScrapData = query.Where(x => x.ReturnCastScrapWeightDate.HasValue && x.ReturnCastScrapWeight.HasValue && x.ReturnCastScrapWeight.Value > 0)
                                    .GroupBy(x => new {
-                                       Month = x.ReturnCastScrapWeightDate.Value.Month,
+                                       Month = x.ReturnCastScrapWeightDate.Value.AddHours(7).Month,
                                        GoldCode = x.GoldNavigation.Code,
                                        GoldName = x.GoldNavigation.NameTh,
                                        GoldSizeCode = x.GoldSizeNavigation.Code,
@@ -1011,6 +1053,22 @@ namespace Jewelry.Service.ProductionPlan
                     monthData.TotalWeight += item.TotalWeight;
                 }
             }
+
+            var meltDates = _jewelryContext.TbtProductionPlanCostGold
+                .Where(x => x.IsActive == true && x.ReturnMeltScrapWeightDate.HasValue)
+                .Select(x => x.ReturnMeltScrapWeightDate.Value)
+                .ToList();
+
+            var castDates = _jewelryContext.TbtProductionPlanCostGold
+                .Where(x => x.IsActive == true && x.ReturnCastScrapWeightDate.HasValue)
+                .Select(x => x.ReturnCastScrapWeightDate.Value)
+                .ToList();
+
+            response.AvailableYears = meltDates.Concat(castDates)
+                .Select(x => x.AddHours(7).Year)
+                .Distinct()
+                .OrderByDescending(x => x)
+                .ToList();
 
             return response;
         }
