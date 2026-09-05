@@ -1828,7 +1828,8 @@ namespace Jewelry.Service.Production.Plan
                                 detail.Worker,
                                 detail.Gold,
                                 GoldWeightSend = detail.GoldWeightSend ?? 0,
-                                GoldWeightCheck = detail.GoldWeightCheck ?? 0
+                                GoldWeightCheck = detail.GoldWeightCheck ?? 0,
+                                IsReturned = detail.GoldWeightCheck.HasValue
                             };
 
             if (request.Gold != null && request.Gold.Length > 0)
@@ -1841,10 +1842,15 @@ namespace Jewelry.Service.Production.Plan
             var missingWorkerRows = fullRows.Where(x => string.IsNullOrWhiteSpace(x.Worker)).ToList();
             var knownRowsAll = fullRows.Where(x => !string.IsNullOrWhiteSpace(x.Worker)).ToList();
 
-            var knownRowsFiltered = knownRowsAll;
+            // a row with GoldWeightCheck == NULL is work still with the worker (not yet returned) —
+            // only rows where the work has actually been returned feed the loss aggregation, otherwise
+            // in-progress gold is counted as 100% lost.
+            var knownRowsReturned = knownRowsAll.Where(x => x.IsReturned).ToList();
+
+            var knownRowsFiltered = knownRowsReturned;
             if (!string.IsNullOrWhiteSpace(request.WorkerCode))
             {
-                knownRowsFiltered = knownRowsAll
+                knownRowsFiltered = knownRowsReturned
                     .Where(x => string.Equals(x.Worker!.Trim(), request.WorkerCode!.Trim(), StringComparison.OrdinalIgnoreCase))
                     .ToList();
             }
@@ -1875,11 +1881,12 @@ namespace Jewelry.Service.Production.Plan
                 })
                 .ToList();
 
-            // department (stage) level loss average — worker-attributed rows only, so unattributed
-            // volume (tracked separately via RowsMissingWorker*) never inflates the benchmark a
+            // department (stage) level loss average — worker-attributed, returned-only rows, so
+            // unattributed volume (tracked separately via RowsMissingWorker*) and work still in
+            // progress (tracked separately via RowsNotReturned*) never inflate the benchmark a
             // worker is compared against. Independent of the WorkerCode drill-down filter, so
             // drilling into one worker still compares them against their whole department.
-            var deptWorkerAttributed = knownRowsAll
+            var deptWorkerAttributed = knownRowsReturned
                 .GroupBy(x => x.Status)
                 .Select(g =>
                 {
@@ -2038,6 +2045,7 @@ namespace Jewelry.Service.Production.Plan
 
             var totalQualifyingCount = fullRows.Count;
             var missingWorkerCount = missingWorkerRows.Count;
+            var notReturnedCount = fullRows.Count(x => !x.IsReturned);
 
             var summary = new jewelry.Model.Production.Plan.GoldLossByWorkerReport.SummaryRow
             {
@@ -2048,6 +2056,10 @@ namespace Jewelry.Service.Production.Plan
                 RowsMissingWorkerCount = missingWorkerCount,
                 RowsMissingWorkerPercent = totalQualifyingCount > 0
                     ? Math.Round((decimal)missingWorkerCount / totalQualifyingCount * 100, 2)
+                    : 0m,
+                RowsNotReturnedCount = notReturnedCount,
+                RowsNotReturnedPercent = totalQualifyingCount > 0
+                    ? Math.Round((decimal)notReturnedCount / totalQualifyingCount * 100, 2)
                     : 0m,
                 StageSummaries = stageAggregates
                     .OrderBy(x => x.StatusCode)
@@ -2637,7 +2649,8 @@ namespace Jewelry.Service.Production.Plan
                     var stageExit = i + 1 < headers.Count ? headers[i + 1].CreateDate : plan.CompletedDate!.Value;
                     var dwellDays = Math.Max(0, (stageExit - current.CreateDate).TotalDays);
 
-                    if (current.Status == jewelry.Model.Constant.ProductionPlanStatus.Melted)
+                    if (current.Status == jewelry.Model.Constant.ProductionPlanStatus.Melted
+                        || current.Status == jewelry.Model.Constant.ProductionPlanStatus.Completed)
                     {
                         continue;
                     }
@@ -2705,7 +2718,9 @@ namespace Jewelry.Service.Production.Plan
             };
 
             var wipPlans = await planQuery
-                .Where(x => x.IsActive == true && x.Status != jewelry.Model.Constant.ProductionPlanStatus.Completed)
+                .Where(x => x.IsActive == true
+                    && x.Status != jewelry.Model.Constant.ProductionPlanStatus.Completed
+                    && x.Status != jewelry.Model.Constant.ProductionPlanStatus.Melted)
                 .Select(x => new
                 {
                     x.Id,

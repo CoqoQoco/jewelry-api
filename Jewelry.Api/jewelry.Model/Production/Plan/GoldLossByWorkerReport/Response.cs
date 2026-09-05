@@ -61,6 +61,8 @@ namespace jewelry.Model.Production.Plan.GoldLossByWorkerReport
         public int JobCount { get; set; }
         public int RowsMissingWorkerCount { get; set; }
         public decimal RowsMissingWorkerPercent { get; set; }
+        public int RowsNotReturnedCount { get; set; }
+        public decimal RowsNotReturnedPercent { get; set; }
         public List<StageSummaryRow> StageSummaries { get; set; } = new List<StageSummaryRow>();
     }
 
