@@ -666,7 +666,71 @@ namespace Jewelry.Service.Stock.Product
             return "success";
         }
 
+        public async Task<jewelry.Model.Stock.Product.UpdatePriceBulk.Response> UpdatePriceBulk(jewelry.Model.Stock.Product.UpdatePriceBulk.Request request)
+        {
+            const int maxItems = 1000;
 
+            if (request.Items == null || !request.Items.Any())
+            {
+                throw new HandleException("Items is required");
+            }
+
+            if (request.Items.Count > maxItems)
+            {
+                throw new HandleException($"Items exceeds the maximum allowed ({maxItems}) per request.");
+            }
+
+            var response = new jewelry.Model.Stock.Product.UpdatePriceBulk.Response();
+            var now = DateTime.UtcNow;
+
+            var skuCodes = request.Items
+                .Where(x => !string.IsNullOrWhiteSpace(x.SkuCode))
+                .Select(x => x.SkuCode)
+                .Distinct()
+                .ToList();
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var skus = await _jewelryContext.TbtSku
+                    .Where(x => skuCodes.Contains(x.SkuCode))
+                    .ToListAsync();
+
+                var skuDict = skus.ToDictionary(x => x.SkuCode, x => x);
+                var toUpdate = new List<TbtSku>();
+
+                foreach (var item in request.Items)
+                {
+                    if (string.IsNullOrWhiteSpace(item.SkuCode) || !skuDict.TryGetValue(item.SkuCode, out var sku))
+                    {
+                        response.NotFound.Add(item.SkuCode);
+                        continue;
+                    }
+
+                    if (sku.DefaultPrice == item.Price)
+                    {
+                        response.Unchanged++;
+                        continue;
+                    }
+
+                    sku.DefaultPrice = item.Price;
+                    sku.UpdateDate = now;
+                    sku.UpdateBy = CurrentUsername;
+
+                    toUpdate.Add(sku);
+                    response.Updated++;
+                }
+
+                if (toUpdate.Any())
+                {
+                    _jewelryContext.TbtSku.UpdateRange(toUpdate);
+                    await _jewelryContext.SaveChangesAsync();
+                }
+
+                scope.Complete();
+            }
+
+            return response;
+        }
 
         public async Task<string> CreateProductCostDeatialPlan(jewelry.Model.Stock.Product.PlanPeoductCost.Request request)
         {

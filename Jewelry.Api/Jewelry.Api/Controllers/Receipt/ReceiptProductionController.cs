@@ -211,5 +211,26 @@ namespace Jewelry.Api.Controllers.Receipt
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+
+        [Route("Transfer/SILVER")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(string))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> TransferSilver(jewelry.Model.Stock.OldStock._9K.Request request)
+        {
+            try
+            {
+
+
+                var response = await _oldStockService.TransferStockSilver(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }

@@ -13,6 +13,7 @@ namespace Jewelry.Service.Stock.Product
         Task<jewelry.Model.Stock.Product.Get.Response> Get(jewelry.Model.Stock.Product.Get.Request request);
         IQueryable<jewelry.Model.Stock.Product.List.PriceTransection> GetStockCostDetail(string stockNumber);
         Task<string> Update(jewelry.Model.Stock.Product.Update.Request request);
+        Task<jewelry.Model.Stock.Product.UpdatePriceBulk.Response> UpdatePriceBulk(jewelry.Model.Stock.Product.UpdatePriceBulk.Request request);
         IQueryable<jewelry.Model.Stock.Product.ListName.Response> ListName(jewelry.Model.Stock.Product.ListName.Request request);
 
         Task<string> CreateProductCostDeatialPlan(jewelry.Model.Stock.Product.PlanPeoductCost.Request request);
