@@ -86,7 +86,10 @@ namespace Jewelry.Service.ProductionPlan
                 refDocType: GoldCostRefDocType,
                 refDocNo: refDocNo,
                 requestDate: requestDate,
-                remark: remark);
+                remark: remark,
+                // ใบเบิกผสมทองคือบันทึกสิ่งที่หลอม/หล่อไปแล้ว ไม่ใช่ใบขออนุมัติ
+                // จึงไม่บล็อกการบันทึกเอกสารแม้สต็อกไม่พอ (ยอดติดลบ = สัญญาณว่ายังไม่ได้ตั้งยอดยกมา)
+                allowNegative: true);
         }
 
         public IQueryable<GoldCostListResponse> ListGoldCost(GoldCostList request)
