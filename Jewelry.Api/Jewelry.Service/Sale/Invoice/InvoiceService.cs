@@ -3,6 +3,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Jewelry.Service.Sale.SaleOrder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -21,16 +22,19 @@ namespace Jewelry.Service.Sale.Invoice
         private IHostEnvironment _hostingEnvironment;
         private readonly IRunningNumber _runningNumberService;
         private readonly IAzureBlobStorageService _azureBlobService;
+        private readonly ISaleOrderService _saleOrderService;
 
         public InvoiceService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor,
             IHostEnvironment hostingEnvironment,
             IRunningNumber runningNumberService,
-            IAzureBlobStorageService azureBlobService) : base(jewelryContext, httpContextAccessor)
+            IAzureBlobStorageService azureBlobService,
+            ISaleOrderService saleOrderService) : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _hostingEnvironment = hostingEnvironment;
             _runningNumberService = runningNumberService;
             _azureBlobService = azureBlobService;
+            _saleOrderService = saleOrderService;
         }
 
         public async Task<string> Create(jewelry.Model.Sale.Invoice.Create.Request request)
@@ -495,9 +499,99 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException($"Invoice not found: {request.InvoiceNumber}");
             }
 
+            ValidateInvoiceCancellable(invoiceHeader);
+
+            var cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
+
+            await _jewelryContext.SaveChangesAsync();
+
+            var message = $"Invoice {request.InvoiceNumber} deleted successfully";
+
+            if (cancelledPaymentCount > 0)
+            {
+                message += $" (ยกเลิกรายการรับชำระเงิน {cancelledPaymentCount} รายการด้วย)";
+            }
+
+            return message;
+        }
+
+        public async Task<jewelry.Model.Sale.Invoice.CancelWithSaleOrder.Response> CancelWithSaleOrder(jewelry.Model.Sale.Invoice.CancelWithSaleOrder.Request request)
+        {
+            if (string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                throw new HandleException("Invoice Number is Required.");
+            }
+
+            var invoiceHeader = await _jewelryContext.TbtSaleInvoiceHeader
+                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber);
+
+            if (invoiceHeader == null)
+            {
+                throw new HandleException($"Invoice not found: {request.InvoiceNumber}");
+            }
+
+            ValidateInvoiceCancellable(invoiceHeader);
+
+            var soNumber = invoiceHeader.SoRunning;
+            var cancelledPaymentCount = 0;
+
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
+            {
+                cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
+
+                // ต้อง flush ก่อน เพราะ InactiveCore อ่านสถานะ Invoice ของสินค้าจากฐานข้อมูล — ยังอยู่ใน transaction เดียวกัน
+                await _jewelryContext.SaveChangesAsync();
+
+                await _saleOrderService.InactiveCore(soNumber);
+
+                await _jewelryContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (HandleException)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"เกิดข้อผิดพลาดในการยกเลิกใบแจ้งหนี้และใบสั่งขาย: {ex.Message}");
+            }
+
+            var message = $"ยกเลิกใบแจ้งหนี้ {request.InvoiceNumber} และใบสั่งขาย {soNumber} เรียบร้อยแล้ว";
+
+            if (cancelledPaymentCount > 0)
+            {
+                message += $" (ยกเลิกรายการรับชำระเงิน {cancelledPaymentCount} รายการด้วย)";
+            }
+
+            return new jewelry.Model.Sale.Invoice.CancelWithSaleOrder.Response
+            {
+                InvoiceNumber = request.InvoiceNumber,
+                SoNumber = soNumber,
+                CancelledPaymentCount = cancelledPaymentCount,
+                Message = message
+            };
+        }
+
+        private void ValidateInvoiceCancellable(TbtSaleInvoiceHeader invoiceHeader)
+        {
+            if (invoiceHeader.IsDelete)
+            {
+                throw new HandleException($"ใบแจ้งหนี้ {invoiceHeader.Running} ถูกยกเลิกไปแล้ว");
+            }
+        }
+
+        // ใช้ทั้ง Delete และ CancelWithSaleOrder — ไม่มี SaveChanges ภายใน ผู้เรียกเป็นคนควบคุม
+        // คืนค่าจำนวนรายการรับชำระเงินที่ถูกยกเลิกไปพร้อมกับใบแจ้งหนี้
+        private async Task<int> CancelInvoiceCore(TbtSaleInvoiceHeader invoiceHeader)
+        {
+            var invoiceNumber = invoiceHeader.Running;
+
             // Update sale order products to remove invoice reference
             var saleOrderProducts = await _jewelryContext.TbtSaleOrderProduct
-                .Where(x => x.Invoice == request.InvoiceNumber)
+                .Where(x => x.Invoice == invoiceNumber)
                 .ToListAsync();
 
             foreach (var product in saleOrderProducts)
@@ -534,7 +628,7 @@ namespace Jewelry.Service.Sale.Invoice
                             ToLocation = piece.LocationCode,
                             Qty = product.Qty,
                             RefDocType = "INVOICE_DELETE",
-                            RefDocNo = request.InvoiceNumber,
+                            RefDocNo = invoiceNumber,
                             MovementDate = DateTime.UtcNow,
                             CreateDate = DateTime.UtcNow,
                             CreateBy = CurrentUsername
@@ -550,6 +644,20 @@ namespace Jewelry.Service.Sale.Invoice
                 product.UpdateDate = DateTime.UtcNow;
             }
 
+            // ยกเลิกรายการรับชำระเงินของใบแจ้งหนี้นี้ด้วย — ไม่ปล่อยให้เหลือรายการรับเงินที่ยังไม่ถูกลบค้างอยู่บนใบที่ยกเลิกแล้ว
+            var payments = await _jewelryContext.TbtSaleInvoicePaymentItem
+                .Where(x => x.InvoiceRunning == invoiceNumber && !x.IsDelete)
+                .ToListAsync();
+
+            foreach (var payment in payments)
+            {
+                payment.IsDelete = true;
+                payment.UpdateBy = CurrentUsername;
+                payment.UpdateDate = DateTime.UtcNow;
+
+                _jewelryContext.TbtSaleInvoicePaymentItem.Update(payment);
+            }
+
             invoiceHeader.UpdateDate = DateTime.UtcNow;
             invoiceHeader.UpdateBy = CurrentUsername;
             invoiceHeader.IsDelete = true;
@@ -557,9 +665,7 @@ namespace Jewelry.Service.Sale.Invoice
             // Delete invoice header
             _jewelryContext.TbtSaleInvoiceHeader.Update(invoiceHeader);
 
-            await _jewelryContext.SaveChangesAsync();
-
-            return $"Invoice {request.InvoiceNumber} deleted successfully";
+            return payments.Count;
         }
 
         public async Task<string> GenerateInvoiceNumber()

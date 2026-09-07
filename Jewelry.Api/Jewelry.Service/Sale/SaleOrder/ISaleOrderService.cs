@@ -18,5 +18,8 @@ namespace Jewelry.Service.Sale.SaleOrder
 
         // Used only by POS/Checkout — no internal transaction/SaveChanges, caller controls both.
         Task<List<string>> ConfirmStockItemsForPos(string soNumber, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems, DateTime confirmedDate);
+
+        // Used by Inactive and by Invoice/CancelWithSaleOrder — no internal transaction/SaveChanges, caller controls both.
+        Task InactiveCore(string soNumber);
     }
 }

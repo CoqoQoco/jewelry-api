@@ -118,6 +118,27 @@ namespace Jewelry.Api.Controllers.Sale
             }
         }
 
+        [HttpPost("CancelWithSaleOrder")]
+        public async Task<IActionResult> CancelWithSaleOrder(jewelry.Model.Sale.Invoice.CancelWithSaleOrder.Request request)
+        {
+            try
+            {
+                var result = await _service.CancelWithSaleOrder(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error cancelling invoice with sale order: {InvoiceNumber}", request.InvoiceNumber);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error cancelling invoice with sale order: {InvoiceNumber}", request.InvoiceNumber);
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while cancelling invoice with sale order" });
+            }
+        }
+
         [HttpGet("GenerateInvoiceNumber")]
         public async Task<IActionResult> GenerateInvoiceNumber()
         {
