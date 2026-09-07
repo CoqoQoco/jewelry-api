@@ -45,6 +45,9 @@ namespace jewelry.Model.Sale.SaleOrder.Create
 
         public string? Remark { get; set; }
 
+        public string? SalePerson { get; set; }
+        public string? SaleSupport { get; set; }
+
         public decimal? SubTotal { get; set; }
 
         public decimal? GrandTotalRaw { get; set; }

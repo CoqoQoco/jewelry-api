@@ -18,5 +18,6 @@ namespace jewelry.Model.User.List
         public string? Username { get; set; }
         public bool? IsActive { get; set; }
         public bool? IsNew { get; set; }
+        public int? RoleId { get; set; }
     }
 }

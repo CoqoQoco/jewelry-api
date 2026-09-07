@@ -2151,6 +2151,12 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
+            entity.Property(e => e.SalePerson)
+                .HasColumnType("character varying")
+                .HasColumnName("sale_person");
+            entity.Property(e => e.SaleSupport)
+                .HasColumnType("character varying")
+                .HasColumnName("sale_support");
             entity.Property(e => e.SpecialAddition).HasColumnName("special_addition");
             entity.Property(e => e.SpecialDiscount).HasColumnName("special_discount");
             entity.Property(e => e.Status).HasColumnName("status");
@@ -2450,6 +2456,12 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
+            entity.Property(e => e.SalePerson)
+                .HasColumnType("character varying")
+                .HasColumnName("sale_person");
+            entity.Property(e => e.SaleSupport)
+                .HasColumnType("character varying")
+                .HasColumnName("sale_support");
             entity.Property(e => e.SoDate).HasColumnName("so_date");
             entity.Property(e => e.Status).HasColumnName("status");
             entity.Property(e => e.StatusName)

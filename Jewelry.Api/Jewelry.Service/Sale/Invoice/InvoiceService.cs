@@ -91,6 +91,10 @@ namespace Jewelry.Service.Sale.Invoice
                 (x.PriceOrigin * (1 - (x.Discount ?? 0) / 100m) / request.CurrencyRate) * x.Qty);
             var t = MathHelper.ComputeTotals(subTotal, request.SpecialDiscount, request.SpecialAddition, request.FreightAndInsurance, request.Vat);
 
+            // ดึงใบสั่งขายเพื่อสแนปช็อตผู้ขาย/ผู้ช่วยขายมาเก็บที่ invoice ณ ตอนสร้าง — ถ้าไม่พบ SO ก็ไม่ throw ให้ปล่อยเป็น null (เป็นแค่ข้อมูลประกอบใบพิมพ์)
+            var saleOrder = await _jewelryContext.TbtSaleOrder
+                .FirstOrDefaultAsync(x => x.SoNumber == request.SoNumber);
+
             // Create invoice header
             var invoiceHeader = new TbtSaleInvoiceHeader
             {
@@ -123,6 +127,10 @@ namespace Jewelry.Service.Sale.Invoice
                 Priority = request.Priority,
                 RefQuotation = request.RefQuotation,
                 Remark = request.Remark,
+
+                // สแนปช็อตผู้ขาย/ผู้ช่วยขายจาก SO ณ ตอนสร้าง invoice เพื่อไม่ให้ใบพิมพ์เปลี่ยนตามเมื่อ SO ถูกแก้ไขภายหลัง
+                SalePerson = saleOrder?.SalePerson,
+                SaleSupport = saleOrder?.SaleSupport,
 
                 Status = 100,
                 StatusName = "invoice",
@@ -295,6 +303,10 @@ namespace Jewelry.Service.Sale.Invoice
                 Priority = invoiceHeader.Priority,
                 RefQuotation = invoiceHeader.RefQuotation,
                 Remark = invoiceHeader.Remark,
+
+                // อ่านจาก invoiceHeader (สแนปช็อต ณ ตอนสร้าง) ไม่ใช่จาก saleOrderHeader เพื่อให้ใบพิมพ์ไม่เปลี่ยนตาม SO ที่แก้ไขภายหลัง
+                SalePerson = invoiceHeader.SalePerson,
+                SaleSupport = invoiceHeader.SaleSupport,
 
                 Status = invoiceHeader.Status,
                 StatusName = invoiceHeader.StatusName,

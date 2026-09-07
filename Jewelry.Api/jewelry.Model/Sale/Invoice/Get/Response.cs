@@ -38,6 +38,8 @@ namespace jewelry.Model.Sale.Invoice.Get
         public string? RefQuotation { get; set; }
         public string? Remark { get; set; }
 
+        public string? SalePerson { get; set; }
+        public string? SaleSupport { get; set; }
 
         public decimal SpecialDiscount { get; set; }
         public decimal SpecialAddition { get; set; }

@@ -391,6 +391,10 @@ namespace Jewelry.Service.User
             {
                 query = query.Where(x => x.IsNew == request.IsNew);
             }
+            if (request.RoleId.HasValue)
+            {
+                query = query.Where(x => x.TbtUserRole.Any(r => r.Role == request.RoleId.Value));
+            }
 
 
             var response = (from user in query

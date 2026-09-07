@@ -107,6 +107,10 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                     Remark = request.Remark,
 
+                    // Trim ชื่อผู้ขาย/ผู้ช่วยขาย เพราะข้อมูลชื่อใน user master บางรายมีช่องว่างหน้า-หลังติดมา และไม่ให้ string ว่างเข้าคอลัมน์
+                    SalePerson = string.IsNullOrWhiteSpace(request.SalePerson) ? null : request.SalePerson.Trim(),
+                    SaleSupport = string.IsNullOrWhiteSpace(request.SaleSupport) ? null : request.SaleSupport.Trim(),
+
                     SubTotal = tCreate.subTotal,
                     SpecialDiscountAmt = request.SpecialDiscount ?? 0,
                     SpecialAdditionAmt = request.SpecialAddition ?? 0,
@@ -165,6 +169,10 @@ namespace Jewelry.Service.Sale.SaleOrder
                 saleOrder.Freight = request.Freight;
 
                 saleOrder.Remark = request.Remark;
+
+                // Trim ชื่อผู้ขาย/ผู้ช่วยขาย เพราะข้อมูลชื่อใน user master บางรายมีช่องว่างหน้า-หลังติดมา และไม่ให้ string ว่างเข้าคอลัมน์
+                saleOrder.SalePerson = string.IsNullOrWhiteSpace(request.SalePerson) ? null : request.SalePerson.Trim();
+                saleOrder.SaleSupport = string.IsNullOrWhiteSpace(request.SaleSupport) ? null : request.SaleSupport.Trim();
 
                 var tUpdate = MathHelper.ComputeTotals(
                     request.SubTotal ?? 0,
@@ -252,6 +260,9 @@ namespace Jewelry.Service.Sale.SaleOrder
                 SoDate = saleOrder.SoDate,
 
                 Remark = saleOrder.Remark,
+
+                SalePerson = saleOrder.SalePerson,
+                SaleSupport = saleOrder.SaleSupport,
 
                 SubTotal = saleOrder.SubTotal,
                 SpecialDiscountAmt = saleOrder.SpecialDiscountAmt,

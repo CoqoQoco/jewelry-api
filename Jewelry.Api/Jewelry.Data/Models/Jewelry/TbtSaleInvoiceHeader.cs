@@ -49,6 +49,10 @@ public partial class TbtSaleInvoiceHeader
 
     public string? Remark { get; set; }
 
+    public string? SalePerson { get; set; }
+
+    public string? SaleSupport { get; set; }
+
     public int Status { get; set; }
 
     public string StatusName { get; set; } = null!;

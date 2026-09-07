@@ -47,6 +47,10 @@ public partial class TbtSaleOrder
 
     public string? Remark { get; set; }
 
+    public string? SalePerson { get; set; }
+
+    public string? SaleSupport { get; set; }
+
     public DateTime? SoDate { get; set; }
 
     public decimal? GoldRate { get; set; }
