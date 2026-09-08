@@ -217,6 +217,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtTicket> TbtTicket { get; set; }
 
+    public virtual DbSet<TbtAnnouncement> TbtAnnouncement { get; set; }
+
     public virtual DbSet<TbtTicketImage> TbtTicketImage { get; set; }
 
     public virtual DbSet<TbtTicketLog> TbtTicketLog { get; set; }
@@ -4690,6 +4692,47 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(e => e.TicketId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_ticket_image_ticket_fk");
+        });
+
+        modelBuilder.Entity<TbtAnnouncement>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_announcement_pk");
+
+            entity.ToTable("tbt_announcement");
+
+            entity.HasIndex(e => new { e.IsActive, e.IsPublished, e.PublishStart }).HasDatabaseName("idx_tbt_announcement_feed");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Title)
+                .HasColumnType("character varying")
+                .HasColumnName("title");
+            entity.Property(e => e.Body)
+                .HasColumnType("text")
+                .HasColumnName("body");
+            entity.Property(e => e.ImagePath)
+                .HasColumnType("character varying")
+                .HasColumnName("image_path");
+            entity.Property(e => e.IsPinned)
+                .HasDefaultValue(false)
+                .HasColumnName("is_pinned");
+            entity.Property(e => e.PublishStart).HasColumnName("publish_start");
+            entity.Property(e => e.PublishEnd).HasColumnName("publish_end");
+            entity.Property(e => e.IsPublished)
+                .HasDefaultValue(true)
+                .HasColumnName("is_published");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
         });
 
         modelBuilder.Entity<TbtTicketImage>(entity =>

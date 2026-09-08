@@ -1,5 +1,6 @@
 ﻿using jewelry.Model.Azure;
 using Jewelry.Data.Context;
+using Jewelry.Service.Announcement;
 using Jewelry.Service.Authentication.Login;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
@@ -131,6 +132,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<ICatalogService, CatalogService>();
 
             services.AddScoped<ITicketService, TicketService>();
+            services.AddScoped<IAnnouncementService, AnnouncementService>();
 
             services.AddScoped<IPrintJobService, PrintJobService>();
 
