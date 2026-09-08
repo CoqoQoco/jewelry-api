@@ -3,6 +3,7 @@ using jewelry.Model.Mold;
 using jewelry.Model.Stock.Gem.Search;
 using jewelry.Model.Stock.Product.Dashboard;
 using Jewelry.Api.Extension;
+using Jewelry.Service.PublicProduct;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
@@ -22,16 +23,19 @@ namespace Jewelry.Api.Controllers.Stock
         private readonly ILogger<MoldController> _logger;
         private readonly IProductService _service;
         private readonly IPlanReceiptService _planReceiptservice;
+        private readonly IPublicProductService _publicProductService;
 
         public StockProductController(ILogger<MoldController> logger,
            IProductService service,
            IPlanReceiptService planReceiptservice,
+           IPublicProductService publicProductService,
            IOptions<ApiBehaviorOptions> apiBehaviorOptions)
            : base(apiBehaviorOptions)
         {
             _logger = logger;
             _service = service;
             _planReceiptservice = planReceiptservice;
+            _publicProductService = publicProductService;
         }
 
         [Route("List")]
@@ -66,6 +70,23 @@ namespace Jewelry.Api.Controllers.Stock
                 var response = await _service.Get(request);
                 return Ok(response);
 
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("PublicLink")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(jewelry.Model.PublicProduct.Link.Response))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public IActionResult PublicLink([FromBody] jewelry.Model.PublicProduct.Link.Request request)
+        {
+            try
+            {
+                var response = _publicProductService.CreateLink(request.StockNumber);
+                return Ok(response);
             }
             catch (HandleException ex)
             {

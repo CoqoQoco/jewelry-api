@@ -24,6 +24,7 @@ using Jewelry.Service.Sale.ExportShipment;
 using Jewelry.Service.Sale.MaterialSale;
 using Jewelry.Service.Sale.SaleReport;
 using Jewelry.Service.Sale.StockBasket;
+using Jewelry.Service.PublicProduct;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
@@ -63,6 +64,12 @@ namespace Jewelry.Api.Extension
             services.Configure<AzureStorageConfig>(
                 configuration.GetSection("AzureStorage")
             );
+
+            // Configure Public Product
+            services.Configure<jewelry.Model.PublicProduct.PublicProductConfig>(
+                configuration.GetSection("PublicProduct")
+            );
+            services.AddMemoryCache();
 
             // Register Azure Blob Storage Service as Singleton
             // (Singleton เพราะ BlobServiceClient เป็น thread-safe และ reusable)
@@ -126,6 +133,8 @@ namespace Jewelry.Api.Extension
             services.AddScoped<ITicketService, TicketService>();
 
             services.AddScoped<IPrintJobService, PrintJobService>();
+
+            services.AddScoped<IPublicProductService, PublicProductService>();
 
             return services;
         }

@@ -3,11 +3,13 @@ using Jewelry.Api.Extension;
 using Jewelry.Data.Context;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using System.Text;
 
@@ -185,6 +187,15 @@ builder.Services.AddSwaggerGen(options =>
 // Add HttpContextAccessor
 builder.Services.AddHttpContextAccessor();
 
+// Rate limiting for public endpoints
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy("public", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
+
 //Register DB, Service 
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
@@ -205,6 +216,7 @@ if (!app.Environment.IsProduction())
 }
 
 app.UseCors("AllowAnyOrigin");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
