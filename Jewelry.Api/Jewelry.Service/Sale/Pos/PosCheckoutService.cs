@@ -4,6 +4,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Sale.Invoice;
 using Jewelry.Service.Sale.SaleOrder;
+using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.Product;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -267,18 +268,23 @@ namespace Jewelry.Service.Sale.Pos
                     throw new HandleException($"ไม่พบสินค้า {stockNumber} ในระบบสต็อก");
                 }
 
-                var existingConfirmation = await _jewelryContext.TbtSaleOrderProduct
-                    .Where(p => p.StockNumber == stockNumber)
-                    .OrderByDescending(p => p.CreateDate)
-                    .FirstOrDefaultAsync();
+                var piece = pieces.First();
+                var available = StockPieceQtyHelper.Available(piece);
 
-                var blockedPiece = pieces.FirstOrDefault(p => p.Status == "RESERVED" || p.Status == "SOLD");
-
-                if (blockedPiece != null || existingConfirmation != null)
+                if (item.Qty > available)
                 {
-                    var soLabel = existingConfirmation?.SoNumber ?? "ไม่ทราบเลขที่";
-                    var sellerLabel = existingConfirmation?.CreateBy ?? "ไม่ทราบผู้ขาย";
-                    throw new HandleException($"สินค้า {stockNumber} ถูกขายไปแล้วในบิล {soLabel} (โดย {sellerLabel})");
+                    var existingConfirmation = await _jewelryContext.TbtSaleOrderProduct
+                        .Where(p => p.StockNumber == stockNumber)
+                        .OrderByDescending(p => p.CreateDate)
+                        .FirstOrDefaultAsync();
+
+                    var message = $"สินค้า {stockNumber} เหลือพร้อมขาย {available} ชิ้น ไม่พอสำหรับจำนวนที่ขอขาย {item.Qty} ชิ้น";
+                    if (existingConfirmation != null)
+                    {
+                        message += $" (ล่าสุดอยู่ในบิล {existingConfirmation.SoNumber} โดย {existingConfirmation.CreateBy})";
+                    }
+
+                    throw new HandleException(message);
                 }
             }
         }

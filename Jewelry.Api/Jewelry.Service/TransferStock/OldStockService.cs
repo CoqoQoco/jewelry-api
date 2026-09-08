@@ -717,47 +717,22 @@ namespace Jewelry.Service.TransferStock
             // 3. Generate running numbers
             var itemsToInsert = validItems.Where(x => !existingPieceProductCodes.Contains(x.stocks!.Noproduct ?? "")).ToList();
 
-            // สำหรับแถวที่สร้างได้หลาย piece (เงิน) จำกัดจำนวน piece สะสมต่อรอบไม่ให้เกิน batchSize
-            // เพื่อไม่ให้ transaction เดียวหนักเกินไป — แถวที่ไม่ถูกหยิบรอบนี้จะยังไม่ถูก mark transfer
-            // จึงถูกโอนในรอบถัดไปเองตามปกติ (ไม่กระทบ gold ที่ pieceQtyFunc เป็น null)
+            // 1 แถวคิว = 1 piece เสมอ (เงินเก็บจำนวนไว้ที่ piece.qty ไม่สร้างหลาย piece ต่อแถวอีกต่อไป)
+            // คงจำกัดจำนวนแถวสะสมต่อรอบไม่ให้เกิน batchSize เพื่อไม่ให้ transaction เดียวหนักเกินไป
+            // แถวที่ไม่ถูกหยิบรอบนี้จะยังไม่ถูก mark transfer จึงถูกโอนในรอบถัดไปเองตามปกติ
             var excludedFromThisRound = new HashSet<TStock>();
-            if (pieceQtyFunc != null)
+            if (pieceQtyFunc != null && itemsToInsert.Count > batchSize)
             {
-                var cumulativePieces = 0;
-                var keptCount = 0;
-                foreach (var it in itemsToInsert)
+                foreach (var it in itemsToInsert.Skip(batchSize))
                 {
-                    var pieceQty = pieceQtyFunc(it.item) ?? 1;
-                    if (pieceQty <= 0) pieceQty = 1;
-
-                    if (cumulativePieces > 0 && cumulativePieces + pieceQty > batchSize)
-                    {
-                        break;
-                    }
-
-                    cumulativePieces += pieceQty;
-                    keptCount++;
+                    excludedFromThisRound.Add(it.item);
                 }
-
-                if (keptCount < itemsToInsert.Count)
-                {
-                    foreach (var it in itemsToInsert.Skip(keptCount))
-                    {
-                        excludedFromThisRound.Add(it.item);
-                    }
-                    itemsToInsert = itemsToInsert.Take(keptCount).ToList();
-                }
+                itemsToInsert = itemsToInsert.Take(batchSize).ToList();
             }
 
             var receiptRunning = await _runningNumberService.GenerateRunningNumber(receiptPrefix);
 
-            var totalRunningNumbersNeeded = pieceQtyFunc == null
-                ? itemsToInsert.Count
-                : itemsToInsert.Sum(x =>
-                {
-                    var pieceQty = pieceQtyFunc(x.item) ?? 1;
-                    return pieceQty <= 0 ? 1 : pieceQty;
-                });
+            var totalRunningNumbersNeeded = itemsToInsert.Count;
 
             var stockRunningNumbers = new List<string>();
             for (int i = 0; i < totalRunningNumbersNeeded; i++)
@@ -767,6 +742,7 @@ namespace Jewelry.Service.TransferStock
 
             // 4. Build insert/update lists
             var newProducts = new List<StockProductDto>();
+            var lotQtyByStockNumber = new Dictionary<string, int>();
             var newPieceMaterials = new List<TbtStockPieceMaterial>();
             var stockUpdates = new List<TStock>();
 
@@ -816,79 +792,77 @@ namespace Jewelry.Service.TransferStock
                 var woNumber = GetWONumber(stock.Jobno);
                 var pieceProductCodeBase = stock.Codeproduct ?? stock.Noproduct;
 
-                for (int p = 0; p < pieceCount; p++)
+                var stockRunning = stockRunningNumbers[runningIndex++];
+                addCount++;
+
+                var newProduct = new StockProductDto
                 {
-                    var stockRunning = stockRunningNumbers[runningIndex++];
-                    addCount++;
+                    StockNumber = stockRunning,
+                    Status = StockProductStatus.Available,
 
-                    var newProduct = new StockProductDto
+                    ReceiptNumber = receiptRunning,
+                    ReceiptDate = DateTime.UtcNow,
+                    ReceiptType = "transfer",
+
+                    Mold = stock.NoCode,
+                    MoldDesign = stock.NoCode,
+
+                    Qty = stock.Quantity ?? 1,
+                    ProductPrice = stock.Pricesale ?? 0,
+
+                    ProductCost = string.IsNullOrEmpty(stock.Pricecost) ? 0 :
+                        decimal.TryParse(stock.Pricecost, out var cost) ? cost : 0,
+                    ProductCode = stock.Noproduct,
+                    ProductNumber = stock.Codeproduct,
+                    ProductNameTh = stock.Productname ?? "DK",
+                    ProductNameEn = stock.Productname ?? "DK",
+
+                    ImageName = stock.NoCode,
+                    ImagePath = $"{stock.NoCode}.jpg",
+
+                    Size = stock.Ringsize,
+                    Remark = stock.Remark,
+                    TagPriceMultiplier = 1,
+                    Location = location,
+
+                    CreateBy = CurrentUsername ?? "system",
+                    CreateDate = DateTime.UtcNow,
+
+                    ProductType = productType.Code,
+                    ProductTypeName = productType.NameTh,
+
+                    ProductionDate = productionDate,
+                    ProductionType = productionType,
+                    ProductionTypeSize = productionTypeSize,
+                    WoOrigin = woOrigin,
+                    Wo = wo,
+                    WoNumber = woNumber
+                };
+
+                newProducts.Add(newProduct);
+                lotQtyByStockNumber[stockRunning] = pieceCount;
+
+                var pieceProductCode = pieceProductCodeBase ?? stockRunning;
+                var materialTypes = new[]
+                {
+                    new { Type = stock.Typeg, TypeCode = stock.Typed1, Qty = stock.Qtyg, Weight = stock.Wg, Unit = stock.Unit1, Price = stock.Priceg, Size = (string?)null },
+                    new { Type = stock.Typed, TypeCode = stock.Typed1, Qty = stock.Qtyd, Weight = stock.Wd, Unit = stock.Unit2, Price = stock.Priced, Size = (string?)null },
+                    new { Type = stock.Typer, TypeCode = stock.Typed1, Qty = stock.Qtyr, Weight = stock.Wr, Unit = stock.Unit3, Price = stock.Pricer, Size = stock.Sizer },
+                    new { Type = stock.TypeS, TypeCode = stock.Typed1, Qty = stock.Qtys, Weight = stock.Ws, Unit = stock.Unit4, Price = stock.Prices, Size = stock.Sizes },
+                    new { Type = stock.Typee, TypeCode = stock.Typed1, Qty = stock.Qtye, Weight = stock.We, Unit = stock.Unit5, Price = stock.Pricee, Size = stock.Sizee },
+                    new { Type = stock.Typem, TypeCode = stock.Typed1, Qty = stock.Qtym, Weight = stock.Wm, Unit = stock.Unit6, Price = stock.Pricem, Size = stock.Sizem }
+                };
+
+                foreach (var mat in materialTypes)
+                {
+                    if (!string.IsNullOrEmpty(mat.Type))
                     {
-                        StockNumber = stockRunning,
-                        Status = StockProductStatus.Available,
+                        var newMaterial = GetPieceMaterial(stockRunning, pieceProductCode, mat.Type.ToUpper().Trim(),
+                            mat.Type, mat.TypeCode, mat.Qty, mat.Weight, mat.Unit, mat.Price, mat.Size);
 
-                        ReceiptNumber = receiptRunning,
-                        ReceiptDate = DateTime.UtcNow,
-                        ReceiptType = "transfer",
-
-                        Mold = stock.NoCode,
-                        MoldDesign = stock.NoCode,
-
-                        Qty = stock.Quantity ?? 1,
-                        ProductPrice = stock.Pricesale ?? 0,
-
-                        ProductCost = string.IsNullOrEmpty(stock.Pricecost) ? 0 :
-                            decimal.TryParse(stock.Pricecost, out var cost) ? cost : 0,
-                        ProductCode = stock.Noproduct,
-                        ProductNumber = stock.Codeproduct,
-                        ProductNameTh = stock.Productname ?? "DK",
-                        ProductNameEn = stock.Productname ?? "DK",
-
-                        ImageName = stock.NoCode,
-                        ImagePath = $"{stock.NoCode}.jpg",
-
-                        Size = stock.Ringsize,
-                        Remark = stock.Remark,
-                        TagPriceMultiplier = 1,
-                        Location = location,
-
-                        CreateBy = CurrentUsername ?? "system",
-                        CreateDate = DateTime.UtcNow,
-
-                        ProductType = productType.Code,
-                        ProductTypeName = productType.NameTh,
-
-                        ProductionDate = productionDate,
-                        ProductionType = productionType,
-                        ProductionTypeSize = productionTypeSize,
-                        WoOrigin = woOrigin,
-                        Wo = wo,
-                        WoNumber = woNumber
-                    };
-
-                    newProducts.Add(newProduct);
-
-                    var pieceProductCode = pieceProductCodeBase ?? stockRunning;
-                    var materialTypes = new[]
-                    {
-                        new { Type = stock.Typeg, TypeCode = stock.Typed1, Qty = stock.Qtyg, Weight = stock.Wg, Unit = stock.Unit1, Price = stock.Priceg, Size = (string?)null },
-                        new { Type = stock.Typed, TypeCode = stock.Typed1, Qty = stock.Qtyd, Weight = stock.Wd, Unit = stock.Unit2, Price = stock.Priced, Size = (string?)null },
-                        new { Type = stock.Typer, TypeCode = stock.Typed1, Qty = stock.Qtyr, Weight = stock.Wr, Unit = stock.Unit3, Price = stock.Pricer, Size = stock.Sizer },
-                        new { Type = stock.TypeS, TypeCode = stock.Typed1, Qty = stock.Qtys, Weight = stock.Ws, Unit = stock.Unit4, Price = stock.Prices, Size = stock.Sizes },
-                        new { Type = stock.Typee, TypeCode = stock.Typed1, Qty = stock.Qtye, Weight = stock.We, Unit = stock.Unit5, Price = stock.Pricee, Size = stock.Sizee },
-                        new { Type = stock.Typem, TypeCode = stock.Typed1, Qty = stock.Qtym, Weight = stock.Wm, Unit = stock.Unit6, Price = stock.Pricem, Size = stock.Sizem }
-                    };
-
-                    foreach (var mat in materialTypes)
-                    {
-                        if (!string.IsNullOrEmpty(mat.Type))
+                        if (CheckTypeOrigin(newMaterial.TypeOrigin))
                         {
-                            var newMaterial = GetPieceMaterial(stockRunning, pieceProductCode, mat.Type.ToUpper().Trim(),
-                                mat.Type, mat.TypeCode, mat.Qty, mat.Weight, mat.Unit, mat.Price, mat.Size);
-
-                            if (CheckTypeOrigin(newMaterial.TypeOrigin))
-                            {
-                                newPieceMaterials.Add(newMaterial);
-                            }
+                            newPieceMaterials.Add(newMaterial);
                         }
                     }
                 }
@@ -928,6 +902,8 @@ namespace Jewelry.Service.TransferStock
 
                 foreach (var stock in newProducts)
                 {
+                    var lotQty = lotQtyByStockNumber.TryGetValue(stock.StockNumber, out var q) ? q : 1;
+
                     var skuCode = stock.DeriveSkuCode();
 
                     if (!skuCache.ContainsKey(skuCode))
@@ -943,12 +919,12 @@ namespace Jewelry.Service.TransferStock
                     var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername ?? "system", locationCache);
                     var stockNumberOrigin = stock.ProductCode;
 
-                    newPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername ?? "system", stockNumberOrigin));
+                    newPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername ?? "system", stockNumberOrigin, qty: lotQty));
 
                     var balanceKey = $"{skuCode}|{locationCode}";
                     if (balanceCache.ContainsKey(balanceKey))
                     {
-                        balanceCache[balanceKey].QtyOnHand += 1;
+                        balanceCache[balanceKey].QtyOnHand += lotQty;
                         balanceCache[balanceKey].LastMovementAt = DateTime.UtcNow;
                     }
                     else
@@ -958,7 +934,7 @@ namespace Jewelry.Service.TransferStock
 
                         if (existingBalance != null)
                         {
-                            existingBalance.QtyOnHand += 1;
+                            existingBalance.QtyOnHand += lotQty;
                             existingBalance.LastMovementAt = DateTime.UtcNow;
                             balanceCache[balanceKey] = existingBalance;
                         }
@@ -968,7 +944,7 @@ namespace Jewelry.Service.TransferStock
                             {
                                 SkuCode = skuCode,
                                 LocationCode = locationCode,
-                                QtyOnHand = 1,
+                                QtyOnHand = lotQty,
                                 QtyReserved = 0,
                                 LastMovementAt = DateTime.UtcNow,
                                 CreateBy = CurrentUsername ?? "system",
@@ -980,7 +956,7 @@ namespace Jewelry.Service.TransferStock
                     }
 
                     var pieceProductCode = stock.ProductNumber ?? stock.StockNumber;
-                    newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername ?? "system", refDocType));
+                    newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername ?? "system", refDocType, qty: lotQty));
                 }
 
                 updateBalances = balanceCache.Values.Where(x => x.Id != 0).ToList();

@@ -266,6 +266,17 @@ namespace Jewelry.Service.Receipt.Production
             return result;
         }
 
+        public static string BuildSilverLotGroupKey(this jewelry.Model.Receipt.Production.Confirm.ConfirmStock confirm)
+        {
+            var materials = confirm.Materials ?? new List<jewelry.Model.Receipt.Production.Confirm.ConfirmMaterial>();
+            var materialsSignature = string.Join(";", materials.Select(m => string.Join("|",
+                m.Type, m.TypeCode, m.Qty, m.QtyUnit, m.Weight, m.WeightUnit,
+                m.Size, m.Region, m.Price, m.QtyPrice, m.QtyWeight, m.QtyWeightUnit, m.QtyWeightPrice)));
+
+            return string.Join("||", confirm.ProductNumber, confirm.MoldDesign, confirm.Size,
+                confirm.StudEarring, confirm.EarringStemSize, confirm.Location, confirm.Price, materialsSignature);
+        }
+
         public static string DeriveSkuCode(this StockProductDto stock)
         {
             if (!string.IsNullOrWhiteSpace(stock.ProductNumber))
@@ -315,15 +326,16 @@ namespace Jewelry.Service.Receipt.Production
             };
         }
 
-        public static TbtStockPiece MapNewStockPiece(this StockProductDto stock, string skuCode, string locationCode, string operatorBy, string? stockNumberOrigin = null)
+        public static TbtStockPiece MapNewStockPiece(this StockProductDto stock, string skuCode, string locationCode, string operatorBy, string? stockNumberOrigin = null, decimal qty = 1)
         {
-            return new TbtStockPiece
+            var piece = new TbtStockPiece
             {
                 StockNumber = stock.StockNumber,
                 ProductCode = stock.ProductNumber ?? stock.StockNumber,
                 SkuCode = skuCode,
                 LocationCode = locationCode,
-                Status = "IN_STOCK",
+                Qty = qty,
+                QtyReserved = 0,
                 ReceiptNumber = stock.ReceiptNumber,
                 ReceiptType = stock.ReceiptType,
                 ReceiptDate = stock.ReceiptDate,
@@ -343,9 +355,13 @@ namespace Jewelry.Service.Receipt.Production
                 CreateBy = operatorBy,
                 CreateDate = DateTime.UtcNow
             };
+
+            Jewelry.Service.Stock.StockPieceQtyHelper.RecalcStatus(piece);
+
+            return piece;
         }
 
-        public static TbtStockMovement MapNewReceiptMovement(string skuCode, string stockNumber, string productCode, string locationCode, string receiptNumber, string operatorBy, string refDocType = "RECEIPT")
+        public static TbtStockMovement MapNewReceiptMovement(string skuCode, string stockNumber, string productCode, string locationCode, string receiptNumber, string operatorBy, string refDocType = "RECEIPT", decimal qty = 1)
         {
             return new TbtStockMovement
             {
@@ -354,7 +370,7 @@ namespace Jewelry.Service.Receipt.Production
                 StockNumber = stockNumber,
                 ProductCode = productCode,
                 ToLocation = locationCode,
-                Qty = 1,
+                Qty = qty,
                 RefDocType = refDocType,
                 RefDocNo = receiptNumber,
                 MovementDate = DateTime.UtcNow,

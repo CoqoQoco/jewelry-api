@@ -4,6 +4,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Sale.SaleOrder;
+using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -184,7 +185,9 @@ namespace Jewelry.Service.Sale.Invoice
 
                 if (balance == null) continue;
 
-                piece.Status = "SOLD";
+                piece.Qty -= soProduct.Qty;
+                piece.QtyReserved -= soProduct.Qty;
+                StockPieceQtyHelper.RecalcStatus(piece);
                 piece.UpdateBy = CurrentUsername;
                 piece.UpdateDate = DateTime.UtcNow;
 
@@ -475,7 +478,13 @@ namespace Jewelry.Service.Sale.Invoice
                             Status = invoice.Status,
                             StatusName = invoice.StatusName,
 
+                            GrandTotalRounded = invoice.GrandTotalRounded,
+                            Deposit = invoice.Deposit,
+
                             ItemCount = _jewelryContext.TbtSaleOrderProduct.Count(x => x.Invoice == invoice.Running),
+                            PaidAmount = _jewelryContext.TbtSaleInvoicePaymentItem
+                                .Where(p => p.InvoiceRunning == invoice.Running && p.IsDelete == false)
+                                .Sum(p => p.Amount),
                             //TotalAmount = _jewelryContext.TbtSaleOrderProduct
                             //    .Where(x => x.Invoice == invoice.Running)
                             //    .Sum(x => x.PriceAfterCurrecyRate * x.Qty)
@@ -599,14 +608,16 @@ namespace Jewelry.Service.Sale.Invoice
                 var piece = await _jewelryContext.TbtStockPiece
                     .FirstOrDefaultAsync(p => p.StockNumber == product.StockNumber);
 
-                if (piece != null && piece.Status == "SOLD")
+                if (piece != null)
                 {
                     var balance = await _jewelryContext.TbtStockBalance
                         .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
 
                     if (balance != null)
                     {
-                        piece.Status = "RESERVED";
+                        piece.Qty += product.Qty;
+                        piece.QtyReserved += product.Qty;
+                        StockPieceQtyHelper.RecalcStatus(piece);
                         piece.UpdateBy = CurrentUsername;
                         piece.UpdateDate = DateTime.UtcNow;
 

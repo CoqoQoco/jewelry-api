@@ -3928,6 +3928,12 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Status)
                 .HasColumnType("character varying")
                 .HasColumnName("status");
+            entity.Property(e => e.Qty)
+                .HasColumnType("numeric(18,4)")
+                .HasColumnName("qty");
+            entity.Property(e => e.QtyReserved)
+                .HasColumnType("numeric(18,4)")
+                .HasColumnName("qty_reserved");
             entity.Property(e => e.ReceiptNumber)
                 .HasColumnType("character varying")
                 .HasColumnName("receipt_number");

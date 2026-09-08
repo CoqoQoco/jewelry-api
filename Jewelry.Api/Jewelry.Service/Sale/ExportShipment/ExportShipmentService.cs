@@ -478,7 +478,7 @@ public class ExportShipmentService : BaseService, IExportShipmentService
             unitPrice = Math.Round((tagPrice ?? 0m) * (pricePercent / 100m) / header.ExchangeRate.Value, 2);
         }
 
-        const decimal qty = 1m;
+        var qty = piece.Qty;
 
         return new TbtExportShipmentItem
         {

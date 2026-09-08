@@ -21,6 +21,6 @@ namespace Jewelry.Model.Stock.Reconciliation
         public string SkuCode { get; set; } = null!;
         public string LocationCode { get; set; } = null!;
         public decimal BalanceQty { get; set; }
-        public int PieceCount { get; set; }
+        public decimal PieceCount { get; set; }
     }
 }

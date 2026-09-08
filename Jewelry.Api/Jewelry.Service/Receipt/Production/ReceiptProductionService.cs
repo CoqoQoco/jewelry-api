@@ -501,6 +501,11 @@ namespace Jewelry.Service.Receipt.Production
             var updateReceipt = query.receipt;
             var updateReceiptItem = new List<TbtStockProductReceiptItem>();
 
+            // แผนเงิน: auto-group แถวที่เหมือนกัน (key ดู BuildSilverLotGroupKey) ให้ใช้เลขวิ่งเดียวกัน (1 ล็อต)
+            var isSilverPlan = query.plan.Type == "Silver";
+            var silverLotRunningByKey = new Dictionary<string, string>();
+            var stockNumbersWithMaterialsPersisted = new HashSet<string>();
+
             decimal? productCostPerUnit = null;
             if (query.plan.TbtProductionPlanPrice != null && query.plan.TbtProductionPlanPrice.Any() && query.plan.ProductQty > 0)
             {
@@ -521,9 +526,22 @@ namespace Jewelry.Service.Receipt.Production
                     throw new HandleException($"{ErrorMessage.StockAlreadyReceipt} --> {stock.StockReceiptNumber}");
                 }
 
-                var prefix = query.plan.Type == "Silver" ? productType.SilverCode : productType.ProductCode;
+                var prefix = isSilverPlan ? productType.SilverCode : productType.ProductCode;
 
-                var _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
+                string _stockRunning;
+                if (isSilverPlan)
+                {
+                    var groupKey = stock.BuildSilverLotGroupKey();
+                    if (!silverLotRunningByKey.TryGetValue(groupKey, out _stockRunning))
+                    {
+                        _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
+                        silverLotRunningByKey[groupKey] = _stockRunning;
+                    }
+                }
+                else
+                {
+                    _stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
+                }
 
                 var newProduct = match.MapNewStockProduction(query.receipt, query.plan, stock, _stockRunning, CurrentUsername);
                 newProduct.ProductCost = productCostPerUnit;
@@ -535,11 +553,12 @@ namespace Jewelry.Service.Receipt.Production
                 {
                     var pieceProductCode = stock.ProductNumber.ToUpper();
                     newProductMaterial = stock.MapNewStockPieceMaterial(_stockRunning, pieceProductCode, CurrentUsername);
-                    newStockPieceMaterials.AddRange(newProductMaterial);
+                    newProductResponse.Materials = newProductMaterial.MapResponseNewStockMaterialProduction();
 
-                    if (newProductMaterial.Any())
+                    // เงิน: material 1 ชุดต่อล็อต — persist เฉพาะครั้งแรกของแต่ละเลข (แถวถัดไปในกลุ่มเดียวกันข้าม)
+                    if (stockNumbersWithMaterialsPersisted.Add(_stockRunning))
                     {
-                        newProductResponse.Materials = newProductMaterial.MapResponseNewStockMaterialProduction();
+                        newStockPieceMaterials.AddRange(newProductMaterial);
                     }
                 }
 
@@ -635,8 +654,12 @@ namespace Jewelry.Service.Receipt.Production
             var locationCache = new Dictionary<string, string>();
             var balanceCache = new Dictionary<string, TbtStockBalance>();
 
-            foreach (var stock in newStocks)
+            // group ตาม StockNumber: แผนทองแต่ละแถวมีเลขวิ่งไม่ซ้ำอยู่แล้ว (กลุ่มละ 1) แผนเงินที่ auto-group แล้วจะมีหลายแถวใน 1 เลข (lotQty)
+            foreach (var stockGroup in newStocks.GroupBy(x => x.StockNumber))
             {
+                var stock = stockGroup.First();
+                var lotQty = stockGroup.Count();
+
                 var skuCode = stock.DeriveSkuCode();
 
                 if (!skuCache.ContainsKey(skuCode))
@@ -652,12 +675,12 @@ namespace Jewelry.Service.Receipt.Production
                 var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername, locationCache);
                 var pieceProductCode = stock.ProductNumber ?? stock.StockNumber;
 
-                newStockPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername));
+                newStockPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername, qty: lotQty));
 
                 var balanceKey = $"{skuCode}|{locationCode}";
                 if (balanceCache.ContainsKey(balanceKey))
                 {
-                    balanceCache[balanceKey].QtyOnHand += 1;
+                    balanceCache[balanceKey].QtyOnHand += lotQty;
                     balanceCache[balanceKey].LastMovementAt = DateTime.UtcNow;
                 }
                 else
@@ -667,7 +690,7 @@ namespace Jewelry.Service.Receipt.Production
 
                     if (existingBalance != null)
                     {
-                        existingBalance.QtyOnHand += 1;
+                        existingBalance.QtyOnHand += lotQty;
                         existingBalance.LastMovementAt = DateTime.UtcNow;
                         balanceCache[balanceKey] = existingBalance;
                     }
@@ -677,7 +700,7 @@ namespace Jewelry.Service.Receipt.Production
                         {
                             SkuCode = skuCode,
                             LocationCode = locationCode,
-                            QtyOnHand = 1,
+                            QtyOnHand = lotQty,
                             QtyReserved = 0,
                             LastMovementAt = DateTime.UtcNow,
                             CreateBy = CurrentUsername,
@@ -688,7 +711,7 @@ namespace Jewelry.Service.Receipt.Production
                     }
                 }
 
-                newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername));
+                newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername, qty: lotQty));
             }
 
             var updateBalances = balanceCache.Values

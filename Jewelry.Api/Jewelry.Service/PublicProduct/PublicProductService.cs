@@ -110,6 +110,8 @@ namespace Jewelry.Service.PublicProduct
                     ProductCode = x.ProductCode,
                     SizeActual = x.SizeActual,
                     Status = x.Status,
+                    Qty = x.Qty,
+                    QtyReserved = x.QtyReserved,
                     ProductNumber = x.SkuCodeNavigation.ProductNumber,
                     ProductNameTh = x.SkuCodeNavigation.ProductNameTh,
                     ProductNameEn = x.SkuCodeNavigation.ProductNameEn,
@@ -179,6 +181,9 @@ namespace Jewelry.Service.PublicProduct
 
             var imagePath = BuildImagePath(matched.ImagePath, matched.ImageName);
 
+            var availableQty = matched.Qty - matched.QtyReserved;
+            if (availableQty < 0) availableQty = 0;
+
             return new jewelry.Model.PublicProduct.Get.Response
             {
                 StockNumber = matched.StockNumber,
@@ -197,7 +202,8 @@ namespace Jewelry.Service.PublicProduct
                 Gems = gems,
                 DisplayPrice = displayPrice,
                 Currency = "THB",
-                IsAvailable = _config.Value.ShowAvailability ? (bool?)(matched.Status == "IN_STOCK") : null
+                IsAvailable = _config.Value.ShowAvailability ? (bool?)(availableQty > 0) : null,
+                AvailableQty = _config.Value.ShowAvailability ? (decimal?)availableQty : null
             };
         }
 
@@ -305,6 +311,8 @@ namespace Jewelry.Service.PublicProduct
             public string ProductCode { get; set; } = null!;
             public string? SizeActual { get; set; }
             public string? Status { get; set; }
+            public decimal Qty { get; set; }
+            public decimal QtyReserved { get; set; }
 
             public string? ProductNumber { get; set; }
             public string ProductNameTh { get; set; } = null!;

@@ -33,8 +33,10 @@ namespace Jewelry.Service.Stock.Reconciliation
                 {
                     g.Key.SkuCode,
                     g.Key.LocationCode,
-                    ExpectedOnHand   = g.Count(p => p.Status == "IN_STOCK" || p.Status == "RESERVED"),
-                    ExpectedReserved = g.Count(p => p.Status == "RESERVED")
+                    // IN_STOCK/RESERVED เท่านั้น กัน piece SOLD เก่า (ก่อนขึ้น qty) ที่ยังเหลือ qty=1 ค้างจาก default ของ migration
+                    ExpectedOnHand   = g.Sum(p => (p.Status == "IN_STOCK" || p.Status == "RESERVED") ? p.Qty : 0),
+                    // ไม่กรอง status เพราะล็อตที่จองบางส่วนยังเป็น IN_STOCK (qtyReserved < qty) แต่ต้องนับ qtyReserved ด้วย
+                    ExpectedReserved = g.Sum(p => p.QtyReserved)
                 })
                 .ToListAsync(ct);
 
@@ -58,7 +60,7 @@ namespace Jewelry.Service.Stock.Reconciliation
                 var actualOnHand   = bal == null ? 0m : bal.QtyOnHand;
                 var actualReserved = bal == null ? 0m : bal.QtyReserved;
 
-                if ((int)actualOnHand != pg.ExpectedOnHand)
+                if (actualOnHand != pg.ExpectedOnHand)
                 {
                     onHandMismatches.Add(new BalanceMismatch
                     {
@@ -68,7 +70,7 @@ namespace Jewelry.Service.Stock.Reconciliation
                         PieceCount = pg.ExpectedOnHand
                     });
                 }
-                if ((int)actualReserved != pg.ExpectedReserved)
+                if (actualReserved != pg.ExpectedReserved)
                 {
                     reservedMismatches.Add(new BalanceMismatch
                     {
@@ -131,8 +133,8 @@ namespace Jewelry.Service.Stock.Reconciliation
                 {
                     g.Key.SkuCode,
                     g.Key.LocationCode,
-                    QtyOnHand = g.Count(p => p.Status == "IN_STOCK" || p.Status == "RESERVED"),
-                    QtyReserved = g.Count(p => p.Status == "RESERVED")
+                    QtyOnHand = g.Sum(p => (p.Status == "IN_STOCK" || p.Status == "RESERVED") ? p.Qty : 0),
+                    QtyReserved = g.Sum(p => p.QtyReserved)
                 })
                 .ToListAsync(ct);
 

@@ -38,6 +38,8 @@ namespace jewelry.Model.Stock.Product.List
 
         public string? Status { get; set; }
         public decimal Qty { get; set; }
+        public decimal QtyReserved { get; set; }
+        public decimal QtyAvailable { get; set; }
 
         public string? Location { get; set; }
         public string? Size { get; set; }

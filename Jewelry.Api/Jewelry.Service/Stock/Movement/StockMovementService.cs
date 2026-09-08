@@ -123,14 +123,22 @@ namespace Jewelry.Service.Stock.Movement
                 if (oldLocation == target)
                     continue;
 
+                // ล็อตที่มีการจองค้าง (QtyReserved > 0) ย้ายทั้งล็อตไม่ได้ — ย้ายบางส่วน (split ล็อต) เป็นเฟส 2
+                if (piece.QtyReserved > 0)
+                {
+                    throw new HandleException($"ไม่สามารถย้ายคลังสินค้า {piece.StockNumber} ได้ เนื่องจากมีการจองค้างอยู่ {piece.QtyReserved} ชิ้น");
+                }
+
+                // ย้ายทั้งล็อตเสมอ — qty ที่ย้าย = จำนวนคงเหลือทั้งหมดของเลขนี้
+                var moveQty = piece.Qty;
+
                 // ปรับ balance ต้นทาง
                 var srcBalance = _jewelryContext.TbtStockBalance
                     .FirstOrDefault(b => b.SkuCode == piece.SkuCode && b.LocationCode == oldLocation);
 
                 if (srcBalance != null)
                 {
-                    srcBalance.QtyOnHand -= 1;
-                    // Assumption: ปรับเฉพาะ QtyOnHand (1 ต่อ piece); QtyReserved คงเดิม
+                    srcBalance.QtyOnHand -= moveQty;
                     srcBalance.QtyAvailable = srcBalance.QtyOnHand - srcBalance.QtyReserved;
                     srcBalance.LastMovementAt = now;
                     srcBalance.UpdateDate = now;
@@ -148,9 +156,9 @@ namespace Jewelry.Service.Stock.Movement
                     {
                         SkuCode = piece.SkuCode,
                         LocationCode = target,
-                        QtyOnHand = 1,
+                        QtyOnHand = moveQty,
                         QtyReserved = 0,
-                        QtyAvailable = 1,
+                        QtyAvailable = moveQty,
                         LastMovementAt = now,
                         CreateDate = now,
                         CreateBy = username
@@ -159,8 +167,7 @@ namespace Jewelry.Service.Stock.Movement
                 }
                 else
                 {
-                    dstBalance.QtyOnHand += 1;
-                    // Assumption: ปรับเฉพาะ QtyOnHand (1 ต่อ piece); QtyReserved คงเดิม
+                    dstBalance.QtyOnHand += moveQty;
                     dstBalance.QtyAvailable = dstBalance.QtyOnHand - dstBalance.QtyReserved;
                     dstBalance.LastMovementAt = now;
                     dstBalance.UpdateDate = now;
@@ -178,7 +185,7 @@ namespace Jewelry.Service.Stock.Movement
                     ProductCode = piece.ProductCode,
                     FromLocation = oldLocation,
                     ToLocation = target,
-                    Qty = 1,
+                    Qty = moveQty,
                     RefDocType = "MoveLocation",
                     Remark = req.Remark,
                     CreateDate = now,

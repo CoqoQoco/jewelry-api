@@ -15,6 +15,10 @@ public partial class TbtStockPiece
 
     public string? Status { get; set; }
 
+    public decimal Qty { get; set; }
+
+    public decimal QtyReserved { get; set; }
+
     public string? ReceiptNumber { get; set; }
 
     public string? ReceiptType { get; set; }

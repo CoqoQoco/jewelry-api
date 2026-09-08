@@ -29,6 +29,7 @@ namespace jewelry.Model.PublicProduct.Get
         public string Currency { get; set; } = "THB";
 
         public bool? IsAvailable { get; set; }
+        public decimal? AvailableQty { get; set; }
     }
 
     public class Gem

@@ -7,6 +7,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.ProductionPlan;
+using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -196,7 +197,9 @@ namespace Jewelry.Service.Stock.Product
 
                                    Mold = item.SkuCodeNavigation.MoldDesign ?? item.SkuCodeNavigation.Mold,
 
-                                   Qty = 1,
+                                   Qty = item.Qty,
+                                   QtyReserved = item.QtyReserved,
+                                   QtyAvailable = item.Qty - item.QtyReserved > 0 ? item.Qty - item.QtyReserved : 0,
                                    ProductPrice = item.SkuCodeNavigation.DefaultPrice ?? 0,
 
                                    ProductNumber = item.SkuCodeNavigation.ProductNumber,
@@ -283,7 +286,9 @@ namespace Jewelry.Service.Stock.Product
 
                                Mold = item.SkuCodeNavigation.MoldDesign ?? item.SkuCodeNavigation.Mold,
 
-                               Qty = 1,
+                               Qty = item.Qty,
+                               QtyReserved = item.QtyReserved,
+                               QtyAvailable = item.Qty - item.QtyReserved > 0 ? item.Qty - item.QtyReserved : 0,
                                ProductPrice = item.SkuCodeNavigation.DefaultPrice ?? 0,
 
                                ProductNumber = item.SkuCodeNavigation.ProductNumber,
@@ -428,7 +433,9 @@ namespace Jewelry.Service.Stock.Product
                 ImageName = sku.ImageName,
                 ImagePath = sku.ImagePath,
                 Status = piece.Status,
-                Qty = 1,
+                Qty = piece.Qty,
+                QtyReserved = piece.QtyReserved,
+                QtyAvailable = StockPieceQtyHelper.Available(piece),
                 Location = piece.LocationCode,
                 Size = piece.SizeActual ?? sku.Size,
                 EarringStemSize = sku.EarringStemSize,
@@ -1228,7 +1235,7 @@ namespace Jewelry.Service.Stock.Product
                             ProductionType = sku.ProductionType,
                             ProductionTypeSize = sku.ProductionTypeSize,
                             Status = piece.Status,
-                            Qty = 1m,
+                            Qty = piece.Qty,
                             ProductPrice = sku.DefaultPrice ?? 0m,
                             Mold = sku.Mold,
                             MoldDesign = sku.MoldDesign,
@@ -1269,7 +1276,8 @@ namespace Jewelry.Service.Stock.Product
                 .GroupBy(x => 1)
                 .Select(g => new StockSummary
                 {
-                    TotalProducts = g.Count(),
+                    // จำนวนสินค้า = จำนวนชิ้นจริง (ล็อตเงินนับตาม qty ไม่ใช่จำนวนแถว piece)
+                    TotalProducts = (int)g.Sum(x => x.Qty),
                     TotalQuantity = g.Sum(x => x.Qty),
                     TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
                     AvailableQuantity = g.Where(x => x.Status == "Available").Sum(x => x.Qty),
@@ -1298,7 +1306,8 @@ namespace Jewelry.Service.Stock.Product
                     ProductTypeName = g.Key.ProductTypeName ?? "Unknown",
                     ProductionType = g.Key.ProductionType ?? "Unknown",
                     ProductionTypeSize = g.Key.ProductionTypeSize ?? "Unknown",
-                    Count = g.Count(),
+                    // จำนวนสินค้า = จำนวนชิ้นจริง (เหมือน TotalQuantity ด้านล่าง — คงไว้ 2 ชื่อ field เพื่อ backward-compat กับผู้เรียกเดิม)
+                    Count = (int)g.Sum(x => x.Qty),
                     TotalQuantity = g.Sum(x => x.Qty),
                     TotalOnProcessQuantity = g.Where(x => x.Status != "Available").Sum(x => x.Qty),
                     TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
@@ -1349,7 +1358,7 @@ namespace Jewelry.Service.Stock.Product
                 .Select(g => new TodaySummary
                 {
                     TotalTransactions = g.Count(),
-                    NewStockItems = g.Count(),
+                    NewStockItems = (int)g.Sum(x => x.Qty),
                     TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
                     PriceChanges = 0, // TODO: Implement price change tracking if needed
                     LowStockAlerts = 0 // TODO: Implement low stock logic if needed
@@ -1398,7 +1407,7 @@ namespace Jewelry.Service.Stock.Product
                 .Select(g => new WeeklySummary
                 {
                     TotalTransactions = g.Count(),
-                    NewStockItems = g.Count(),
+                    NewStockItems = (int)g.Sum(x => x.Qty),
                     TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
                     PriceChanges = 0,
                     LowStockAlerts = 0
@@ -1419,7 +1428,7 @@ namespace Jewelry.Service.Stock.Product
                 {
                     Date = g.Key,
                     TransactionCount = g.Count(),
-                    NewStockCount = g.Count(),
+                    NewStockCount = (int)g.Sum(x => x.Qty),
                     TotalValue = g.Sum(x => x.ProductPrice * x.Qty)
                 })
                 .OrderBy(x => x.Date)
@@ -1438,7 +1447,7 @@ namespace Jewelry.Service.Stock.Product
                 .Select(g => new MonthlySummary
                 {
                     TotalTransactions = g.Count(),
-                    NewStockItems = g.Count(),
+                    NewStockItems = (int)g.Sum(x => x.Qty),
                     TotalValue = g.Sum(x => x.ProductPrice * x.Qty),
                     PriceChanges = 0,
                     TotalAvailableProducts = g.Count(x => x.Status == "Available")
@@ -1463,7 +1472,7 @@ namespace Jewelry.Service.Stock.Product
                     WeekStartDate = g.Min(x => x.CreateDate.Date),
                     WeekEndDate = g.Max(x => x.CreateDate.Date).AddDays(6),
                     TransactionCount = g.Count(),
-                    NewStockCount = g.Count(),
+                    NewStockCount = (int)g.Sum(x => x.Qty),
                     TotalValue = g.Sum(x => x.ProductPrice * x.Qty)
                 })
                 .OrderBy(x => x.WeekNumber)
@@ -1516,8 +1525,9 @@ namespace Jewelry.Service.Stock.Product
                 .Select(g => new jewelry.Model.Stock.Product.MaterialValuationSummary.SummaryItem
                 {
                     TotalCount = g.Count(),
-                    TotalWeight = g.Sum(x => x.Weight ?? 0),
-                    TotalValue = g.Sum(x => x.Price ?? 0)
+                    // ล็อตเงิน 1 piece มีได้หลายชิ้น (qty) — material เป็น BOM ต่อ 1 ชิ้น ต้องคูณ qty ของ piece ถึงจะได้น้ำหนัก/มูลค่ารวมจริง
+                    TotalWeight = g.Sum(x => (x.Weight ?? 0) * x.StockPieceNavigation.Qty),
+                    TotalValue = g.Sum(x => (x.Price ?? 0) * x.StockPieceNavigation.Qty)
                 })
                 .FirstOrDefaultAsync() ?? new jewelry.Model.Stock.Product.MaterialValuationSummary.SummaryItem();
 
@@ -1527,8 +1537,8 @@ namespace Jewelry.Service.Stock.Product
                 {
                     Type = g.Key,
                     Count = g.Count(),
-                    TotalWeight = g.Sum(x => x.Weight ?? 0),
-                    TotalValue = g.Sum(x => x.Price ?? 0)
+                    TotalWeight = g.Sum(x => (x.Weight ?? 0) * x.StockPieceNavigation.Qty),
+                    TotalValue = g.Sum(x => (x.Price ?? 0) * x.StockPieceNavigation.Qty)
                 })
                 .ToListAsync();
 

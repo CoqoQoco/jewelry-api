@@ -37,7 +37,10 @@ namespace Jewelry.Service.Stock.Balance
                                     PieceStatus = p.Status,
                                     QtyOnHand = b != null ? b.QtyOnHand : 0,
                                     QtyReserved = b != null ? b.QtyReserved : 0,
-                                    QtyAvailable = b != null ? (b.QtyAvailable ?? 0) : 0
+                                    QtyAvailable = b != null ? (b.QtyAvailable ?? 0) : 0,
+                                    PieceQty = p.Qty,
+                                    PieceQtyReserved = p.QtyReserved,
+                                    PieceQtyAvailable = (p.Qty - p.QtyReserved) > 0 ? (p.Qty - p.QtyReserved) : 0
                                 }).ToListAsync(ct);
             return result;
         }

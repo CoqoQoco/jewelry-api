@@ -3,6 +3,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -588,7 +589,7 @@ namespace Jewelry.Service.Sale.SaleOrder
             //    throw new HandleException($"Cannot confirm stock items for Sale Order {request.SoNumber}. Invalid status: {saleOrder.StatusName}.");
             //}
 
-            ValidateStockItemConfirmations(request.StockItems);
+            await ValidateStockItemConfirmations(request.StockItems);
 
             var confirmedDate = DateTime.UtcNow;
 
@@ -637,12 +638,12 @@ namespace Jewelry.Service.Sale.SaleOrder
                 throw new HandleException($"Sale Order {soNumber} not found.");
             }
 
-            ValidateStockItemConfirmations(stockItems);
+            await ValidateStockItemConfirmations(stockItems);
 
             return await ConfirmStockItemsCore(saleOrder, stockItems, confirmedDate);
         }
 
-        private void ValidateStockItemConfirmations(List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems)
+        private async Task ValidateStockItemConfirmations(List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems)
         {
             var errors = new List<string>();
 
@@ -670,6 +671,19 @@ namespace Jewelry.Service.Sale.SaleOrder
                     continue;
                 }
 
+                // Silver lot: จองเกินจำนวนพร้อมขาย (qty - qtyReserved) ของ piece ไม่ได้
+                var piece = await _jewelryContext.TbtStockPiece
+                    .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
+
+                if (piece != null)
+                {
+                    var available = StockPieceQtyHelper.Available(piece);
+                    if (stockItem.Qty > available)
+                    {
+                        errors.Add($"เลข {stockItem.StockNumber} จองได้ไม่เกินจำนวนพร้อมขาย ({available}) แต่ขอจอง {stockItem.Qty}.");
+                        continue;
+                    }
+                }
 
                 //// Check if item is already confirmed in this sale order
                 //var existingConfirmation = await _jewelryContext.TbtSaleOrderProduct
@@ -730,7 +744,8 @@ namespace Jewelry.Service.Sale.SaleOrder
                         _jewelryContext.TbtStockBalance.Update(balance);
                     }
 
-                    piece.Status = "RESERVED";
+                    piece.QtyReserved += stockItem.Qty;
+                    StockPieceQtyHelper.RecalcStatus(piece);
                     piece.UpdateDate = confirmedDate;
                     piece.UpdateBy = CurrentUsername;
                     _jewelryContext.TbtStockPiece.Update(piece);
@@ -817,7 +832,8 @@ namespace Jewelry.Service.Sale.SaleOrder
                         _jewelryContext.TbtStockBalance.Update(balance);
                     }
 
-                    piece.Status = "IN_STOCK";
+                    piece.QtyReserved = Math.Max(0, piece.QtyReserved - product.Qty);
+                    StockPieceQtyHelper.RecalcStatus(piece);
                     piece.UpdateDate = now;
                     piece.UpdateBy = CurrentUsername;
                     _jewelryContext.TbtStockPiece.Update(piece);
@@ -937,7 +953,8 @@ namespace Jewelry.Service.Sale.SaleOrder
                                 _jewelryContext.TbtStockBalance.Update(balance);
                             }
 
-                            piece.Status = "IN_STOCK";
+                            piece.QtyReserved = Math.Max(0, piece.QtyReserved - confirmedProduct.Qty);
+                            StockPieceQtyHelper.RecalcStatus(piece);
                             piece.UpdateDate = unconfirmedDate;
                             piece.UpdateBy = CurrentUsername;
                             _jewelryContext.TbtStockPiece.Update(piece);
