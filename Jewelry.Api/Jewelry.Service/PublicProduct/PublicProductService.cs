@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -176,7 +177,7 @@ namespace Jewelry.Service.PublicProduct
                 displayPrice = computed > 0 ? computed : (decimal?)null;
             }
 
-            var imagePath = string.IsNullOrEmpty(matched.ImageName) ? null : $"{matched.ImagePath}/{matched.ImageName}";
+            var imagePath = BuildImagePath(matched.ImagePath, matched.ImageName);
 
             return new jewelry.Model.PublicProduct.Get.Response
             {
@@ -198,6 +199,41 @@ namespace Jewelry.Service.PublicProduct
                 Currency = "THB",
                 IsAvailable = _config.Value.ShowAvailability ? (bool?)(matched.Status == "IN_STOCK") : null
             };
+        }
+
+        private const string StockProductFolder = "Stock/Product";
+
+        // กรณี legacy migrated SKU: ImagePath คือชื่อไฟล์ ("{NoCode}.jpg") อยู่ใต้โฟลเดอร์ Stock/Product เสมอ
+        // กรณีอัปโหลด/แทนที่รูปผ่าน ProductImageService.Replace: ImagePath คือโฟลเดอร์เต็ม ("Stock/Product") + ImageName คือชื่อไฟล์
+        private static string? BuildImagePath(string? imagePath, string? imageName)
+        {
+            if (string.IsNullOrEmpty(imagePath) && string.IsNullOrEmpty(imageName))
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(imagePath) && imagePath.Contains('/'))
+            {
+                if (string.IsNullOrEmpty(imageName))
+                {
+                    return null;
+                }
+
+                return $"{imagePath.TrimEnd('/')}/{imageName}";
+            }
+
+            if (!string.IsNullOrEmpty(imagePath))
+            {
+                return $"{StockProductFolder}/{imagePath}";
+            }
+
+            var fileName = imageName!;
+            if (!Path.HasExtension(fileName))
+            {
+                fileName = $"{fileName}.jpg";
+            }
+
+            return $"{StockProductFolder}/{fileName}";
         }
 
         private static bool TryParseToken(string token, out string stockNumber, out string sig)
