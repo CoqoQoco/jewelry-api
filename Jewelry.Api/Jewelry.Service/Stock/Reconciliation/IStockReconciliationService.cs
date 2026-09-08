@@ -5,6 +5,6 @@ namespace Jewelry.Service.Stock.Reconciliation
     public interface IStockReconciliationService
     {
         Task<ReconciliationReport> CheckDriftAsync(CancellationToken ct);
-        Task<int> RebuildBalanceFromPiecesAsync(CancellationToken ct);
+        Task<RebuildBalanceResult> RebuildBalanceFromPiecesAsync(CancellationToken ct);
     }
 }

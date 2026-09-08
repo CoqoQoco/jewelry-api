@@ -123,6 +123,12 @@ namespace Jewelry.Service.Stock.Movement
                 if (oldLocation == target)
                     continue;
 
+                // ชิ้นที่ขายไปแล้ว (SOLD) หรือไม่มีจำนวนคงเหลือ ไม่ใช่สต็อกที่ขายได้แล้ว ย้ายคลังไม่ได้
+                if (piece.Status == "SOLD" || piece.Qty <= 0)
+                {
+                    throw new HandleException($"ไม่สามารถย้ายคลังสินค้า {piece.StockNumber} ได้ เนื่องจากสถานะเป็น {piece.Status ?? "ไม่ทราบสถานะ"} ไม่ใช่สต็อกที่พร้อมขายแล้ว");
+                }
+
                 // ล็อตที่มีการจองค้าง (QtyReserved > 0) ย้ายทั้งล็อตไม่ได้ — ย้ายบางส่วน (split ล็อต) เป็นเฟส 2
                 if (piece.QtyReserved > 0)
                 {

@@ -35,8 +35,8 @@ namespace Jewelry.Api.Controllers.Stock
         [HttpPost]
         public async Task<IActionResult> RebuildBalance(CancellationToken ct)
         {
-            var rebuiltCount = await _service.RebuildBalanceFromPiecesAsync(ct);
-            return Ok(new { rebuiltCount });
+            var result = await _service.RebuildBalanceFromPiecesAsync(ct);
+            return Ok(result);
         }
     }
 }

@@ -115,16 +115,15 @@ namespace Jewelry.Service.Stock.Reconciliation
             return report;
         }
 
-        public async Task<int> RebuildBalanceFromPiecesAsync(CancellationToken ct)
+        public async Task<RebuildBalanceResult> RebuildBalanceFromPiecesAsync(CancellationToken ct)
         {
+            const int batchSize = 500;
+
             using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
 
-            var toDelete = await _jewelryContext.TbtStockBalance
-                .Where(b => b.CreateBy == "BACKFILL" || b.CreateBy == "RECONCILE")
-                .ToListAsync(ct);
-
-            _jewelryContext.TbtStockBalance.RemoveRange(toDelete);
-            await _jewelryContext.SaveChangesAsync(ct);
+            // โหลด balance ทั้งหมด (tracked) ไว้ upsert — ห้ามลบทิ้งเพราะ ~22,000 แถวสร้างโดยผู้ใช้จริงตอนรับของ
+            var existingBalances = await _jewelryContext.TbtStockBalance.ToListAsync(ct);
+            var balanceMap = existingBalances.ToDictionary(b => (b.SkuCode, b.LocationCode));
 
             var aggregated = await _jewelryContext.TbtStockPiece
                 .AsNoTracking()
@@ -139,23 +138,101 @@ namespace Jewelry.Service.Stock.Reconciliation
                 .ToListAsync(ct);
 
             var now = DateTime.UtcNow;
-            var newBalances = aggregated.Select(a => new TbtStockBalance
-            {
-                SkuCode = a.SkuCode,
-                LocationCode = a.LocationCode,
-                QtyOnHand = a.QtyOnHand,
-                QtyReserved = a.QtyReserved,
-                LastMovementAt = now,
-                CreateDate = now,
-                CreateBy = "RECONCILE"
-            }).ToList();
+            var result = new RebuildBalanceResult();
+            var pendingUpdates = new List<TbtStockBalance>();
+            var pendingInserts = new List<TbtStockBalance>();
+            var touchedKeys = new HashSet<(string SkuCode, string LocationCode)>();
 
-            _jewelryContext.TbtStockBalance.AddRange(newBalances);
-            await _jewelryContext.SaveChangesAsync(ct);
+            async Task FlushAsync()
+            {
+                if (pendingUpdates.Count > 0)
+                {
+                    _jewelryContext.TbtStockBalance.UpdateRange(pendingUpdates);
+                    pendingUpdates.Clear();
+                }
+                if (pendingInserts.Count > 0)
+                {
+                    _jewelryContext.TbtStockBalance.AddRange(pendingInserts);
+                    pendingInserts.Clear();
+                }
+                await _jewelryContext.SaveChangesAsync(ct);
+            }
+
+            foreach (var a in aggregated)
+            {
+                var key = (a.SkuCode, a.LocationCode);
+                touchedKeys.Add(key);
+
+                if (balanceMap.TryGetValue(key, out var existing))
+                {
+                    if (existing.QtyOnHand != a.QtyOnHand || existing.QtyReserved != a.QtyReserved)
+                    {
+                        existing.QtyOnHand = a.QtyOnHand;
+                        existing.QtyReserved = a.QtyReserved;
+                        existing.LastMovementAt = now;
+                        existing.UpdateDate = now;
+                        existing.UpdateBy = "RECONCILE";
+                        pendingUpdates.Add(existing);
+                        result.UpdatedCount++;
+                    }
+                    else
+                    {
+                        result.UnchangedCount++;
+                    }
+                }
+                else
+                {
+                    pendingInserts.Add(new TbtStockBalance
+                    {
+                        SkuCode = a.SkuCode,
+                        LocationCode = a.LocationCode,
+                        QtyOnHand = a.QtyOnHand,
+                        QtyReserved = a.QtyReserved,
+                        LastMovementAt = now,
+                        CreateDate = now,
+                        CreateBy = "RECONCILE"
+                    });
+                    result.InsertedCount++;
+                }
+
+                if (pendingUpdates.Count + pendingInserts.Count >= batchSize)
+                {
+                    await FlushAsync();
+                }
+            }
+
+            // balance ที่ไม่มี piece เหลือเลย (เช่น piece ถูกย้ายคลังออกไปหมด) — เคลียร์ยอดเป็น 0 แทนการลบแถว
+            foreach (var kv in balanceMap)
+            {
+                if (touchedKeys.Contains(kv.Key)) continue;
+
+                var existing = kv.Value;
+                if (existing.QtyOnHand != 0 || existing.QtyReserved != 0)
+                {
+                    existing.QtyOnHand = 0;
+                    existing.QtyReserved = 0;
+                    existing.LastMovementAt = now;
+                    existing.UpdateDate = now;
+                    existing.UpdateBy = "RECONCILE";
+                    pendingUpdates.Add(existing);
+                    result.ZeroedCount++;
+                }
+                else
+                {
+                    result.UnchangedCount++;
+                }
+
+                if (pendingUpdates.Count + pendingInserts.Count >= batchSize)
+                {
+                    await FlushAsync();
+                }
+            }
+
+            await FlushAsync();
 
             scope.Complete();
 
-            return newBalances.Count;
+            return result;
         }
     }
 }
