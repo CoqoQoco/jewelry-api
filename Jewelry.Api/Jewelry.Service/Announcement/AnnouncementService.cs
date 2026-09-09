@@ -31,6 +31,7 @@ public class AnnouncementService : BaseService, IAnnouncementService
     public async Task<FeedAnnouncementResponse> Feed(FeedAnnouncementRequest request)
     {
         var now = DateTime.UtcNow;
+        var isDev = IsDevRole();
 
         var take = request.Take;
         if (take < 1) take = 1;
@@ -42,7 +43,8 @@ public class AnnouncementService : BaseService, IAnnouncementService
             .AsNoTracking()
             .Where(x => x.IsActive && x.IsPublished
                 && x.PublishStart <= now
-                && (x.PublishEnd == null || x.PublishEnd >= now));
+                && (x.PublishEnd == null || x.PublishEnd >= now)
+                && (x.Audience == AnnouncementAudience.All || (isDev && x.Audience == AnnouncementAudience.Dev)));
 
         var total = await query.CountAsync();
 
@@ -95,6 +97,12 @@ public class AnnouncementService : BaseService, IAnnouncementService
         if (request.IsPinned.HasValue)
             query = query.Where(x => x.IsPinned == request.IsPinned.Value);
 
+        if (!string.IsNullOrEmpty(request.Audience))
+        {
+            var normalizedAudience = NormalizeAudience(request.Audience);
+            query = query.Where(x => x.Audience == normalizedAudience);
+        }
+
         if (request.Sort == null || !request.Sort.Any())
             query = query.OrderByDescending(x => x.IsPinned).ThenByDescending(x => x.CreateDate);
 
@@ -118,6 +126,8 @@ public class AnnouncementService : BaseService, IAnnouncementService
         if (publishEnd.HasValue && publishEnd.Value < publishStart)
             throw new HandleException("วันสิ้นสุดต้องไม่ก่อนวันเริ่มแสดง");
 
+        var audience = NormalizeAudience(request.Audience);
+
         string? imagePath = null;
         if (request.Image != null)
             imagePath = await UploadImage(request.Image);
@@ -131,6 +141,7 @@ public class AnnouncementService : BaseService, IAnnouncementService
             PublishStart = publishStart,
             PublishEnd = publishEnd,
             IsPublished = request.IsPublished,
+            Audience = audience,
             IsActive = true,
             CreateDate = DateTime.UtcNow,
             CreateBy = CurrentUsername
@@ -159,6 +170,7 @@ public class AnnouncementService : BaseService, IAnnouncementService
         if (publishEnd.HasValue && publishEnd.Value < publishStart)
             throw new HandleException("วันสิ้นสุดต้องไม่ก่อนวันเริ่มแสดง");
 
+        var audience = NormalizeAudience(request.Audience);
         var oldImagePath = entity.ImagePath;
 
         entity.Title = title;
@@ -167,6 +179,7 @@ public class AnnouncementService : BaseService, IAnnouncementService
         entity.PublishStart = publishStart;
         entity.PublishEnd = publishEnd;
         entity.IsPublished = request.IsPublished;
+        entity.Audience = audience;
 
         if (request.RemoveImage)
             entity.ImagePath = null;
@@ -222,6 +235,25 @@ public class AnnouncementService : BaseService, IAnnouncementService
         await _jewelryContext.SaveChangesAsync();
 
         return "success";
+    }
+
+    private static string NormalizeAudience(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(normalized))
+            return AnnouncementAudience.All;
+
+        if (!AnnouncementAudience.AllValues.Contains(normalized))
+            throw new HandleException("ค่าผู้เห็นประกาศไม่ถูกต้อง");
+
+        return normalized;
+    }
+
+    // JWT role claim (ClaimTypes.Role) เก็บ "ชื่อ" role ตรงๆ (เช่น "Dev") ไม่ใช่ id — ดู LoginService.GenerateToken
+    // และ PermissionAuthorizationHandler ที่เทียบ userRoles กับ TbmUserRole.Name เช่นกัน
+    private bool IsDevRole()
+    {
+        return CurrentUserRoles.Any(r => string.Equals(r, "Dev", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string ValidateTitle(string? title)
@@ -285,6 +317,7 @@ public class AnnouncementService : BaseService, IAnnouncementService
             PublishStart = x.PublishStart,
             PublishEnd = x.PublishEnd,
             IsPublished = x.IsPublished,
+            Audience = x.Audience,
             DisplayStatus = GetDisplayStatus(x, now),
             CreateDate = x.CreateDate,
             CreateBy = x.CreateBy,

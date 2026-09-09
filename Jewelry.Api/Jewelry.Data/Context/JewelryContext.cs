@@ -4739,6 +4739,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
+            entity.Property(e => e.Audience)
+                .HasColumnType("character varying")
+                .HasDefaultValue("all")
+                .HasColumnName("audience");
         });
 
         modelBuilder.Entity<TbtTicketImage>(entity =>

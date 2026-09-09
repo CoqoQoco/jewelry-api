@@ -21,6 +21,7 @@ public class SearchAnnouncementRequest : DataSourceRequest
     public string? Keyword { get; set; }
     public bool? IsPublished { get; set; }
     public bool? IsPinned { get; set; }
+    public string? Audience { get; set; }
 }
 
 public class CreateAnnouncementRequest
@@ -38,6 +39,8 @@ public class CreateAnnouncementRequest
     public DateTimeOffset? PublishEnd { get; set; }
 
     public bool IsPublished { get; set; } = true;
+
+    public string Audience { get; set; } = AnnouncementAudience.All;
 
     public IFormFile? Image { get; set; }
 }

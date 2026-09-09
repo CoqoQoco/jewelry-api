@@ -29,4 +29,6 @@ public partial class TbtAnnouncement
     public DateTime? UpdateDate { get; set; }
 
     public string? UpdateBy { get; set; }
+
+    public string Audience { get; set; } = "all";
 }

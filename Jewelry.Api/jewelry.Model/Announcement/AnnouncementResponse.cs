@@ -13,6 +13,7 @@ public class AnnouncementItemResponse
     public DateTime PublishStart { get; set; }
     public DateTime? PublishEnd { get; set; }
     public bool IsPublished { get; set; }
+    public string Audience { get; set; } = AnnouncementAudience.All;
     public string DisplayStatus { get; set; } = null!;
     public DateTime CreateDate { get; set; }
     public string CreateBy { get; set; } = null!;
