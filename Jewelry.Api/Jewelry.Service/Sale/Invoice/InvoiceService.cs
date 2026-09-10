@@ -584,6 +584,85 @@ namespace Jewelry.Service.Sale.Invoice
             };
         }
 
+        public async Task<jewelry.Model.Sale.Invoice.CancelAndUnconfirm.Response> CancelAndUnconfirm(jewelry.Model.Sale.Invoice.CancelAndUnconfirm.Request request)
+        {
+            if (string.IsNullOrEmpty(request.InvoiceNumber))
+            {
+                throw new HandleException("Invoice Number is Required.");
+            }
+
+            var invoiceHeader = await _jewelryContext.TbtSaleInvoiceHeader
+                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber);
+
+            if (invoiceHeader == null)
+            {
+                throw new HandleException($"Invoice not found: {request.InvoiceNumber}");
+            }
+
+            ValidateInvoiceCancellable(invoiceHeader);
+
+            var soNumber = invoiceHeader.SoRunning;
+
+            if (string.IsNullOrEmpty(soNumber))
+            {
+                throw new HandleException($"ใบแจ้งหนี้ {request.InvoiceNumber} ไม่มีใบสั่งขายผูกอยู่");
+            }
+
+            // สแนปช็อตรายการสินค้าที่ผูกกับ invoice นี้ก่อน — ต้องทำก่อน CancelInvoiceCore เพราะ core จะ set Invoice = null ทำให้หาไม่เจอภายหลัง
+            var stockItemsToUnconfirm = await _jewelryContext.TbtSaleOrderProduct
+                .Where(x => x.Invoice == request.InvoiceNumber)
+                .Select(x => new jewelry.Model.Sale.SaleOrder.UnconfirmStock.StockItemUnconfirmation
+                {
+                    Id = (int)x.Id,
+                    StockNumber = x.StockNumber
+                })
+                .ToListAsync();
+
+            var cancelledPaymentCount = 0;
+            List<string> unconfirmedStockNumbers;
+
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
+            {
+                cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
+
+                // ต้อง flush ก่อน เพราะ UnconfirmStockItemsCore อ่านสถานะสินค้าจากฐานข้อมูล — ยังอยู่ใน transaction เดียวกัน
+                await _jewelryContext.SaveChangesAsync();
+
+                unconfirmedStockNumbers = await _saleOrderService.UnconfirmStockItemsCore(soNumber, stockItemsToUnconfirm);
+
+                await _jewelryContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (HandleException)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"เกิดข้อผิดพลาดในการยกเลิกใบแจ้งหนี้และปลดยืนยันสินค้า: {ex.Message}");
+            }
+
+            var message = $"ยกเลิกใบแจ้งหนี้ {request.InvoiceNumber} และปลดยืนยันสินค้า {unconfirmedStockNumbers.Count} รายการออกจากใบสั่งขาย {soNumber} เรียบร้อยแล้ว";
+
+            if (cancelledPaymentCount > 0)
+            {
+                message += $" (ยกเลิกรายการรับชำระเงิน {cancelledPaymentCount} รายการด้วย)";
+            }
+
+            return new jewelry.Model.Sale.Invoice.CancelAndUnconfirm.Response
+            {
+                InvoiceNumber = request.InvoiceNumber,
+                SoNumber = soNumber,
+                CancelledPaymentCount = cancelledPaymentCount,
+                UnconfirmedItemCount = unconfirmedStockNumbers.Count,
+                UnconfirmedStockNumbers = unconfirmedStockNumbers,
+                Message = message
+            };
+        }
+
         private void ValidateInvoiceCancellable(TbtSaleInvoiceHeader invoiceHeader)
         {
             if (invoiceHeader.IsDelete)

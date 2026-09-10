@@ -928,58 +928,7 @@ namespace Jewelry.Service.Sale.SaleOrder
             using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
             try
             {
-                foreach (var stockItem in request.StockItems)
-                {
-                    // Get the confirmed product entry
-                    var confirmedProduct = await _jewelryContext.TbtSaleOrderProduct
-                        .FirstOrDefaultAsync(p => p.SoNumber == request.SoNumber.ToUpper() &&
-                                                  p.StockNumber == stockItem.StockNumber &&
-                                                  p.Id == stockItem.Id);
-
-                    if (confirmedProduct != null)
-                    {
-                        var piece = await _jewelryContext.TbtStockPiece
-                            .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
-
-                        if (piece != null)
-                        {
-                            var balance = await _jewelryContext.TbtStockBalance
-                                .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
-
-                            if (balance != null)
-                            {
-                                balance.QtyReserved -= confirmedProduct.Qty;
-                                balance.LastMovementAt = unconfirmedDate;
-                                _jewelryContext.TbtStockBalance.Update(balance);
-                            }
-
-                            piece.QtyReserved = Math.Max(0, piece.QtyReserved - confirmedProduct.Qty);
-                            StockPieceQtyHelper.RecalcStatus(piece);
-                            piece.UpdateDate = unconfirmedDate;
-                            piece.UpdateBy = CurrentUsername;
-                            _jewelryContext.TbtStockPiece.Update(piece);
-
-                            _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                            {
-                                MovementDate = unconfirmedDate,
-                                MovementType = "UNRESERVE",
-                                SkuCode = piece.SkuCode,
-                                StockNumber = piece.StockNumber,
-                                ProductCode = piece.ProductCode,
-                                ToLocation = piece.LocationCode,
-                                Qty = confirmedProduct.Qty,
-                                RefDocType = "SO",
-                                RefDocNo = saleOrder.SoNumber,
-                                CreateDate = unconfirmedDate,
-                                CreateBy = CurrentUsername
-                            });
-                        }
-
-                        // Remove confirmed product entry
-                        _jewelryContext.TbtSaleOrderProduct.Remove(confirmedProduct);
-                        unconfirmedStockNumbers.Add(stockItem.StockNumber);
-                    }
-                }
+                unconfirmedStockNumbers = await UnconfirmStockItemsCore(request.SoNumber, request.StockItems);
 
                 // Save all changes
                 await _jewelryContext.SaveChangesAsync();
@@ -999,6 +948,69 @@ namespace Jewelry.Service.Sale.SaleOrder
                 await transaction.RollbackAsync();
                 throw new HandleException($"Error unconfirming stock items: {ex.Message}");
             }
+        }
+
+        // Used by UnconfirmStockItems and by Invoice/CancelAndUnconfirm — no internal transaction/SaveChanges, caller controls both.
+        public async Task<List<string>> UnconfirmStockItemsCore(string soNumber, List<jewelry.Model.Sale.SaleOrder.UnconfirmStock.StockItemUnconfirmation> stockItems)
+        {
+            var soNumberUpper = soNumber.ToUpper();
+            var unconfirmedDate = DateTime.UtcNow;
+            var unconfirmedStockNumbers = new List<string>();
+
+            foreach (var stockItem in stockItems)
+            {
+                // Get the confirmed product entry
+                var confirmedProduct = await _jewelryContext.TbtSaleOrderProduct
+                    .FirstOrDefaultAsync(p => p.SoNumber == soNumberUpper &&
+                                              p.StockNumber == stockItem.StockNumber &&
+                                              p.Id == stockItem.Id);
+
+                if (confirmedProduct != null)
+                {
+                    var piece = await _jewelryContext.TbtStockPiece
+                        .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
+
+                    if (piece != null)
+                    {
+                        var balance = await _jewelryContext.TbtStockBalance
+                            .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                        if (balance != null)
+                        {
+                            balance.QtyReserved -= confirmedProduct.Qty;
+                            balance.LastMovementAt = unconfirmedDate;
+                            _jewelryContext.TbtStockBalance.Update(balance);
+                        }
+
+                        piece.QtyReserved = Math.Max(0, piece.QtyReserved - confirmedProduct.Qty);
+                        StockPieceQtyHelper.RecalcStatus(piece);
+                        piece.UpdateDate = unconfirmedDate;
+                        piece.UpdateBy = CurrentUsername;
+                        _jewelryContext.TbtStockPiece.Update(piece);
+
+                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                        {
+                            MovementDate = unconfirmedDate,
+                            MovementType = "UNRESERVE",
+                            SkuCode = piece.SkuCode,
+                            StockNumber = piece.StockNumber,
+                            ProductCode = piece.ProductCode,
+                            ToLocation = piece.LocationCode,
+                            Qty = confirmedProduct.Qty,
+                            RefDocType = "SO",
+                            RefDocNo = soNumberUpper,
+                            CreateDate = unconfirmedDate,
+                            CreateBy = CurrentUsername
+                        });
+                    }
+
+                    // Remove confirmed product entry
+                    _jewelryContext.TbtSaleOrderProduct.Remove(confirmedProduct);
+                    unconfirmedStockNumbers.Add(stockItem.StockNumber);
+                }
+            }
+
+            return unconfirmedStockNumbers;
         }
     }
 }

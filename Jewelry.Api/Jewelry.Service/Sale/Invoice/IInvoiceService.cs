@@ -13,6 +13,7 @@ namespace Jewelry.Service.Sale.Invoice
         IQueryable<jewelry.Model.Sale.Invoice.List.Response> List(jewelry.Model.Sale.Invoice.List.Request request);
         Task<string> Delete(jewelry.Model.Sale.Invoice.Delete.Request request);
         Task<jewelry.Model.Sale.Invoice.CancelWithSaleOrder.Response> CancelWithSaleOrder(jewelry.Model.Sale.Invoice.CancelWithSaleOrder.Request request);
+        Task<jewelry.Model.Sale.Invoice.CancelAndUnconfirm.Response> CancelAndUnconfirm(jewelry.Model.Sale.Invoice.CancelAndUnconfirm.Request request);
         Task<string> GenerateInvoiceNumber();
 
         // Invoice Version methods

@@ -139,6 +139,27 @@ namespace Jewelry.Api.Controllers.Sale
             }
         }
 
+        [HttpPost("CancelAndUnconfirm")]
+        public async Task<IActionResult> CancelAndUnconfirm(jewelry.Model.Sale.Invoice.CancelAndUnconfirm.Request request)
+        {
+            try
+            {
+                var result = await _service.CancelAndUnconfirm(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error cancelling invoice and unconfirming stock: {InvoiceNumber}", request.InvoiceNumber);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error cancelling invoice and unconfirming stock: {InvoiceNumber}", request.InvoiceNumber);
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while cancelling invoice and unconfirming stock" });
+            }
+        }
+
         [HttpGet("GenerateInvoiceNumber")]
         public async Task<IActionResult> GenerateInvoiceNumber()
         {

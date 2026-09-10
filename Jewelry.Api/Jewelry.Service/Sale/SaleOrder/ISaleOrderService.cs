@@ -21,5 +21,8 @@ namespace Jewelry.Service.Sale.SaleOrder
 
         // Used by Inactive and by Invoice/CancelWithSaleOrder — no internal transaction/SaveChanges, caller controls both.
         Task InactiveCore(string soNumber);
+
+        // Used by UnconfirmStockItems and by Invoice/CancelAndUnconfirm — no internal transaction/SaveChanges, caller controls both.
+        Task<List<string>> UnconfirmStockItemsCore(string soNumber, List<jewelry.Model.Sale.SaleOrder.UnconfirmStock.StockItemUnconfirmation> stockItems);
     }
 }
