@@ -65,6 +65,7 @@ namespace jewelry.Model.Stock.Product.Get
         public string? TypeName { get; set; }
         public string? TypeCode { get; set; }
         public string? TypeBarcode { get; set; }
+        public string? TypeOrigin { get; set; }
 
         public decimal? Qty { get; set; }
         public string? QtyUnit { get; set; }

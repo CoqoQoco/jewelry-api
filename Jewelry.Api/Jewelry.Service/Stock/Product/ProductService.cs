@@ -452,6 +452,7 @@ namespace Jewelry.Service.Stock.Product
                                  TypeName = material.TypeName,
                                  TypeCode = material.TypeCode,
                                  TypeBarcode = material.TypeBarcode,
+                                 TypeOrigin = material.TypeOrigin,
                                  Qty = material.Qty,
                                  QtyUnit = material.QtyUnit,
                                  Weight = material.Weight,
