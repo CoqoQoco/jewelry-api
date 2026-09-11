@@ -6,7 +6,10 @@ using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
 using Jewelry.Service.Master.Bank;
+using Jewelry.Service.Master.SaleChannel;
 using Jewelry.Service.Mold;
+using Jewelry.Service.Notification;
+using Jewelry.Service.Notification.Rules;
 using Jewelry.Service.Production.Plan;
 using Jewelry.Service.Production.PlanBOM;
 using Jewelry.Service.Production.PrePlan;
@@ -83,6 +86,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IFileExtension, FileExtension>();
             services.AddScoped<IMasterService, MasterService>();
             services.AddScoped<IMasterBankService, MasterBankService>();
+            services.AddScoped<ISaleChannelService, SaleChannelService>();
             services.AddScoped<IMoldService, MoldService>();
             services.AddScoped<IRunningNumber, RunningNumber>();
             services.AddScoped<ICustomerService, CustomerService>();
@@ -137,6 +141,10 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IPrintJobService, PrintJobService>();
 
             services.AddScoped<IPublicProductService, PublicProductService>();
+
+            services.AddScoped<INotificationRule, InvoiceOutstandingRule>();
+            services.AddScoped<NotificationRuleRunner>();
+            services.AddScoped<INotificationService, NotificationService>();
 
             return services;
         }

@@ -25,5 +25,10 @@ namespace jewelry.Model.Sale.Invoice.List
         public string? StockNumber { get; set; }
         public string? ProductNumber { get; set; }
         public string? MoldNumber { get; set; }
+
+        public string? SaleChannelCode { get; set; }
+        public string? PaymentStatus { get; set; }
+        public bool? OverdueOnly { get; set; }
+        public string? OwnerUsername { get; set; }
     }
 }

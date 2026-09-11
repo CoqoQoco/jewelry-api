@@ -56,5 +56,23 @@ namespace Jewelry.Api.Controllers.Sale
                 return StatusCode(500, ex.Message);
             }
         }
+
+        [Route("ByChannel")]
+        [HttpPost]
+        [RequirePermission("sale:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Sale.SaleReport.ByChannel.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ByChannel([FromBody] jewelry.Model.Sale.SaleReport.ByChannel.Request request)
+        {
+            try
+            {
+                var response = await _service.ByChannel(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
     }
 }

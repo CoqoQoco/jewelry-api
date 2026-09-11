@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ByChannel = jewelry.Model.Sale.SaleReport.ByChannel;
 
 namespace Jewelry.Service.Sale.SaleReport
 {
@@ -264,6 +265,131 @@ namespace Jewelry.Service.Sale.SaleReport
                         ? statusName
                         : string.Empty
             }).ToList();
+        }
+
+        public async Task<ByChannel.Response> ByChannel(ByChannel.Request request)
+        {
+            // Thailand has no DST, so a fixed +7h offset always converts a UTC instant
+            // to the correct Thai calendar date/time — this lets us compute exact UTC
+            // bounds for the requested Thai date range and filter with plain >=/< at the DB level.
+            var fromThaiDate = request.DateFrom.UtcDateTime.AddHours(7).Date;
+            var toThaiDate = request.DateTo.UtcDateTime.AddHours(7).Date;
+
+            var fromUtcBound = fromThaiDate.AddHours(-7);
+            var toUtcBoundExclusive = toThaiDate.AddDays(1).AddHours(-7);
+
+            var invoiceQuery = _jewelryContext.TbtSaleInvoiceHeader
+                .AsNoTracking()
+                .Where(x => x.IsDelete == false
+                    && x.CreateDate >= fromUtcBound
+                    && x.CreateDate < toUtcBoundExclusive);
+
+            // Empty filter = "ทุกจุดขาย": deliberately skip the SaleChannelCode predicate entirely
+            // (rather than comparing against null) so old invoices with no SaleChannelCode
+            // stay included in the "all channels" view instead of silently dropping out.
+            if (!string.IsNullOrEmpty(request.SaleChannelCode))
+            {
+                invoiceQuery = invoiceQuery.Where(x => x.SaleChannelCode == request.SaleChannelCode);
+            }
+
+            // Grouping by Thai-local calendar day doesn't translate reliably to SQL in this
+            // project (known EF Core translation gotcha) — pull the filtered rows into memory
+            // first (report-scale volume, at most a few hundred rows/month) and do every
+            // grouping/aggregation (day, seller, currency, payment) in C# from here on.
+            var invoiceRows = await invoiceQuery
+                .Select(x => new
+                {
+                    x.Running,
+                    x.CreateDate,
+                    x.GrandTotalRounded,
+                    x.CurrencyUnit,
+                    x.SalePersonUsername,
+                    x.CreateBy,
+                    x.Payment
+                })
+                .ToListAsync();
+
+            var runningNumbers = invoiceRows.Select(x => x.Running).Distinct().ToList();
+
+            var productRows = await _jewelryContext.TbtSaleOrderProduct
+                .AsNoTracking()
+                .Where(x => x.Invoice != null && runningNumbers.Contains(x.Invoice))
+                .Select(x => new { x.Invoice, x.StockNumber })
+                .ToListAsync();
+
+            var pieceCount = productRows.Count;
+
+            var summary = new ByChannel.SummaryData
+            {
+                InvoiceCount = invoiceRows.Count,
+                PieceCount = pieceCount,
+                Amounts = AggregateCurrency(invoiceRows.Select(x => (x.CurrencyUnit, x.GrandTotalRounded)))
+            };
+
+            var byDay = invoiceRows
+                .GroupBy(x => x.CreateDate.AddHours(7).Date)
+                .OrderBy(g => g.Key)
+                .Select(g => new ByChannel.ByDayData
+                {
+                    Date = g.Key,
+                    InvoiceCount = g.Count(),
+                    Amounts = AggregateCurrency(g.Select(x => (x.CurrencyUnit, x.GrandTotalRounded)))
+                })
+                .ToList();
+
+            var bySeller = invoiceRows
+                .GroupBy(x => !string.IsNullOrEmpty(x.SalePersonUsername) ? x.SalePersonUsername! : x.CreateBy)
+                .OrderByDescending(g => g.Count())
+                .Select(g => new ByChannel.BySellerData
+                {
+                    SellerUsername = g.Key,
+                    InvoiceCount = g.Count(),
+                    Amounts = AggregateCurrency(g.Select(x => (x.CurrencyUnit, x.GrandTotalRounded)))
+                })
+                .ToList();
+
+            var topProducts = productRows
+                .GroupBy(x => x.StockNumber)
+                .Select(g => new ByChannel.TopProductData
+                {
+                    ProductCode = g.Key,
+                    PieceCount = g.Count()
+                })
+                .OrderByDescending(x => x.PieceCount)
+                .Take(10)
+                .ToList();
+
+            var paymentMix = invoiceRows
+                .GroupBy(x => x.Payment)
+                .OrderByDescending(g => g.Count())
+                .Select(g => new ByChannel.PaymentMixData
+                {
+                    Payment = g.Key,
+                    InvoiceCount = g.Count()
+                })
+                .ToList();
+
+            return new ByChannel.Response
+            {
+                Summary = summary,
+                ByDay = byDay,
+                BySeller = bySeller,
+                TopProducts = topProducts,
+                PaymentMix = paymentMix
+            };
+        }
+
+        private static List<ByChannel.CurrencyTotal> AggregateCurrency(IEnumerable<(string CurrencyUnit, decimal? GrandTotalRounded)> rows)
+        {
+            return rows
+                .GroupBy(x => x.CurrencyUnit)
+                .Select(g => new ByChannel.CurrencyTotal
+                {
+                    CurrencyUnit = g.Key,
+                    Amount = g.Sum(x => x.GrandTotalRounded ?? 0)
+                })
+                .OrderBy(x => x.CurrencyUnit)
+                .ToList();
         }
     }
 }

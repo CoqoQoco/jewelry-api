@@ -91,5 +91,11 @@ public partial class TbtSaleInvoiceHeader
 
     public decimal? RoundingAdjustment { get; set; }
 
+    public string? SaleChannelCode { get; set; }
+
+    public DateTime? DueDate { get; set; }
+
+    public string? SalePersonUsername { get; set; }
+
     public virtual ICollection<TbtSaleInvoicePaymentItem> TbtSaleInvoicePaymentItem { get; set; } = new List<TbtSaleInvoicePaymentItem>();
 }

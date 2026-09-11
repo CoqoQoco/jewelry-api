@@ -38,5 +38,11 @@ namespace jewelry.Model.Sale.Invoice.List
         public decimal PaidAmount { get; set; }
         public decimal? GrandTotalRounded { get; set; }
         public decimal? Deposit { get; set; }
+
+        public string? SaleChannelCode { get; set; }
+        public string? SaleChannelName { get; set; }
+        public DateTime? DueDate { get; set; }
+        public string? OwnerUsername { get; set; }
+        public decimal OutstandingAmount { get; set; }
     }
 }

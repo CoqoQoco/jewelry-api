@@ -231,6 +231,12 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtPrintJob> TbtPrintJob { get; set; }
 
+    public virtual DbSet<TbmNotificationType> TbmNotificationType { get; set; }
+
+    public virtual DbSet<TbtNotification> TbtNotification { get; set; }
+
+    public virtual DbSet<TbmSaleChannel> TbmSaleChannel { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Stock>(entity =>
@@ -2178,6 +2184,13 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GrandTotalRaw).HasColumnName("grand_total_raw");
             entity.Property(e => e.GrandTotalRounded).HasColumnName("grand_total_rounded");
             entity.Property(e => e.RoundingAdjustment).HasColumnName("rounding_adjustment");
+            entity.Property(e => e.SaleChannelCode)
+                .HasColumnType("character varying")
+                .HasColumnName("sale_channel_code");
+            entity.Property(e => e.DueDate).HasColumnName("due_date");
+            entity.Property(e => e.SalePersonUsername)
+                .HasColumnType("character varying")
+                .HasColumnName("sale_person_username");
         });
 
         modelBuilder.Entity<TbtSaleInvoicePaymentItem>(entity =>
@@ -2485,6 +2498,12 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GrandTotalRaw).HasColumnName("grand_total_raw");
             entity.Property(e => e.GrandTotalRounded).HasColumnName("grand_total_rounded");
             entity.Property(e => e.RoundingAdjustment).HasColumnName("rounding_adjustment");
+            entity.Property(e => e.SaleChannelCode)
+                .HasColumnType("character varying")
+                .HasColumnName("sale_channel_code");
+            entity.Property(e => e.SalePersonUsername)
+                .HasColumnType("character varying")
+                .HasColumnName("sale_person_username");
         });
 
         modelBuilder.Entity<TbtSaleOrderProduct>(entity =>
@@ -5176,6 +5195,179 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("deleted_by");
             entity.Property(e => e.DeletedDate).HasColumnName("deleted_date");
+        });
+
+        modelBuilder.Entity<TbmNotificationType>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbm_notification_type_pk");
+
+            entity.ToTable("tbm_notification_type");
+
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.Module)
+                .HasColumnType("character varying")
+                .HasColumnName("module");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.Icon)
+                .HasColumnType("character varying")
+                .HasColumnName("icon");
+            entity.Property(e => e.DefaultSeverity)
+                .HasColumnType("character varying")
+                .HasDefaultValue("INFO")
+                .HasColumnName("default_severity");
+            entity.Property(e => e.SeverityWarnDays).HasColumnName("severity_warn_days");
+            entity.Property(e => e.SeverityCritDays).HasColumnName("severity_crit_days");
+            entity.Property(e => e.EscalateDays).HasColumnName("escalate_days");
+            entity.Property(e => e.ActionRoute)
+                .HasColumnType("character varying")
+                .HasColumnName("action_route");
+            entity.Property(e => e.Source)
+                .HasColumnType("character varying")
+                .HasColumnName("source");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+        });
+
+        modelBuilder.Entity<TbtNotification>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_notification_pk");
+
+            entity.ToTable("tbt_notification");
+
+            entity.HasIndex(e => new { e.TypeCode, e.RefDocNo, e.RecipientUsername })
+                .IsUnique()
+                .HasDatabaseName("uq_notification_dedupe")
+                .HasFilter("ref_doc_no IS NOT NULL");
+
+            entity.HasIndex(e => new { e.RecipientUsername, e.State, e.DueDate })
+                .HasDatabaseName("idx_notification_inbox");
+
+            entity.HasIndex(e => new { e.RefDocType, e.RefDocNo })
+                .HasDatabaseName("idx_notification_ref");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.TypeCode)
+                .HasColumnType("character varying")
+                .HasColumnName("type_code");
+            entity.Property(e => e.RecipientUsername)
+                .HasColumnType("character varying")
+                .HasColumnName("recipient_username");
+            entity.Property(e => e.Title)
+                .HasColumnType("character varying")
+                .HasColumnName("title");
+            entity.Property(e => e.Body)
+                .HasColumnType("character varying")
+                .HasColumnName("body");
+            entity.Property(e => e.RefDocType)
+                .HasColumnType("character varying")
+                .HasColumnName("ref_doc_type");
+            entity.Property(e => e.RefDocNo)
+                .HasColumnType("character varying")
+                .HasColumnName("ref_doc_no");
+            entity.Property(e => e.ActionUrl)
+                .HasColumnType("character varying")
+                .HasColumnName("action_url");
+            entity.Property(e => e.Severity)
+                .HasColumnType("character varying")
+                .HasDefaultValue("INFO")
+                .HasColumnName("severity");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.CurrencyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("currency_unit");
+            entity.Property(e => e.EventDate).HasColumnName("event_date");
+            entity.Property(e => e.DueDate).HasColumnName("due_date");
+            entity.Property(e => e.State)
+                .HasColumnType("character varying")
+                .HasDefaultValue("NEW")
+                .HasColumnName("state");
+            entity.Property(e => e.SnoozeUntil).HasColumnName("snooze_until");
+            entity.Property(e => e.Source)
+                .HasColumnType("character varying")
+                .HasColumnName("source");
+            entity.Property(e => e.IsEscalated)
+                .HasDefaultValue(false)
+                .HasColumnName("is_escalated");
+            entity.Property(e => e.ReadDate).HasColumnName("read_date");
+            entity.Property(e => e.DoneDate).HasColumnName("done_date");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(d => d.TbmNotificationType).WithMany(p => p.TbtNotification)
+                .HasForeignKey(d => d.TypeCode)
+                .HasConstraintName("tbt_notification_type_fk");
+        });
+
+        modelBuilder.Entity<TbmSaleChannel>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbm_sale_channel_pk");
+
+            entity.ToTable("tbm_sale_channel");
+
+            entity.HasIndex(e => new { e.IsActive, e.StartDate, e.EndDate })
+                .HasDatabaseName("idx_sale_channel_active_range");
+
+            entity.Property(e => e.Code)
+                .HasColumnType("character varying")
+                .HasColumnName("code");
+            entity.Property(e => e.NameTh)
+                .HasColumnType("character varying")
+                .HasColumnName("name_th");
+            entity.Property(e => e.NameEn)
+                .HasColumnType("character varying")
+                .HasColumnName("name_en");
+            entity.Property(e => e.Type)
+                .HasColumnType("character varying")
+                .HasColumnName("type");
+            entity.Property(e => e.Venue)
+                .HasColumnType("character varying")
+                .HasColumnName("venue");
+            entity.Property(e => e.StartDate)
+                .HasColumnType("date")
+                .HasColumnName("start_date");
+            entity.Property(e => e.EndDate)
+                .HasColumnType("date")
+                .HasColumnName("end_date");
+            entity.Property(e => e.IsDefault)
+                .HasDefaultValue(false)
+                .HasColumnName("is_default");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
         });
 
         OnModelCreatingPartial(modelBuilder);

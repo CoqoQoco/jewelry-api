@@ -80,4 +80,8 @@ public partial class TbtSaleOrder
     public decimal? GrandTotalRounded { get; set; }
 
     public decimal? RoundingAdjustment { get; set; }
+
+    public string? SaleChannelCode { get; set; }
+
+    public string? SalePersonUsername { get; set; }
 }

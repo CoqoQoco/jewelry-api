@@ -100,6 +100,39 @@ namespace Jewelry.Service.Sale.Invoice
             var saleOrder = await _jewelryContext.TbtSaleOrder
                 .FirstOrDefaultAsync(x => x.SoNumber == request.SoNumber);
 
+            // จุดขาย: ใช้ค่าที่ request ส่งมาก่อน ถ้าไม่ส่งมาให้เลือกอัตโนมัติจากช่องที่ active และอยู่ในช่วงวันที่ปัจจุบัน (sort_order น้อยสุดก่อน) แล้วค่อย fallback ไปที่ตัว is_default
+            var saleChannelCode = request.SaleChannelCode;
+            if (string.IsNullOrEmpty(saleChannelCode))
+            {
+                var today = DateTime.UtcNow;
+                var activeChannel = await _jewelryContext.TbmSaleChannel
+                    .Where(c => c.IsActive
+                        && (!c.StartDate.HasValue || c.StartDate.Value <= today)
+                        && (!c.EndDate.HasValue || c.EndDate.Value >= today))
+                    .OrderBy(c => c.SortOrder ?? int.MaxValue)
+                    .FirstOrDefaultAsync();
+
+                saleChannelCode = activeChannel?.Code;
+
+                if (string.IsNullOrEmpty(saleChannelCode))
+                {
+                    var defaultChannel = await _jewelryContext.TbmSaleChannel
+                        .FirstOrDefaultAsync(c => c.IsDefault);
+                    saleChannelCode = defaultChannel?.Code;
+                }
+            }
+
+            // สแนปช็อตจุดขายกลับไปที่ SO ด้วยถ้าของเดิมยังว่าง — ไม่ทับค่าที่ SO มีอยู่แล้ว
+            if (saleOrder != null && string.IsNullOrEmpty(saleOrder.SaleChannelCode) && !string.IsNullOrEmpty(saleChannelCode))
+            {
+                saleOrder.SaleChannelCode = saleChannelCode;
+                saleOrder.UpdateBy = CurrentUsername;
+                saleOrder.UpdateDate = DateTime.UtcNow;
+                _jewelryContext.TbtSaleOrder.Update(saleOrder);
+            }
+
+            var createDate = DateTime.UtcNow;
+
             // Create invoice header
             var invoiceHeader = new TbtSaleInvoiceHeader
             {
@@ -108,7 +141,7 @@ namespace Jewelry.Service.Sale.Invoice
                 SoRunning = request.SoNumber,
 
                 CreateBy = CurrentUsername,
-                CreateDate = DateTime.UtcNow,
+                CreateDate = createDate,
 
                 CurrencyRate = request.CurrencyRate,
                 CurrencyUnit = request.CurrencyUnit,
@@ -136,6 +169,10 @@ namespace Jewelry.Service.Sale.Invoice
                 // สแนปช็อตผู้ขาย/ผู้ช่วยขายจาก SO ณ ตอนสร้าง invoice เพื่อไม่ให้ใบพิมพ์เปลี่ยนตามเมื่อ SO ถูกแก้ไขภายหลัง
                 SalePerson = saleOrder?.SalePerson,
                 SaleSupport = saleOrder?.SaleSupport,
+                SalePersonUsername = saleOrder?.SalePersonUsername,
+
+                SaleChannelCode = saleChannelCode,
+                DueDate = createDate.AddDays(request.PaymentDay),
 
                 Status = 100,
                 StatusName = "invoice",
@@ -214,6 +251,41 @@ namespace Jewelry.Service.Sale.Invoice
                     CreateDate = DateTime.UtcNow,
                     CreateBy = CurrentUsername
                 });
+            }
+
+            // บันทึกรับเงินอัตโนมัติ — เฉพาะวิธีชำระที่ถือว่าได้เงินแล้วตอนออกบิล (เงินสด/โอน/บัตรเครดิต)
+            // เช็ค (3) ไม่นับว่าได้เงินเพราะยังไม่ขึ้นเงิน, ค้างชำระ (0) และเครดิตกำหนดวัน (5) ยังไม่ได้รับเงิน — ปล่อยเป็นใบค้างให้ตามเก็บ ไม่สร้างแถว payment
+            if (request.Payment == 1 || request.Payment == 2 || request.Payment == 4)
+            {
+                var autoPaymentAmount = invoiceHeader.GrandTotalRounded.GetValueOrDefault() - invoiceHeader.Deposit;
+
+                if (autoPaymentAmount > 0)
+                {
+                    var autoPaymentRunning = await _runningNumberService.GenerateRunningNumberForGold($"PAY-{invoiceNumber}");
+
+                    var autoPayment = new TbtSaleInvoicePaymentItem
+                    {
+                        Running = autoPaymentRunning,
+                        InvoiceRunning = invoiceNumber,
+                        SoRunning = request.SoNumber,
+
+                        PaymentDate = createDate,
+
+                        Amount = autoPaymentAmount,
+                        CurrencyUnit = invoiceHeader.CurrencyUnit,
+
+                        PaymantName = invoiceHeader.PaymantName,
+                        Payment = invoiceHeader.Payment,
+
+                        Remark = "บันทึกอัตโนมัติจากวิธีชำระตอนออกบิล",
+                        ImagePath = "",
+
+                        CreateBy = CurrentUsername,
+                        CreateDate = DateTime.UtcNow,
+                    };
+
+                    _jewelryContext.TbtSaleInvoicePaymentItem.Add(autoPayment);
+                }
             }
 
             await _jewelryContext.SaveChangesAsync();
@@ -444,6 +516,59 @@ namespace Jewelry.Service.Sale.Invoice
                                 && _jewelryContext.TbtSku.Any(sku => sku.SkuCode == piece.SkuCode && sku.MoldDesign != null && sku.MoldDesign.Contains(request.MoldNumber)))));
             }
 
+            if (!string.IsNullOrEmpty(request.SaleChannelCode))
+            {
+                entityQuery = entityQuery.Where(x => x.SaleChannelCode == request.SaleChannelCode);
+            }
+
+            if (!string.IsNullOrEmpty(request.OwnerUsername))
+            {
+                entityQuery = entityQuery.Where(x =>
+                    (string.IsNullOrEmpty(x.SalePersonUsername) ? x.CreateBy : x.SalePersonUsername) == request.OwnerUsername);
+            }
+
+            if (request.OverdueOnly == true)
+            {
+                var todayUtc = DateTime.UtcNow.Date;
+                entityQuery = entityQuery.Where(x => (x.DueDate ?? x.CreateDate) < todayUtc);
+            }
+
+            if (!string.IsNullOrEmpty(request.PaymentStatus))
+            {
+                if (request.PaymentStatus == "paid")
+                {
+                    entityQuery = entityQuery.Where(x =>
+                        (x.GrandTotalRounded ?? 0) - x.Deposit -
+                        _jewelryContext.TbtSaleInvoicePaymentItem
+                            .Where(p => p.InvoiceRunning == x.Running && p.IsDelete == false)
+                            .Sum(p => p.Amount) <= 0);
+                }
+                else if (request.PaymentStatus == "unpaid")
+                {
+                    entityQuery = entityQuery.Where(x =>
+                        (x.GrandTotalRounded ?? 0) - x.Deposit -
+                        _jewelryContext.TbtSaleInvoicePaymentItem
+                            .Where(p => p.InvoiceRunning == x.Running && p.IsDelete == false)
+                            .Sum(p => p.Amount) > 0
+                        && _jewelryContext.TbtSaleInvoicePaymentItem
+                            .Where(p => p.InvoiceRunning == x.Running && p.IsDelete == false)
+                            .Sum(p => p.Amount) == 0
+                        && x.Deposit == 0);
+                }
+                else if (request.PaymentStatus == "partial")
+                {
+                    entityQuery = entityQuery.Where(x =>
+                        (x.GrandTotalRounded ?? 0) - x.Deposit -
+                        _jewelryContext.TbtSaleInvoicePaymentItem
+                            .Where(p => p.InvoiceRunning == x.Running && p.IsDelete == false)
+                            .Sum(p => p.Amount) > 0
+                        && (_jewelryContext.TbtSaleInvoicePaymentItem
+                                .Where(p => p.InvoiceRunning == x.Running && p.IsDelete == false)
+                                .Sum(p => p.Amount) > 0
+                            || x.Deposit > 0));
+                }
+            }
+
             var query = from invoice in entityQuery
                         select new jewelry.Model.Sale.Invoice.List.Response
                         {
@@ -488,6 +613,19 @@ namespace Jewelry.Service.Sale.Invoice
                             //TotalAmount = _jewelryContext.TbtSaleOrderProduct
                             //    .Where(x => x.Invoice == invoice.Running)
                             //    .Sum(x => x.PriceAfterCurrecyRate * x.Qty)
+
+                            SaleChannelCode = invoice.SaleChannelCode,
+                            SaleChannelName = _jewelryContext.TbmSaleChannel
+                                .Where(c => c.Code == invoice.SaleChannelCode)
+                                .Select(c => c.NameTh)
+                                .FirstOrDefault(),
+                            DueDate = invoice.DueDate,
+                            OwnerUsername = !string.IsNullOrEmpty(invoice.SalePersonUsername) ? invoice.SalePersonUsername : invoice.CreateBy,
+
+                            OutstandingAmount = (invoice.GrandTotalRounded ?? 0) - invoice.Deposit -
+                                _jewelryContext.TbtSaleInvoicePaymentItem
+                                    .Where(p => p.InvoiceRunning == invoice.Running && p.IsDelete == false)
+                                    .Sum(p => p.Amount),
                         };
 
             return query;
@@ -500,6 +638,11 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException("Invoice Number is Required.");
             }
 
+            if (string.IsNullOrEmpty(request.DeleteReason))
+            {
+                throw new HandleException("Delete Reason is Required.");
+            }
+
             var invoiceHeader = await _jewelryContext.TbtSaleInvoiceHeader
                 .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber);
 
@@ -509,6 +652,8 @@ namespace Jewelry.Service.Sale.Invoice
             }
 
             ValidateInvoiceCancellable(invoiceHeader);
+
+            invoiceHeader.DeleteReason = request.DeleteReason;
 
             var cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
 

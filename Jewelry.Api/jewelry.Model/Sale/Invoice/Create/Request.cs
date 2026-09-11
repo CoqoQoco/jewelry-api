@@ -18,6 +18,8 @@ namespace jewelry.Model.Sale.Invoice.Create
         public string CurrencyUnit { get; set; }
         public decimal CurrencyRate { get; set; }
 
+        public string? SaleChannelCode { get; set; }
+
         public DateTimeOffset? DeliveryDate { get; set; }
         public decimal Deposit { get; set; }
 
