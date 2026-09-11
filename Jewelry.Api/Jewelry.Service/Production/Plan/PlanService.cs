@@ -1519,29 +1519,76 @@ namespace Jewelry.Service.Production.Plan
         #endregion
 
         #region --- gold loss monthly report ---
-        public async Task<jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchResponse> GetGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchRequest request)
-        {
-            // 1. คำนวณช่วงวันที่ของเดือนที่เลือก
-            var startDate = new DateTimeOffset(new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc));
-            var endDate = startDate.AddMonths(1).AddSeconds(-1);
 
-            // 2. Aggregate live data: ดึง status detail ของแผนกที่เลือก group by gold type
-            var liveData = await (from detail in _jewelryContext.TbtProductionPlanStatusDetail
+        // shared by GetGoldLossMonthlyReport / SaveGoldLossMonthlyReport so the two never drift apart again —
+        // returned-only filter (GoldWeightCheck != null && GoldWeightSend > 0) + ICT month boundary
+        // [1st 00:00 ICT, next month 1st 00:00 ICT), same rule as GetGoldLossByStageReport / GetGoldLossByWorkerReport.
+        private class GoldLossMonthlyLiveAggregate
+        {
+            public string? GoldType { get; set; }
+            public decimal SumGoldWeightSend { get; set; }
+            public decimal SumGoldWeightCheck { get; set; }
+        }
+
+        private class GoldLossMonthlyRawData
+        {
+            public List<GoldLossMonthlyLiveAggregate> LiveData { get; set; } = new List<GoldLossMonthlyLiveAggregate>();
+            public int RowsReturned { get; set; }
+            public int RowsPendingReturn { get; set; }
+            public decimal PendingWeight { get; set; }
+        }
+
+        private async Task<GoldLossMonthlyRawData> GetGoldLossMonthlyRawData(int year, int month, int status)
+        {
+            var startDate = new DateTimeOffset(new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Unspecified), TimeSpan.FromHours(7));
+            var endDate = startDate.AddMonths(1);
+            var startUtc = startDate.UtcDateTime;
+            var endUtc = endDate.UtcDateTime;
+
+            var fullRows = await (from detail in _jewelryContext.TbtProductionPlanStatusDetail
                                   join header in _jewelryContext.TbtProductionPlanStatusHeader
                                       on detail.HeaderId equals header.Id
-                                  where header.Status == request.Status
+                                  where header.Status == status
                                       && header.IsActive == true
                                       && detail.IsActive == true
-                                      && header.CreateDate >= startDate
-                                      && header.CreateDate <= endDate
+                                      && detail.GoldWeightSend > 0
                                       && !string.IsNullOrEmpty(detail.Gold)
-                                  group detail by detail.Gold into g
+                                      && header.CreateDate >= startUtc
+                                      && header.CreateDate < endUtc
                                   select new
                                   {
-                                      GoldType = g.Key,
-                                      SumGoldWeightSend = g.Sum(x => x.GoldWeightSend ?? 0),
-                                      SumGoldWeightCheck = g.Sum(x => x.GoldWeightCheck ?? 0),
+                                      detail.Gold,
+                                      GoldWeightSend = detail.GoldWeightSend ?? 0,
+                                      GoldWeightCheck = detail.GoldWeightCheck ?? 0,
+                                      IsReturned = detail.GoldWeightCheck.HasValue
                                   }).ToListAsync();
+
+            var returnedRows = fullRows.Where(x => x.IsReturned).ToList();
+            var pendingRows = fullRows.Where(x => !x.IsReturned).ToList();
+
+            var liveData = returnedRows
+                .GroupBy(x => x.Gold)
+                .Select(g => new GoldLossMonthlyLiveAggregate
+                {
+                    GoldType = g.Key,
+                    SumGoldWeightSend = g.Sum(x => x.GoldWeightSend),
+                    SumGoldWeightCheck = g.Sum(x => x.GoldWeightCheck),
+                }).ToList();
+
+            return new GoldLossMonthlyRawData
+            {
+                LiveData = liveData,
+                RowsReturned = returnedRows.Count,
+                RowsPendingReturn = pendingRows.Count,
+                PendingWeight = pendingRows.Sum(x => x.GoldWeightSend)
+            };
+        }
+
+        public async Task<jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchResponse> GetGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SearchRequest request)
+        {
+            // 1-2. returned-only live aggregation, ICT month boundary — shared helper
+            var rawData = await GetGoldLossMonthlyRawData(request.Year, request.Month, request.Status);
+            var liveData = rawData.LiveData;
 
             // 3. ดึง saved data ของเดือนที่เลือก
             var savedData = await _jewelryContext.TbtGoldLossMonthlyReport
@@ -1553,19 +1600,32 @@ namespace Jewelry.Service.Production.Plan
 
             var hasSavedData = savedData.Any();
 
-            // 4. ถ้ายังไม่เคยบันทึก → ดึง default จากเดือนก่อนหน้า
+            // 4. ถ้ายังไม่เคยบันทึก → ไล่ย้อนหลังหาเดือนล่าสุดที่มีข้อมูลบันทึกไว้ (ไม่เกิน 12 เดือน)
             var previousDefaults = new List<Jewelry.Data.Models.Jewelry.TbtGoldLossMonthlyReport>();
+            int? defaultFromYear = null;
+            int? defaultFromMonth = null;
+
             if (!hasSavedData)
             {
-                var prevMonth = request.Month == 1 ? 12 : request.Month - 1;
-                var prevYear = request.Month == 1 ? request.Year - 1 : request.Year;
+                var targetMonthIndex = request.Year * 12 + (request.Month - 1);
+                var earliestMonthIndex = targetMonthIndex - 12;
 
-                previousDefaults = await _jewelryContext.TbtGoldLossMonthlyReport
-                    .Where(x => x.Year == prevYear
-                        && x.Month == prevMonth
-                        && x.Status == request.Status
-                        && x.IsActive == true)
+                var candidateRecords = await _jewelryContext.TbtGoldLossMonthlyReport
+                    .Where(x => x.Status == request.Status
+                        && x.IsActive == true
+                        && (x.Year * 12 + (x.Month - 1)) < targetMonthIndex
+                        && (x.Year * 12 + (x.Month - 1)) >= earliestMonthIndex)
                     .ToListAsync();
+
+                if (candidateRecords.Any())
+                {
+                    var latestMonthIndex = candidateRecords.Max(x => x.Year * 12 + (x.Month - 1));
+                    previousDefaults = candidateRecords
+                        .Where(x => (x.Year * 12 + (x.Month - 1)) == latestMonthIndex)
+                        .ToList();
+                    defaultFromYear = previousDefaults.First().Year;
+                    defaultFromMonth = previousDefaults.First().Month;
+                }
             }
 
             // 5. ดึง master gold เพื่อ map ชื่อทอง
@@ -1614,33 +1674,20 @@ namespace Jewelry.Service.Production.Plan
                 Status = request.Status,
                 HasSavedData = hasSavedData,
                 TotalMoneyDiff = rows.Sum(r => r.MoneyDiff),
-                Rows = rows
+                Rows = rows,
+                DefaultFromYear = defaultFromYear,
+                DefaultFromMonth = defaultFromMonth,
+                RowsReturned = rawData.RowsReturned,
+                RowsPendingReturn = rawData.RowsPendingReturn,
+                PendingWeight = rawData.PendingWeight
             };
         }
 
         public async Task<string> SaveGoldLossMonthlyReport(jewelry.Model.Production.Plan.GoldLossMonthlyReport.SaveRequest request)
         {
-            // 1. คำนวณช่วงวันที่ของเดือนที่เลือก
-            var startDate = new DateTimeOffset(new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc));
-            var endDate = startDate.AddMonths(1).AddSeconds(-1);
-
-            // 2. Re-aggregate live data
-            var liveData = await (from detail in _jewelryContext.TbtProductionPlanStatusDetail
-                                  join header in _jewelryContext.TbtProductionPlanStatusHeader
-                                      on detail.HeaderId equals header.Id
-                                  where header.Status == request.Status
-                                      && header.IsActive == true
-                                      && detail.IsActive == true
-                                      && header.CreateDate >= startDate
-                                      && header.CreateDate <= endDate
-                                      && !string.IsNullOrEmpty(detail.Gold)
-                                  group detail by detail.Gold into g
-                                  select new
-                                  {
-                                      GoldType = g.Key,
-                                      SumGoldWeightSend = g.Sum(x => x.GoldWeightSend ?? 0),
-                                      SumGoldWeightCheck = g.Sum(x => x.GoldWeightCheck ?? 0),
-                                  }).ToListAsync();
+            // 1-2. Re-aggregate live data — same returned-only + ICT month boundary rule as GetGoldLossMonthlyReport (shared helper)
+            var rawData = await GetGoldLossMonthlyRawData(request.Year, request.Month, request.Status);
+            var liveData = rawData.LiveData;
 
             // 3. ดึง existing saved records
             var existingRecords = await _jewelryContext.TbtGoldLossMonthlyReport
@@ -1726,44 +1773,104 @@ namespace Jewelry.Service.Production.Plan
         #region --- gold loss by stage report ---
         public async Task<jewelry.Model.Production.Plan.GoldLossByStageReport.SearchResponse> GetGoldLossByStageReport(jewelry.Model.Production.Plan.GoldLossByStageReport.SearchRequest request)
         {
-            var startDate = new DateTimeOffset(new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc));
-            var endDate = startDate.AddMonths(1).AddSeconds(-1);
+            // month boundary in Thai local time (ICT, UTC+7): [1st 00:00 ICT, next month 1st 00:00 ICT)
+            var startDate = new DateTimeOffset(new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Unspecified), TimeSpan.FromHours(7));
+            var endDate = startDate.AddMonths(1);
+            var startUtc = startDate.UtcDateTime;
+            var endUtc = endDate.UtcDateTime;
 
-            var liveData = await (from detail in _jewelryContext.TbtProductionPlanStatusDetail
+            var statuses = (request.Status != null && request.Status.Length > 0)
+                ? request.Status
+                : new[]
+                {
+                    jewelry.Model.Constant.ProductionPlanStatus.Casting,
+                    jewelry.Model.Constant.ProductionPlanStatus.Scrubb,
+                    jewelry.Model.Constant.ProductionPlanStatus.Gems,
+                    jewelry.Model.Constant.ProductionPlanStatus.Embedd,
+                    jewelry.Model.Constant.ProductionPlanStatus.Plated
+                };
+
+            var fullRows = await (from detail in _jewelryContext.TbtProductionPlanStatusDetail
                                   join header in _jewelryContext.TbtProductionPlanStatusHeader
                                       on detail.HeaderId equals header.Id
                                   where header.IsActive == true
                                       && detail.IsActive == true
-                                      && header.CreateDate >= startDate
-                                      && header.CreateDate <= endDate
-                                  group new { detail, header } by header.Status into g
+                                      && detail.GoldWeightSend > 0
+                                      && statuses.Contains(header.Status)
+                                      && header.CreateDate >= startUtc
+                                      && header.CreateDate < endUtc
                                   select new
                                   {
-                                      StatusCode = g.Key,
-                                      SumGoldWeightSend = g.Sum(x => x.detail.GoldWeightSend ?? 0),
-                                      SumGoldWeightCheck = g.Sum(x => x.detail.GoldWeightCheck ?? 0),
-                                      JobCount = g.Select(x => x.header.Id).Distinct().Count()
+                                      header.Id,
+                                      header.Status,
+                                      GoldWeightSend = detail.GoldWeightSend ?? 0,
+                                      GoldWeightCheck = detail.GoldWeightCheck ?? 0,
+                                      IsReturned = detail.GoldWeightCheck.HasValue
                                   }).ToListAsync();
+
+            // a row with GoldWeightCheck == NULL is work still with the worker (not yet returned) —
+            // only returned rows feed the loss aggregation, otherwise in-progress gold is counted
+            // as 100% lost (see GetGoldLossByWorkerReport for the same pattern).
+            var returnedRows = fullRows.Where(x => x.IsReturned).ToList();
+            var pendingRows = fullRows.Where(x => !x.IsReturned).ToList();
+
+            var returnedGroups = returnedRows
+                .GroupBy(x => x.Status)
+                .Select(g => new
+                {
+                    StatusCode = g.Key,
+                    SumGoldWeightSend = g.Sum(x => x.GoldWeightSend),
+                    SumGoldWeightCheck = g.Sum(x => x.GoldWeightCheck),
+                    RowsReturned = g.Count()
+                }).ToList();
+
+            var pendingGroups = pendingRows
+                .GroupBy(x => x.Status)
+                .Select(g => new
+                {
+                    StatusCode = g.Key,
+                    RowsPendingReturn = g.Count(),
+                    PendingWeight = g.Sum(x => x.GoldWeightSend)
+                }).ToList();
+
+            var jobCounts = fullRows
+                .GroupBy(x => x.Status)
+                .Select(g => new
+                {
+                    StatusCode = g.Key,
+                    JobCount = g.Select(x => x.Id).Distinct().Count()
+                }).ToList();
 
             var statusMaster = await _jewelryContext.TbmProductionPlanStatus.ToListAsync();
 
-            var rows = liveData.Select(item =>
+            var statusCodes = fullRows.Select(x => x.Status).Distinct().ToList();
+
+            var rows = statusCodes.Select(statusCode =>
             {
-                var master = statusMaster.FirstOrDefault(m => m.Id == item.StatusCode);
-                var rawLoss = item.SumGoldWeightSend - item.SumGoldWeightCheck;
-                var rawLossPercent = item.SumGoldWeightSend > 0
-                    ? Math.Round(rawLoss / item.SumGoldWeightSend * 100, 2)
+                var master = statusMaster.FirstOrDefault(m => m.Id == statusCode);
+                var returned = returnedGroups.FirstOrDefault(x => x.StatusCode == statusCode);
+                var pending = pendingGroups.FirstOrDefault(x => x.StatusCode == statusCode);
+                var job = jobCounts.FirstOrDefault(x => x.StatusCode == statusCode);
+
+                var sumSend = returned?.SumGoldWeightSend ?? 0m;
+                var sumCheck = returned?.SumGoldWeightCheck ?? 0m;
+                var rawLoss = sumSend - sumCheck;
+                var rawLossPercent = sumSend > 0
+                    ? Math.Round(rawLoss / sumSend * 100, 2)
                     : 0;
 
                 return new jewelry.Model.Production.Plan.GoldLossByStageReport.GoldLossByStageRow
                 {
-                    StatusCode = item.StatusCode,
+                    StatusCode = statusCode,
                     StatusName = master?.NameTh ?? string.Empty,
-                    SumGoldWeightSend = item.SumGoldWeightSend,
-                    SumGoldWeightCheck = item.SumGoldWeightCheck,
+                    SumGoldWeightSend = sumSend,
+                    SumGoldWeightCheck = sumCheck,
                     RawLoss = rawLoss,
                     RawLossPercent = rawLossPercent,
-                    JobCount = item.JobCount
+                    JobCount = job?.JobCount ?? 0,
+                    RowsReturned = returned?.RowsReturned ?? 0,
+                    RowsPendingReturn = pending?.RowsPendingReturn ?? 0,
+                    PendingWeight = pending?.PendingWeight ?? 0m
                 };
             }).OrderBy(x => x.StatusCode).ToList();
 
@@ -1777,7 +1884,10 @@ namespace Jewelry.Service.Production.Plan
                 SumGoldWeightCheck = totalCheck,
                 RawLoss = totalRawLoss,
                 RawLossPercent = totalSend > 0 ? Math.Round(totalRawLoss / totalSend * 100, 2) : 0,
-                JobCount = rows.Sum(x => x.JobCount)
+                JobCount = rows.Sum(x => x.JobCount),
+                RowsReturned = rows.Sum(x => x.RowsReturned),
+                RowsPendingReturn = rows.Sum(x => x.RowsPendingReturn),
+                PendingWeight = rows.Sum(x => x.PendingWeight)
             };
 
             return new jewelry.Model.Production.Plan.GoldLossByStageReport.SearchResponse

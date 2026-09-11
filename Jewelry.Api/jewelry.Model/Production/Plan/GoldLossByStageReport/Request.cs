@@ -4,5 +4,6 @@ namespace jewelry.Model.Production.Plan.GoldLossByStageReport
     {
         public int Year { get; set; }
         public int Month { get; set; }
+        public int[]? Status { get; set; }
     }
 }

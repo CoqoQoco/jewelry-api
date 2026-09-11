@@ -20,6 +20,7 @@ namespace Jewelry.Service.Worker
         List<GoldLossSlipSummaryResponse> ListSlips(ListGoldLossSlipRequest request);
         GoldLossSlipResponse GetSlip(long id);
         Task CancelSlip(long id);
+        IQueryable<ReportGoldLossSlipByWorkerResponse> ReportByWorker(ReportGoldLossSlipByWorkerSearch request);
     }
 
     public class WorkerGoldLossSlipService : BaseService, IWorkerGoldLossSlipService
@@ -91,6 +92,7 @@ namespace Jewelry.Service.Worker
                 return new TbtWorkerGoldLossSlipItem
                 {
                     SlipId = header.Id,
+                    ProductionPlanId = x.ProductionPlanId,
                     Wo = x.Wo,
                     WoNumber = x.WoNumber,
                     ProductNumber = x.ProductNumber,
@@ -246,6 +248,82 @@ namespace Jewelry.Service.Worker
             }
 
             await _jewelryContext.SaveChangesAsync();
+        }
+
+        public IQueryable<ReportGoldLossSlipByWorkerResponse> ReportByWorker(ReportGoldLossSlipByWorkerSearch request)
+        {
+            var query = _jewelryContext.TbtWorkerGoldLossSlip
+                .Include(x => x.TbtWorkerGoldLossSlipItem.Where(i => i.IsActive))
+                .Where(x => x.IsActive);
+
+            if (request.RequestDateStart.HasValue)
+            {
+                var startUtc = request.RequestDateStart.Value.StartOfDayUtc();
+                query = query.Where(x => x.RequestDateEnd >= startUtc.UtcDateTime);
+            }
+
+            if (request.RequestDateEnd.HasValue)
+            {
+                var endUtc = request.RequestDateEnd.Value.EndOfDayUtc();
+                query = query.Where(x => x.RequestDateEnd <= endUtc.UtcDateTime);
+            }
+
+            if (!string.IsNullOrEmpty(request.WorkerCode))
+            {
+                query = query.Where(x => x.WorkerCode == request.WorkerCode.ToUpper());
+            }
+
+            var slips = query.ToList();
+
+            List<ReportGoldLossSlipByWorkerResponse> result;
+
+            if (request.GroupByMonth)
+            {
+                result = slips
+                    .GroupBy(x => new
+                    {
+                        x.WorkerCode,
+                        x.WorkerName,
+                        Year = x.RequestDateEnd.AddHours(7).Date.Year,
+                        Month = x.RequestDateEnd.AddHours(7).Date.Month,
+                    })
+                    .Select(g => BuildReportByWorkerRow(g.Key.WorkerCode, g.Key.WorkerName, g.Key.Year, g.Key.Month, g.ToList()))
+                    .ToList();
+            }
+            else
+            {
+                result = slips
+                    .GroupBy(x => new { x.WorkerCode, x.WorkerName })
+                    .Select(g => BuildReportByWorkerRow(g.Key.WorkerCode, g.Key.WorkerName, null, null, g.ToList()))
+                    .ToList();
+            }
+
+            return result.AsQueryable();
+        }
+
+        private static ReportGoldLossSlipByWorkerResponse BuildReportByWorkerRow(
+            string workerCode,
+            string? workerName,
+            int? year,
+            int? month,
+            List<TbtWorkerGoldLossSlip> slips)
+        {
+            var items = slips.SelectMany(s => s.TbtWorkerGoldLossSlipItem.Where(i => i.IsActive)).ToList();
+
+            return new ReportGoldLossSlipByWorkerResponse
+            {
+                WorkerCode = workerCode,
+                WorkerName = workerName,
+                Year = year,
+                Month = month,
+                SlipCount = slips.Count,
+                TotalWeightSend = items.Sum(i => i.GoldWeightSend ?? 0),
+                TotalWeightCheck = items.Sum(i => i.GoldWeightCheck ?? 0),
+                TotalWeightLossAllowed = items.Sum(i => i.WeightLossAllowed ?? 0),
+                TotalWeightLossActual = items.Sum(i => i.WeightLossActual ?? 0),
+                TotalMoneyDiff = items.Sum(i => i.MoneyDiff ?? 0),
+                TotalGoldReturnAmount = slips.Sum(s => s.TotalGoldReturnAmount ?? 0),
+            };
         }
 
         private async Task<string> GenerateGlsDocumentNo()

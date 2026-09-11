@@ -302,6 +302,24 @@ namespace Jewelry.Api.Controllers
             }
         }
 
+        [Route("ReportGoldLossSlipByWorker")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<ReportGoldLossSlipByWorkerResponse>))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public DataSourceResult ReportGoldLossSlipByWorker([FromBody] ReportGoldLossSlipByWorkerRequest request)
+        {
+            try
+            {
+                var report = _goldLossSlipService.ReportByWorker(request.Search);
+                return report.ToDataSource(request);
+            }
+            catch (HandleException ex)
+            {
+                return new DataSourceResult() { Errors = BadRequest(new NotFoundResponse() { Message = ex.Message }), };
+            }
+        }
+
         [Route("SearchGoldLossTangJobs")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(List<SearchGoldLossTangJobsResponse>))]

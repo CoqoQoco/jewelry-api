@@ -13,6 +13,7 @@ namespace jewelry.Model.Worker.GoldLossTangSlip
         public decimal LossPercent { get; set; }
         public decimal PricePerGram { get; set; }
         public string? Remark { get; set; }
+        public bool ConfirmNegativeLoss { get; set; } = false;
         public List<CreateGoldLossTangSlipItem> Items { get; set; } = new List<CreateGoldLossTangSlipItem>();
         public List<GoldLossTangExtraLine> IssuedLines { get; set; } = new List<GoldLossTangExtraLine>();
         public List<GoldLossTangExtraLine> ReturnedLines { get; set; } = new List<GoldLossTangExtraLine>();

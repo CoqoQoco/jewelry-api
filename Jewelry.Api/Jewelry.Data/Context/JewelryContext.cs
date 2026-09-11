@@ -3721,6 +3721,7 @@ public partial class JewelryContext : DbContext
                 .ValueGeneratedOnAdd()
                 .HasColumnName("id");
             entity.Property(e => e.SlipId).HasColumnName("slip_id");
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
             entity.Property(e => e.Wo)
                 .HasColumnType("character varying")
                 .HasColumnName("wo");

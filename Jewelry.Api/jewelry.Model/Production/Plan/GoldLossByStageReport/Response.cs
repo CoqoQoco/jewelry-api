@@ -19,6 +19,9 @@ namespace jewelry.Model.Production.Plan.GoldLossByStageReport
         public decimal RawLoss { get; set; }
         public decimal RawLossPercent { get; set; }
         public int JobCount { get; set; }
+        public int RowsReturned { get; set; }
+        public int RowsPendingReturn { get; set; }
+        public decimal PendingWeight { get; set; }
     }
 
     public class TotalRow
@@ -28,5 +31,8 @@ namespace jewelry.Model.Production.Plan.GoldLossByStageReport
         public decimal RawLoss { get; set; }
         public decimal RawLossPercent { get; set; }
         public int JobCount { get; set; }
+        public int RowsReturned { get; set; }
+        public int RowsPendingReturn { get; set; }
+        public decimal PendingWeight { get; set; }
     }
 }

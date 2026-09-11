@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace jewelry.Model.Worker.GoldLossTangSlip
 {
     public class ReportGoldLossTangByWorkerResponse
@@ -13,5 +15,20 @@ namespace jewelry.Model.Worker.GoldLossTangSlip
         public decimal? TotalAllowedLoss { get; set; }
         public decimal? TotalDiffLoss { get; set; }
         public decimal? TotalMoneyDiff { get; set; }
+        public List<GoldTypeBreakdownRow> ByGoldType { get; set; } = new List<GoldTypeBreakdownRow>();
+    }
+
+    public class GoldTypeBreakdownRow
+    {
+        public string? GoldSize { get; set; }
+        public decimal? PricePerGram { get; set; }
+        public bool HasMixedPrice { get; set; }
+        public decimal IssuedTotal { get; set; }
+        public decimal ReturnedTotal { get; set; }
+        public decimal RawLoss { get; set; }
+        public decimal AllowedLoss { get; set; }
+        public decimal DiffLoss { get; set; }
+        public decimal MoneyDiff { get; set; }
+        public int SlipCount { get; set; }
     }
 }

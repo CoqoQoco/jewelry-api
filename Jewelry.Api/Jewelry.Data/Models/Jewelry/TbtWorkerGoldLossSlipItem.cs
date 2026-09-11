@@ -8,6 +8,8 @@ public partial class TbtWorkerGoldLossSlipItem
 
     public long SlipId { get; set; }
 
+    public int? ProductionPlanId { get; set; }
+
     public string? Wo { get; set; }
 
     public int? WoNumber { get; set; }

@@ -212,6 +212,13 @@ namespace Jewelry.Service.Worker
 
             // Formula (round-half-up, matching frontend Math.round)
             decimal rawLoss = issuedTotal - returnedTotal;
+
+            if (rawLoss < 0 && !request.ConfirmNegativeLoss)
+            {
+                throw new HandleException(
+                    $"น้ำหนักคืน ({returnedTotal:0.####} g) มากกว่าน้ำหนักจ่าย ({issuedTotal:0.####} g) — ตรวจสอบรายการงานก่อนบันทึก");
+            }
+
             // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) ไม่รวม add-on
             decimal allowedLoss = RoundHalfUp(returnedFromJobs * request.LossPercent / 100m, 4);
             decimal diffLoss = RoundHalfUp(allowedLoss - rawLoss, 4);
@@ -458,6 +465,13 @@ namespace Jewelry.Service.Worker
             decimal returnedTotal = returnedFromJobs + returnedFromCustom;
 
             decimal rawLoss = issuedTotal - returnedTotal;
+
+            if (rawLoss < 0 && !request.ConfirmNegativeLoss)
+            {
+                throw new HandleException(
+                    $"น้ำหนักคืน ({returnedTotal:0.####} g) มากกว่าน้ำหนักจ่าย ({issuedTotal:0.####} g) — ตรวจสอบรายการงานก่อนบันทึก");
+            }
+
             // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) ไม่รวม add-on
             decimal allowedLoss = RoundHalfUp(returnedFromJobs * request.LossPercent / 100m, 4);
             decimal diffLoss = RoundHalfUp(allowedLoss - rawLoss, 4);
@@ -713,6 +727,7 @@ namespace Jewelry.Service.Worker
         public IQueryable<ReportGoldLossTangByWorkerResponse> ReportByWorker(ReportGoldLossTangByWorkerSearch request)
         {
             var query = _jewelryContext.TbtGoldLossTangSlip
+                .Include(x => x.TbtGoldLossTangSlipItem.Where(i => i.IsActive))
                 .Where(x => x.IsActive);
 
             if (request.RequestDateStart.HasValue)
@@ -732,52 +747,91 @@ namespace Jewelry.Service.Worker
                 query = query.Where(x => x.WorkerCode == request.WorkerCode.ToUpper());
             }
 
+            var slips = query.ToList();
+
+            List<ReportGoldLossTangByWorkerResponse> result;
+
             if (request.GroupByMonth)
             {
-                return query
-                    .Select(x => new
+                result = slips
+                    .GroupBy(x => new
                     {
                         x.WorkerCode,
                         x.WorkerName,
-                        Local = x.RequestDateEnd.Value.AddHours(7),
-                        x.IssuedTotal,
-                        x.ReturnedTotal,
-                        x.RawLoss,
-                        x.AllowedLoss,
-                        x.DiffLoss,
-                        x.TotalMoneyDiff,
+                        Year = x.RequestDateEnd.Value.AddHours(7).Date.Year,
+                        Month = x.RequestDateEnd.Value.AddHours(7).Date.Month,
                     })
-                    .GroupBy(x => new { x.WorkerCode, x.WorkerName, Year = x.Local.Date.Year, Month = x.Local.Date.Month })
-                    .Select(g => new ReportGoldLossTangByWorkerResponse
-                    {
-                        WorkerCode = g.Key.WorkerCode,
-                        WorkerName = g.Key.WorkerName,
-                        Year = g.Key.Year,
-                        Month = g.Key.Month,
-                        SlipCount = g.Count(),
-                        TotalIssued = g.Sum(x => x.IssuedTotal),
-                        TotalReturned = g.Sum(x => x.ReturnedTotal),
-                        TotalRawLoss = g.Sum(x => x.RawLoss),
-                        TotalAllowedLoss = g.Sum(x => x.AllowedLoss),
-                        TotalDiffLoss = g.Sum(x => x.DiffLoss),
-                        TotalMoneyDiff = g.Sum(x => x.TotalMoneyDiff),
-                    });
+                    .Select(g => BuildWorkerByWorkerRow(g.Key.WorkerCode, g.Key.WorkerName, g.Key.Year, g.Key.Month, g.ToList()))
+                    .ToList();
+            }
+            else
+            {
+                result = slips
+                    .GroupBy(x => new { x.WorkerCode, x.WorkerName })
+                    .Select(g => BuildWorkerByWorkerRow(g.Key.WorkerCode, g.Key.WorkerName, null, null, g.ToList()))
+                    .ToList();
             }
 
-            return query
-                .GroupBy(x => new { x.WorkerCode, x.WorkerName })
-                .Select(g => new ReportGoldLossTangByWorkerResponse
+            return result.AsQueryable();
+        }
+
+        private ReportGoldLossTangByWorkerResponse BuildWorkerByWorkerRow(
+            string workerCode,
+            string? workerName,
+            int? year,
+            int? month,
+            List<TbtGoldLossTangSlip> slips)
+        {
+            var byGoldType = slips
+                .GroupBy(s => ResolveSlipGoldSize(s))
+                .Select(g =>
                 {
-                    WorkerCode = g.Key.WorkerCode,
-                    WorkerName = g.Key.WorkerName,
-                    SlipCount = g.Count(),
-                    TotalIssued = g.Sum(x => x.IssuedTotal),
-                    TotalReturned = g.Sum(x => x.ReturnedTotal),
-                    TotalRawLoss = g.Sum(x => x.RawLoss),
-                    TotalAllowedLoss = g.Sum(x => x.AllowedLoss),
-                    TotalDiffLoss = g.Sum(x => x.DiffLoss),
-                    TotalMoneyDiff = g.Sum(x => x.TotalMoneyDiff),
-                });
+                    var groupSlips = g.ToList();
+                    var issuedTotal = groupSlips.Sum(s => s.IssuedTotal ?? 0);
+                    var returnedTotal = groupSlips.Sum(s => s.ReturnedTotal ?? 0);
+                    var rawLoss = groupSlips.Sum(s => s.RawLoss ?? 0);
+                    var allowedLoss = groupSlips.Sum(s => s.AllowedLoss ?? 0);
+                    var diffLoss = groupSlips.Sum(s => s.DiffLoss ?? 0);
+                    var moneyDiff = groupSlips.Sum(s => s.TotalMoneyDiff ?? 0);
+
+                    var distinctPrices = groupSlips.Select(s => s.PricePerGram ?? 0).Distinct().ToList();
+                    var weightBase = groupSlips.Sum(s => s.ReturnedTotal ?? 0);
+                    decimal pricePerGram = weightBase != 0
+                        ? groupSlips.Sum(s => (s.ReturnedTotal ?? 0) * (s.PricePerGram ?? 0)) / weightBase
+                        : (distinctPrices.Any() ? distinctPrices.Average() : 0);
+
+                    return new GoldTypeBreakdownRow
+                    {
+                        GoldSize = g.Key,
+                        PricePerGram = pricePerGram,
+                        HasMixedPrice = distinctPrices.Count > 1,
+                        IssuedTotal = issuedTotal,
+                        ReturnedTotal = returnedTotal,
+                        RawLoss = rawLoss,
+                        AllowedLoss = allowedLoss,
+                        DiffLoss = diffLoss,
+                        MoneyDiff = moneyDiff,
+                        SlipCount = groupSlips.Count,
+                    };
+                })
+                .OrderBy(x => x.GoldSize)
+                .ToList();
+
+            return new ReportGoldLossTangByWorkerResponse
+            {
+                WorkerCode = workerCode,
+                WorkerName = workerName,
+                Year = year,
+                Month = month,
+                SlipCount = slips.Count,
+                TotalIssued = slips.Sum(s => s.IssuedTotal),
+                TotalReturned = slips.Sum(s => s.ReturnedTotal),
+                TotalRawLoss = slips.Sum(s => s.RawLoss),
+                TotalAllowedLoss = slips.Sum(s => s.AllowedLoss),
+                TotalDiffLoss = slips.Sum(s => s.DiffLoss),
+                TotalMoneyDiff = slips.Sum(s => s.TotalMoneyDiff),
+                ByGoldType = byGoldType,
+            };
         }
 
         public ReportGoldLossTangMonthlyResponse ReportMonthly(ReportGoldLossTangMonthlyRequest request)
@@ -924,7 +978,29 @@ namespace Jewelry.Service.Worker
                 .OrderByDescending(g => g.Count())
                 .Select(g => g.Key!)
                 .ToList();
-            return new GoldLossTangLineOptionsResponse { Issued = issued, Returned = returned };
+
+            var lastPrices = _jewelryContext.TbtGoldLossTangSlipItem
+                .Where(i => i.IsActive && i.GoldSize != null && i.GoldSize != "")
+                .Join(_jewelryContext.TbtGoldLossTangSlip.Where(s => s.IsActive),
+                    i => i.SlipId,
+                    s => s.Id,
+                    (i, s) => new { i.GoldSize, s.PricePerGram, s.CreateDate, s.DocumentNo })
+                .ToList()
+                .GroupBy(x => x.GoldSize)
+                .Select(g =>
+                {
+                    var latest = g.OrderByDescending(x => x.CreateDate).First();
+                    return new LastPriceByGoldSize
+                    {
+                        GoldSize = g.Key!,
+                        PricePerGram = latest.PricePerGram,
+                        FromDate = latest.CreateDate,
+                        FromDocumentNo = latest.DocumentNo,
+                    };
+                })
+                .ToList();
+
+            return new GoldLossTangLineOptionsResponse { Issued = issued, Returned = returned, LastPrices = lastPrices };
         }
 
         private async Task<string> GenerateGltDocumentNo()
@@ -1015,6 +1091,18 @@ namespace Jewelry.Service.Worker
                 }).ToList(),
                 TypeSummaries = BuildTypeSummaries(items.Where(i => i.IsActive).ToList()),
             };
+        }
+
+        private static string? ResolveSlipGoldSize(TbtGoldLossTangSlip slip)
+        {
+            var sizes = slip.TbtGoldLossTangSlipItem
+                .Where(i => i.IsActive)
+                .Select(i => i.GoldSize)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Distinct()
+                .ToList();
+
+            return sizes.Count == 1 ? sizes[0] : null;
         }
 
         private static decimal RoundHalfUp(decimal value, int decimals)

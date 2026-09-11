@@ -10,6 +10,11 @@ namespace jewelry.Model.Production.Plan.GoldLossMonthlyReport
         public bool HasSavedData { get; set; }
         public decimal TotalMoneyDiff { get; set; }
         public List<GoldLossMonthlyRow> Rows { get; set; } = new List<GoldLossMonthlyRow>();
+        public int? DefaultFromYear { get; set; }
+        public int? DefaultFromMonth { get; set; }
+        public int RowsReturned { get; set; }
+        public int RowsPendingReturn { get; set; }
+        public decimal PendingWeight { get; set; }
     }
 
     public class GoldLossMonthlyRow

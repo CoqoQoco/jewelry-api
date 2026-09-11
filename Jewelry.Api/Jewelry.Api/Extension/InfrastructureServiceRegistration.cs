@@ -102,6 +102,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductImageService, ProductImageService>();
 
             services.AddScoped<IPlanService, PlanService>();
+            services.AddScoped<IGoldLossReconcileReportService, GoldLossReconcileReportService>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<IPlanBOMService, PlanBOMService>();
             services.AddScoped<IProductionPrePlanService, ProductionPrePlanService>();

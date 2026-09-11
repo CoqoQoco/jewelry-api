@@ -18,14 +18,17 @@ namespace Jewelry.Api.Controllers.Production
     {
         private readonly ILogger<PlanController> _logger;
         private readonly IPlanService _planService;
+        private readonly IGoldLossReconcileReportService _goldLossReconcileReportService;
 
         public PlanController(ILogger<PlanController> logger,
             IPlanService planService,
+            IGoldLossReconcileReportService goldLossReconcileReportService,
             IOptions<ApiBehaviorOptions> apiBehaviorOptions)
             : base(apiBehaviorOptions)
         {
             _logger = logger;
             _planService = planService;
+            _goldLossReconcileReportService = goldLossReconcileReportService;
         }
 
         [Route("StatusDetailList")]
@@ -185,6 +188,24 @@ namespace Jewelry.Api.Controllers.Production
             try
             {
                 var response = await _planService.GetGoldLossByStageReport(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("GoldLossReconcileReport")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.GoldLossReconcileReport.SearchResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GetGoldLossReconcileReport([FromBody] jewelry.Model.Production.Plan.GoldLossReconcileReport.SearchRequest request)
+        {
+            try
+            {
+                var response = await _goldLossReconcileReportService.GetGoldLossReconcileReport(request);
                 return Ok(response);
             }
             catch (HandleException ex)
