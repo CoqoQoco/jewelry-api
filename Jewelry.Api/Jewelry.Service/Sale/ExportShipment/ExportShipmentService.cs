@@ -475,7 +475,8 @@ public class ExportShipmentService : BaseService, IExportShipmentService
         if (header.ExchangeRate.HasValue && header.ExchangeRate.Value != 0)
         {
             var pricePercent = header.PricePercent ?? 100m;
-            unitPrice = Math.Round((tagPrice ?? 0m) * (pricePercent / 100m) / header.ExchangeRate.Value, 2);
+            // ปัดครึ่งขึ้นตามความละเอียดของสกุลเงินเอกสาร (header.Currency) — แทน Math.Round เดิมที่เป็น banker's rounding (ToEven)
+            unitPrice = MathHelper.RoundMoney((tagPrice ?? 0m) * (pricePercent / 100m) / header.ExchangeRate.Value, header.Currency ?? "THB");
         }
 
         var qty = piece.Qty;

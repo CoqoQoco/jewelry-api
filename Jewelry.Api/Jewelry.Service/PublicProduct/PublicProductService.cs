@@ -1,6 +1,7 @@
 ﻿using jewelry.Model.Exceptions;
 using jewelry.Model.PublicProduct;
 using Jewelry.Data.Context;
+using Jewelry.Service.Helper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -175,7 +176,8 @@ namespace Jewelry.Service.PublicProduct
             decimal? displayPrice = null;
             if (_config.Value.ShowPrice)
             {
-                var computed = Math.Round((matched.DefaultPrice ?? 0) * (matched.TagPriceMultiplier ?? 1), 2);
+                // หน้าสาธารณะไม่มีสกุลเงินของตัวเอง — ถือเป็น THB เสมอ ปัดครึ่งขึ้นแทน Math.Round เดิมที่เป็น banker's rounding (ToEven)
+                var computed = MathHelper.RoundMoney((matched.DefaultPrice ?? 0) * (matched.TagPriceMultiplier ?? 1), "THB");
                 displayPrice = computed > 0 ? computed : (decimal?)null;
             }
 

@@ -29,8 +29,20 @@ namespace Jewelry.Service.Helper
             return RoundDecimal(amount * (percent / 100), decimalPosition);
         }
 
-        public static decimal CeilMoney(decimal value)
-            => Math.Ceiling(Math.Round(value, 2, MidpointRounding.AwayFromZero));
+        // เกณฑ์ปัดเศษเงินของเอกสารขายต้องตรงกับฝั่ง UI เสมอ (jeweley-ui: src/services/utils/money.js)
+        // ปัดครึ่งขึ้นแบบ away-from-zero เป็นจำนวนเต็ม — ใช้กับยอดสุดท้ายของเอกสารขายทุกสกุลเงิน
+        public static decimal RoundMoney(decimal value)
+            => Math.Round(value, 0, MidpointRounding.AwayFromZero);
+
+        // ปัดครึ่งขึ้นตามความละเอียดของสกุลเงิน: สกุลต่างประเทศ (ไม่ใช่ THB) ปัดเป็นจำนวนเต็ม, THB ปัด 2 ตำแหน่ง
+        public static decimal RoundMoney(decimal value, string currencyUnit)
+        {
+            var decimalPosition = IsForeignCurrency(currencyUnit) ? 0 : 2;
+            return Math.Round(value, decimalPosition, MidpointRounding.AwayFromZero);
+        }
+
+        public static bool IsForeignCurrency(string currencyUnit)
+            => !string.Equals((currencyUnit ?? string.Empty).Trim(), "THB", StringComparison.OrdinalIgnoreCase);
 
         public static (decimal subTotal, decimal vatAmount, decimal raw, decimal rounded, decimal adjustment)
             ComputeTotals(decimal subTotal, decimal specialDiscount, decimal specialAddition, decimal freight, decimal vatPercent)
@@ -38,7 +50,7 @@ namespace Jewelry.Service.Helper
             var afterSpecial = subTotal - specialDiscount + specialAddition + freight;
             var vatAmount = afterSpecial * (vatPercent / 100m);
             var raw = afterSpecial + vatAmount;
-            var rounded = CeilMoney(raw);
+            var rounded = RoundMoney(raw);
             return (subTotal, vatAmount, raw, rounded, rounded - raw);
         }
     }
