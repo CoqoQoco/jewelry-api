@@ -22,6 +22,7 @@ namespace jewelry.Model.Sale.SaleOrder.ConfirmStock
         [Range(0.001, double.MaxValue, ErrorMessage = "Appraisal price must be greater than 0")]
         public decimal AppraisalPrice { get; set; }
         public decimal Discount { get; set; }
+        public string? LineKey { get; set; }
 
     }
 }

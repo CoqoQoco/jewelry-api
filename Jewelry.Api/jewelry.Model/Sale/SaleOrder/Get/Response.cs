@@ -69,6 +69,7 @@ namespace jewelry.Model.Sale.SaleOrder.Get
     {
         public long Id { get; set; }
         public string StockNumber { get; set; }
+        public string? LineKey { get; set; }
 
         public decimal PriceOrigin { get; set; }
         public decimal Qty { get; set; }

@@ -282,7 +282,9 @@ namespace Jewelry.Service.Sale.SaleOrder
                     using (JsonDocument doc = JsonDocument.Parse(response.Data))
                     {
                         var root = doc.RootElement;
-                        var stockNumbers = new List<string>();
+                        // เก็บทั้ง stockNumber และ lineKey ต่อ entry (คงลำดับ + คงรายการซ้ำไว้ทั้งหมด)
+                        // ใบเก่าที่ไม่มี lineKey ใน JSON จะได้ lineKey = null
+                        var stockItemsFromJson = new List<(string? StockNumber, string? LineKey)>();
 
                         if (root.TryGetProperty("stockItems", out JsonElement stockItemsElement))
                         {
@@ -290,16 +292,24 @@ namespace Jewelry.Service.Sale.SaleOrder
                             {
                                 if (item.TryGetProperty("stockNumber", out JsonElement stockNumberElement))
                                 {
-                                    stockNumbers.Add(stockNumberElement.GetString());
+                                    string? lineKey = null;
+                                    if (item.TryGetProperty("lineKey", out JsonElement lineKeyElement)
+                                        && lineKeyElement.ValueKind == JsonValueKind.String)
+                                    {
+                                        lineKey = lineKeyElement.GetString();
+                                    }
+
+                                    stockItemsFromJson.Add((stockNumberElement.GetString(), lineKey));
                                 }
                             }
                         }
 
-                        if (stockNumbers.Any())
-                        { 
-                            response.StockConfirm = stockNumbers.Select(s => new jewelry.Model.Sale.SaleOrder.Get.StockConfirm
+                        if (stockItemsFromJson.Any())
+                        {
+                            response.StockConfirm = stockItemsFromJson.Select(s => new jewelry.Model.Sale.SaleOrder.Get.StockConfirm
                             {
-                                StockNumber = s,
+                                StockNumber = s.StockNumber,
+                                LineKey = s.LineKey,
                                 IsConfirm = false
                             }).ToList();
                         }
@@ -321,12 +331,32 @@ namespace Jewelry.Service.Sale.SaleOrder
             {
                 if (response.StockConfirm.Any())
                 {
+                    // กันหลายแถว DB ที่เลขสินค้าเดียวกันไปจับคู่ placeholder ตัวเดียวกันซ้ำ (ต้อง 1 ต่อ 1)
+                    var matchedPlaceholders = new HashSet<jewelry.Model.Sale.SaleOrder.Get.StockConfirm>();
+
                     foreach (var stock in stockConfrim)
                     {
-                        var matchStock = response.StockConfirm.FirstOrDefault(s => s.StockNumber == stock.StockNumber);
+                        // 1) จับคู่ด้วย lineKey ก่อน ถ้า DB แถวนี้มี lineKey
+                        jewelry.Model.Sale.SaleOrder.Get.StockConfirm? matchStock = null;
+                        if (!string.IsNullOrEmpty(stock.LineKey))
+                        {
+                            matchStock = response.StockConfirm.FirstOrDefault(s =>
+                                !matchedPlaceholders.Contains(s) && s.LineKey == stock.LineKey);
+                        }
+
+                        // 2) ไม่เจอ (หรือไม่มี lineKey) → fallback จับคู่ด้วย StockNumber ตัวแรกที่ยังไม่ถูกใช้ (ข้อมูลเก่า)
+                        if (matchStock == null)
+                        {
+                            matchStock = response.StockConfirm.FirstOrDefault(s =>
+                                !matchedPlaceholders.Contains(s) && s.StockNumber == stock.StockNumber);
+                        }
+
                         if (matchStock != null)
                         {
+                            matchedPlaceholders.Add(matchStock);
+
                             matchStock.Id = stock.Id;
+                            matchStock.LineKey = stock.LineKey;
                             matchStock.PriceOrigin = stock.PriceOrigin;
                             matchStock.IsConfirm = true;
 
@@ -345,6 +375,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                             {
                                 Id = stock.Id,
                                 StockNumber = stock.StockNumber,
+                                LineKey = stock.LineKey,
                                 IsConfirm = true,
 
                                 PriceOrigin = stock.PriceOrigin,
@@ -366,6 +397,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                     {
                         Id = s.Id,
                         StockNumber = s.StockNumber,
+                        LineKey = s.LineKey,
 
                         PriceOrigin = s.PriceOrigin,
                         Qty = s.Qty,
@@ -671,20 +703,6 @@ namespace Jewelry.Service.Sale.SaleOrder
                     continue;
                 }
 
-                // Silver lot: จองเกินจำนวนพร้อมขาย (qty - qtyReserved) ของ piece ไม่ได้
-                var piece = await _jewelryContext.TbtStockPiece
-                    .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
-
-                if (piece != null)
-                {
-                    var available = StockPieceQtyHelper.Available(piece);
-                    if (stockItem.Qty > available)
-                    {
-                        errors.Add($"เลข {stockItem.StockNumber} จองได้ไม่เกินจำนวนพร้อมขาย ({available}) แต่ขอจอง {stockItem.Qty}.");
-                        continue;
-                    }
-                }
-
                 //// Check if item is already confirmed in this sale order
                 //var existingConfirmation = await _jewelryContext.TbtSaleOrderProduct
                 //    .FirstOrDefaultAsync(p => p.SoNumber == request.SoNumber.ToUpper() &&
@@ -695,6 +713,28 @@ namespace Jewelry.Service.Sale.SaleOrder
                 //    errors.Add($"Stock item {stockItem.StockNumber} is already confirmed in this sale order.");
                 //    continue;
                 //}
+            }
+
+            // Silver lot: จองเกินจำนวนพร้อมขาย (qty - qtyReserved) ของ piece ไม่ได้
+            // ต้องรวมจำนวนข้ามบรรทัดที่เลขสินค้าเดียวกันก่อนเทียบ (1 ใบสั่งขายอาจมีหลายบรรทัดเลขสินค้าเดียวกัน)
+            var groupedByStockNumber = stockItems
+                .Where(s => !string.IsNullOrEmpty(s.StockNumber))
+                .GroupBy(s => s.StockNumber)
+                .Select(g => new { StockNumber = g.Key, TotalQty = g.Sum(x => x.Qty) });
+
+            foreach (var group in groupedByStockNumber)
+            {
+                var piece = await _jewelryContext.TbtStockPiece
+                    .FirstOrDefaultAsync(p => p.StockNumber == group.StockNumber);
+
+                if (piece != null)
+                {
+                    var available = StockPieceQtyHelper.Available(piece);
+                    if (group.TotalQty > available)
+                    {
+                        errors.Add($"เลข {group.StockNumber} จองได้ไม่เกินจำนวนพร้อมขาย ({available}) แต่ขอจอง {group.TotalQty}.");
+                    }
+                }
             }
 
             // If there are validation errors, return them
@@ -722,6 +762,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                     PriceOrigin = stockItem.AppraisalPrice,
                     Discount = stockItem.Discount,
                     NetPrice = stockItem.AppraisalPrice * (1 - (stockItem.Discount) / 100),
+                    LineKey = stockItem.LineKey,
 
                     CreateDate = confirmedDate,
                     CreateBy = CurrentUsername

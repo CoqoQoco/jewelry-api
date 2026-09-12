@@ -41,4 +41,6 @@ public partial class TbtSaleOrderProduct
     public string? InvoiceItem { get; set; }
 
     public string? DkInvoiceNumber { get; set; }
+
+    public string? LineKey { get; set; }
 }

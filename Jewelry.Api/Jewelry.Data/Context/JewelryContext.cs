@@ -2538,6 +2538,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.InvoiceItem)
                 .HasColumnType("character varying")
                 .HasColumnName("invoice_item");
+            entity.Property(e => e.LineKey)
+                .HasColumnType("character varying")
+                .HasColumnName("line_key");
             entity.Property(e => e.NetPrice).HasColumnName("net_price");
             entity.Property(e => e.PriceOrigin)
                 .HasComment("Price in THB")

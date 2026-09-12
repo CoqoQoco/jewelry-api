@@ -68,6 +68,7 @@ namespace jewelry.Model.Sale.Invoice.Get
     {
         public long Id { get; set; }
         public string StockNumber { get; set; } = null!;
+        public string? LineKey { get; set; }
         public bool IsConfirmed { get; set; }
         public bool IsInvoice => !string.IsNullOrEmpty(Invoice);
         public string? Invoice { get; set; }

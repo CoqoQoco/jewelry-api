@@ -57,6 +57,15 @@ namespace jewelry.Model.Stock.Product.Get
         public List<Material> Materials { get; set; } = new List<Material>();
         public List<PriceTransaction> PriceTransactions { get; set; } = new List<PriceTransaction>();
         public List<PlanPriceItem> PlanPriceItems { get; set; } = new List<PlanPriceItem>();
+        public List<Reservation> Reservations { get; set; } = new List<Reservation>();
+    }
+
+    public class Reservation
+    {
+        public string SoNumber { get; set; }
+        public decimal Qty { get; set; }
+        public string? Invoice { get; set; }
+        public DateTime CreateDate { get; set; }
     }
 
     public class Material

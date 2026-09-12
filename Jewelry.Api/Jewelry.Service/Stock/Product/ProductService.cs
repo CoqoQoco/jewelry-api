@@ -463,6 +463,19 @@ namespace Jewelry.Service.Stock.Product
                              }).ToList(),
             };
 
+            response.Reservations = await _jewelryContext.TbtSaleOrderProduct
+                .AsNoTracking()
+                .Where(x => x.StockNumber == piece.StockNumber)
+                .OrderBy(x => x.CreateDate)
+                .Select(x => new jewelry.Model.Stock.Product.Get.Reservation()
+                {
+                    SoNumber = x.SoNumber,
+                    Qty = x.Qty,
+                    Invoice = x.Invoice,
+                    CreateDate = x.CreateDate
+                })
+                .ToListAsync();
+
             TbtProductionPlan plan = null;
             if (!string.IsNullOrEmpty(response.Wo) && response.WoNumber.HasValue)
             {
