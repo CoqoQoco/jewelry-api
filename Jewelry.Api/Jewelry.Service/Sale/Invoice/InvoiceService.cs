@@ -253,41 +253,6 @@ namespace Jewelry.Service.Sale.Invoice
                 });
             }
 
-            // บันทึกรับเงินอัตโนมัติ — เฉพาะวิธีชำระที่ถือว่าได้เงินแล้วตอนออกบิล (เงินสด/โอน/บัตรเครดิต)
-            // เช็ค (3) ไม่นับว่าได้เงินเพราะยังไม่ขึ้นเงิน, ค้างชำระ (0) และเครดิตกำหนดวัน (5) ยังไม่ได้รับเงิน — ปล่อยเป็นใบค้างให้ตามเก็บ ไม่สร้างแถว payment
-            if (request.Payment == 1 || request.Payment == 2 || request.Payment == 4)
-            {
-                var autoPaymentAmount = invoiceHeader.GrandTotalRounded.GetValueOrDefault() - invoiceHeader.Deposit;
-
-                if (autoPaymentAmount > 0)
-                {
-                    var autoPaymentRunning = await _runningNumberService.GenerateRunningNumberForGold($"PAY-{invoiceNumber}");
-
-                    var autoPayment = new TbtSaleInvoicePaymentItem
-                    {
-                        Running = autoPaymentRunning,
-                        InvoiceRunning = invoiceNumber,
-                        SoRunning = request.SoNumber,
-
-                        PaymentDate = createDate,
-
-                        Amount = autoPaymentAmount,
-                        CurrencyUnit = invoiceHeader.CurrencyUnit,
-
-                        PaymantName = invoiceHeader.PaymantName,
-                        Payment = invoiceHeader.Payment,
-
-                        Remark = "บันทึกอัตโนมัติจากวิธีชำระตอนออกบิล",
-                        ImagePath = "",
-
-                        CreateBy = CurrentUsername,
-                        CreateDate = DateTime.UtcNow,
-                    };
-
-                    _jewelryContext.TbtSaleInvoicePaymentItem.Add(autoPayment);
-                }
-            }
-
             await _jewelryContext.SaveChangesAsync();
 
             return invoiceNumber;
@@ -339,6 +304,7 @@ namespace Jewelry.Service.Sale.Invoice
                 {
                     Id = sop.Id,
                     StockNumber = sop.StockNumber,
+                    LineKey = sop.LineKey,
                     IsConfirmed = true,
                     Invoice = sop.Invoice,
                     InvoiceItem = sop.InvoiceItem,
