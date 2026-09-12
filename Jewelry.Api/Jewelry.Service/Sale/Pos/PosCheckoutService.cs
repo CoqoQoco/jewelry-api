@@ -69,10 +69,9 @@ namespace Jewelry.Service.Sale.Pos
                 await GuardStockAvailability(request.Items);
 
                 // 1) Create Sale Order (reuse SaleOrderService.Upsert — always creation branch, no SoNumber)
-                // ปัดราคาต่อชิ้นตามความละเอียดของสกุลเงินก่อนคูณจำนวน แล้วรวมจากเลขที่ปัดแล้วเท่านั้น (ต้องตรงกับ InvoiceService/ฝั่ง UI)
-                var posCurrencyUnit = string.IsNullOrWhiteSpace(request.CurrencyUnit) ? "THB" : request.CurrencyUnit;
+                // ไม่ปัดเศษราคาต่อชิ้นหรือยอดต่อแถว คิดเต็มความละเอียดแล้วปัดครั้งเดียวที่ยอดสุดท้าย (ต้องตรงกับ InvoiceService/ฝั่ง UI)
                 var subTotal = request.Items.Sum(i =>
-                    MathHelper.RoundMoney(i.AppraisalPrice * (1 - i.DiscountPercent / 100m) / request.CurrencyRate, posCurrencyUnit) * i.Qty);
+                    i.AppraisalPrice * (1 - i.DiscountPercent / 100m) / request.CurrencyRate * i.Qty);
 
                 // ประกอบ Data (stockItems/copyItems/allItems/freight/copyFreight) เหมือนที่หน้าเว็บ (sale-order-view.vue)
                 // ส่งให้ SaleOrder.Upsert เก็บลง TbtSaleOrder.Data — ให้ SaleOrder/Invoice-Detail ฝั่งเว็บเปิดบิล POS แล้วเห็นรายการสินค้าครบเหมือนบิลที่สร้างจากเว็บ

@@ -91,10 +91,9 @@ namespace Jewelry.Service.Sale.Invoice
             // Generate invoice number
             var invoiceNumber = await GenerateInvoiceNumber();
 
-            // Compute totals from confirmed items — ปัดราคาต่อชิ้นตามความละเอียดของสกุลเงินก่อนคูณจำนวน แล้วรวมจากเลขที่ปัดแล้วเท่านั้น (ต้องตรงกับฝั่ง UI)
-            var currencyUnit = string.IsNullOrWhiteSpace(request.CurrencyUnit) ? "THB" : request.CurrencyUnit;
+            // Compute totals from confirmed items — ไม่ปัดเศษราคาต่อชิ้นหรือยอดต่อแถว คิดเต็มความละเอียดแล้วปัดครั้งเดียวที่ยอดสุดท้าย (ต้องตรงกับฝั่ง UI)
             var subTotal = getstockConfrim.Sum(x =>
-                MathHelper.RoundMoney(x.PriceOrigin * (1 - (x.Discount ?? 0) / 100m) / request.CurrencyRate, currencyUnit) * x.Qty);
+                x.PriceOrigin * (1 - (x.Discount ?? 0) / 100m) / request.CurrencyRate * x.Qty);
             var t = MathHelper.ComputeTotals(subTotal, request.SpecialDiscount, request.SpecialAddition, request.FreightAndInsurance, request.Vat);
 
             // ดึงใบสั่งขายเพื่อสแนปช็อตผู้ขาย/ผู้ช่วยขายมาเก็บที่ invoice ณ ตอนสร้าง — ถ้าไม่พบ SO ก็ไม่ throw ให้ปล่อยเป็น null (เป็นแค่ข้อมูลประกอบใบพิมพ์)

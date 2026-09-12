@@ -156,8 +156,8 @@ namespace Jewelry.Service.Sale.BillingNote
             var goldResizeAmount = request.GoldResizeQty * request.GoldResizePerUnit;
             var silverResizeAmount = request.SilverResizeQty * request.SilverResizePerUnit;
             var supportAmount = request.HasSupport ? subTotal * request.SupportPercent / 100m : 0m;
-            // ปัดครึ่งขึ้น (BillingNote ไม่มีสกุลเงินของตัวเอง — ถือเป็น THB เสมอ) แล้วรวมยอดสุดท้ายเป็นจำนวนเต็มด้วย half-up
-            var vatAmount = MathHelper.RoundMoney(subTotal * request.VatPercent / 100m, "THB");
+            // ไม่ปัดเศษ vatAmount ระหว่างทาง ปัดครั้งเดียวที่ grandTotal เป็นทศนิยม 2 ตำแหน่งแบบ half-up
+            var vatAmount = subTotal * request.VatPercent / 100m;
             var grandTotal = MathHelper.RoundMoney(subTotal + vatAmount);
 
             var header = new TbtSaleBillingNoteHeader
@@ -276,8 +276,8 @@ namespace Jewelry.Service.Sale.BillingNote
             header.SupportAmount = request.HasSupport ? header.SubTotal * request.SupportPercent / 100m : 0m;
 
             header.VatPercent = request.VatPercent;
-            // ปัดครึ่งขึ้น (BillingNote ไม่มีสกุลเงินของตัวเอง — ถือเป็น THB เสมอ) แล้วรวมยอดสุดท้ายเป็นจำนวนเต็มด้วย half-up
-            header.VatAmount = MathHelper.RoundMoney(subTotal * request.VatPercent / 100m, "THB");
+            // ไม่ปัดเศษ vatAmount ระหว่างทาง ปัดครั้งเดียวที่ grandTotal เป็นทศนิยม 2 ตำแหน่งแบบ half-up
+            header.VatAmount = subTotal * request.VatPercent / 100m;
             header.GrandTotal = MathHelper.RoundMoney(subTotal + header.VatAmount);
 
             header.Remark = request.Remark;

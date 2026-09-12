@@ -30,15 +30,14 @@ namespace Jewelry.Service.Helper
         }
 
         // เกณฑ์ปัดเศษเงินของเอกสารขายต้องตรงกับฝั่ง UI เสมอ (jeweley-ui: src/services/utils/money.js)
-        // ปัดครึ่งขึ้นแบบ away-from-zero เป็นจำนวนเต็ม — ใช้กับยอดสุดท้ายของเอกสารขายทุกสกุลเงิน
+        // ไม่ปัดเศษระหว่างทาง ปัดครั้งเดียวที่ยอดสุดท้ายเป็นทศนิยม 2 ตำแหน่งแบบ away-from-zero — ใช้เกณฑ์เดียวกันทั้งสกุลต่างประเทศและ THB
         public static decimal RoundMoney(decimal value)
-            => Math.Round(value, 0, MidpointRounding.AwayFromZero);
+            => Math.Round(value, 2, MidpointRounding.AwayFromZero);
 
-        // ปัดครึ่งขึ้นตามความละเอียดของสกุลเงิน: สกุลต่างประเทศ (ไม่ใช่ THB) ปัดเป็นจำนวนเต็ม, THB ปัด 2 ตำแหน่ง
+        // ปัดครึ่งขึ้นเป็นทศนิยม 2 ตำแหน่งทุกสกุลเงิน — เก็บ signature ไว้เพื่อ compat กับจุดเรียกเดิม
         public static decimal RoundMoney(decimal value, string currencyUnit)
         {
-            var decimalPosition = IsForeignCurrency(currencyUnit) ? 0 : 2;
-            return Math.Round(value, decimalPosition, MidpointRounding.AwayFromZero);
+            return Math.Round(value, 2, MidpointRounding.AwayFromZero);
         }
 
         public static bool IsForeignCurrency(string currencyUnit)
@@ -51,7 +50,7 @@ namespace Jewelry.Service.Helper
             var vatAmount = afterSpecial * (vatPercent / 100m);
             var raw = afterSpecial + vatAmount;
             var rounded = RoundMoney(raw);
-            return (subTotal, vatAmount, raw, rounded, rounded - raw);
+            return (subTotal, vatAmount, raw, rounded, 0m);
         }
     }
 }
