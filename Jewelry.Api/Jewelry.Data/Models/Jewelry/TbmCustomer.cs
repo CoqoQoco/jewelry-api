@@ -29,6 +29,10 @@ public partial class TbmCustomer
 
     public string? TaxId { get; set; }
 
+    public string? CertBrandName { get; set; }
+
+    public string? CertLogoPath { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;

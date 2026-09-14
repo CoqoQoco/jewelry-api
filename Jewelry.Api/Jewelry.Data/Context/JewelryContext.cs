@@ -229,6 +229,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleInvoicePrintLog> TbtSaleInvoicePrintLog { get; set; }
 
+    public virtual DbSet<TbtSaleCertificate> TbtSaleCertificate { get; set; }
+
     public virtual DbSet<TbtPrintJob> TbtPrintJob { get; set; }
 
     public virtual DbSet<TbmNotificationType> TbmNotificationType { get; set; }
@@ -589,6 +591,12 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.TaxId)
                 .HasColumnType("character varying")
                 .HasColumnName("tax_id");
+            entity.Property(e => e.CertBrandName)
+                .HasColumnType("character varying")
+                .HasColumnName("cert_brand_name");
+            entity.Property(e => e.CertLogoPath)
+                .HasColumnType("character varying")
+                .HasColumnName("cert_logo_path");
 
             entity.HasOne(d => d.TypeCodeNavigation).WithMany(p => p.TbmCustomer)
                 .HasForeignKey(d => d.TypeCode)
@@ -4908,6 +4916,67 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("printed_by");
             entity.Property(e => e.PrintedAt).HasColumnName("printed_at");
+        });
+
+        modelBuilder.Entity<TbtSaleCertificate>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_sale_certificate_pk");
+
+            entity.ToTable("tbt_sale_certificate");
+
+            entity.HasIndex(e => e.InvoiceNo).HasDatabaseName("idx_tbt_sale_certificate_invoice_no");
+            entity.HasIndex(e => e.CertificateNo).HasDatabaseName("idx_tbt_sale_certificate_certificate_no");
+            entity.HasIndex(e => e.StockNumber).HasDatabaseName("idx_tbt_sale_certificate_stock_number");
+            entity.HasIndex(e => e.CustomerCode).HasDatabaseName("idx_tbt_sale_certificate_customer_code");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.Batch)
+                .HasColumnType("character varying")
+                .HasColumnName("batch");
+            entity.Property(e => e.CertificateNo)
+                .HasColumnType("character varying")
+                .HasColumnName("certificate_no");
+            entity.Property(e => e.IssueNo).HasColumnName("issue_no");
+            entity.Property(e => e.InvoiceRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_running");
+            entity.Property(e => e.InvoiceNo)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_no");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.ItemNo)
+                .HasColumnType("character varying")
+                .HasColumnName("item_no");
+            entity.Property(e => e.CustomerCode)
+                .HasColumnType("character varying")
+                .HasColumnName("customer_code");
+            entity.Property(e => e.BrandMode)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'dk'::character varying")
+                .HasColumnName("brand_mode");
+            entity.Property(e => e.BrandName)
+                .HasColumnType("character varying")
+                .HasColumnName("brand_name");
+            entity.Property(e => e.BrandLogoPath)
+                .HasColumnType("character varying")
+                .HasColumnName("brand_logo_path");
+            entity.Property(e => e.ImagePath)
+                .HasColumnType("character varying")
+                .HasColumnName("image_path");
+            entity.Property(e => e.SignerTitle)
+                .HasColumnType("character varying")
+                .HasColumnName("signer_title");
+            entity.Property(e => e.Data)
+                .HasColumnType("jsonb")
+                .HasColumnName("data");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
         });
 
         modelBuilder.Entity<TbtGoldLossTangSlip>(entity =>

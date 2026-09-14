@@ -2,6 +2,7 @@
 using Jewelry.Data.Context;
 using Jewelry.Service.Announcement;
 using Jewelry.Service.Authentication.Login;
+using Jewelry.Service.Certificate;
 using Jewelry.Service.Customer;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master;
@@ -116,6 +117,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IQuotationService, QuotationService>();
             services.AddScoped<ISaleOrderService, SaleOrderService>();
             services.AddScoped<IInvoiceService, InvoiceService>();
+            services.AddScoped<ICertificateService, CertificateService>();
             services.AddScoped<IPosCheckoutService, PosCheckoutService>();
             services.AddScoped<IBillingNoteService, BillingNoteService>();
             services.AddScoped<IMaterialSaleService, MaterialSaleService>();
