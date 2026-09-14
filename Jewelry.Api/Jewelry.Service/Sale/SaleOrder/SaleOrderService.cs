@@ -265,6 +265,8 @@ namespace Jewelry.Service.Sale.SaleOrder
                 SalePerson = saleOrder.SalePerson,
                 SaleSupport = saleOrder.SaleSupport,
 
+                SaleChannelCode = saleOrder.SaleChannelCode,
+
                 SubTotal = saleOrder.SubTotal,
                 SpecialDiscountAmt = saleOrder.SpecialDiscountAmt,
                 SpecialAdditionAmt = saleOrder.SpecialAdditionAmt,
@@ -274,6 +276,15 @@ namespace Jewelry.Service.Sale.SaleOrder
                 GrandTotalRounded = saleOrder.GrandTotalRounded,
                 RoundingAdjustment = saleOrder.RoundingAdjustment
             };
+
+            if (!string.IsNullOrEmpty(response.SaleChannelCode))
+            {
+                var saleChannel = await _jewelryContext.TbmSaleChannel
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Code == response.SaleChannelCode);
+
+                response.SaleChannelName = saleChannel?.NameTh ?? saleChannel?.NameEn ?? saleChannel?.Code;
+            }
 
             if (!string.IsNullOrEmpty(response.Data))
             {

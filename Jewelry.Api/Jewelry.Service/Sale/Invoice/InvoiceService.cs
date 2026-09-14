@@ -3,6 +3,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Jewelry.Service.Master.SaleChannel;
 using Jewelry.Service.Sale.SaleOrder;
 using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
@@ -24,18 +25,21 @@ namespace Jewelry.Service.Sale.Invoice
         private readonly IRunningNumber _runningNumberService;
         private readonly IAzureBlobStorageService _azureBlobService;
         private readonly ISaleOrderService _saleOrderService;
+        private readonly ISaleChannelService _saleChannelService;
 
         public InvoiceService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor,
             IHostEnvironment hostingEnvironment,
             IRunningNumber runningNumberService,
             IAzureBlobStorageService azureBlobService,
-            ISaleOrderService saleOrderService) : base(jewelryContext, httpContextAccessor)
+            ISaleOrderService saleOrderService,
+            ISaleChannelService saleChannelService) : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _hostingEnvironment = hostingEnvironment;
             _runningNumberService = runningNumberService;
             _azureBlobService = azureBlobService;
             _saleOrderService = saleOrderService;
+            _saleChannelService = saleChannelService;
         }
 
         public async Task<string> Create(jewelry.Model.Sale.Invoice.Create.Request request)
@@ -100,35 +104,42 @@ namespace Jewelry.Service.Sale.Invoice
             var saleOrder = await _jewelryContext.TbtSaleOrder
                 .FirstOrDefaultAsync(x => x.SoNumber == request.SoNumber);
 
-            // จุดขาย: ใช้ค่าที่ request ส่งมาก่อน ถ้าไม่ส่งมาให้เลือกอัตโนมัติจากช่องที่ active และอยู่ในช่วงวันที่ปัจจุบัน (sort_order น้อยสุดก่อน) แล้วค่อย fallback ไปที่ตัว is_default
-            var saleChannelCode = request.SaleChannelCode;
-            if (string.IsNullOrEmpty(saleChannelCode))
+            // จุดขาย: SO เป็นตัวตั้ง ใบแจ้งหนี้ต้องจุดขายเดียวกับ SO เสมอ ถ้า SO มีจุดขายอยู่แล้วให้ใช้ค่านั้น ไม่สนใจค่าที่ request ส่งมา
+            string? saleChannelCode;
+            if (saleOrder != null && !string.IsNullOrEmpty(saleOrder.SaleChannelCode))
             {
-                var today = DateTime.UtcNow;
-                var activeChannel = await _jewelryContext.TbmSaleChannel
-                    .Where(c => c.IsActive
-                        && (!c.StartDate.HasValue || c.StartDate.Value <= today)
-                        && (!c.EndDate.HasValue || c.EndDate.Value >= today))
-                    .OrderBy(c => c.SortOrder ?? int.MaxValue)
-                    .FirstOrDefaultAsync();
-
-                saleChannelCode = activeChannel?.Code;
-
+                saleChannelCode = saleOrder.SaleChannelCode;
+            }
+            else
+            {
+                // ยังไม่เคยมีจุดขาย: ใช้ค่าที่ request ส่งมา ถ้าไม่ส่งมาให้เลือกอัตโนมัติจากช่องที่ active ในวันนี้
+                saleChannelCode = request.SaleChannelCode;
                 if (string.IsNullOrEmpty(saleChannelCode))
                 {
-                    var defaultChannel = await _jewelryContext.TbmSaleChannel
-                        .FirstOrDefaultAsync(c => c.IsDefault);
-                    saleChannelCode = defaultChannel?.Code;
+                    saleChannelCode = (await _saleChannelService.Current())?.Code;
                 }
-            }
 
-            // สแนปช็อตจุดขายกลับไปที่ SO ด้วยถ้าของเดิมยังว่าง — ไม่ทับค่าที่ SO มีอยู่แล้ว
-            if (saleOrder != null && string.IsNullOrEmpty(saleOrder.SaleChannelCode) && !string.IsNullOrEmpty(saleChannelCode))
-            {
-                saleOrder.SaleChannelCode = saleChannelCode;
-                saleOrder.UpdateBy = CurrentUsername;
-                saleOrder.UpdateDate = DateTime.UtcNow;
-                _jewelryContext.TbtSaleOrder.Update(saleOrder);
+                if (saleOrder != null && !string.IsNullOrEmpty(saleChannelCode))
+                {
+                    saleOrder.SaleChannelCode = saleChannelCode;
+                    saleOrder.UpdateBy = CurrentUsername;
+                    saleOrder.UpdateDate = DateTime.UtcNow;
+                    _jewelryContext.TbtSaleOrder.Update(saleOrder);
+
+                    // sync จุดขายไปยังใบแจ้งหนี้เดิมของ SO นี้ที่ยังจุดขายไม่ตรงกันด้วย — ไม่แตะ UpdateBy/UpdateDate เพราะฟิลด์นี้ใช้บันทึกว่าใครลบใบแจ้งหนี้เมื่อไหร่
+                    var invoicesToSync = await _jewelryContext.TbtSaleInvoiceHeader
+                        .Where(x => x.SoRunning == request.SoNumber && x.SaleChannelCode != saleChannelCode)
+                        .ToListAsync();
+
+                    if (invoicesToSync.Any())
+                    {
+                        foreach (var inv in invoicesToSync)
+                        {
+                            inv.SaleChannelCode = saleChannelCode;
+                        }
+                        _jewelryContext.TbtSaleInvoiceHeader.UpdateRange(invoicesToSync);
+                    }
+                }
             }
 
             var createDate = DateTime.UtcNow;

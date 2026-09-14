@@ -52,6 +52,9 @@ namespace jewelry.Model.Sale.SaleOrder.Get
         public string? SalePerson { get; set; }
         public string? SaleSupport { get; set; }
 
+        public string? SaleChannelCode { get; set; }
+        public string? SaleChannelName { get; set; }
+
         public decimal? SubTotal { get; set; }
         public decimal? SpecialDiscountAmt { get; set; }
         public decimal? SpecialAdditionAmt { get; set; }

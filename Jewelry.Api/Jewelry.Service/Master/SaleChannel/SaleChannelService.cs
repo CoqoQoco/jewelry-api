@@ -67,25 +67,31 @@ namespace Jewelry.Service.Master.SaleChannel
 
         public async Task<SaleChannelResponse?> Current()
         {
-            var today = DateTime.UtcNow.AddHours(7).Date;
-
-            var entity = await _jewelryContext.TbmSaleChannel
+            // master table เล็ก โหลด active channel ทั้งหมดมากรอง/เรียงในหน่วยความจำ
+            // เพื่อเลี่ยงปัญหาการแปลงวันที่ระหว่าง EF/Npgsql กับเงื่อนไขเขตเวลาไทย (ค่าจาก timestamptz กลับมาเป็น Kind=Utc)
+            var channels = await _jewelryContext.TbmSaleChannel
                 .AsNoTracking()
-                .Where(x => x.IsActive
-                    && (x.StartDate == null || x.StartDate <= today)
-                    && (x.EndDate == null || x.EndDate >= today))
-                .OrderBy(x => x.SortOrder)
+                .Where(x => x.IsActive)
+                .ToListAsync();
+
+            var todayThai = DateTime.UtcNow.AddHours(7).Date;
+
+            // ช่องที่มีช่วงวันที่เฉพาะ (เช่น งานแฟร์) ต้องชนะช่องที่เปิดตลอดไปอย่าง SHOP เสมอ แม้ sort_order จะมากกว่า
+            var entity = channels
+                .Where(x => (x.StartDate == null || x.StartDate.Value.AddHours(7).Date <= todayThai)
+                    && (x.EndDate == null || x.EndDate.Value.AddHours(7).Date >= todayThai))
+                .OrderByDescending(x => x.StartDate.HasValue || x.EndDate.HasValue)
+                .ThenBy(x => x.SortOrder ?? int.MaxValue)
                 .ThenBy(x => x.Code)
-                .FirstOrDefaultAsync();
+                .FirstOrDefault();
 
             if (entity == null)
             {
-                entity = await _jewelryContext.TbmSaleChannel
-                    .AsNoTracking()
-                    .Where(x => x.IsActive && x.IsDefault)
-                    .OrderBy(x => x.SortOrder)
+                entity = channels
+                    .Where(x => x.IsDefault)
+                    .OrderBy(x => x.SortOrder ?? int.MaxValue)
                     .ThenBy(x => x.Code)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefault();
             }
 
             return entity == null ? null : ToResponse(entity);
