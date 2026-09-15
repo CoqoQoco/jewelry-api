@@ -828,6 +828,7 @@ namespace Jewelry.Service.Worker
                 TotalReturned = slips.Sum(s => s.ReturnedTotal),
                 TotalRawLoss = slips.Sum(s => s.RawLoss),
                 TotalAllowedLoss = slips.Sum(s => s.AllowedLoss),
+                TotalAllowedLossBase = slips.Sum(s => s.TbtGoldLossTangSlipItem.Where(i => i.IsActive).Sum(i => i.GoldWeightCheck ?? 0)),
                 TotalDiffLoss = slips.Sum(s => s.DiffLoss),
                 TotalMoneyDiff = slips.Sum(s => s.TotalMoneyDiff),
                 ByGoldType = byGoldType,

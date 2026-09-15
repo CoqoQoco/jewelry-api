@@ -13,6 +13,7 @@ namespace jewelry.Model.Worker.GoldLossTangSlip
         public decimal? TotalReturned { get; set; }
         public decimal? TotalRawLoss { get; set; }
         public decimal? TotalAllowedLoss { get; set; }
+        public decimal? TotalAllowedLossBase { get; set; }
         public decimal? TotalDiffLoss { get; set; }
         public decimal? TotalMoneyDiff { get; set; }
         public List<GoldTypeBreakdownRow> ByGoldType { get; set; } = new List<GoldTypeBreakdownRow>();
