@@ -182,6 +182,91 @@ namespace Jewelry.Service.Stock.Product
                     .Max(m => (DateTime?)m.MovementDate) <= lastMoveDateTo);
             }
 
+            if (request.Materials != null && request.Materials.Any(m => !string.IsNullOrWhiteSpace(m)))
+            {
+                var selectedMaterials = request.Materials
+                    .Where(m => !string.IsNullOrWhiteSpace(m))
+                    .Select(m => m.Trim())
+                    .Distinct()
+                    .ToList();
+
+                var wantDiamond = selectedMaterials.Any(m => string.Equals(m, "DIAMOND", StringComparison.OrdinalIgnoreCase));
+                var gemCodes = selectedMaterials
+                    .Where(m => !string.Equals(m, "DIAMOND", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                var gemMasters = gemCodes.Any()
+                    ? _jewelryContext.TbmGem.AsNoTracking().Where(g => gemCodes.Contains(g.Code)).ToList()
+                    : new List<TbmGem>();
+
+                var gemTokensByCode = gemCodes.ToDictionary(
+                    code => code,
+                    code =>
+                    {
+                        var master = gemMasters.FirstOrDefault(g => g.Code == code);
+                        var tokens = new List<string>();
+                        if (master != null)
+                        {
+                            if (!string.IsNullOrEmpty(master.NameEn)) tokens.Add(master.NameEn.Trim().ToUpper());
+                            if (!string.IsNullOrEmpty(master.Code)) tokens.Add(master.Code.Trim().ToUpper());
+                        }
+                        return tokens.Distinct().ToList();
+                    });
+
+                if (request.MaterialMatchAll != false)
+                {
+                    if (wantDiamond)
+                    {
+                        pieces = pieces.Where(x => x.TbtStockPieceMaterial.Any(m =>
+                            m.Type.Trim().ToUpper() == "DIAMOND"
+                            || (m.TypeCode != null && (m.TypeCode.Trim().ToUpper() == "DIAMOND" || m.TypeCode.Trim().ToUpper() == "DI"))));
+                    }
+
+                    foreach (var code in gemCodes)
+                    {
+                        var tokens = gemTokensByCode[code];
+                        if (tokens.Count == 0)
+                        {
+                            pieces = pieces.Where(x => false);
+                        }
+                        else
+                        {
+                            pieces = pieces.Where(x => x.TbtStockPieceMaterial.Any(m =>
+                                m.Type.Trim().ToUpper() == "GEM"
+                                && m.TypeCode != null
+                                && tokens.Contains(m.TypeCode.Trim().ToUpper())));
+                        }
+                    }
+                }
+                else
+                {
+                    var allTokens = gemCodes.SelectMany(code => gemTokensByCode[code]).Distinct().ToList();
+
+                    if (!wantDiamond && allTokens.Count == 0)
+                    {
+                        pieces = pieces.Where(x => false);
+                    }
+                    else
+                    {
+                        pieces = pieces.Where(x => x.TbtStockPieceMaterial.Any(m =>
+                            (wantDiamond && (m.Type.Trim().ToUpper() == "DIAMOND"
+                                || (m.TypeCode != null && (m.TypeCode.Trim().ToUpper() == "DIAMOND" || m.TypeCode.Trim().ToUpper() == "DI"))))
+                            || (allTokens.Count > 0 && m.Type.Trim().ToUpper() == "GEM" && m.TypeCode != null && allTokens.Contains(m.TypeCode.Trim().ToUpper()))));
+                    }
+                }
+            }
+
+            if (request.PriceMin.HasValue)
+            {
+                var priceMin = request.PriceMin.Value;
+                pieces = pieces.Where(x => ((x.SkuCodeNavigation.DefaultPrice ?? 0) * (x.SkuCodeNavigation.TagPriceMultiplier ?? 1)) >= priceMin);
+            }
+            if (request.PriceMax.HasValue)
+            {
+                var priceMax = request.PriceMax.Value;
+                pieces = pieces.Where(x => ((x.SkuCodeNavigation.DefaultPrice ?? 0) * (x.SkuCodeNavigation.TagPriceMultiplier ?? 1)) <= priceMax);
+            }
+
             if (request.IncludeLastMovement == true)
             {
                 var responseWithMovement = from item in pieces

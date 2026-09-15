@@ -45,5 +45,10 @@ namespace jewelry.Model.Stock.Product.List
         public string? LastMoveBy { get; set; }
         public DateTimeOffset? LastMoveDateFrom { get; set; }
         public DateTimeOffset? LastMoveDateTo { get; set; }
+
+        public string[]? Materials { get; set; }
+        public bool? MaterialMatchAll { get; set; }
+        public decimal? PriceMin { get; set; }
+        public decimal? PriceMax { get; set; }
     }
 }
