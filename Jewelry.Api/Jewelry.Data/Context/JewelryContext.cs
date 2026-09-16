@@ -2554,6 +2554,9 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.InvoiceItem)
                 .HasColumnType("character varying")
                 .HasColumnName("invoice_item");
+            entity.Property(e => e.IsPlaceholder)
+                .HasDefaultValue(false)
+                .HasColumnName("is_placeholder");
             entity.Property(e => e.LineKey)
                 .HasColumnType("character varying")
                 .HasColumnName("line_key");

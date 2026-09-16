@@ -24,5 +24,7 @@ namespace jewelry.Model.Sale.SaleOrder.ConfirmStock
         public decimal Discount { get; set; }
         public string? LineKey { get; set; }
 
+        public bool IsPlaceholder { get; set; }
+
     }
 }

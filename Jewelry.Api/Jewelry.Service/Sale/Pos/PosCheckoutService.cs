@@ -276,8 +276,10 @@ namespace Jewelry.Service.Sale.Pos
 
                 if (item.Qty > available)
                 {
+                    // placeholder (รายการรอของ) ไม่เคยจองชิ้นนี้จริง — กันเลขที่พนักงานพิมพ์เองพ้องกับเลขสต็อกจริงโดยบังเอิญ
+                    // แล้วขึ้นข้อความชี้ไปบิลผิดใบ
                     var existingConfirmation = await _jewelryContext.TbtSaleOrderProduct
-                        .Where(p => p.StockNumber == stockNumber)
+                        .Where(p => p.StockNumber == stockNumber && !p.IsPlaceholder)
                         .OrderByDescending(p => p.CreateDate)
                         .FirstOrDefaultAsync();
 

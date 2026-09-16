@@ -296,25 +296,33 @@ namespace Jewelry.Service.Sale.SaleOrder
                         var root = doc.RootElement;
                         // เก็บทั้ง stockNumber และ lineKey ต่อ entry (คงลำดับ + คงรายการซ้ำไว้ทั้งหมด)
                         // ใบเก่าที่ไม่มี lineKey ใน JSON จะได้ lineKey = null
+                        // อ่านทั้ง stockItems (ของจริงในคลัง) และ copyItems (รายการสำเนา/รอของ) — ไม่งั้นบรรทัด
+                        // copyItems ที่ถูกยืนยันเป็น placeholder แล้วจะจับคู่กับ JSON ต้นทางไม่ได้ (ไปต่อท้ายเป็นแถวใหม่แทน)
                         var stockItemsFromJson = new List<(string? StockNumber, string? LineKey)>();
 
-                        if (root.TryGetProperty("stockItems", out JsonElement stockItemsElement))
+                        void CollectItemsFromJson(string propertyName)
                         {
-                            foreach (var item in stockItemsElement.EnumerateArray())
+                            if (root.TryGetProperty(propertyName, out JsonElement itemsElement))
                             {
-                                if (item.TryGetProperty("stockNumber", out JsonElement stockNumberElement))
+                                foreach (var item in itemsElement.EnumerateArray())
                                 {
-                                    string? lineKey = null;
-                                    if (item.TryGetProperty("lineKey", out JsonElement lineKeyElement)
-                                        && lineKeyElement.ValueKind == JsonValueKind.String)
+                                    if (item.TryGetProperty("stockNumber", out JsonElement stockNumberElement))
                                     {
-                                        lineKey = lineKeyElement.GetString();
-                                    }
+                                        string? lineKey = null;
+                                        if (item.TryGetProperty("lineKey", out JsonElement lineKeyElement)
+                                            && lineKeyElement.ValueKind == JsonValueKind.String)
+                                        {
+                                            lineKey = lineKeyElement.GetString();
+                                        }
 
-                                    stockItemsFromJson.Add((stockNumberElement.GetString(), lineKey));
+                                        stockItemsFromJson.Add((stockNumberElement.GetString(), lineKey));
+                                    }
                                 }
                             }
                         }
+
+                        CollectItemsFromJson("stockItems");
+                        CollectItemsFromJson("copyItems");
 
                         if (stockItemsFromJson.Any())
                         {
@@ -368,9 +376,13 @@ namespace Jewelry.Service.Sale.SaleOrder
                             matchedPlaceholders.Add(matchStock);
 
                             matchStock.Id = stock.Id;
+                            // ยืนยันแล้ว: ใช้เลขสต็อกจริงจาก DB เสมอ — สำคัญกับ copy line ที่ JSON ต้นทาง
+                            // ยังไม่มี stockNumber (เป็น placeholder ที่พนักงานเพิ่งพิมพ์เลขเข้ามาตอนยืนยัน)
+                            matchStock.StockNumber = stock.StockNumber;
                             matchStock.LineKey = stock.LineKey;
                             matchStock.PriceOrigin = stock.PriceOrigin;
                             matchStock.IsConfirm = true;
+                            matchStock.IsPlaceholder = stock.IsPlaceholder;
 
                             matchStock.Qty = stock.Qty;
                             matchStock.Discount = stock.Discount;
@@ -389,6 +401,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                                 StockNumber = stock.StockNumber,
                                 LineKey = stock.LineKey,
                                 IsConfirm = true,
+                                IsPlaceholder = stock.IsPlaceholder,
 
                                 PriceOrigin = stock.PriceOrigin,
                                 Qty = stock.Qty,
@@ -410,6 +423,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                         Id = s.Id,
                         StockNumber = s.StockNumber,
                         LineKey = s.LineKey,
+                        IsPlaceholder = s.IsPlaceholder,
 
                         PriceOrigin = s.PriceOrigin,
                         Qty = s.Qty,
@@ -428,7 +442,11 @@ namespace Jewelry.Service.Sale.SaleOrder
             #region *** get stock product ***
             if (response.StockConfirm.Any())
             {
-                var stockArray = response.StockConfirm.Select(s => s.StockNumber).ToArray();
+                // copyItems ที่ยังไม่ยืนยันไม่มี stockNumber (null) — กรองออกก่อนสร้าง array ให้ query piece
+                var stockArray = response.StockConfirm
+                    .Where(s => !string.IsNullOrEmpty(s.StockNumber))
+                    .Select(s => s.StockNumber)
+                    .ToArray();
                 var pieces = await _jewelryContext.TbtStockPiece
                     .Where(p => stockArray.Contains(p.StockNumber))
                     .ToListAsync();
@@ -634,8 +652,9 @@ namespace Jewelry.Service.Sale.SaleOrder
             //}
 
             var confirmedDate = DateTime.UtcNow;
+            // placeholder ไม่มีของจริงให้จอง ไม่ต้องล็อก piece/balance — ล็อกเฉพาะเลขสต็อกของรายการจริงเท่านั้น
             var requestStockNumbers = request.StockItems
-                .Where(s => !string.IsNullOrEmpty(s.StockNumber))
+                .Where(s => !string.IsNullOrEmpty(s.StockNumber) && !s.IsPlaceholder)
                 .Select(s => s.StockNumber)
                 .Distinct();
 
@@ -696,8 +715,9 @@ namespace Jewelry.Service.Sale.SaleOrder
             }
 
             // เรียกจาก PosCheckoutService ซึ่งเปิด transaction ไว้แล้ว — ล็อกซ้ำในนี้ปลอดภัย (transaction เดียวกัน) ไม่เปิด transaction ใหม่
+            // placeholder ไม่มีของจริงให้จอง ไม่ต้องล็อก piece/balance — ล็อกเฉพาะเลขสต็อกของรายการจริงเท่านั้น
             var requestStockNumbers = stockItems
-                .Where(s => !string.IsNullOrEmpty(s.StockNumber))
+                .Where(s => !string.IsNullOrEmpty(s.StockNumber) && !s.IsPlaceholder)
                 .Select(s => s.StockNumber)
                 .Distinct();
             await _jewelryContext.LockStockPiecesAsync(requestStockNumbers);
@@ -783,10 +803,44 @@ namespace Jewelry.Service.Sale.SaleOrder
                 }
             }
 
-            // Silver lot: จองเกินจำนวนพร้อมขาย (qty - qtyReserved) ของ piece ไม่ได้
-            // ต้องรวมจำนวนข้ามบรรทัดที่เลขสินค้าเดียวกันก่อนเทียบ (1 ใบสั่งขายอาจมีหลายบรรทัดเลขสินค้าเดียวกัน)
+            // กันเลขสต็อกของ placeholder (พนักงานพิมพ์เอง) ซ้ำกัน — ไม่มีของจริงให้ยึดตามระบบเหมือนของจริง
+            // 3) ซ้ำกันเองภายในคำขอเดียวกัน (เฉพาะรายการ placeholder)
+            var duplicatePlaceholderGroups = stockItems
+                .Where(s => s.IsPlaceholder && !string.IsNullOrEmpty(s.StockNumber))
+                .GroupBy(s => s.StockNumber)
+                .Where(g => g.Count() > 1);
+
+            foreach (var group in duplicatePlaceholderGroups)
+            {
+                errors.Add($"เลข {group.Key} (รายการรอของ) ซ้ำกันในคำขอเดียวกัน");
+            }
+
+            // 4) ซ้ำกับบรรทัดที่มีอยู่แล้วในใบสั่งขายนี้ (ทั้งของจริงและ placeholder เดิม)
+            var placeholderStockNumbers = stockItems
+                .Where(s => s.IsPlaceholder && !string.IsNullOrEmpty(s.StockNumber))
+                .Select(s => s.StockNumber)
+                .Distinct()
+                .ToList();
+
+            if (placeholderStockNumbers.Any())
+            {
+                var soNumberUpper = soNumber.ToUpper();
+                var existingStockNumbers = await _jewelryContext.TbtSaleOrderProduct
+                    .Where(p => p.SoNumber == soNumberUpper && placeholderStockNumbers.Contains(p.StockNumber))
+                    .Select(p => p.StockNumber)
+                    .Distinct()
+                    .ToListAsync();
+
+                foreach (var stockNumber in existingStockNumbers)
+                {
+                    errors.Add($"เลข {stockNumber} (รายการรอของ) มีอยู่แล้วในใบสั่งขายนี้");
+                }
+            }
+
+            // Silver lot: จองเกินจำนวนพร้อมขาย (qty - qtyReserved) ของ piece ไม่ได้ — ข้าม placeholder เพราะไม่มีของจริง
+            // ให้ตรวจ ไม่ต้อง lookup piece เลย ต้องรวมจำนวนข้ามบรรทัดที่เลขสินค้าเดียวกันก่อนเทียบ (1 ใบสั่งขายอาจมีหลายบรรทัดเลขสินค้าเดียวกัน)
             var groupedByStockNumber = stockItems
-                .Where(s => !string.IsNullOrEmpty(s.StockNumber))
+                .Where(s => !string.IsNullOrEmpty(s.StockNumber) && !s.IsPlaceholder)
                 .GroupBy(s => s.StockNumber)
                 .Select(g => new { StockNumber = g.Key, TotalQty = g.Sum(x => x.Qty) });
 
@@ -795,18 +849,22 @@ namespace Jewelry.Service.Sale.SaleOrder
                 var piece = await _jewelryContext.TbtStockPiece
                     .FirstOrDefaultAsync(p => p.StockNumber == group.StockNumber);
 
-                if (piece != null)
+                // ของจริงต้องมี piece อยู่ในคลังเสมอ ไม่งั้นจะกลายเป็นแถวยืนยันที่ไม่กระทบสต็อกแบบมองไม่เห็น (เคยเป็นบั๊กเงียบ)
+                if (piece == null)
                 {
-                    var available = StockPieceQtyHelper.Available(piece);
-                    if (group.TotalQty > available)
-                    {
-                        var shortage = group.TotalQty - available;
-                        var stockNumberLabel = string.IsNullOrEmpty(piece.StockNumberOrigin)
-                            ? group.StockNumber
-                            : $"{group.StockNumber} ({piece.StockNumberOrigin})";
+                    errors.Add($"ไม่พบเลขสินค้า {group.StockNumber} ในคลัง กรุณาตรวจสอบเลขที่กรอก");
+                    continue;
+                }
 
-                        errors.Add($"เลข {stockNumberLabel} พร้อมขาย {available:0.##} ชิ้น แต่ขอ {group.TotalQty:0.##} ชิ้น (ขาด {shortage:0.##})");
-                    }
+                var available = StockPieceQtyHelper.Available(piece);
+                if (group.TotalQty > available)
+                {
+                    var shortage = group.TotalQty - available;
+                    var stockNumberLabel = string.IsNullOrEmpty(piece.StockNumberOrigin)
+                        ? group.StockNumber
+                        : $"{group.StockNumber} ({piece.StockNumberOrigin})";
+
+                    errors.Add($"เลข {stockNumberLabel} พร้อมขาย {available:0.##} ชิ้น แต่ขอ {group.TotalQty:0.##} ชิ้น (ขาด {shortage:0.##})");
                 }
             }
 
@@ -836,6 +894,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                     Discount = stockItem.Discount,
                     NetPrice = stockItem.AppraisalPrice * (1 - (stockItem.Discount) / 100),
                     LineKey = stockItem.LineKey,
+                    IsPlaceholder = stockItem.IsPlaceholder,
 
                     CreateDate = confirmedDate,
                     CreateBy = CurrentUsername
@@ -843,11 +902,17 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                 _jewelryContext.TbtSaleOrderProduct.Add(newProduct);
 
-                var piece = await _jewelryContext.TbtStockPiece
-                    .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
-
-                if (piece != null)
+                // placeholder = รายการรอของ (เลขพนักงานพิมพ์เอง) — ไม่มีของจริงให้จอง ข้าม stock effect ทั้งหมด
+                if (!stockItem.IsPlaceholder)
                 {
+                    var piece = await _jewelryContext.TbtStockPiece
+                        .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
+
+                    if (piece == null)
+                    {
+                        throw new HandleException($"ไม่พบเลขสินค้า {stockItem.StockNumber} ในคลัง ไม่สามารถยืนยันรายการนี้ได้");
+                    }
+
                     var balance = await _jewelryContext.TbtStockBalance
                         .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
 
@@ -939,41 +1004,46 @@ namespace Jewelry.Service.Sale.SaleOrder
 
             foreach (var product in confirmedProducts)
             {
-                var piece = await _jewelryContext.TbtStockPiece
-                    .FirstOrDefaultAsync(p => p.StockNumber == product.StockNumber);
-
-                if (piece != null)
+                // placeholder ไม่เคยจองของจริง (ConfirmStockItemsCore ข้าม stock effect ให้แล้ว) — ลบแถวเฉยๆ ห้ามแตะ piece/balance
+                // (เลขที่พนักงานพิมพ์เองอาจไปพ้องกับเลขสต็อกจริงในระบบโดยบังเอิญ ถ้าไม่กันไว้จะเผลอไปลด qty_reserved ของชิ้นอื่น)
+                if (!product.IsPlaceholder)
                 {
-                    var balance = await _jewelryContext.TbtStockBalance
-                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+                    var piece = await _jewelryContext.TbtStockPiece
+                        .FirstOrDefaultAsync(p => p.StockNumber == product.StockNumber);
 
-                    if (balance != null)
+                    if (piece != null)
                     {
-                        balance.QtyReserved -= product.Qty;
-                        balance.LastMovementAt = now;
-                        _jewelryContext.TbtStockBalance.Update(balance);
+                        var balance = await _jewelryContext.TbtStockBalance
+                            .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                        if (balance != null)
+                        {
+                            balance.QtyReserved -= product.Qty;
+                            balance.LastMovementAt = now;
+                            _jewelryContext.TbtStockBalance.Update(balance);
+                        }
+
+                        piece.QtyReserved = Math.Max(0, piece.QtyReserved - product.Qty);
+                        StockPieceQtyHelper.RecalcStatus(piece);
+                        piece.UpdateDate = now;
+                        piece.UpdateBy = CurrentUsername;
+                        _jewelryContext.TbtStockPiece.Update(piece);
+
+                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                        {
+                            MovementDate = now,
+                            MovementType = "UNRESERVE",
+                            SkuCode = piece.SkuCode,
+                            StockNumber = piece.StockNumber,
+                            ProductCode = piece.ProductCode,
+                            ToLocation = piece.LocationCode,
+                            Qty = product.Qty,
+                            RefDocType = "SO",
+                            RefDocNo = saleOrder.SoNumber,
+                            CreateDate = now,
+                            CreateBy = CurrentUsername
+                        });
                     }
-
-                    piece.QtyReserved = Math.Max(0, piece.QtyReserved - product.Qty);
-                    StockPieceQtyHelper.RecalcStatus(piece);
-                    piece.UpdateDate = now;
-                    piece.UpdateBy = CurrentUsername;
-                    _jewelryContext.TbtStockPiece.Update(piece);
-
-                    _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                    {
-                        MovementDate = now,
-                        MovementType = "UNRESERVE",
-                        SkuCode = piece.SkuCode,
-                        StockNumber = piece.StockNumber,
-                        ProductCode = piece.ProductCode,
-                        ToLocation = piece.LocationCode,
-                        Qty = product.Qty,
-                        RefDocType = "SO",
-                        RefDocNo = saleOrder.SoNumber,
-                        CreateDate = now,
-                        CreateBy = CurrentUsername
-                    });
                 }
 
                 _jewelryContext.TbtSaleOrderProduct.Remove(product);
@@ -1090,41 +1160,45 @@ namespace Jewelry.Service.Sale.SaleOrder
                     throw new HandleException($"Cannot unconfirm stock item {stockItem.StockNumber} - already included in invoice {confirmedProduct.Invoice}.");
                 }
 
-                var piece = await _jewelryContext.TbtStockPiece
-                    .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
-
-                if (piece != null)
+                // placeholder ไม่เคยจองของจริง (ConfirmStockItemsCore ข้าม stock effect ให้แล้ว) — ลบแถวเฉยๆ ห้ามแตะ piece/balance
+                if (!confirmedProduct.IsPlaceholder)
                 {
-                    var balance = await _jewelryContext.TbtStockBalance
-                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+                    var piece = await _jewelryContext.TbtStockPiece
+                        .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
 
-                    if (balance != null)
+                    if (piece != null)
                     {
-                        balance.QtyReserved -= confirmedProduct.Qty;
-                        balance.LastMovementAt = unconfirmedDate;
-                        _jewelryContext.TbtStockBalance.Update(balance);
+                        var balance = await _jewelryContext.TbtStockBalance
+                            .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                        if (balance != null)
+                        {
+                            balance.QtyReserved -= confirmedProduct.Qty;
+                            balance.LastMovementAt = unconfirmedDate;
+                            _jewelryContext.TbtStockBalance.Update(balance);
+                        }
+
+                        piece.QtyReserved = Math.Max(0, piece.QtyReserved - confirmedProduct.Qty);
+                        StockPieceQtyHelper.RecalcStatus(piece);
+                        piece.UpdateDate = unconfirmedDate;
+                        piece.UpdateBy = CurrentUsername;
+                        _jewelryContext.TbtStockPiece.Update(piece);
+
+                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                        {
+                            MovementDate = unconfirmedDate,
+                            MovementType = "UNRESERVE",
+                            SkuCode = piece.SkuCode,
+                            StockNumber = piece.StockNumber,
+                            ProductCode = piece.ProductCode,
+                            ToLocation = piece.LocationCode,
+                            Qty = confirmedProduct.Qty,
+                            RefDocType = "SO",
+                            RefDocNo = soNumberUpper,
+                            CreateDate = unconfirmedDate,
+                            CreateBy = CurrentUsername
+                        });
                     }
-
-                    piece.QtyReserved = Math.Max(0, piece.QtyReserved - confirmedProduct.Qty);
-                    StockPieceQtyHelper.RecalcStatus(piece);
-                    piece.UpdateDate = unconfirmedDate;
-                    piece.UpdateBy = CurrentUsername;
-                    _jewelryContext.TbtStockPiece.Update(piece);
-
-                    _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                    {
-                        MovementDate = unconfirmedDate,
-                        MovementType = "UNRESERVE",
-                        SkuCode = piece.SkuCode,
-                        StockNumber = piece.StockNumber,
-                        ProductCode = piece.ProductCode,
-                        ToLocation = piece.LocationCode,
-                        Qty = confirmedProduct.Qty,
-                        RefDocType = "SO",
-                        RefDocNo = soNumberUpper,
-                        CreateDate = unconfirmedDate,
-                        CreateBy = CurrentUsername
-                    });
                 }
 
                 // Remove confirmed product entry
@@ -1133,6 +1207,137 @@ namespace Jewelry.Service.Sale.SaleOrder
             }
 
             return unconfirmedStockNumbers;
+        }
+
+        public async Task<jewelry.Model.Sale.SaleOrder.ReplaceConfirmedStock.Response> ReplaceConfirmedStock(jewelry.Model.Sale.SaleOrder.ReplaceConfirmedStock.Request request)
+        {
+            if (string.IsNullOrEmpty(request.SoNumber))
+            {
+                throw new HandleException("Sale Order Number is required.");
+            }
+
+            if (string.IsNullOrEmpty(request.NewStockNumber))
+            {
+                throw new HandleException("New Stock Number is required.");
+            }
+
+            var soNumberUpper = request.SoNumber.ToUpper();
+            var replacedDate = DateTime.UtcNow;
+
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
+            {
+                // Global lock order: stock piece -> stock balance -> sale order product
+                await _jewelryContext.LockStockPiecesAsync(new[] { request.NewStockNumber });
+
+                var piece = await _jewelryContext.TbtStockPiece
+                    .FirstOrDefaultAsync(p => p.StockNumber == request.NewStockNumber);
+
+                if (piece == null)
+                {
+                    throw new HandleException($"ไม่พบเลขสินค้า {request.NewStockNumber} ในคลัง");
+                }
+
+                if (piece.Status == "SOLD")
+                {
+                    throw new HandleException($"เลขสินค้า {request.NewStockNumber} ถูกขายไปแล้ว ไม่สามารถใช้เติมรายการรอของได้");
+                }
+
+                await _jewelryContext.LockStockBalancesAsync(new[] { piece.SkuCode });
+                await _jewelryContext.LockSaleOrderProductsByIdsAsync(new[] { request.SaleOrderProductId });
+
+                var soProduct = await _jewelryContext.TbtSaleOrderProduct
+                    .FirstOrDefaultAsync(p => p.SoNumber == soNumberUpper && p.Id == request.SaleOrderProductId);
+
+                if (soProduct == null)
+                {
+                    throw new HandleException($"ไม่พบรายการ (ID: {request.SaleOrderProductId}) ในใบสั่งขาย {request.SoNumber}");
+                }
+
+                if (!soProduct.IsPlaceholder)
+                {
+                    throw new HandleException("รายการนี้ไม่ใช่รายการรอของ (placeholder) ไม่สามารถเติมของแทนที่ได้");
+                }
+
+                if (!string.IsNullOrEmpty(soProduct.Invoice))
+                {
+                    throw new HandleException($"รายการนี้ออกใบแจ้งหนี้ {soProduct.Invoice} ไปแล้ว ไม่สามารถเติมของแทนที่ได้");
+                }
+
+                var qty = request.Qty ?? soProduct.Qty;
+                if (qty <= 0)
+                {
+                    throw new HandleException("จำนวนต้องมากกว่า 0");
+                }
+
+                var available = StockPieceQtyHelper.Available(piece);
+                if (qty > available)
+                {
+                    throw new HandleException($"เลข {request.NewStockNumber} พร้อมขาย {available:0.##} ชิ้น แต่ขอ {qty:0.##} ชิ้น");
+                }
+
+                var balance = await _jewelryContext.TbtStockBalance
+                    .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+
+                // เก็บ identity เดิมของแถวไว้ — เปลี่ยนเฉพาะเลขสต็อก/สถานะ placeholder/จำนวน/audit fields
+                // ราคาที่ตกลงกับลูกค้าไว้แล้ว (LineKey, Id, PriceOrigin, Discount, NetPrice) ห้ามแตะ
+                soProduct.StockNumber = request.NewStockNumber;
+                soProduct.Stocknumberorigin = piece.ProductCode;
+                soProduct.IsPlaceholder = false;
+                soProduct.Qty = qty;
+                soProduct.UpdateBy = CurrentUsername;
+                soProduct.UpdateDate = replacedDate;
+                _jewelryContext.TbtSaleOrderProduct.Update(soProduct);
+
+                if (balance != null)
+                {
+                    balance.QtyReserved += qty;
+                    balance.LastMovementAt = replacedDate;
+                    _jewelryContext.TbtStockBalance.Update(balance);
+                }
+
+                piece.QtyReserved += qty;
+                StockPieceQtyHelper.RecalcStatus(piece);
+                piece.UpdateDate = replacedDate;
+                piece.UpdateBy = CurrentUsername;
+                _jewelryContext.TbtStockPiece.Update(piece);
+
+                _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                {
+                    MovementDate = replacedDate,
+                    MovementType = "RESERVE",
+                    SkuCode = piece.SkuCode,
+                    StockNumber = piece.StockNumber,
+                    ProductCode = piece.ProductCode,
+                    FromLocation = piece.LocationCode,
+                    Qty = qty,
+                    RefDocType = "SO",
+                    RefDocNo = soNumberUpper,
+                    CreateDate = replacedDate,
+                    CreateBy = CurrentUsername
+                });
+
+                await _jewelryContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return new jewelry.Model.Sale.SaleOrder.ReplaceConfirmedStock.Response
+                {
+                    SaleOrderProductId = soProduct.Id,
+                    StockNumber = soProduct.StockNumber,
+                    StockNumberOrigin = soProduct.Stocknumberorigin,
+                    Message = $"เติมของสำเร็จ เปลี่ยนเป็นเลขสินค้า {soProduct.StockNumber}"
+                };
+            }
+            catch (HandleException)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"Error replacing confirmed stock: {ex.Message}");
+            }
         }
     }
 }

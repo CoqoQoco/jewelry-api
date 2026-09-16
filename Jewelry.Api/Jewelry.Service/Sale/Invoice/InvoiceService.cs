@@ -171,6 +171,14 @@ namespace Jewelry.Service.Sale.Invoice
                 }
             }
 
+            // รายการรอของ (placeholder) ยังไม่มีชิ้นจริงในคลัง ห้ามออกใบแจ้งหนี้เด็ดขาดจนกว่าจะเติมของจริงแทนที่
+            var placeholderRows = getstockConfrim.Where(x => x.IsPlaceholder).ToList();
+            if (placeholderRows.Any())
+            {
+                var placeholderStockNumbers = string.Join(", ", placeholderRows.Select(x => x.StockNumber).Distinct());
+                throw new HandleException($"บรรทัด {placeholderStockNumbers} ยังไม่มีของจริงในคลัง ต้องเติมของก่อนออกใบแจ้งหนี้");
+            }
+
             if (getstockConfrim.Any(x => !string.IsNullOrEmpty(x.Invoice)))
             {
                 throw new HandleException("One or more items have already been invoiced.");
@@ -364,7 +372,12 @@ namespace Jewelry.Service.Sale.Invoice
                 var piece = await _jewelryContext.TbtStockPiece
                     .FirstOrDefaultAsync(p => p.StockNumber == soProduct.StockNumber);
 
-                if (piece == null) continue;
+                // ผ่านการ block placeholder ข้างบนมาแล้ว แถวที่เหลือทุกแถวต้องเป็นของจริง ไม่พบ piece = ข้อมูลผิดปกติ
+                // ต้อง throw ไม่ใช่ continue เงียบๆ (เดิมทำให้ตัดสต็อกไม่ครบแต่ invoice ออกไปแล้วโดยไม่มีใครรู้)
+                if (piece == null)
+                {
+                    throw new HandleException($"ไม่พบเลขสินค้า {soProduct.StockNumber} ในคลัง ไม่สามารถออกใบแจ้งหนี้ได้");
+                }
 
                 var balance = await _jewelryContext.TbtStockBalance
                     .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);

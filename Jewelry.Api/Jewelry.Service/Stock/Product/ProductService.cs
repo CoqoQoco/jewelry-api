@@ -550,7 +550,9 @@ namespace Jewelry.Service.Stock.Product
 
             response.Reservations = await _jewelryContext.TbtSaleOrderProduct
                 .AsNoTracking()
-                .Where(x => x.StockNumber == piece.StockNumber)
+                // placeholder (รายการรอของ) ไม่เคยจองชิ้นนี้จริง — กันเลขที่พนักงานพิมพ์เองพ้องกับเลขสต็อกจริงโดยบังเอิญ
+                // แล้วโชว์เป็นรายการจองปลอมบนหน้ารายละเอียดสินค้า
+                .Where(x => x.StockNumber == piece.StockNumber && !x.IsPlaceholder)
                 .OrderBy(x => x.CreateDate)
                 .Select(x => new jewelry.Model.Stock.Product.Get.Reservation()
                 {

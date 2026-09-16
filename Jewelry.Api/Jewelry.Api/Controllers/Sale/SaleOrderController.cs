@@ -157,5 +157,23 @@ namespace Jewelry.Api.Controllers.Sale
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("ReplaceConfirmedStock")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Sale.SaleOrder.ReplaceConfirmedStock.Response))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ReplaceConfirmedStock([FromBody] jewelry.Model.Sale.SaleOrder.ReplaceConfirmedStock.Request request)
+        {
+            try
+            {
+                var response = await _service.ReplaceConfirmedStock(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }

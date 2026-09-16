@@ -86,6 +86,7 @@ namespace jewelry.Model.Sale.SaleOrder.Get
 
         public bool IsConfirm { get; set; } = false;
         public bool IsInvoice => !string.IsNullOrEmpty(Invoice);
+        public bool IsPlaceholder { get; set; } = false;
 
         public bool IsRemainProduct { get; set; } = true;
         public string? Message { get; set; }

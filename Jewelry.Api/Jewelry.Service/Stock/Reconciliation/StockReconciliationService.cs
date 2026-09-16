@@ -126,8 +126,10 @@ namespace Jewelry.Service.Stock.Reconciliation
                         .Sum(m => m.MovementType == "RECEIPT" || m.MovementType == "RETURN"
                             ? m.Qty
                             : (m.MovementType == "SALE" ? -m.Qty : 0m))
+                    // placeholder (รายการรอของ) ไม่เคยจองของจริง — กันเลขที่พนักงานพิมพ์เองพ้องกับเลขสต็อกจริงโดยบังเอิญ
+                    // แล้วถูกนับรวมเป็นยอดจองของ piece นั้นทั้งที่ไม่เคยกระทบ qty_reserved จริง
                     || p.QtyReserved != _jewelryContext.TbtSaleOrderProduct
-                        .Where(sop => sop.StockNumber == p.StockNumber && sop.Invoice == null)
+                        .Where(sop => sop.StockNumber == p.StockNumber && sop.Invoice == null && !sop.IsPlaceholder)
                         .Sum(sop => sop.Qty)
                     || p.QtyReserved > p.Qty
                     || p.Qty < 0);
@@ -146,7 +148,7 @@ namespace Jewelry.Service.Stock.Reconciliation
                             ? m.Qty
                             : (m.MovementType == "SALE" ? -m.Qty : 0m)),
                     ConfirmedUninvoicedQty = _jewelryContext.TbtSaleOrderProduct
-                        .Where(sop => sop.StockNumber == p.StockNumber && sop.Invoice == null)
+                        .Where(sop => sop.StockNumber == p.StockNumber && sop.Invoice == null && !sop.IsPlaceholder)
                         .Sum(sop => sop.Qty)
                 })
                 .ToListAsync(ct);

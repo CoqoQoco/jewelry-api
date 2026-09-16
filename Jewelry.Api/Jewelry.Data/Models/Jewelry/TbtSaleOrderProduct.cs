@@ -43,4 +43,6 @@ public partial class TbtSaleOrderProduct
     public string? DkInvoiceNumber { get; set; }
 
     public string? LineKey { get; set; }
+
+    public bool IsPlaceholder { get; set; }
 }

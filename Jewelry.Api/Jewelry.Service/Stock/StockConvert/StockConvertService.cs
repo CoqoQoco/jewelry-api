@@ -653,9 +653,11 @@ public class StockConvertService : BaseService, IStockConvertService
 
         var resultStockNumbers = resultPairs.Select(x => x.Result!.StockNumber).ToList();
 
+        // placeholder (รายการรอของ) ไม่ใช่การยืนยันของจริง — กันเลขที่พนักงานพิมพ์เองพ้องกับเลขผลลัพธ์ของใบแปลงสินค้า
+        // โดยบังเอิญ แล้วทำให้ระบบคิดว่ารายการนี้ถูกยืนยันแล้วทั้งที่ยังรอเติมของจริงอยู่
         var confirmedStockNumbers = new HashSet<string>(
             await _jewelryContext.TbtSaleOrderProduct
-                .Where(p => resultStockNumbers.Contains(p.StockNumber))
+                .Where(p => resultStockNumbers.Contains(p.StockNumber) && !p.IsPlaceholder)
                 .Select(p => p.StockNumber)
                 .ToListAsync());
 

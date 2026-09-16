@@ -15,6 +15,7 @@ namespace Jewelry.Service.Sale.SaleOrder
         Task<jewelry.Model.Sale.SaleOrder.ConfirmStock.Response> ConfirmStockItems(jewelry.Model.Sale.SaleOrder.ConfirmStock.Request request);
         Task<jewelry.Model.Sale.SaleOrder.UnconfirmStock.Response> UnconfirmStockItems(jewelry.Model.Sale.SaleOrder.UnconfirmStock.Request request);
         Task<bool> Inactive(jewelry.Model.Sale.SaleOrder.Inactive.Request request);
+        Task<jewelry.Model.Sale.SaleOrder.ReplaceConfirmedStock.Response> ReplaceConfirmedStock(jewelry.Model.Sale.SaleOrder.ReplaceConfirmedStock.Request request);
 
         // Used only by POS/Checkout — no internal transaction/SaveChanges, caller controls both.
         Task<List<string>> ConfirmStockItemsForPos(string soNumber, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems, DateTime confirmedDate);
