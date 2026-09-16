@@ -45,6 +45,7 @@ using Jewelry.Service.Stock.Location;
 using Jewelry.Service.Stock.Movement;
 using Jewelry.Service.Stock.Piece;
 using Jewelry.Service.Catalog;
+using Jewelry.Service.GoldPrice;
 using Jewelry.Service.Stock.Reconciliation;
 using Jewelry.Service.Ticket;
 using Jewelry.Service.Stock.Sku;
@@ -77,6 +78,16 @@ namespace Jewelry.Api.Extension
                 configuration.GetSection("PublicProduct")
             );
             services.AddMemoryCache();
+
+            // Configure Gold Price upstream client (สมาคมค้าทองคำ - ไม่มี API ทางการ ใช้ internal ajax endpoint)
+            const string goldTradersDefaultBaseUrl = "https://gtadmin.goldtraders.or.th";
+            services.AddHttpClient(Jewelry.Service.GoldPrice.GoldPriceService.ClientName, client =>
+            {
+                var baseUrl = configuration["GoldPrice:BaseUrl"];
+                client.BaseAddress = new Uri(string.IsNullOrWhiteSpace(baseUrl) ? goldTradersDefaultBaseUrl : baseUrl);
+                client.Timeout = TimeSpan.FromSeconds(20);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
+            });
 
             // Register Azure Blob Storage Service as Singleton
             // (Singleton เพราะ BlobServiceClient เป็น thread-safe และ reusable)
@@ -148,6 +159,8 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IPrintJobService, PrintJobService>();
 
             services.AddScoped<IPublicProductService, PublicProductService>();
+
+            services.AddScoped<IGoldPriceService, GoldPriceService>();
 
             services.AddScoped<INotificationRule, InvoiceOutstandingRule>();
             services.AddScoped<NotificationRuleRunner>();
