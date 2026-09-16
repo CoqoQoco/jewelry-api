@@ -370,6 +370,23 @@ namespace Jewelry.Api.Controllers.Stock
 
         #endregion
 
+        [Route("Availability")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Stock.Product.Availability.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Availability([FromBody] jewelry.Model.Stock.Product.Availability.Request request)
+        {
+            try
+            {
+                var response = await _service.GetAvailability(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("MaterialValuationSummary")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.MaterialValuationSummary.Response))]

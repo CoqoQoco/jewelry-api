@@ -38,5 +38,13 @@ namespace Jewelry.Api.Controllers.Stock
             var result = await _service.RebuildBalanceFromPiecesAsync(ct);
             return Ok(result);
         }
+
+        [Route("CheckPieceLedger")]
+        [HttpGet]
+        public async Task<IActionResult> CheckPieceLedger(CancellationToken ct)
+        {
+            var report = await _service.CheckPieceLedgerAsync(ct);
+            return Ok(report);
+        }
     }
 }

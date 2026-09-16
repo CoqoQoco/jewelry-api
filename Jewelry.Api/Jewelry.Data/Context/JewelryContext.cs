@@ -136,6 +136,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtSaleOrderProduct> TbtSaleOrderProduct { get; set; }
 
+    public virtual DbSet<TbtSaleOrderDeposit> TbtSaleOrderDeposit { get; set; }
+
+    public virtual DbSet<TbtSaleOrderDepositApply> TbtSaleOrderDepositApply { get; set; }
+
     public virtual DbSet<TbtSaleDocument> TbtSaleDocument { get; set; }
 
     public virtual DbSet<TbtSaleQuotation> TbtSaleQuotation { get; set; }
@@ -2564,6 +2568,96 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtSaleOrderDeposit>(entity =>
+        {
+            entity.HasKey(e => e.Running).HasName("tbt_sale_order_deposit_pk");
+
+            entity.ToTable("tbt_sale_order_deposit");
+
+            entity.Property(e => e.Running)
+                .HasColumnType("character varying")
+                .HasColumnName("running");
+            entity.Property(e => e.SoNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("so_number");
+            entity.Property(e => e.DepositDate).HasColumnName("deposit_date");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.CurrencyUnit)
+                .HasColumnType("character varying")
+                .HasColumnName("currency_unit");
+            entity.Property(e => e.CurrencyRate).HasColumnName("currency_rate");
+            entity.Property(e => e.Payment).HasColumnName("payment");
+            entity.Property(e => e.PaymentName)
+                .HasColumnType("character varying")
+                .HasColumnName("payment_name");
+            entity.Property(e => e.BankCode)
+                .HasColumnType("character varying")
+                .HasColumnName("bank_code");
+            entity.Property(e => e.BankBranch)
+                .HasColumnType("character varying")
+                .HasColumnName("bank_branch");
+            entity.Property(e => e.ReferenceNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("reference_number");
+            entity.Property(e => e.ImagePath)
+                .HasColumnType("character varying")
+                .HasColumnName("image_path");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.IsDelete).HasColumnName("is_delete");
+            entity.Property(e => e.DeleteReason)
+                .HasColumnType("character varying")
+                .HasColumnName("delete_reason");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+        });
+
+        modelBuilder.Entity<TbtSaleOrderDepositApply>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_sale_order_deposit_apply_pk");
+
+            entity.ToTable("tbt_sale_order_deposit_apply");
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+            entity.Property(e => e.DepositRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("deposit_running");
+            entity.Property(e => e.SoNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("so_number");
+            entity.Property(e => e.InvoiceRunning)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_running");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.IsDelete).HasColumnName("is_delete");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne(d => d.DepositRunningNavigation).WithMany(p => p.TbtSaleOrderDepositApply)
+                .HasForeignKey(d => d.DepositRunning)
+                .HasConstraintName("tbt_sale_order_deposit_apply_deposit_fk");
+
+            entity.HasOne(d => d.TbtSaleInvoiceHeader).WithMany()
+                .HasForeignKey(d => new { d.InvoiceRunning, d.SoNumber })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_sale_order_deposit_apply_invoice_fk");
         });
 
         modelBuilder.Entity<TbtStockBasket>(entity =>

@@ -5,6 +5,7 @@ using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master.SaleChannel;
 using Jewelry.Service.Sale.SaleOrder;
+using Jewelry.Service.Sale.SaleOrderDeposit;
 using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
@@ -65,6 +66,53 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException("Invoice items are required.");
             }
 
+            var stockArray = request.Items.Select(i => i.StockNumber).ToArray();
+
+            // Line-aware selection: ถ้าทุกบรรทัดส่ง SaleOrderProductId มา ใช้ id เลือกแถวแบบเจาะจง (รองรับ SO เดียวกันที่มี StockNumber ซ้ำจากล็อตเงิน re-scan)
+            // ถ้าไม่มีบรรทัดไหนส่งมาเลย ใช้พฤติกรรมเดิม (match ด้วย StockNumber) เพื่อไม่กระทบ POS/client เก่า
+            var itemsWithId = request.Items.Count(i => i.SaleOrderProductId.HasValue);
+            var useIds = itemsWithId == request.Items.Count;
+
+            if (itemsWithId > 0 && !useIds)
+            {
+                throw new HandleException("รายการใบแจ้งหนี้ต้องระบุ SaleOrderProductId ครบทุกบรรทัด หรือไม่ระบุเลย");
+            }
+
+            if (useIds)
+            {
+                var idList = request.Items.Select(i => i.SaleOrderProductId!.Value).ToList();
+                if (idList.Distinct().Count() != idList.Count)
+                {
+                    throw new HandleException("มี SaleOrderProductId ซ้ำกันในรายการใบแจ้งหนี้");
+                }
+            }
+
+            // ถ้าเรียกจาก POS transaction จะเปิดอยู่แล้ว (PosCheckoutService) — ใช้ transaction เดิม ไม่เปิดซ้อน
+            var ownsTransaction = _jewelryContext.Database.CurrentTransaction == null;
+            var transaction = ownsTransaction
+                ? await _jewelryContext.Database.BeginTransactionAsync()
+                : null;
+
+            try
+            {
+            // ล็อกแถวมัดจำของ SO ก่อน (ถ้าจะหักมัดจำ) แล้วค่อยล็อก piece แล้วค่อยล็อกแถว SO product ตามลำดับ global: invoice header → SO deposit → piece → SO product (กัน deadlock)
+            if (request.DepositApplyAmount.HasValue && request.DepositApplyAmount.Value > 0)
+            {
+                await _jewelryContext.LockSaleOrderDepositsAsync(request.SoNumber);
+            }
+
+            await _jewelryContext.LockStockPiecesAsync(stockArray);
+
+            if (useIds)
+            {
+                var lockIds = request.Items.Select(i => i.SaleOrderProductId!.Value).ToList();
+                await _jewelryContext.LockSaleOrderProductsByIdsAsync(lockIds);
+            }
+            else
+            {
+                await _jewelryContext.LockSaleOrderProductsAsync(request.SoNumber, stockArray);
+            }
+
             //check duplicate DK Invoice Number
             if (!string.IsNullOrEmpty(request.DKInvoiceNumber))
             {
@@ -77,16 +125,51 @@ namespace Jewelry.Service.Sale.Invoice
                 }
             }
 
-            //check all stock not exist invoice
-            var stockArray = request.Items.Select(i => i.StockNumber).ToArray();
-            var getstockConfrim = await _jewelryContext.TbtSaleOrderProduct
-                .Where(x => x.SoNumber == request.SoNumber && stockArray.Contains(x.StockNumber))
-                .ToListAsync();
+            //check all stock not exist invoice — ต้องรันหลังล็อกแถวข้างบน กันสองคำขอออก invoice ซ้อนกันเห็น Invoice == null พร้อมกันทั้งคู่
+            List<TbtSaleOrderProduct> getstockConfrim;
 
-            if (!getstockConfrim.Any())
+            if (useIds)
             {
-                throw new HandleException("No matching Sale Order Products found for the provided items.");
+                var ids = request.Items.Select(i => i.SaleOrderProductId!.Value).ToList();
+
+                var rowsById = await _jewelryContext.TbtSaleOrderProduct
+                    .Where(x => x.SoNumber == request.SoNumber && ids.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id);
+
+                var badLines = new List<string>();
+                foreach (var item in request.Items)
+                {
+                    var id = item.SaleOrderProductId!.Value;
+                    if (!rowsById.TryGetValue(id, out var row))
+                    {
+                        badLines.Add($"SaleOrderProductId {id} (StockNumber {item.StockNumber}) ไม่พบในใบสั่งขาย {request.SoNumber}");
+                        continue;
+                    }
+                    if (row.StockNumber != item.StockNumber)
+                    {
+                        badLines.Add($"SaleOrderProductId {id} เป็นสินค้า {row.StockNumber} ไม่ตรงกับ StockNumber {item.StockNumber} ที่ส่งมา");
+                    }
+                }
+
+                if (badLines.Any())
+                {
+                    throw new HandleException($"รายการใบแจ้งหนี้ไม่ถูกต้อง: {string.Join("; ", badLines)}");
+                }
+
+                getstockConfrim = ids.Select(id => rowsById[id]).ToList();
             }
+            else
+            {
+                getstockConfrim = await _jewelryContext.TbtSaleOrderProduct
+                    .Where(x => x.SoNumber == request.SoNumber && stockArray.Contains(x.StockNumber))
+                    .ToListAsync();
+
+                if (!getstockConfrim.Any())
+                {
+                    throw new HandleException("No matching Sale Order Products found for the provided items.");
+                }
+            }
+
             if (getstockConfrim.Any(x => !string.IsNullOrEmpty(x.Invoice)))
             {
                 throw new HandleException("One or more items have already been invoiced.");
@@ -144,6 +227,55 @@ namespace Jewelry.Service.Sale.Invoice
 
             var createDate = DateTime.UtcNow;
 
+            // หักมัดจำของ SO เข้าใบแจ้งหนี้นี้ (ถ้าระบุ DepositApplyAmount มา) — allocate แบบ FIFO ตาม depositDate/createDate ของมัดจำแต่ละครั้ง
+            var depositApplies = new List<TbtSaleOrderDepositApply>();
+            decimal? depositApplyAmount = (request.DepositApplyAmount.HasValue && request.DepositApplyAmount.Value > 0)
+                ? request.DepositApplyAmount.Value
+                : null;
+
+            if (depositApplyAmount.HasValue)
+            {
+                var depositBalance = await SaleOrderDepositHelper.GetBalanceAsync(_jewelryContext, request.SoNumber);
+                if (depositApplyAmount.Value > depositBalance)
+                {
+                    throw new HandleException($"ยอดหักมัดจำ ({depositApplyAmount.Value:N2}) มากกว่ายอดมัดจำคงเหลือของใบสั่งขาย {request.SoNumber} ({depositBalance:N2})");
+                }
+
+                if (depositApplyAmount.Value > t.rounded)
+                {
+                    throw new HandleException("ยอดหักมัดจำต้องไม่มากกว่ายอดรวมใบแจ้งหนี้");
+                }
+
+                var remainingToApply = depositApplyAmount.Value;
+                var availableDeposits = await SaleOrderDepositHelper.GetAvailableDepositsAsync(_jewelryContext, request.SoNumber);
+
+                foreach (var (availableDeposit, remainingOnDeposit) in availableDeposits)
+                {
+                    if (remainingToApply <= 0) break;
+
+                    var take = Math.Min(remainingToApply, remainingOnDeposit);
+                    if (take <= 0) continue;
+
+                    depositApplies.Add(new TbtSaleOrderDepositApply
+                    {
+                        DepositRunning = availableDeposit.Running,
+                        SoNumber = request.SoNumber,
+                        InvoiceRunning = invoiceNumber,
+                        Amount = take,
+                        IsDelete = false,
+                        CreateBy = CurrentUsername,
+                        CreateDate = createDate
+                    });
+
+                    remainingToApply -= take;
+                }
+
+                if (remainingToApply > 0)
+                {
+                    throw new HandleException("ยอดมัดจำคงเหลือไม่พอสำหรับหักตามจำนวนที่ระบุ");
+                }
+            }
+
             // Create invoice header
             var invoiceHeader = new TbtSaleInvoiceHeader
             {
@@ -164,7 +296,7 @@ namespace Jewelry.Service.Sale.Invoice
                 CustomerTel = request.CustomerTel,
 
                 DeliveryDate = request.DeliveryDate.HasValue ? request.DeliveryDate.Value.UtcDateTime : null,
-                Deposit = request.Deposit,
+                Deposit = depositApplyAmount ?? request.Deposit,
 
                 GoldRate = request.GoldRate,
                 Markup = request.Markup,
@@ -204,6 +336,11 @@ namespace Jewelry.Service.Sale.Invoice
             };
 
             _jewelryContext.TbtSaleInvoiceHeader.Add(invoiceHeader);
+
+            if (depositApplies.Any())
+            {
+                _jewelryContext.TbtSaleOrderDepositApply.AddRange(depositApplies);
+            }
 
             // Update sale order products with invoice information
             foreach (var item in getstockConfrim)
@@ -266,7 +403,28 @@ namespace Jewelry.Service.Sale.Invoice
 
             await _jewelryContext.SaveChangesAsync();
 
+            if (ownsTransaction)
+            {
+                await transaction!.CommitAsync();
+            }
+
             return invoiceNumber;
+            }
+            catch
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.RollbackAsync();
+                }
+                throw;
+            }
+            finally
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.DisposeAsync();
+                }
+            }
         }
 
         public async Task<jewelry.Model.Sale.Invoice.Get.Response> Get(jewelry.Model.Sale.Invoice.Get.Request request)
@@ -628,13 +786,34 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException($"Invoice not found: {request.InvoiceNumber}");
             }
 
-            ValidateInvoiceCancellable(invoiceHeader);
+            int cancelledPaymentCount;
 
-            invoiceHeader.DeleteReason = request.DeleteReason;
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
+            {
+                // ล็อกแถว invoice header ก่อน แล้วอ่านสถานะล่าสุดมาเช็คซ้ำ กันสองคำขอยกเลิก invoice เดียวกันพร้อมกัน (T1)
+                await _jewelryContext.LockInvoiceHeaderAsync(invoiceHeader.Running);
+                await _jewelryContext.Entry(invoiceHeader).ReloadAsync();
 
-            var cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
+                ValidateInvoiceCancellable(invoiceHeader);
 
-            await _jewelryContext.SaveChangesAsync();
+                invoiceHeader.DeleteReason = request.DeleteReason;
+
+                cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
+
+                await _jewelryContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (HandleException)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"Error deleting invoice: {ex.Message}");
+            }
 
             var message = $"Invoice {request.InvoiceNumber} deleted successfully";
 
@@ -661,14 +840,20 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException($"Invoice not found: {request.InvoiceNumber}");
             }
 
-            ValidateInvoiceCancellable(invoiceHeader);
-
-            var soNumber = invoiceHeader.SoRunning;
+            string soNumber;
             var cancelledPaymentCount = 0;
 
             using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
             try
             {
+                // ล็อกแถว invoice header ก่อน แล้วอ่านสถานะล่าสุดมาเช็คซ้ำ กันสองคำขอยกเลิก invoice เดียวกันพร้อมกัน (T1)
+                await _jewelryContext.LockInvoiceHeaderAsync(invoiceHeader.Running);
+                await _jewelryContext.Entry(invoiceHeader).ReloadAsync();
+
+                ValidateInvoiceCancellable(invoiceHeader);
+
+                soNumber = invoiceHeader.SoRunning;
+
                 cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
 
                 // ต้อง flush ก่อน เพราะ InactiveCore อ่านสถานะ Invoice ของสินค้าจากฐานข้อมูล — ยังอยู่ใน transaction เดียวกัน
@@ -721,31 +906,37 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException($"Invoice not found: {request.InvoiceNumber}");
             }
 
-            ValidateInvoiceCancellable(invoiceHeader);
-
-            var soNumber = invoiceHeader.SoRunning;
-
-            if (string.IsNullOrEmpty(soNumber))
-            {
-                throw new HandleException($"ใบแจ้งหนี้ {request.InvoiceNumber} ไม่มีใบสั่งขายผูกอยู่");
-            }
-
-            // สแนปช็อตรายการสินค้าที่ผูกกับ invoice นี้ก่อน — ต้องทำก่อน CancelInvoiceCore เพราะ core จะ set Invoice = null ทำให้หาไม่เจอภายหลัง
-            var stockItemsToUnconfirm = await _jewelryContext.TbtSaleOrderProduct
-                .Where(x => x.Invoice == request.InvoiceNumber)
-                .Select(x => new jewelry.Model.Sale.SaleOrder.UnconfirmStock.StockItemUnconfirmation
-                {
-                    Id = (int)x.Id,
-                    StockNumber = x.StockNumber
-                })
-                .ToListAsync();
-
+            string soNumber;
+            List<jewelry.Model.Sale.SaleOrder.UnconfirmStock.StockItemUnconfirmation> stockItemsToUnconfirm;
             var cancelledPaymentCount = 0;
             List<string> unconfirmedStockNumbers;
 
             using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
             try
             {
+                // ล็อกแถว invoice header ก่อน แล้วอ่านสถานะล่าสุดมาเช็คซ้ำ กันสองคำขอยกเลิก invoice เดียวกันพร้อมกัน (T1)
+                await _jewelryContext.LockInvoiceHeaderAsync(invoiceHeader.Running);
+                await _jewelryContext.Entry(invoiceHeader).ReloadAsync();
+
+                ValidateInvoiceCancellable(invoiceHeader);
+
+                soNumber = invoiceHeader.SoRunning;
+
+                if (string.IsNullOrEmpty(soNumber))
+                {
+                    throw new HandleException($"ใบแจ้งหนี้ {request.InvoiceNumber} ไม่มีใบสั่งขายผูกอยู่");
+                }
+
+                // สแนปช็อตรายการสินค้าที่ผูกกับ invoice นี้ก่อน — ต้องทำก่อน CancelInvoiceCore เพราะ core จะ set Invoice = null ทำให้หาไม่เจอภายหลัง
+                stockItemsToUnconfirm = await _jewelryContext.TbtSaleOrderProduct
+                    .Where(x => x.Invoice == request.InvoiceNumber)
+                    .Select(x => new jewelry.Model.Sale.SaleOrder.UnconfirmStock.StockItemUnconfirmation
+                    {
+                        Id = (int)x.Id,
+                        StockNumber = x.StockNumber
+                    })
+                    .ToListAsync();
+
                 cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
 
                 // ต้อง flush ก่อน เพราะ UnconfirmStockItemsCore อ่านสถานะสินค้าจากฐานข้อมูล — ยังอยู่ใน transaction เดียวกัน
@@ -799,10 +990,31 @@ namespace Jewelry.Service.Sale.Invoice
         {
             var invoiceNumber = invoiceHeader.Running;
 
+            // คืนมัดจำที่หักเข้าใบแจ้งหนี้นี้กลับเข้ายอดคงเหลือของ SO — ล็อกแถวมัดจำหลังล็อก header (ผู้เรียกล็อกไว้แล้ว) ก่อนล็อก piece ตามลำดับ global
+            var activeDepositApplies = await _jewelryContext.TbtSaleOrderDepositApply
+                .Where(a => a.InvoiceRunning == invoiceNumber && !a.IsDelete)
+                .ToListAsync();
+
+            if (activeDepositApplies.Any())
+            {
+                await _jewelryContext.LockSaleOrderDepositsAsync(invoiceHeader.SoRunning);
+
+                foreach (var apply in activeDepositApplies)
+                {
+                    apply.IsDelete = true;
+                    apply.UpdateBy = CurrentUsername;
+                    apply.UpdateDate = DateTime.UtcNow;
+                }
+                _jewelryContext.TbtSaleOrderDepositApply.UpdateRange(activeDepositApplies);
+            }
+
             // Update sale order products to remove invoice reference
             var saleOrderProducts = await _jewelryContext.TbtSaleOrderProduct
                 .Where(x => x.Invoice == invoiceNumber)
                 .ToListAsync();
+
+            // ล็อก piece ก่อนเพิ่ม qty กลับ กันคำขอ confirm ล็อตเงินเดียวกันมาเขียนทับพร้อมกัน (lost update)
+            await _jewelryContext.LockStockPiecesAsync(saleOrderProducts.Select(p => p.StockNumber));
 
             foreach (var product in saleOrderProducts)
             {

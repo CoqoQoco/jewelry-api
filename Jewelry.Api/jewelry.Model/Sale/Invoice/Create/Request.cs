@@ -22,6 +22,7 @@ namespace jewelry.Model.Sale.Invoice.Create
 
         public DateTimeOffset? DeliveryDate { get; set; }
         public decimal Deposit { get; set; }
+        public decimal? DepositApplyAmount { get; set; }
 
         public decimal GoldRate { get; set; }
         public decimal Markup { get; set; }
@@ -46,6 +47,6 @@ namespace jewelry.Model.Sale.Invoice.Create
     public class InvoiceItem
     {
         public string StockNumber { get; set; } = null!;
-       
+        public long? SaleOrderProductId { get; set; }
     }
 }

@@ -22,6 +22,7 @@ using Jewelry.Service.Sale.Quotation;
 using Jewelry.Service.Sale.SaleDocument;
 using Jewelry.Service.Sale.SaleDocumentCatalog;
 using Jewelry.Service.Sale.SaleOrder;
+using Jewelry.Service.Sale.SaleOrderDeposit;
 using Jewelry.Service.Sale.Invoice;
 using Jewelry.Service.Sale.Pos;
 using Jewelry.Service.Sale.BillingNote;
@@ -116,6 +117,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IPermissionService, Jewelry.Service.Permission.PermissionService>();
             services.AddScoped<IQuotationService, QuotationService>();
             services.AddScoped<ISaleOrderService, SaleOrderService>();
+            services.AddScoped<ISaleOrderDepositService, SaleOrderDepositService>();
             services.AddScoped<IInvoiceService, InvoiceService>();
             services.AddScoped<ICertificateService, CertificateService>();
             services.AddScoped<IPosCheckoutService, PosCheckoutService>();

@@ -115,6 +115,82 @@ namespace Jewelry.Service.Stock.Reconciliation
             return report;
         }
 
+        public async Task<PieceLedgerReport> CheckPieceLedgerAsync(CancellationToken ct)
+        {
+            // เงื่อนไขความผิดปกติทั้งหมดเช็คในนี้ (correlated subquery ต่อ piece) ให้ postgres กรองให้ ไม่โหลด piece ทั้งหมด (~30k แถว) มาวนใน memory
+            var mismatchQuery = _jewelryContext.TbtStockPiece
+                .AsNoTracking()
+                .Where(p =>
+                    p.Qty != _jewelryContext.TbtStockMovement
+                        .Where(m => m.StockNumber == p.StockNumber && m.ProductCode == p.ProductCode)
+                        .Sum(m => m.MovementType == "RECEIPT" || m.MovementType == "RETURN"
+                            ? m.Qty
+                            : (m.MovementType == "SALE" ? -m.Qty : 0m))
+                    || p.QtyReserved != _jewelryContext.TbtSaleOrderProduct
+                        .Where(sop => sop.StockNumber == p.StockNumber && sop.Invoice == null)
+                        .Sum(sop => sop.Qty)
+                    || p.QtyReserved > p.Qty
+                    || p.Qty < 0);
+
+            var mismatches = await mismatchQuery
+                .Select(p => new PieceLedgerRow
+                {
+                    StockNumber = p.StockNumber,
+                    ProductCode = p.ProductCode,
+                    Status = p.Status,
+                    Qty = p.Qty,
+                    QtyReserved = p.QtyReserved,
+                    LedgerQty = _jewelryContext.TbtStockMovement
+                        .Where(m => m.StockNumber == p.StockNumber && m.ProductCode == p.ProductCode)
+                        .Sum(m => m.MovementType == "RECEIPT" || m.MovementType == "RETURN"
+                            ? m.Qty
+                            : (m.MovementType == "SALE" ? -m.Qty : 0m)),
+                    ConfirmedUninvoicedQty = _jewelryContext.TbtSaleOrderProduct
+                        .Where(sop => sop.StockNumber == p.StockNumber && sop.Invoice == null)
+                        .Sum(sop => sop.Qty)
+                })
+                .ToListAsync(ct);
+
+            var items = mismatches.Select(x =>
+            {
+                var issues = new List<string>();
+                if (x.Qty != x.LedgerQty) issues.Add("LEDGER_MISMATCH");
+                if (x.QtyReserved != x.ConfirmedUninvoicedQty) issues.Add("RESERVED_MISMATCH");
+                if (x.QtyReserved > x.Qty) issues.Add("RESERVED_OVER_QTY");
+                if (x.Qty < 0) issues.Add("NEGATIVE_QTY");
+
+                return new PieceLedgerIssue
+                {
+                    StockNumber = x.StockNumber,
+                    ProductCode = x.ProductCode,
+                    Status = x.Status,
+                    Qty = x.Qty,
+                    QtyReserved = x.QtyReserved,
+                    LedgerQty = x.LedgerQty,
+                    ConfirmedUninvoicedQty = x.ConfirmedUninvoicedQty,
+                    Issues = issues
+                };
+            }).ToList();
+
+            return new PieceLedgerReport
+            {
+                CheckedAt = DateTime.UtcNow,
+                IssueCount = items.Count,
+                Items = items.Take(100).ToList()
+            };
+        }
+
+        private class PieceLedgerRow
+        {
+            public string StockNumber { get; set; } = null!;
+            public string ProductCode { get; set; } = null!;
+            public string? Status { get; set; }
+            public decimal Qty { get; set; }
+            public decimal QtyReserved { get; set; }
+            public decimal LedgerQty { get; set; }
+            public decimal ConfirmedUninvoicedQty { get; set; }
+        }
+
         public async Task<RebuildBalanceResult> RebuildBalanceFromPiecesAsync(CancellationToken ct)
         {
             const int batchSize = 500;

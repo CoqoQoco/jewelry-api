@@ -6,5 +6,6 @@ namespace Jewelry.Service.Stock.Reconciliation
     {
         Task<ReconciliationReport> CheckDriftAsync(CancellationToken ct);
         Task<RebuildBalanceResult> RebuildBalanceFromPiecesAsync(CancellationToken ct);
+        Task<PieceLedgerReport> CheckPieceLedgerAsync(CancellationToken ct);
     }
 }

@@ -1653,6 +1653,47 @@ namespace Jewelry.Service.Stock.Product
             };
         }
 
+        public async Task<List<jewelry.Model.Stock.Product.Availability.Response>> GetAvailability(jewelry.Model.Stock.Product.Availability.Request request)
+        {
+            var stockNumbers = (request.StockNumbers ?? new List<string>())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s.Trim())
+                .Distinct()
+                .ToList();
+
+            if (!stockNumbers.Any())
+            {
+                throw new HandleException("Stock Numbers is required.");
+            }
+
+            if (stockNumbers.Count > 500)
+            {
+                throw new HandleException("Stock Numbers must not exceed 500 items.");
+            }
+
+            var pieces = await _jewelryContext.TbtStockPiece
+                .AsNoTracking()
+                .Where(p => stockNumbers.Contains(p.StockNumber))
+                .ToListAsync();
+
+            // PK คือ (stock_number, product_code) — เลขสต็อกเดียวอาจมีได้มากกว่า 1 แถว จึง group แล้วเอาแถวแรก ห้าม ToDictionary ตรงๆ
+            return pieces
+                .GroupBy(p => p.StockNumber)
+                .Select(g => g.First())
+                .Select(p => new jewelry.Model.Stock.Product.Availability.Response
+                {
+                    StockNumber = p.StockNumber,
+                    StockNumberOrigin = p.StockNumberOrigin,
+                    ProductCode = p.ProductCode,
+                    LocationCode = p.LocationCode,
+                    Qty = p.Qty,
+                    QtyReserved = p.QtyReserved,
+                    QtyAvailable = StockPieceQtyHelper.Available(p),
+                    Status = p.Status
+                })
+                .ToList();
+        }
+
         private static string ToDisplayMaterialType(string normalizedType)
         {
             if (string.IsNullOrEmpty(normalizedType))
