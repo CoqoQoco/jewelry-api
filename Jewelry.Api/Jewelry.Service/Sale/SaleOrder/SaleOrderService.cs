@@ -919,6 +919,9 @@ namespace Jewelry.Service.Sale.SaleOrder
                 .Where(x => x.SoNumber == soNumber && string.IsNullOrEmpty(x.Invoice))
                 .ToListAsync();
 
+            // ล็อก piece ของแถวที่ยังไม่ออก invoice ก่อนปล่อยจอง กันสองคำขอ (เช่น ยกเลิก SO กับ ยืนยัน/ออก invoice) ชนกันบน qty_reserved
+            await _jewelryContext.LockStockPiecesAsync(confirmedProducts.Select(p => p.StockNumber));
+
             foreach (var product in confirmedProducts)
             {
                 var piece = await _jewelryContext.TbtStockPiece
