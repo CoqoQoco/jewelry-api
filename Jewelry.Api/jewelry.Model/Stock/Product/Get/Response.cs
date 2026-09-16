@@ -58,6 +58,21 @@ namespace jewelry.Model.Stock.Product.Get
         public List<PriceTransaction> PriceTransactions { get; set; } = new List<PriceTransaction>();
         public List<PlanPriceItem> PlanPriceItems { get; set; } = new List<PlanPriceItem>();
         public List<Reservation> Reservations { get; set; } = new List<Reservation>();
+
+        public ConvertedFromInfo? ConvertedFrom { get; set; }
+        public ConvertedToInfo? ConvertedTo { get; set; }
+    }
+
+    public class ConvertedFromInfo
+    {
+        public string Running { get; set; }
+        public List<string> SourceStockNumbers { get; set; } = new List<string>();
+    }
+
+    public class ConvertedToInfo
+    {
+        public string Running { get; set; }
+        public string ResultStockNumber { get; set; }
     }
 
     public class Reservation

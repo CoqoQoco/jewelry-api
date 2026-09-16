@@ -4,6 +4,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Receipt.Production;
+using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -139,6 +140,20 @@ namespace Jewelry.Service.Receipt.Outsource
             var locationCache = new Dictionary<string, string>();
             var balanceCache = new Dictionary<string, TbtStockBalance>();
 
+            // เคารพ transaction เดิมถ้าถูกเรียกจากภายในอีก transaction ที่เปิดอยู่แล้ว เหมือน InvoiceService.Create / StockMovementService.MoveLocation
+            var ownsTransaction = _jewelryContext.Database.CurrentTransaction == null;
+            var transaction = ownsTransaction
+                ? await _jewelryContext.Database.BeginTransactionAsync()
+                : null;
+
+            try
+            {
+
+            // การรับสินค้าสร้าง stock piece ใหม่เสมอ ไม่มีแถวเดิมให้ล็อก (ล็อก piece row ที่ยังไม่มีอยู่คือ no-op)
+            // สิ่งที่ชนกับ path อื่นได้จริงคือแถว balance ของ SKU ที่กำลังจะถูกบวกเพิ่ม จึงล็อกก่อนอ่านค่า balance เดิมด้านล่าง
+            var skuCodesToLock = newStocks.Select(x => x.DeriveSkuCode()).Distinct().ToList();
+            await _jewelryContext.LockStockBalancesAsync(skuCodesToLock);
+
             foreach (var stock in newStocks)
             {
                 var skuCode = stock.DeriveSkuCode();
@@ -199,44 +214,61 @@ namespace Jewelry.Service.Receipt.Outsource
                 .Where(x => x.Id != 0)
                 .ToList();
 
-            using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            _jewelryContext.TbtStockProductReceiptPlan.Add(header);
+
+            if (newReceiptItems.Any())
             {
-                _jewelryContext.TbtStockProductReceiptPlan.Add(header);
+                _jewelryContext.TbtStockProductReceiptItem.AddRange(newReceiptItems);
+            }
+            if (newSkus.Any())
+            {
+                _jewelryContext.TbtSku.AddRange(newSkus);
+            }
+            if (newStockPieces.Any())
+            {
+                _jewelryContext.TbtStockPiece.AddRange(newStockPieces);
+            }
+            if (newStockPieceMaterials.Any())
+            {
+                _jewelryContext.TbtStockPieceMaterial.AddRange(newStockPieceMaterials);
+            }
+            if (upsertBalances.Any())
+            {
+                _jewelryContext.TbtStockBalance.AddRange(upsertBalances);
+            }
+            if (updateBalances.Any())
+            {
+                _jewelryContext.TbtStockBalance.UpdateRange(updateBalances);
+            }
+            if (newMovements.Any())
+            {
+                _jewelryContext.TbtStockMovement.AddRange(newMovements);
+            }
 
-                if (newReceiptItems.Any())
-                {
-                    _jewelryContext.TbtStockProductReceiptItem.AddRange(newReceiptItems);
-                }
-                if (newSkus.Any())
-                {
-                    _jewelryContext.TbtSku.AddRange(newSkus);
-                }
-                if (newStockPieces.Any())
-                {
-                    _jewelryContext.TbtStockPiece.AddRange(newStockPieces);
-                }
-                if (newStockPieceMaterials.Any())
-                {
-                    _jewelryContext.TbtStockPieceMaterial.AddRange(newStockPieceMaterials);
-                }
-                if (upsertBalances.Any())
-                {
-                    _jewelryContext.TbtStockBalance.AddRange(upsertBalances);
-                }
-                if (updateBalances.Any())
-                {
-                    _jewelryContext.TbtStockBalance.UpdateRange(updateBalances);
-                }
-                if (newMovements.Any())
-                {
-                    _jewelryContext.TbtStockMovement.AddRange(newMovements);
-                }
+            await _jewelryContext.SaveChangesAsync();
 
-                await _jewelryContext.SaveChangesAsync();
-                scope.Complete();
+            if (ownsTransaction)
+            {
+                await transaction!.CommitAsync();
             }
 
             return response;
+            }
+            catch
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.RollbackAsync();
+                }
+                throw;
+            }
+            finally
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.DisposeAsync();
+                }
+            }
         }
 
         public IQueryable<jewelry.Model.Receipt.Outsource.History.List.Response> ListHistory(jewelry.Model.Receipt.Outsource.History.List.Search request)

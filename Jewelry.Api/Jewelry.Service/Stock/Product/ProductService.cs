@@ -665,6 +665,46 @@ namespace Jewelry.Service.Stock.Product
                     }).ToList();
             }
 
+            var convertItems = await _jewelryContext.TbtStockConvertItem
+                .AsNoTracking()
+                .Where(x => x.StockNumber == piece.StockNumber)
+                .ToListAsync();
+
+            var asConvertResult = convertItems.FirstOrDefault(x => x.Role == "RESULT");
+            if (asConvertResult != null)
+            {
+                var sourceStockNumbers = await _jewelryContext.TbtStockConvertItem
+                    .AsNoTracking()
+                    .Where(x => x.HeaderRunning == asConvertResult.HeaderRunning && x.Role == "SOURCE")
+                    .Select(x => x.StockNumber)
+                    .ToListAsync();
+
+                response.ConvertedFrom = new jewelry.Model.Stock.Product.Get.ConvertedFromInfo
+                {
+                    Running = asConvertResult.HeaderRunning,
+                    SourceStockNumbers = sourceStockNumbers
+                };
+            }
+
+            var asConvertSource = convertItems.FirstOrDefault(x => x.Role == "SOURCE");
+            if (asConvertSource != null)
+            {
+                var resultStockNumber = await _jewelryContext.TbtStockConvertItem
+                    .AsNoTracking()
+                    .Where(x => x.HeaderRunning == asConvertSource.HeaderRunning && x.Role == "RESULT")
+                    .Select(x => x.StockNumber)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrEmpty(resultStockNumber))
+                {
+                    response.ConvertedTo = new jewelry.Model.Stock.Product.Get.ConvertedToInfo
+                    {
+                        Running = asConvertSource.HeaderRunning,
+                        ResultStockNumber = resultStockNumber
+                    };
+                }
+            }
+
             return response;
         }
         public async Task<string> Update(jewelry.Model.Stock.Product.Update.Request request)

@@ -877,6 +877,11 @@ namespace Jewelry.Service.TransferStock
             }
 
             // 5. Save in batches
+            // ตั้งใจไม่ใส่ StockLockHelper (LockStockBalancesAsync) ในเมธอดนี้:
+            // นี่คือเครื่องมือ import ของเก่าที่ admin กดเองครั้งคราว ไม่ใช่ path ขายที่วิ่งตลอดเวลา และ request.Take ควบคุมได้เองว่าจะดึงมากี่แถวต่อครั้ง (อาจถึงหลักพัน)
+            // การใส่ FOR UPDATE ล็อก SKU ทั้งหมดที่แตะในรอบนี้ไว้ตลอดทั้ง transaction เดียวจะยิ่งขยายหน้าต่างที่ path ขายถูกบล็อก โดยไม่ได้ป้องกันอะไรเพิ่มจาก row lock ที่ Postgres ทำให้อยู่แล้วตอน UPDATE จริง ๆ
+            // ถ้าจะแก้ให้ปลอดภัยกว่านี้ต้องตัด batch ให้เล็กลงเป็นหลาย transaction (เหมือน RebuildBalanceFromPiecesAsync) ซึ่งเป็นการรื้อ flow ทั้งหมด (เสี่ยง mark IsTransfer ค้างครึ่ง ๆ กลาง ๆ ถ้า batch หลังพัง) เกินขอบเขตงานนี้
+            // ผู้ใช้ endpoint นี้ควรรันตอนโหลดต่ำ/นอกเวลาขาย และเรียกทีละคำขอ (ไม่รันซ้อนกันเอง)
             using var scope = new TransactionScope(
                TransactionScopeOption.Required,
                new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
