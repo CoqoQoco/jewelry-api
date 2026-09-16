@@ -644,6 +644,7 @@ namespace Jewelry.Service.Sale.SaleOrder
             {
                 // ล็อก piece ก่อนตรวจสอบ/ยืนยัน กันสองคำขอจองชิ้นเดียวกันพร้อมกันแล้วจองเกินจำนวนพร้อมขาย
                 await _jewelryContext.LockStockPiecesAsync(requestStockNumbers);
+                await LockStockBalancesForStockNumbersAsync(requestStockNumbers);
 
                 await ValidateStockItemConfirmations(saleOrder.SoNumber, request.StockItems);
 
@@ -700,10 +701,23 @@ namespace Jewelry.Service.Sale.SaleOrder
                 .Select(s => s.StockNumber)
                 .Distinct();
             await _jewelryContext.LockStockPiecesAsync(requestStockNumbers);
+            await LockStockBalancesForStockNumbersAsync(requestStockNumbers);
 
             await ValidateStockItemConfirmations(saleOrder.SoNumber, stockItems);
 
             return await ConfirmStockItemsCore(saleOrder, stockItems, confirmedDate);
+        }
+
+        // ล็อกแถว tbt_stock_balance ของ SKU ที่ผูกกับ stock number เหล่านี้ — ต้องเรียกหลังล็อก piece เสมอ (ลำดับ global: piece -> balance)
+        private async Task LockStockBalancesForStockNumbersAsync(IEnumerable<string> stockNumbers)
+        {
+            var skuCodes = await _jewelryContext.TbtStockPiece
+                .Where(p => stockNumbers.Contains(p.StockNumber))
+                .Select(p => p.SkuCode)
+                .Distinct()
+                .ToListAsync();
+
+            await _jewelryContext.LockStockBalancesAsync(skuCodes);
         }
 
         private async Task ValidateStockItemConfirmations(string soNumber, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems)
@@ -921,6 +935,7 @@ namespace Jewelry.Service.Sale.SaleOrder
 
             // ล็อก piece ของแถวที่ยังไม่ออก invoice ก่อนปล่อยจอง กันสองคำขอ (เช่น ยกเลิก SO กับ ยืนยัน/ออก invoice) ชนกันบน qty_reserved
             await _jewelryContext.LockStockPiecesAsync(confirmedProducts.Select(p => p.StockNumber));
+            await LockStockBalancesForStockNumbersAsync(confirmedProducts.Select(p => p.StockNumber));
 
             foreach (var product in confirmedProducts)
             {
@@ -1054,6 +1069,7 @@ namespace Jewelry.Service.Sale.SaleOrder
 
             // ล็อก piece + แถว SO product ก่อน แล้วค่อยเช็คว่ายังอยู่จริงและยังไม่ถูก invoice — กันสองคำขอ unconfirm/cancel ชนกัน
             await _jewelryContext.LockStockPiecesAsync(requestStockNumbers);
+            await LockStockBalancesForStockNumbersAsync(requestStockNumbers);
             await _jewelryContext.LockSaleOrderProductsAsync(soNumberUpper, requestStockNumbers);
 
             foreach (var stockItem in stockItems)

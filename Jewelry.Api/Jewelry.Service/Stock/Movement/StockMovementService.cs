@@ -4,6 +4,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
@@ -102,9 +103,23 @@ namespace Jewelry.Service.Stock.Movement
                 throw new HandleException($"ไม่พบ Location {req.TargetLocationCode} ในระบบ");
             }
 
+            // เคารพ transaction เดิมถ้าถูกเรียกจากภายในอีก transaction ที่เปิดอยู่แล้ว เหมือน InvoiceService.Create
+            var ownsTransaction = _jewelryContext.Database.CurrentTransaction == null;
+            var transaction = ownsTransaction
+                ? await _jewelryContext.Database.BeginTransactionAsync()
+                : null;
+
+            try
+            {
+
+            // ล็อก piece ก่อน แล้วค่อยล็อก balance ของ SKU ที่เกี่ยวข้อง ตามลำดับ global: piece -> balance
+            await _jewelryContext.LockStockPiecesAsync(req.StockNumbers);
+
             var pieces = _jewelryContext.TbtStockPiece
                 .Where(p => req.StockNumbers.Contains(p.StockNumber))
                 .ToList();
+
+            await _jewelryContext.LockStockBalancesAsync(pieces.Select(p => p.SkuCode));
 
             var now = DateTime.UtcNow;
             var username = CurrentUsername;
@@ -145,7 +160,6 @@ namespace Jewelry.Service.Stock.Movement
                 if (srcBalance != null)
                 {
                     srcBalance.QtyOnHand -= moveQty;
-                    srcBalance.QtyAvailable = srcBalance.QtyOnHand - srcBalance.QtyReserved;
                     srcBalance.LastMovementAt = now;
                     srcBalance.UpdateDate = now;
                     srcBalance.UpdateBy = username;
@@ -164,7 +178,6 @@ namespace Jewelry.Service.Stock.Movement
                         LocationCode = target,
                         QtyOnHand = moveQty,
                         QtyReserved = 0,
-                        QtyAvailable = moveQty,
                         LastMovementAt = now,
                         CreateDate = now,
                         CreateBy = username
@@ -174,7 +187,6 @@ namespace Jewelry.Service.Stock.Movement
                 else
                 {
                     dstBalance.QtyOnHand += moveQty;
-                    dstBalance.QtyAvailable = dstBalance.QtyOnHand - dstBalance.QtyReserved;
                     dstBalance.LastMovementAt = now;
                     dstBalance.UpdateDate = now;
                     dstBalance.UpdateBy = username;
@@ -221,7 +233,28 @@ namespace Jewelry.Service.Stock.Movement
 
             await _jewelryContext.SaveChangesAsync();
 
+            if (ownsTransaction)
+            {
+                await transaction!.CommitAsync();
+            }
+
             return new Response { Message = "success", MovedCount = movedCount };
+            }
+            catch
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.RollbackAsync();
+                }
+                throw;
+            }
+            finally
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.DisposeAsync();
+                }
+            }
         }
     }
 }

@@ -95,13 +95,14 @@ namespace Jewelry.Service.Sale.Invoice
 
             try
             {
-            // ล็อกแถวมัดจำของ SO ก่อน (ถ้าจะหักมัดจำ) แล้วค่อยล็อก piece แล้วค่อยล็อกแถว SO product ตามลำดับ global: invoice header → SO deposit → piece → SO product (กัน deadlock)
+            // ล็อกแถวมัดจำของ SO ก่อน (ถ้าจะหักมัดจำ) แล้วค่อยล็อก piece แล้วค่อยล็อก balance แล้วค่อยล็อกแถว SO product ตามลำดับ global: invoice header → SO deposit → piece → balance → SO product (กัน deadlock)
             if (request.DepositApplyAmount.HasValue && request.DepositApplyAmount.Value > 0)
             {
                 await _jewelryContext.LockSaleOrderDepositsAsync(request.SoNumber);
             }
 
             await _jewelryContext.LockStockPiecesAsync(stockArray);
+            await LockStockBalancesForStockNumbersAsync(stockArray);
 
             if (useIds)
             {
@@ -984,6 +985,18 @@ namespace Jewelry.Service.Sale.Invoice
             }
         }
 
+        // ล็อกแถว tbt_stock_balance ของ SKU ที่ผูกกับ stock number เหล่านี้ — ต้องเรียกหลังล็อก piece เสมอ (ลำดับ global: piece -> balance)
+        private async Task LockStockBalancesForStockNumbersAsync(IEnumerable<string> stockNumbers)
+        {
+            var skuCodes = await _jewelryContext.TbtStockPiece
+                .Where(p => stockNumbers.Contains(p.StockNumber))
+                .Select(p => p.SkuCode)
+                .Distinct()
+                .ToListAsync();
+
+            await _jewelryContext.LockStockBalancesAsync(skuCodes);
+        }
+
         // ใช้ทั้ง Delete และ CancelWithSaleOrder — ไม่มี SaveChanges ภายใน ผู้เรียกเป็นคนควบคุม
         // คืนค่าจำนวนรายการรับชำระเงินที่ถูกยกเลิกไปพร้อมกับใบแจ้งหนี้
         private async Task<int> CancelInvoiceCore(TbtSaleInvoiceHeader invoiceHeader)
@@ -1015,6 +1028,7 @@ namespace Jewelry.Service.Sale.Invoice
 
             // ล็อก piece ก่อนเพิ่ม qty กลับ กันคำขอ confirm ล็อตเงินเดียวกันมาเขียนทับพร้อมกัน (lost update)
             await _jewelryContext.LockStockPiecesAsync(saleOrderProducts.Select(p => p.StockNumber));
+            await LockStockBalancesForStockNumbersAsync(saleOrderProducts.Select(p => p.StockNumber));
 
             foreach (var product in saleOrderProducts)
             {

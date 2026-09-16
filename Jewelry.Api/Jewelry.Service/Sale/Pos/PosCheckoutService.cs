@@ -256,6 +256,7 @@ namespace Jewelry.Service.Sale.Pos
         {
             // ล็อกตามลำดับ StockNumber เดียวกันเสมอ กัน deadlock เมื่อ 2 บิลขายสินค้าชุดที่ทับกันพร้อมกัน
             var orderedItems = items.OrderBy(i => i.StockNumber, StringComparer.Ordinal).ToList();
+            var skuCodesToLock = new List<string>();
 
             foreach (var item in orderedItems)
             {
@@ -288,7 +289,12 @@ namespace Jewelry.Service.Sale.Pos
 
                     throw new HandleException(message);
                 }
+
+                skuCodesToLock.Add(piece.SkuCode);
             }
+
+            // ล็อก balance ของ SKU เหล่านี้หลังล็อก piece ครบทุกชิ้นแล้ว ตามลำดับ global: piece -> balance
+            await _jewelryContext.LockStockBalancesAsync(skuCodesToLock);
         }
 
         private static readonly JsonSerializerOptions SaleOrderDataJsonOptions = new JsonSerializerOptions

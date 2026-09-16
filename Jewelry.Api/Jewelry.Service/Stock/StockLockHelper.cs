@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Jewelry.Service.Stock
 {
     // Row-lock helper ที่ต้องเรียกภายใน transaction ที่เปิดอยู่แล้วเท่านั้น — lock ที่ถูกยิงนอก transaction จะถูกปล่อยทันทีและไม่ได้กันอะไรเลย
-    // ลำดับ lock ต้องเรียงเดียวกันทุก path เสมอ กัน deadlock: invoice header -> SO deposit -> stock piece -> sale order product
+    // ลำดับ lock ต้องเรียงเดียวกันทุก path เสมอ กัน deadlock: invoice header -> SO deposit -> stock piece -> stock balance -> sale order product
     public static class StockLockHelper
     {
         public static async Task LockSaleOrderDepositsAsync(this JewelryContext context, string soNumber)
@@ -35,6 +35,21 @@ namespace Jewelry.Service.Stock
                 SELECT 1 FROM tbt_stock_piece
                 WHERE stock_number = ANY({numbers})
                 ORDER BY stock_number, product_code
+                FOR UPDATE");
+        }
+
+        public static async Task LockStockBalancesAsync(this JewelryContext context, IEnumerable<string> skuCodes)
+        {
+            EnsureTransaction(context);
+
+            var codes = DistinctOrdered(skuCodes);
+            if (codes.Length == 0) return;
+
+            // ล็อกทุกแถวของ SKU เหล่านี้ (ทุกคลัง) ไม่ใช่แค่คลังเดียว — การย้ายคลังแตะ balance สองแถวพร้อมกัน
+            await context.Database.ExecuteSqlInterpolatedAsync($@"
+                SELECT 1 FROM tbt_stock_balance
+                WHERE sku_code = ANY({codes})
+                ORDER BY sku_code, location_code
                 FOR UPDATE");
         }
 
