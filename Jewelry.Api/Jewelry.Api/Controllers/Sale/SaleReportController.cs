@@ -22,23 +22,6 @@ namespace Jewelry.Api.Controllers.Sale
             _service = service;
         }
 
-        [Route("PipelineSummary")]
-        [HttpPost]
-        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Sale.SaleReport.PipelineSummary.Response))]
-        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-        public async Task<IActionResult> PipelineSummary([FromBody] jewelry.Model.Sale.SaleReport.PipelineSummary.Request request)
-        {
-            try
-            {
-                var response = await _service.PipelineSummary(request);
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, ex.Message);
-            }
-        }
-
         [Route("CustomerProductionStatus")]
         [HttpPost]
         [RequirePermission("sale:view")]
@@ -67,6 +50,78 @@ namespace Jewelry.Api.Controllers.Sale
             try
             {
                 var response = await _service.ByChannel(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("SalesSummary")]
+        [HttpPost]
+        [RequirePermission("sale:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Sale.SaleReport.SalesSummary.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> SalesSummary([FromBody] jewelry.Model.Sale.SaleReport.SalesSummary.Request request)
+        {
+            try
+            {
+                var response = await _service.SalesSummary(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("ProductGroupSales")]
+        [HttpPost]
+        [RequirePermission("sale:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Sale.SaleReport.ProductGroupSales.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ProductGroupSales([FromBody] jewelry.Model.Sale.SaleReport.ProductGroupSales.Request request)
+        {
+            try
+            {
+                var response = await _service.ProductGroupSales(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("TopDesignSales")]
+        [HttpPost]
+        [RequirePermission("sale:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Sale.SaleReport.TopDesignSales.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> TopDesignSales([FromBody] jewelry.Model.Sale.SaleReport.TopDesignSales.Request request)
+        {
+            try
+            {
+                var response = await _service.TopDesignSales(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("InvoiceCustomerSuggest")]
+        [HttpPost]
+        [RequirePermission("sale:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Sale.SaleReport.InvoiceCustomerSuggest.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> InvoiceCustomerSuggest([FromBody] jewelry.Model.Sale.SaleReport.InvoiceCustomerSuggest.Request request)
+        {
+            try
+            {
+                var response = await _service.InvoiceCustomerSuggest(request);
                 return Ok(response);
             }
             catch (Exception ex)
