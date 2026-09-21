@@ -219,8 +219,10 @@ namespace Jewelry.Service.Worker
                     $"น้ำหนักคืน ({returnedTotal:0.####} g) มากกว่าน้ำหนักจ่าย ({issuedTotal:0.####} g) — ตรวจสอบรายการงานก่อนบันทึก");
             }
 
-            // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) ไม่รวม add-on
-            decimal allowedLoss = RoundHalfUp(returnedFromJobs * request.LossPercent / 100m, 4);
+            // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) รวมรายการคืนที่ติ๊ก CountInLoss (เช่น งานซ่อม/งานส่งที่ไม่มี Job)
+            decimal returnedLossBaseFromCustom = (request.ReturnedLines ?? new List<GoldLossTangExtraLine>())
+                .Where(l => l.CountInCalc && l.CountInLoss).Sum(l => l.Weight);
+            decimal allowedLoss = RoundHalfUp((returnedFromJobs + returnedLossBaseFromCustom) * request.LossPercent / 100m, 4);
             decimal diffLoss = RoundHalfUp(allowedLoss - rawLoss, 4);
             decimal totalMoneyDiff = RoundHalfUp(diffLoss, 2) * request.PricePerGram;
 
@@ -318,6 +320,7 @@ namespace Jewelry.Service.Worker
                     Name = line.Name,
                     Weight = line.Weight,
                     CountInCalc = line.CountInCalc,
+                    CountInLoss = false,
                     IsActive = true,
                 });
             }
@@ -330,6 +333,7 @@ namespace Jewelry.Service.Worker
                     Name = line.Name,
                     Weight = line.Weight,
                     CountInCalc = line.CountInCalc,
+                    CountInLoss = line.CountInLoss,
                     IsActive = true,
                 });
             }
@@ -472,8 +476,10 @@ namespace Jewelry.Service.Worker
                     $"น้ำหนักคืน ({returnedTotal:0.####} g) มากกว่าน้ำหนักจ่าย ({issuedTotal:0.####} g) — ตรวจสอบรายการงานก่อนบันทึก");
             }
 
-            // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) ไม่รวม add-on
-            decimal allowedLoss = RoundHalfUp(returnedFromJobs * request.LossPercent / 100m, 4);
+            // allowedLoss คิดจากฐานคืนตัวงาน (returnedFromJobs) รวมรายการคืนที่ติ๊ก CountInLoss (เช่น งานซ่อม/งานส่งที่ไม่มี Job)
+            decimal returnedLossBaseFromCustom = (request.ReturnedLines ?? new List<GoldLossTangExtraLine>())
+                .Where(l => l.CountInCalc && l.CountInLoss).Sum(l => l.Weight);
+            decimal allowedLoss = RoundHalfUp((returnedFromJobs + returnedLossBaseFromCustom) * request.LossPercent / 100m, 4);
             decimal diffLoss = RoundHalfUp(allowedLoss - rawLoss, 4);
             decimal totalMoneyDiff = RoundHalfUp(diffLoss, 2) * request.PricePerGram;
 
@@ -568,6 +574,7 @@ namespace Jewelry.Service.Worker
                     Name = line.Name,
                     Weight = line.Weight,
                     CountInCalc = line.CountInCalc,
+                    CountInLoss = false,
                     IsActive = true,
                 });
             }
@@ -580,6 +587,7 @@ namespace Jewelry.Service.Worker
                     Name = line.Name,
                     Weight = line.Weight,
                     CountInCalc = line.CountInCalc,
+                    CountInLoss = line.CountInLoss,
                     IsActive = true,
                 });
             }
@@ -728,6 +736,7 @@ namespace Jewelry.Service.Worker
         {
             var query = _jewelryContext.TbtGoldLossTangSlip
                 .Include(x => x.TbtGoldLossTangSlipItem.Where(i => i.IsActive))
+                .Include(x => x.TbtGoldLossTangSlipExtra.Where(e => e.IsActive))
                 .Where(x => x.IsActive);
 
             if (request.RequestDateStart.HasValue)
@@ -828,7 +837,8 @@ namespace Jewelry.Service.Worker
                 TotalReturned = slips.Sum(s => s.ReturnedTotal),
                 TotalRawLoss = slips.Sum(s => s.RawLoss),
                 TotalAllowedLoss = slips.Sum(s => s.AllowedLoss),
-                TotalAllowedLossBase = slips.Sum(s => s.TbtGoldLossTangSlipItem.Where(i => i.IsActive).Sum(i => i.GoldWeightCheck ?? 0)),
+                TotalAllowedLossBase = slips.Sum(s => s.TbtGoldLossTangSlipItem.Where(i => i.IsActive).Sum(i => i.GoldWeightCheck ?? 0))
+                    + slips.Sum(s => s.TbtGoldLossTangSlipExtra.Where(e => e.IsActive && e.Kind == 2 && e.CountInCalc && e.CountInLoss).Sum(e => e.Weight ?? 0)),
                 TotalDiffLoss = slips.Sum(s => s.DiffLoss),
                 TotalMoneyDiff = slips.Sum(s => s.TotalMoneyDiff),
                 ByGoldType = byGoldType,
@@ -935,6 +945,7 @@ namespace Jewelry.Service.Worker
                         Name = e.Name,
                         Weight = e.Weight,
                         CountInCalc = e.CountInCalc,
+                        CountInLoss = e.CountInLoss,
                     }).ToList(),
                 };
             }).ToList();
@@ -1081,6 +1092,7 @@ namespace Jewelry.Service.Worker
                     Name = e.Name,
                     Weight = e.Weight,
                     CountInCalc = e.CountInCalc,
+                    CountInLoss = e.CountInLoss,
                 }).ToList(),
                 ReturnedLines = returnedLines.Select(e => new GoldLossTangExtraLineResponse
                 {
@@ -1089,6 +1101,7 @@ namespace Jewelry.Service.Worker
                     Name = e.Name,
                     Weight = e.Weight,
                     CountInCalc = e.CountInCalc,
+                    CountInLoss = e.CountInLoss,
                 }).ToList(),
                 TypeSummaries = BuildTypeSummaries(items.Where(i => i.IsActive).ToList()),
             };
