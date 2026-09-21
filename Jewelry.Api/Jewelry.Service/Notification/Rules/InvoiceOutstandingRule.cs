@@ -1,3 +1,4 @@
+using jewelry.Model.Constant;
 using Jewelry.Data.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +24,7 @@ public class InvoiceOutstandingRule : INotificationRule
                      select new
                      {
                          invoice.Running,
+                         invoice.InvoiceType,
                          invoice.CustomerName,
                          invoice.GrandTotalRounded,
                          invoice.Deposit,
@@ -56,7 +58,7 @@ public class InvoiceOutstandingRule : INotificationRule
             candidates.Add(new NotificationCandidate
             {
                 RecipientUsername = recipient,
-                RefDocType = "INVOICE",
+                RefDocType = invoice.InvoiceType == InvoiceTypes.Material ? "INVOICE_MATERIAL" : "INVOICE",
                 RefDocNo = invoice.Running,
                 Title = $"{invoice.Running} · {invoice.CustomerName}",
                 Body = $"ยอดคงเหลือ {outstanding:N2} {invoice.CurrencyUnit}",

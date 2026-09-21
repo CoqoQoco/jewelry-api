@@ -50,6 +50,28 @@ namespace Jewelry.Api.Controllers.Sale
             }
         }
 
+        [HttpPost("CreateFromMaterialSale")]
+        [RequirePermission("sale:create")]
+        public async Task<IActionResult> CreateFromMaterialSale(jewelry.Model.Sale.Invoice.CreateFromMaterialSale.Request request)
+        {
+            try
+            {
+                var result = await _service.CreateFromMaterialSale(request);
+                return Ok(new { invoiceNumber = result, message = "Invoice created successfully" });
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error creating invoice from material sale");
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error creating invoice from material sale");
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while creating invoice" });
+            }
+        }
+
         [HttpPost("Get")]
         public async Task<IActionResult> Get(jewelry.Model.Sale.Invoice.Get.Request request)
         {

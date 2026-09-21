@@ -1,8 +1,10 @@
+using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -76,14 +78,15 @@ namespace Jewelry.Service.Sale.MaterialSale
             }
         }
 
-        private static List<TbtSaleMaterialItem> BuildItems(List<jewelry.Model.Sale.MaterialSale.Create.Item> requestItems)
+        private static List<TbtSaleMaterialItem> BuildItems(List<jewelry.Model.Sale.MaterialSale.Create.Item> requestItems, decimal vatPercent)
         {
             var items = new List<TbtSaleMaterialItem>();
 
             foreach (var i in requestItems)
             {
-                var priceExclVat = Math.Round(i.PriceInclVat / 1.07m, 2, MidpointRounding.AwayFromZero);
-                var amount = Math.Round(priceExclVat * i.QtyWeight, 2, MidpointRounding.AwayFromZero);
+                // ไม่ปัดเศษราคา/จำนวนเงินต่อบรรทัดระหว่างทาง เก็บดิบไว้ก่อน ปัดครั้งเดียวที่ยอดรวมเอกสาร (MaterialSaleMoney.Totals)
+                var priceExclVat = MaterialSaleMoney.PriceExclVat(i.PriceInclVat, vatPercent);
+                var amount = priceExclVat * i.QtyWeight;
 
                 items.Add(new TbtSaleMaterialItem
                 {
@@ -124,10 +127,8 @@ namespace Jewelry.Service.Sale.MaterialSale
                 throw new HandleException($"เลขที่เอกสาร {documentNo} ซ้ำในระบบ");
             }
 
-            var items = BuildItems(request.Items);
-            var subTotal = Math.Round(items.Sum(x => x.Amount), 2, MidpointRounding.AwayFromZero);
-            var vatAmount = Math.Round(subTotal * request.VatPercent / 100m, 2, MidpointRounding.AwayFromZero);
-            var grandTotal = subTotal + vatAmount;
+            var items = BuildItems(request.Items, request.VatPercent);
+            var t = MaterialSaleMoney.Totals(items.Select(x => (x.PriceInclVat, x.QtyWeight)), request.VatPercent);
 
             var header = new TbtSaleMaterialHeader
             {
@@ -142,10 +143,10 @@ namespace Jewelry.Service.Sale.MaterialSale
                 CustomerEmail = request.CustomerEmail,
                 CustomerTaxId = request.CustomerTaxId,
 
-                SubTotal = subTotal,
+                SubTotal = t.subTotal,
                 VatPercent = request.VatPercent,
-                VatAmount = vatAmount,
-                GrandTotal = grandTotal,
+                VatAmount = t.vatAmount,
+                GrandTotal = t.rounded,
 
                 Remark = request.Remark,
 
@@ -205,10 +206,8 @@ namespace Jewelry.Service.Sale.MaterialSale
                 throw new HandleException($"เลขที่เอกสาร {documentNo} ซ้ำในระบบ");
             }
 
-            var items = BuildItems(request.Items);
-            var subTotal = Math.Round(items.Sum(x => x.Amount), 2, MidpointRounding.AwayFromZero);
-            var vatAmount = Math.Round(subTotal * request.VatPercent / 100m, 2, MidpointRounding.AwayFromZero);
-            var grandTotal = subTotal + vatAmount;
+            var items = BuildItems(request.Items, request.VatPercent);
+            var t = MaterialSaleMoney.Totals(items.Select(x => (x.PriceInclVat, x.QtyWeight)), request.VatPercent);
 
             header.DocumentNo = documentNo;
             header.DocumentDate = request.DocumentDate.UtcDateTime;
@@ -220,10 +219,10 @@ namespace Jewelry.Service.Sale.MaterialSale
             header.CustomerEmail = request.CustomerEmail;
             header.CustomerTaxId = request.CustomerTaxId;
 
-            header.SubTotal = subTotal;
+            header.SubTotal = t.subTotal;
             header.VatPercent = request.VatPercent;
-            header.VatAmount = vatAmount;
-            header.GrandTotal = grandTotal;
+            header.VatAmount = t.vatAmount;
+            header.GrandTotal = t.rounded;
 
             header.Remark = request.Remark;
 
@@ -262,6 +261,11 @@ namespace Jewelry.Service.Sale.MaterialSale
                 throw new HandleException($"ไม่พบเอกสาร {request.Running}");
             }
 
+            var invoiceNumber = await _jewelryContext.TbtSaleInvoiceHeader
+                .Where(x => x.InvoiceType == InvoiceTypes.Material && x.SoRunning == header.Running && !x.IsDelete)
+                .Select(x => x.Running)
+                .FirstOrDefaultAsync();
+
             return new jewelry.Model.Sale.MaterialSale.Get.Response
             {
                 Running = header.Running,
@@ -295,6 +299,8 @@ namespace Jewelry.Service.Sale.MaterialSale
                 CreateBy = header.CreateBy,
                 UpdateDate = header.UpdateDate,
                 UpdateBy = header.UpdateBy,
+
+                InvoiceNumber = invoiceNumber,
 
                 Items = header.TbtSaleMaterialItem
                     .OrderBy(x => x.ItemNo)
@@ -370,7 +376,12 @@ namespace Jewelry.Service.Sale.MaterialSale
                              StatusName = header.StatusName,
 
                              CreateDate = header.CreateDate,
-                             CreateBy = header.CreateBy
+                             CreateBy = header.CreateBy,
+
+                             InvoiceNumber = _jewelryContext.TbtSaleInvoiceHeader
+                                 .Where(x => x.InvoiceType == InvoiceTypes.Material && x.SoRunning == header.Running && !x.IsDelete)
+                                 .Select(x => x.Running)
+                                 .FirstOrDefault()
                          };
 
             return result.OrderByDescending(x => x.CreateDate);
@@ -378,27 +389,36 @@ namespace Jewelry.Service.Sale.MaterialSale
 
         public async Task<string> Confirm(jewelry.Model.Sale.MaterialSale.Confirm.Request request)
         {
-            var header = await _jewelryContext.TbtSaleMaterialHeader
-                .Include(x => x.TbtSaleMaterialItem)
-                .FirstOrDefaultAsync(x => x.Running == request.Running && x.IsDelete == false);
+            string documentNo;
 
-            if (header == null)
+            // เดิมใช้ TransactionScope โดยโหลด header ก่อนเปิด transaction — สองคำขอ Confirm กดพร้อมกัน (double-click)
+            // เห็นสถานะ Draft พร้อมกันทั้งคู่แล้วตัดสต็อกซ้ำ ต้องล็อกแถว header ก่อนโหลดข้อมูลเสมอ
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
             {
-                throw new HandleException($"ไม่พบเอกสาร {request.Running}");
-            }
+                await _jewelryContext.LockSaleMaterialHeaderAsync(request.Running);
 
-            if (header.Status != 10)
-            {
-                throw new HandleException("ยืนยันได้เฉพาะเอกสารสถานะร่าง");
-            }
+                var header = await _jewelryContext.TbtSaleMaterialHeader
+                    .Include(x => x.TbtSaleMaterialItem)
+                    .FirstOrDefaultAsync(x => x.Running == request.Running && x.IsDelete == false);
 
-            if (header.TbtSaleMaterialItem == null || !header.TbtSaleMaterialItem.Any())
-            {
-                throw new HandleException("เอกสารไม่มีรายการขาย ไม่สามารถยืนยันได้");
-            }
+                if (header == null)
+                {
+                    throw new HandleException($"ไม่พบเอกสาร {request.Running}");
+                }
 
-            using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
-            {
+                if (header.Status != 10)
+                {
+                    throw new HandleException("ยืนยันได้เฉพาะเอกสารสถานะร่าง");
+                }
+
+                if (header.TbtSaleMaterialItem == null || !header.TbtSaleMaterialItem.Any())
+                {
+                    throw new HandleException("เอกสารไม่มีรายการขาย ไม่สามารถยืนยันได้");
+                }
+
+                documentNo = header.DocumentNo;
+
                 var gemCodes = header.TbtSaleMaterialItem.Select(x => x.GemCode).Distinct().ToList();
                 var gems = await _jewelryContext.TbtStockGem
                     .Where(x => gemCodes.Contains(x.Code))
@@ -483,30 +503,59 @@ namespace Jewelry.Service.Sale.MaterialSale
                 _jewelryContext.TbtSaleMaterialHeader.Update(header);
 
                 await _jewelryContext.SaveChangesAsync();
-                scope.Complete();
+                await transaction.CommitAsync();
+            }
+            catch (HandleException)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"เกิดข้อผิดพลาดในการยืนยันการขายวัตถุดิบ: {ex.Message}");
             }
 
-            return $"ยืนยันการขายวัตถุดิบ {header.DocumentNo} สำเร็จ";
+            return $"ยืนยันการขายวัตถุดิบ {documentNo} สำเร็จ";
         }
 
         public async Task<string> Cancel(jewelry.Model.Sale.MaterialSale.Cancel.Request request)
         {
-            var header = await _jewelryContext.TbtSaleMaterialHeader
-                .Include(x => x.TbtSaleMaterialItem)
-                .FirstOrDefaultAsync(x => x.Running == request.Running && x.IsDelete == false);
+            string documentNo;
 
-            if (header == null)
+            using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+            try
             {
-                throw new HandleException($"ไม่พบเอกสาร {request.Running}");
-            }
+                // ล็อกแถว header ก่อนโหลดข้อมูล กันสองคำขอยกเลิกพร้อมกันคืนสต็อกซ้ำ
+                await _jewelryContext.LockSaleMaterialHeaderAsync(request.Running);
 
-            if (header.Status != 100)
-            {
-                throw new HandleException("ยกเลิกได้เฉพาะเอกสารสถานะยืนยันแล้ว");
-            }
+                var header = await _jewelryContext.TbtSaleMaterialHeader
+                    .Include(x => x.TbtSaleMaterialItem)
+                    .FirstOrDefaultAsync(x => x.Running == request.Running && x.IsDelete == false);
 
-            using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
-            {
+                if (header == null)
+                {
+                    throw new HandleException($"ไม่พบเอกสาร {request.Running}");
+                }
+
+                if (header.Status != 100)
+                {
+                    throw new HandleException("ยกเลิกได้เฉพาะเอกสารสถานะยืนยันแล้ว");
+                }
+
+                // ยกเลิก SM ไม่ได้ถ้ามีใบแจ้งหนี้ที่ยัง active อยู่ ต้องยกเลิกใบแจ้งหนี้ก่อนเสมอ
+                var activeInvoiceRunning = await _jewelryContext.TbtSaleInvoiceHeader
+                    .Where(x => x.InvoiceType == InvoiceTypes.Material && x.SoRunning == header.Running && !x.IsDelete)
+                    .Select(x => x.Running)
+                    .FirstOrDefaultAsync();
+
+                if (activeInvoiceRunning != null)
+                {
+                    throw new HandleException($"ใบสั่งขายวัตถุดิบ {header.DocumentNo} มีใบแจ้งหนี้ {activeInvoiceRunning} อยู่ กรุณายกเลิกใบแจ้งหนี้ก่อน");
+                }
+
+                documentNo = header.DocumentNo;
+
                 var gemCodes = header.TbtSaleMaterialItem.Select(x => x.GemCode).Distinct().ToList();
                 var gems = await _jewelryContext.TbtStockGem
                     .Where(x => gemCodes.Contains(x.Code))
@@ -573,10 +622,20 @@ namespace Jewelry.Service.Sale.MaterialSale
                 _jewelryContext.TbtSaleMaterialHeader.Update(header);
 
                 await _jewelryContext.SaveChangesAsync();
-                scope.Complete();
+                await transaction.CommitAsync();
+            }
+            catch (HandleException)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw new HandleException($"เกิดข้อผิดพลาดในการยกเลิกการขายวัตถุดิบ: {ex.Message}");
             }
 
-            return $"ยกเลิกการขายวัตถุดิบ {header.DocumentNo} สำเร็จ";
+            return $"ยกเลิกการขายวัตถุดิบ {documentNo} สำเร็จ";
         }
 
         public async Task<string> Delete(jewelry.Model.Sale.MaterialSale.Delete.Request request)

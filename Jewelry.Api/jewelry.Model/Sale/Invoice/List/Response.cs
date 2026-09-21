@@ -6,6 +6,7 @@ namespace jewelry.Model.Sale.Invoice.List
     {
         public string InvoiceNumber { get; set; } = null!;
         public string? DKInvoiceNumber { get; set; }
+        public string InvoiceType { get; set; } = "PRODUCT";
         public string CreateBy { get; set; } = null!;
         public DateTime CreateDate { get; set; }
         public string? UpdateBy { get; set; }

@@ -37,6 +37,9 @@ namespace jewelry.Model.Sale.MaterialSale.Get
         public DateTime? UpdateDate { get; set; }
         public string? UpdateBy { get; set; }
 
+        // เลขที่ใบแจ้งหนี้ (INVM) ที่ออกจากเอกสารนี้ — null ถ้ายังไม่เคยออกหรือใบแจ้งหนี้ถูกยกเลิกไปแล้ว
+        public string? InvoiceNumber { get; set; }
+
         public List<Item> Items { get; set; } = new List<Item>();
     }
 

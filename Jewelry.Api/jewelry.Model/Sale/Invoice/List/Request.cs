@@ -11,6 +11,7 @@ namespace jewelry.Model.Sale.Invoice.List
     {
         public string? InvoiceNumber { get; set; }
         public string? DKInvoiceNumber { get; set; }
+        public string? InvoiceType { get; set; }
         public string? CustomerName { get; set; }
         public string? CustomerCode { get; set; }
         public int? Status { get; set; }

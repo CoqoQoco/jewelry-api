@@ -1,3 +1,4 @@
+using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -113,7 +114,30 @@ namespace Jewelry.Service.Sale.BillingNote
                             Amount = sop.NetPrice ?? 0
                         };
 
-            return await query.ToListAsync();
+            var productRows = await query.ToListAsync();
+
+            // ใบแจ้งหนี้วัตถุดิบไม่มี tbt_sale_order_product — ต้อง join รายการจาก tbt_sale_material_item ผ่าน so_running ของ invoice แทน
+            var materialQuery = from inv in _jewelryContext.TbtSaleInvoiceHeader
+                                 join item in _jewelryContext.TbtSaleMaterialItem on inv.SoRunning equals item.Running
+                                 where inv.InvoiceType == InvoiceTypes.Material
+                                    && !inv.IsDelete
+                                    && request.InvoiceRunnings.Contains(inv.Running)
+                                 select new jewelry.Model.Sale.BillingNote.PreviewProducts.Response
+                                 {
+                                     InvoiceRunning = inv.Running,
+                                     ProductNumber = item.GemCode,
+                                     ProductType = "MATERIAL",
+                                     ProductTypeName = "วัตถุดิบ",
+                                     ProductionType = item.GemGroup,
+                                     Qty = item.QtyPiece,
+                                     Amount = item.Amount
+                                 };
+
+            var materialRows = await materialQuery.ToListAsync();
+
+            productRows.AddRange(materialRows);
+
+            return productRows;
         }
 
         public async Task<string> Create(jewelry.Model.Sale.BillingNote.Create.Request request)

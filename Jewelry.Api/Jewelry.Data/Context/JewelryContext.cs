@@ -2207,6 +2207,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.SalePersonUsername)
                 .HasColumnType("character varying")
                 .HasColumnName("sale_person_username");
+            entity.Property(e => e.InvoiceType)
+                .HasMaxLength(20)
+                .HasColumnType("character varying")
+                .HasColumnName("invoice_type");
         });
 
         modelBuilder.Entity<TbtSaleInvoicePaymentItem>(entity =>

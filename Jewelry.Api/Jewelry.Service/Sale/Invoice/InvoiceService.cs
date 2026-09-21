@@ -1,15 +1,18 @@
+using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Master.SaleChannel;
+using Jewelry.Service.Sale.MaterialSale;
 using Jewelry.Service.Sale.SaleOrder;
 using Jewelry.Service.Sale.SaleOrderDeposit;
 using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -289,6 +292,7 @@ namespace Jewelry.Service.Sale.Invoice
             var invoiceHeader = new TbtSaleInvoiceHeader
             {
                 Running = invoiceNumber,
+                InvoiceType = InvoiceTypes.Product,
                 DkInvoiceNumber = request.DKInvoiceNumber,
                 SoRunning = request.SoNumber,
 
@@ -441,6 +445,182 @@ namespace Jewelry.Service.Sale.Invoice
             }
         }
 
+        public async Task<string> CreateFromMaterialSale(jewelry.Model.Sale.Invoice.CreateFromMaterialSale.Request request)
+        {
+            if (string.IsNullOrEmpty(request.MaterialSaleRunning))
+            {
+                throw new HandleException("กรุณาระบุเลขที่ใบสั่งขายวัตถุดิบ");
+            }
+
+            if (string.IsNullOrEmpty(request.PaymentName) || request.Payment < 0)
+            {
+                throw new HandleException("กรุณาระบุวิธีชำระเงิน");
+            }
+
+            if (request.PaymentDay < 0)
+            {
+                throw new HandleException("จำนวนวันเครดิตต้องไม่ติดลบ");
+            }
+
+            // ถ้าเรียกจาก transaction ที่เปิดอยู่แล้วให้ใช้ต่อ ไม่เปิดซ้อน (ตามแพทเทิร์นเดียวกับ Create)
+            var ownsTransaction = _jewelryContext.Database.CurrentTransaction == null;
+            var transaction = ownsTransaction
+                ? await _jewelryContext.Database.BeginTransactionAsync()
+                : null;
+
+            try
+            {
+                // ล็อกแถวใบสั่งขายวัตถุดิบก่อนเสมอ (ลำดับ global: sale material header -> invoice header -> ...)
+                // กันสองคำขอออกใบแจ้งหนี้จากใบเดียวกันพร้อมกันเห็นว่ายังไม่มี invoice active ทั้งคู่
+                await _jewelryContext.LockSaleMaterialHeaderAsync(request.MaterialSaleRunning);
+
+                var sm = await _jewelryContext.TbtSaleMaterialHeader
+                    .Include(x => x.TbtSaleMaterialItem)
+                    .FirstOrDefaultAsync(x => x.Running == request.MaterialSaleRunning && x.IsDelete == false);
+
+                if (sm == null)
+                {
+                    throw new HandleException($"ไม่พบใบสั่งขายวัตถุดิบ {request.MaterialSaleRunning}");
+                }
+
+                if (sm.Status != 100)
+                {
+                    throw new HandleException("ออกใบแจ้งหนี้ได้เฉพาะใบสั่งขายวัตถุดิบที่ยืนยันแล้ว");
+                }
+
+                if (sm.TbtSaleMaterialItem == null || !sm.TbtSaleMaterialItem.Any())
+                {
+                    throw new HandleException("ใบสั่งขายวัตถุดิบไม่มีรายการ ไม่สามารถออกใบแจ้งหนี้ได้");
+                }
+
+                var existingInvoice = await _jewelryContext.TbtSaleInvoiceHeader
+                    .Where(x => x.InvoiceType == InvoiceTypes.Material && x.SoRunning == sm.Running && !x.IsDelete)
+                    .Select(x => x.Running)
+                    .FirstOrDefaultAsync();
+
+                if (existingInvoice != null)
+                {
+                    throw new HandleException($"ใบสั่งขายวัตถุดิบ {sm.DocumentNo} ออกใบแจ้งหนี้ไปแล้ว ({existingInvoice})");
+                }
+
+                string? saleChannelCode;
+                if (!string.IsNullOrEmpty(request.SaleChannelCode))
+                {
+                    var channelExists = await _jewelryContext.TbmSaleChannel.AnyAsync(x => x.Code == request.SaleChannelCode);
+                    if (!channelExists)
+                    {
+                        throw new HandleException($"ไม่พบจุดขาย {request.SaleChannelCode}");
+                    }
+                    saleChannelCode = request.SaleChannelCode;
+                }
+                else
+                {
+                    saleChannelCode = (await _saleChannelService.Current())?.Code;
+                }
+
+                // คำนวณยอดใหม่จากราคารวม Vat ต่อบรรทัดของ SM เสมอ ไม่เชื่อ SubTotal/GrandTotal ที่บันทึกไว้
+                // (ข้อมูลเก่าอาจปัดเศษระหว่างทางผิดเกณฑ์ ดู MaterialSaleMoney)
+                var t = MaterialSaleMoney.Totals(
+                    sm.TbtSaleMaterialItem.Select(x => (x.PriceInclVat, x.QtyWeight)), sm.VatPercent);
+
+                var invoiceNumber = await _runningNumberService.GenerateRunningNumberForGold("INVM");
+                var createDate = DateTime.UtcNow;
+
+                var invoiceHeader = new TbtSaleInvoiceHeader
+                {
+                    Running = invoiceNumber,
+                    InvoiceType = InvoiceTypes.Material,
+                    SoRunning = sm.Running,
+                    DkInvoiceNumber = null,
+
+                    CreateBy = CurrentUsername,
+                    CreateDate = createDate,
+
+                    CurrencyUnit = "THB",
+                    CurrencyRate = 1,
+
+                    CustomerCode = string.IsNullOrWhiteSpace(sm.CustomerCode) ? "WALKIN" : sm.CustomerCode,
+                    CustomerName = sm.CustomerName,
+                    CustomerAddress = sm.CustomerAddress,
+                    CustomerTel = sm.CustomerTel,
+                    CustomerEmail = sm.CustomerEmail,
+
+                    Deposit = 0,
+                    GoldRate = 0,
+                    Markup = 0,
+
+                    PaymantName = request.PaymentName,
+                    Payment = request.Payment,
+                    PaymentDay = request.PaymentDay,
+
+                    Priority = "Normal",
+                    Remark = request.Remark,
+
+                    SaleChannelCode = saleChannelCode,
+                    DueDate = createDate.AddDays(request.PaymentDay),
+
+                    Status = 100,
+                    StatusName = "invoice",
+
+                    SpecialDiscount = 0,
+                    SpecialAddition = 0,
+                    FreightAndInsurance = 0,
+                    Vat = sm.VatPercent,
+
+                    SubTotal = t.subTotal,
+                    SpecialDiscountAmt = 0,
+                    SpecialAdditionAmt = 0,
+                    FreightAmt = 0,
+                    VatAmount = t.vatAmount,
+                    GrandTotalRaw = t.raw,
+                    GrandTotalRounded = t.rounded,
+                    RoundingAdjustment = t.adjustment,
+                };
+
+                _jewelryContext.TbtSaleInvoiceHeader.Add(invoiceHeader);
+
+                await _jewelryContext.SaveChangesAsync();
+
+                if (ownsTransaction)
+                {
+                    await transaction!.CommitAsync();
+                }
+
+                return invoiceNumber;
+            }
+            catch (DbUpdateException dbEx) when (IsMaterialSoRunningUniqueViolation(dbEx))
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.RollbackAsync();
+                }
+                throw new HandleException("ใบสั่งขายวัตถุดิบนี้ออกใบแจ้งหนี้ไปแล้ว");
+            }
+            catch
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.RollbackAsync();
+                }
+                throw;
+            }
+            finally
+            {
+                if (ownsTransaction)
+                {
+                    await transaction!.DisposeAsync();
+                }
+            }
+        }
+
+        // กันออกใบแจ้งหนี้ซ้ำระดับ DB จากสองคำขอพร้อมกันแข่งกันผ่าน pre-check เดียวกัน (unique index tbt_sale_invoice_header_material_so_running_uq)
+        private static bool IsMaterialSoRunningUniqueViolation(DbUpdateException ex)
+        {
+            return ex.InnerException is PostgresException pgEx
+                && pgEx.SqlState == "23505"
+                && (pgEx.ConstraintName == null || pgEx.ConstraintName == "tbt_sale_invoice_header_material_so_running_uq");
+        }
+
         public async Task<jewelry.Model.Sale.Invoice.Get.Response> Get(jewelry.Model.Sale.Invoice.Get.Request request)
         {
             if (string.IsNullOrEmpty(request.InvoiceNumber))
@@ -458,7 +638,7 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException($"Invoice not found: {request.InvoiceNumber}");
             }
 
-            // Get SO Number from invoice header
+            // Get SO Number from invoice header — สำหรับ MATERIAL คือ tbt_sale_material_header.running ไม่ใช่ SO จริง
             var soNumber = invoiceHeader.SoRunning;
 
             if (string.IsNullOrEmpty(soNumber))
@@ -466,40 +646,12 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException($"Invoice {request.InvoiceNumber} does not have associated Sale Order.");
             }
 
-            // Get Sale Order Header to get Data (JSON of all items)
-            var saleOrderHeader = await _jewelryContext.TbtSaleOrder
-                .FirstOrDefaultAsync(x => x.SoNumber == soNumber);
-
-            if (saleOrderHeader == null)
-            {
-                throw new HandleException($"Sale Order {soNumber} not found.");
-            }
-
-            // Get confirmed items with invoice info
-            var confirmedItems = await (
-                from sop in _jewelryContext.TbtSaleOrderProduct
-                join piece in _jewelryContext.TbtStockPiece on sop.StockNumber equals piece.StockNumber into pieceJoin
-                from piece in pieceJoin.DefaultIfEmpty()
-                join sku in _jewelryContext.TbtSku on piece.SkuCode equals sku.SkuCode into skuJoin
-                from sku in skuJoin.DefaultIfEmpty()
-                where sop.Invoice == request.InvoiceNumber
-                select new jewelry.Model.Sale.Invoice.Get.Item
-                {
-                    Id = sop.Id,
-                    StockNumber = sop.StockNumber,
-                    LineKey = sop.LineKey,
-                    IsConfirmed = true,
-                    Invoice = sop.Invoice,
-                    InvoiceItem = sop.InvoiceItem,
-                    EarringStemSize = sku != null ? sku.EarringStemSize : null
-                }
-            ).ToListAsync();
-
             var response = new jewelry.Model.Sale.Invoice.Get.Response
             {
                 InvoiceNumber = invoiceHeader.Running,
                 DKInvoiceNumber = invoiceHeader.DkInvoiceNumber,
                 SoNumber = soNumber,
+                InvoiceType = invoiceHeader.InvoiceType,
 
                 CreateDate = invoiceHeader.CreateDate,
                 CreateBy = invoiceHeader.CreateBy,
@@ -552,9 +704,77 @@ namespace Jewelry.Service.Sale.Invoice
                 GrandTotalRaw = invoiceHeader.GrandTotalRaw,
                 GrandTotalRounded = invoiceHeader.GrandTotalRounded,
                 RoundingAdjustment = invoiceHeader.RoundingAdjustment,
-
-                ConfirmedItems = confirmedItems
             };
+
+            if (invoiceHeader.InvoiceType == InvoiceTypes.Material)
+            {
+                // ใบแจ้งหนี้วัตถุดิบ: so_running คือ tbt_sale_material_header.running ไม่ใช่ SO — ข้ามการหา SO/สินค้าทั้งหมด
+                // ไม่กรอง IsDelete เพราะ SM ถูกยกเลิกไม่ได้ตราบใดที่ยังมี invoice active อยู่ (กันโหลดไม่ได้ทั้งที่ invoice ยังอยู่)
+                var sm = await _jewelryContext.TbtSaleMaterialHeader
+                    .Include(x => x.TbtSaleMaterialItem)
+                    .FirstOrDefaultAsync(x => x.Running == soNumber);
+
+                if (sm == null)
+                {
+                    throw new HandleException($"ไม่พบใบสั่งขายวัตถุดิบ {soNumber} ของใบแจ้งหนี้ {request.InvoiceNumber}");
+                }
+
+                response.CustomerTaxId = sm.CustomerTaxId;
+                response.MaterialSaleRunning = sm.Running;
+                response.MaterialSaleDocumentNo = sm.DocumentNo;
+                response.MaterialSaleDocumentDate = sm.DocumentDate;
+
+                response.MaterialItems = sm.TbtSaleMaterialItem
+                    .OrderBy(x => x.ItemNo)
+                    .Select(x => new jewelry.Model.Sale.Invoice.Get.MaterialItem
+                    {
+                        ItemNo = x.ItemNo,
+                        GemCode = x.GemCode,
+                        GemName = x.GemName,
+                        GemGroup = x.GemGroup,
+                        GemShape = x.GemShape,
+                        GemSize = x.GemSize,
+                        GemGrade = x.GemGrade,
+                        Description = x.Description,
+                        QtyPiece = x.QtyPiece,
+                        QtyWeight = x.QtyWeight,
+                        PriceInclVat = x.PriceInclVat,
+                        PriceExclVat = x.PriceExclVat,
+                        Amount = x.Amount,
+                        Remark = x.Remark
+                    }).ToList();
+            }
+            else
+            {
+                // Get Sale Order Header to get Data (JSON of all items)
+                var saleOrderHeader = await _jewelryContext.TbtSaleOrder
+                    .FirstOrDefaultAsync(x => x.SoNumber == soNumber);
+
+                if (saleOrderHeader == null)
+                {
+                    throw new HandleException($"Sale Order {soNumber} not found.");
+                }
+
+                // Get confirmed items with invoice info
+                response.ConfirmedItems = await (
+                    from sop in _jewelryContext.TbtSaleOrderProduct
+                    join piece in _jewelryContext.TbtStockPiece on sop.StockNumber equals piece.StockNumber into pieceJoin
+                    from piece in pieceJoin.DefaultIfEmpty()
+                    join sku in _jewelryContext.TbtSku on piece.SkuCode equals sku.SkuCode into skuJoin
+                    from sku in skuJoin.DefaultIfEmpty()
+                    where sop.Invoice == request.InvoiceNumber
+                    select new jewelry.Model.Sale.Invoice.Get.Item
+                    {
+                        Id = sop.Id,
+                        StockNumber = sop.StockNumber,
+                        LineKey = sop.LineKey,
+                        IsConfirmed = true,
+                        Invoice = sop.Invoice,
+                        InvoiceItem = sop.InvoiceItem,
+                        EarringStemSize = sku != null ? sku.EarringStemSize : null
+                    }
+                ).ToListAsync();
+            }
 
             if (invoiceHeader.TbtSaleInvoicePaymentItem.Any())
             {
@@ -602,6 +822,11 @@ namespace Jewelry.Service.Sale.Invoice
             {
                 var pattern = $"%{LikePattern.EscapeLikePattern(request.DKInvoiceNumber)}%";
                 entityQuery = entityQuery.Where(x => x.DkInvoiceNumber != null && EF.Functions.ILike(x.DkInvoiceNumber, pattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.InvoiceType))
+            {
+                entityQuery = entityQuery.Where(x => x.InvoiceType == request.InvoiceType);
             }
 
             if (!string.IsNullOrEmpty(request.CustomerName))
@@ -747,6 +972,7 @@ namespace Jewelry.Service.Sale.Invoice
                         {
                             InvoiceNumber = invoice.Running,
                             DKInvoiceNumber = invoice.DkInvoiceNumber,
+                            InvoiceType = invoice.InvoiceType,
 
                             CreateBy = invoice.CreateBy,
                             CreateDate = invoice.CreateDate,
@@ -782,7 +1008,9 @@ namespace Jewelry.Service.Sale.Invoice
                             GrandTotalRounded = invoice.GrandTotalRounded,
                             Deposit = invoice.Deposit,
 
-                            ItemCount = _jewelryContext.TbtSaleOrderProduct.Count(x => x.Invoice == invoice.Running),
+                            ItemCount = invoice.InvoiceType == InvoiceTypes.Material
+                                ? _jewelryContext.TbtSaleMaterialItem.Count(i => i.Running == invoice.SoRunning)
+                                : _jewelryContext.TbtSaleOrderProduct.Count(x => x.Invoice == invoice.Running),
                             PaidAmount = _jewelryContext.TbtSaleInvoicePaymentItem
                                 .Where(p => p.InvoiceRunning == invoice.Running && p.IsDelete == false)
                                 .Sum(p => p.Amount),
@@ -966,6 +1194,11 @@ namespace Jewelry.Service.Sale.Invoice
 
                 ValidateInvoiceCancellable(invoiceHeader);
 
+                if (invoiceHeader.InvoiceType == InvoiceTypes.Material)
+                {
+                    throw new HandleException("ใบแจ้งหนี้วัตถุดิบยกเลิกได้ด้วยเมนู 'ยกเลิกใบแจ้งหนี้' เท่านั้น");
+                }
+
                 soNumber = invoiceHeader.SoRunning;
 
                 cancelledPaymentCount = await CancelInvoiceCore(invoiceHeader);
@@ -1033,6 +1266,11 @@ namespace Jewelry.Service.Sale.Invoice
                 await _jewelryContext.Entry(invoiceHeader).ReloadAsync();
 
                 ValidateInvoiceCancellable(invoiceHeader);
+
+                if (invoiceHeader.InvoiceType == InvoiceTypes.Material)
+                {
+                    throw new HandleException("ใบแจ้งหนี้วัตถุดิบยกเลิกได้ด้วยเมนู 'ยกเลิกใบแจ้งหนี้' เท่านั้น");
+                }
 
                 soNumber = invoiceHeader.SoRunning;
 
@@ -1244,12 +1482,17 @@ namespace Jewelry.Service.Sale.Invoice
             }
 
             // Check if invoice exists
-            var invoiceExists = await _jewelryContext.TbtSaleInvoiceHeader
-                .AnyAsync(x => x.Running == request.InvoiceNumber);
+            var invoiceHeaderForVersion = await _jewelryContext.TbtSaleInvoiceHeader
+                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber);
 
-            if (!invoiceExists)
+            if (invoiceHeaderForVersion == null)
             {
                 throw new HandleException($"Invoice {request.InvoiceNumber} not found.");
+            }
+
+            if (invoiceHeaderForVersion.InvoiceType == InvoiceTypes.Material)
+            {
+                throw new HandleException("ใบแจ้งหนี้วัตถุดิบไม่รองรับการบันทึกเวอร์ชัน");
             }
 
             // Generate version number

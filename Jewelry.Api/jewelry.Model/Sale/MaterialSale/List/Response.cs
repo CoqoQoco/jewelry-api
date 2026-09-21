@@ -18,5 +18,8 @@ namespace jewelry.Model.Sale.MaterialSale.List
 
         public DateTime CreateDate { get; set; }
         public string CreateBy { get; set; } = null!;
+
+        // เลขที่ใบแจ้งหนี้ (INVM) ที่ออกจากเอกสารนี้ — null ถ้ายังไม่เคยออกหรือใบแจ้งหนี้ถูกยกเลิกไปแล้ว
+        public string? InvoiceNumber { get; set; }
     }
 }

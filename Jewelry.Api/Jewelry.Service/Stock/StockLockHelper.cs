@@ -8,9 +8,21 @@ using System.Threading.Tasks;
 namespace Jewelry.Service.Stock
 {
     // Row-lock helper ที่ต้องเรียกภายใน transaction ที่เปิดอยู่แล้วเท่านั้น — lock ที่ถูกยิงนอก transaction จะถูกปล่อยทันทีและไม่ได้กันอะไรเลย
-    // ลำดับ lock ต้องเรียงเดียวกันทุก path เสมอ กัน deadlock: invoice header -> SO deposit -> stock piece -> stock balance -> sale order product
+    // ลำดับ lock ต้องเรียงเดียวกันทุก path เสมอ กัน deadlock: sale material header -> invoice header -> SO deposit -> stock piece -> stock balance -> sale order product
     public static class StockLockHelper
     {
+        public static async Task LockSaleMaterialHeaderAsync(this JewelryContext context, string running)
+        {
+            EnsureTransaction(context);
+
+            if (string.IsNullOrEmpty(running)) return;
+
+            await context.Database.ExecuteSqlInterpolatedAsync($@"
+                SELECT 1 FROM tbt_sale_material_header
+                WHERE running = {running}
+                FOR UPDATE");
+        }
+
         public static async Task LockSaleOrderDepositsAsync(this JewelryContext context, string soNumber)
         {
             EnsureTransaction(context);

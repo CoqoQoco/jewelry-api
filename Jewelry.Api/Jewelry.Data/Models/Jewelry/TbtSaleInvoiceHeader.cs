@@ -97,5 +97,7 @@ public partial class TbtSaleInvoiceHeader
 
     public string? SalePersonUsername { get; set; }
 
+    public string InvoiceType { get; set; } = "PRODUCT";
+
     public virtual ICollection<TbtSaleInvoicePaymentItem> TbtSaleInvoicePaymentItem { get; set; } = new List<TbtSaleInvoicePaymentItem>();
 }
