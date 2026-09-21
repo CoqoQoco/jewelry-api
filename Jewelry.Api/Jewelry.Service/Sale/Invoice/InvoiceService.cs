@@ -887,9 +887,11 @@ namespace Jewelry.Service.Sale.Invoice
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
                 var pattern = $"%{LikePattern.EscapeLikePattern(request.StockNumber)}%";
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+                var normalizedPattern = $"%{LikePattern.EscapeLikePattern(normalized)}%";
                 entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
                     .Any(p => p.Invoice == x.Running
-                        && (EF.Functions.ILike(p.StockNumber, pattern)
+                        && ((normalized != "" && EF.Functions.ILike(p.StockNumber.Replace("-", ""), normalizedPattern))
                             || _jewelryContext.TbtStockPiece.Any(piece => piece.StockNumber == p.StockNumber
                                 && piece.StockNumberOrigin != null
                                 && EF.Functions.ILike(piece.StockNumberOrigin, pattern)))));

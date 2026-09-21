@@ -842,7 +842,11 @@ namespace Jewelry.Service.Receipt.Production
             }
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
-                receipt = receipt.Where(x => x.StockNumber.Contains(request.StockNumber));
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    receipt = receipt.Where(x => x.StockNumber != null && x.StockNumber.Replace("-", "").Contains(normalized));
+                }
             }
             if (!string.IsNullOrEmpty(request.Mold))
             {

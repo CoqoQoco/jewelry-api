@@ -78,17 +78,24 @@ namespace Jewelry.Service.Helper
 
         public async Task<string> GenerateRunningNumberForStockProductHash(string key)
         {
-            // แปลงปีเดือน (2403 → 6I3)
+            // แปลงปีเดือน (2609 → 20H)
             int yearMonth = int.Parse(DateTime.UtcNow.ToString("yyMM"));
             string encodedMonth = ToBase36(yearMonth);
 
+            // เก็บ key ของ counter ให้มีขีดเหมือนเดิม (เช่น "DK-18K-20H") เพื่อให้ตัวนับต่อเนื่องจากค่าเดิมที่มีอยู่แล้วใน DB
+            // ห้ามเปลี่ยน key นี้ ไม่งั้นตัวนับจะรีเซ็ตแล้วชนกับเลขเก่าหลังตัดขีดออก
             var keyWithEncodedMonth = $"{key}-{encodedMonth}"; // ใช้ในฐานข้อมูลเพื่อรีเซ็ตเลข
 
             // Running number ที่รีเซ็ตทุกเดือน
             var monthlyRunning = await Next(keyWithEncodedMonth);
 
-            // แสดงค่า Base36 ใน response
-            return $"{key}-{encodedMonth}-{monthlyRunning:000}"; // return แบบที่ไม่สามารถเดาได้ง่าย
+            // เลขที่ return ใหม่ไม่มีขีดเลย (เช่น "DK18K20H792") เพื่อไม่ให้ปนกับเลขเก่าที่มีขีด
+            return FormatStockNumber(key, encodedMonth, monthlyRunning);
+        }
+
+        public static string FormatStockNumber(string key, string encodedMonth, long running)
+        {
+            return $"{key.Replace("-", "")}{encodedMonth}{running:000}";
         }
 
         public async Task<string> GenerateQuotationNumber()

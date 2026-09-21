@@ -634,10 +634,15 @@ namespace Jewelry.Service.Sale.SaleOrder
             if (!string.IsNullOrWhiteSpace(request.StockNumber))
             {
                 var keyword = request.StockNumber.Trim();
-                query = query.Where(x =>
-                    _jewelryContext.TbtSaleOrderProduct
-                        .Any(p => p.SoNumber == x.SoNumber
-                               && EF.Functions.ILike(p.StockNumber, $"%{keyword}%")));
+                var normalized = StockNumberSearch.Normalize(keyword);
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    var normalizedPattern = $"%{LikePattern.EscapeLikePattern(normalized)}%";
+                    query = query.Where(x =>
+                        _jewelryContext.TbtSaleOrderProduct
+                            .Any(p => p.SoNumber == x.SoNumber
+                                   && EF.Functions.ILike(p.StockNumber.Replace("-", ""), normalizedPattern)));
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(request.ProductNumber))

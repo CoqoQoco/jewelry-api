@@ -268,7 +268,11 @@ namespace Jewelry.Service.Certificate
 
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
-                query = query.Where(x => x.StockNumber == request.StockNumber);
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    query = query.Where(x => x.StockNumber.Replace("-", "") == normalized);
+                }
             }
 
             if (!string.IsNullOrEmpty(request.CustomerCode))

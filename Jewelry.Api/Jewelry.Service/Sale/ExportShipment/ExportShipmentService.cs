@@ -272,8 +272,9 @@ public class ExportShipmentService : BaseService, IExportShipmentService
                 if (!string.IsNullOrEmpty(filter.Keyword))
                 {
                     var keyword = filter.Keyword;
+                    var normalizedKeyword = StockNumberSearch.Normalize(keyword);
                     pieceQuery = pieceQuery.Where(p =>
-                        p.StockNumber.Contains(keyword) ||
+                        (normalizedKeyword != "" && p.StockNumber.Replace("-", "").Contains(normalizedKeyword)) ||
                         p.ProductCode.Contains(keyword) ||
                         (p.SkuCodeNavigation.ProductNumber != null && p.SkuCodeNavigation.ProductNumber.Contains(keyword)) ||
                         p.SkuCodeNavigation.ProductNameEn.Contains(keyword) ||

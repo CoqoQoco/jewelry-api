@@ -533,7 +533,11 @@ public class StockConvertService : BaseService, IStockConvertService
         }
         if (!string.IsNullOrEmpty(request.SourceStockNumber))
         {
-            query = query.Where(x => x.TbtStockConvertItem.Any(i => i.Role == "SOURCE" && i.StockNumber.Contains(request.SourceStockNumber)));
+            var normalized = StockNumberSearch.Normalize(request.SourceStockNumber);
+            if (!string.IsNullOrEmpty(normalized))
+            {
+                query = query.Where(x => x.TbtStockConvertItem.Any(i => i.Role == "SOURCE" && i.StockNumber.Replace("-", "").Contains(normalized)));
+            }
         }
 
         query = query.OrderByDescending(x => x.CreateDate);

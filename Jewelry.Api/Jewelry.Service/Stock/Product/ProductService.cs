@@ -64,7 +64,11 @@ namespace Jewelry.Service.Stock.Product
             }
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
-                pieces = pieces.Where(x => x.StockNumber.Contains(request.StockNumber));
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    pieces = pieces.Where(x => x.StockNumber.Replace("-", "").Contains(normalized));
+                }
             }
             if (!string.IsNullOrEmpty(request.StockNumberOrigin))
             {
@@ -123,8 +127,9 @@ namespace Jewelry.Service.Stock.Product
             if (!string.IsNullOrEmpty(request.Keyword))
             {
                 var keyword = request.Keyword;
+                var normalizedKeyword = StockNumberSearch.Normalize(keyword);
                 pieces = pieces.Where(x =>
-                    x.StockNumber.Contains(keyword) ||
+                    (normalizedKeyword != "" && x.StockNumber.Replace("-", "").Contains(normalizedKeyword)) ||
                     x.ProductCode.Contains(keyword) ||
                     (x.SkuCodeNavigation.ProductNumber != null && x.SkuCodeNavigation.ProductNumber.Contains(keyword)) ||
                     x.SkuCodeNavigation.ProductNameEn.Contains(keyword) ||
@@ -485,6 +490,30 @@ namespace Jewelry.Service.Stock.Product
             }
 
             var piece = query.FirstOrDefault();
+
+            // fallback: เลขเก่ามีขีด / เลขใหม่ไม่มีขีด พิมพ์แบบไหนก็หาเจอ เทียบแบบตัดขีดออกทั้งสองฝั่ง
+            if (piece == null && !string.IsNullOrEmpty(request.StockNumber))
+            {
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+
+                var fallbackQuery = _jewelryContext.TbtStockPiece
+                    .AsNoTracking()
+                    .Include(x => x.SkuCodeNavigation)
+                    .Include(x => x.TbtStockPieceMaterial)
+                    .Where(x => x.StockNumber.Replace("-", "") == normalized);
+
+                if (!string.IsNullOrEmpty(request.StockNumberOrigin))
+                {
+                    fallbackQuery = fallbackQuery.Where(x => x.StockNumberOrigin == request.StockNumberOrigin);
+                }
+
+                if (!string.IsNullOrEmpty(request.ProductNumber))
+                {
+                    fallbackQuery = fallbackQuery.Where(x => x.ProductCode == request.ProductNumber);
+                }
+
+                piece = fallbackQuery.FirstOrDefault();
+            }
 
             if (piece == null)
             {
@@ -1116,7 +1145,11 @@ namespace Jewelry.Service.Stock.Product
             // Apply filters
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
-                query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    query = query.Where(x => x.StockNumber.Replace("-", "").Contains(normalized));
+                }
             }
 
             if (!string.IsNullOrEmpty(request.Running))
@@ -1186,7 +1219,11 @@ namespace Jewelry.Service.Stock.Product
 
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
-                query = query.Where(x => x.StockNumber.Contains(request.StockNumber));
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    query = query.Where(x => x.StockNumber.Replace("-", "").Contains(normalized));
+                }
             }
 
             if (!string.IsNullOrEmpty(request.Running))

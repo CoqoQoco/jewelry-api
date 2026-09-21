@@ -59,7 +59,11 @@ namespace Jewelry.Service.Stock.Movement
 
             if (!string.IsNullOrWhiteSpace(request.StockNumber))
             {
-                query = query.Where(x => x.StockNumber != null && x.StockNumber.Contains(request.StockNumber));
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    query = query.Where(x => x.StockNumber != null && x.StockNumber.Replace("-", "").Contains(normalized));
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(request.CurrentLocation))
