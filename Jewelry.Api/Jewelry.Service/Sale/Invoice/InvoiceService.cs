@@ -594,22 +594,26 @@ namespace Jewelry.Service.Sale.Invoice
             // Apply entity-level filters (before projection)
             if (!string.IsNullOrEmpty(request.InvoiceNumber))
             {
-                entityQuery = entityQuery.Where(x => x.Running.Contains(request.InvoiceNumber));
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.InvoiceNumber)}%";
+                entityQuery = entityQuery.Where(x => EF.Functions.ILike(x.Running, pattern));
             }
 
             if (!string.IsNullOrEmpty(request.DKInvoiceNumber))
             {
-                entityQuery = entityQuery.Where(x => x.DkInvoiceNumber != null && x.DkInvoiceNumber.Contains(request.DKInvoiceNumber));
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.DKInvoiceNumber)}%";
+                entityQuery = entityQuery.Where(x => x.DkInvoiceNumber != null && EF.Functions.ILike(x.DkInvoiceNumber, pattern));
             }
 
             if (!string.IsNullOrEmpty(request.CustomerName))
             {
-                entityQuery = entityQuery.Where(x => x.CustomerName.Contains(request.CustomerName));
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.CustomerName)}%";
+                entityQuery = entityQuery.Where(x => EF.Functions.ILike(x.CustomerName, pattern));
             }
 
             if (!string.IsNullOrEmpty(request.CustomerCode))
             {
-                entityQuery = entityQuery.Where(x => x.CustomerCode.Contains(request.CustomerCode));
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.CustomerCode)}%";
+                entityQuery = entityQuery.Where(x => EF.Functions.ILike(x.CustomerCode, pattern));
             }
 
             if (request.Status.HasValue)
@@ -619,7 +623,20 @@ namespace Jewelry.Service.Sale.Invoice
 
             if (!string.IsNullOrEmpty(request.CreateBy))
             {
-                entityQuery = entityQuery.Where(x => x.CreateBy.Contains(request.CreateBy));
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.CreateBy)}%";
+                entityQuery = entityQuery.Where(x => EF.Functions.ILike(x.CreateBy, pattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.SalePerson))
+            {
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.SalePerson)}%";
+                entityQuery = entityQuery.Where(x => x.SalePerson != null && EF.Functions.ILike(x.SalePerson, pattern));
+            }
+
+            if (!string.IsNullOrEmpty(request.SaleSupport))
+            {
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.SaleSupport)}%";
+                entityQuery = entityQuery.Where(x => x.SaleSupport != null && EF.Functions.ILike(x.SaleSupport, pattern));
             }
 
             if (request.CreateDateFrom.HasValue)
@@ -644,25 +661,32 @@ namespace Jewelry.Service.Sale.Invoice
 
             if (!string.IsNullOrEmpty(request.StockNumber))
             {
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.StockNumber)}%";
                 entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
-                    .Any(p => p.Invoice == x.Running && p.StockNumber.Contains(request.StockNumber)));
+                    .Any(p => p.Invoice == x.Running
+                        && (EF.Functions.ILike(p.StockNumber, pattern)
+                            || _jewelryContext.TbtStockPiece.Any(piece => piece.StockNumber == p.StockNumber
+                                && piece.StockNumberOrigin != null
+                                && EF.Functions.ILike(piece.StockNumberOrigin, pattern)))));
             }
 
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.ProductNumber)}%";
                 entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
                     .Any(p => p.Invoice == x.Running
                         && _jewelryContext.TbtStockPiece
-                            .Any(piece => piece.StockNumber == p.StockNumber && piece.ProductCode.Contains(request.ProductNumber))));
+                            .Any(piece => piece.StockNumber == p.StockNumber && EF.Functions.ILike(piece.ProductCode, pattern))));
             }
 
             if (!string.IsNullOrEmpty(request.MoldNumber))
             {
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.MoldNumber)}%";
                 entityQuery = entityQuery.Where(x => _jewelryContext.TbtSaleOrderProduct
                     .Any(p => p.Invoice == x.Running
                         && _jewelryContext.TbtStockPiece
                             .Any(piece => piece.StockNumber == p.StockNumber
-                                && _jewelryContext.TbtSku.Any(sku => sku.SkuCode == piece.SkuCode && sku.MoldDesign != null && sku.MoldDesign.Contains(request.MoldNumber)))));
+                                && _jewelryContext.TbtSku.Any(sku => sku.SkuCode == piece.SkuCode && sku.MoldDesign != null && EF.Functions.ILike(sku.MoldDesign, pattern)))));
             }
 
             if (!string.IsNullOrEmpty(request.SaleChannelCode))
@@ -752,6 +776,9 @@ namespace Jewelry.Service.Sale.Invoice
                             Status = invoice.Status,
                             StatusName = invoice.StatusName,
 
+                            SalePerson = invoice.SalePerson,
+                            SaleSupport = invoice.SaleSupport,
+
                             GrandTotalRounded = invoice.GrandTotalRounded,
                             Deposit = invoice.Deposit,
 
@@ -778,6 +805,79 @@ namespace Jewelry.Service.Sale.Invoice
                         };
 
             return query;
+        }
+
+        public async Task<List<jewelry.Model.Sale.Invoice.MoldSuggest.Response>> MoldSuggest(jewelry.Model.Sale.Invoice.MoldSuggest.Request request)
+        {
+            var query = from sop in _jewelryContext.TbtSaleOrderProduct
+                        where sop.Invoice != null && sop.Invoice != ""
+                        join piece in _jewelryContext.TbtStockPiece on sop.StockNumber equals piece.StockNumber
+                        join sku in _jewelryContext.TbtSku on piece.SkuCode equals sku.SkuCode
+                        where sku.MoldDesign != null
+                        select new { Invoice = sop.Invoice!, MoldDesign = sku.MoldDesign! };
+
+            if (!string.IsNullOrEmpty(request.Search?.Text))
+            {
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.Search.Text)}%";
+                query = query.Where(x => EF.Functions.ILike(x.MoldDesign, pattern));
+            }
+
+            var rows = await query.ToListAsync();
+
+            var take = request.Take > 0 ? request.Take : 20;
+
+            var result = rows
+                .GroupBy(x => x.MoldDesign)
+                .Select(g => new jewelry.Model.Sale.Invoice.MoldSuggest.Response
+                {
+                    MoldDesign = g.Key,
+                    InvoiceCount = g.Select(x => x.Invoice).Distinct().Count(),
+                    ItemCount = g.Count()
+                })
+                .OrderByDescending(x => x.InvoiceCount)
+                .ThenBy(x => x.MoldDesign)
+                .Take(take)
+                .ToList();
+
+            return result;
+        }
+
+        public async Task<jewelry.Model.Sale.Invoice.SaleTeamSuggest.Response> SaleTeamSuggest()
+        {
+            var invoices = await _jewelryContext.TbtSaleInvoiceHeader
+                .Where(x => x.IsDelete == false)
+                .Select(x => new { x.SalePerson, x.SaleSupport, x.SalePersonUsername, x.CreateBy })
+                .ToListAsync();
+
+            var salePersons = invoices
+                .Where(x => !string.IsNullOrEmpty(x.SalePerson))
+                .GroupBy(x => x.SalePerson!)
+                .Select(g => new jewelry.Model.Sale.Invoice.SaleTeamSuggest.Item { Name = g.Key, InvoiceCount = g.Count() })
+                .OrderByDescending(x => x.InvoiceCount)
+                .ThenBy(x => x.Name)
+                .ToList();
+
+            var saleSupports = invoices
+                .Where(x => !string.IsNullOrEmpty(x.SaleSupport))
+                .GroupBy(x => x.SaleSupport!)
+                .Select(g => new jewelry.Model.Sale.Invoice.SaleTeamSuggest.Item { Name = g.Key, InvoiceCount = g.Count() })
+                .OrderByDescending(x => x.InvoiceCount)
+                .ThenBy(x => x.Name)
+                .ToList();
+
+            var owners = invoices
+                .GroupBy(x => string.IsNullOrEmpty(x.SalePersonUsername) ? x.CreateBy : x.SalePersonUsername!)
+                .Select(g => new jewelry.Model.Sale.Invoice.SaleTeamSuggest.Item { Name = g.Key, InvoiceCount = g.Count() })
+                .OrderByDescending(x => x.InvoiceCount)
+                .ThenBy(x => x.Name)
+                .ToList();
+
+            return new jewelry.Model.Sale.Invoice.SaleTeamSuggest.Response
+            {
+                SalePersons = salePersons,
+                SaleSupports = saleSupports,
+                Owners = owners
+            };
         }
 
         public async Task<string> Delete(jewelry.Model.Sale.Invoice.Delete.Request request)

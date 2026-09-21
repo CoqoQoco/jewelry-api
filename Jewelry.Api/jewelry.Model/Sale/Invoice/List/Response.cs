@@ -30,6 +30,8 @@ namespace jewelry.Model.Sale.Invoice.List
         public string? Remark { get; set; }
         public int Status { get; set; }
         public string StatusName { get; set; } = null!;
+        public string? SalePerson { get; set; }
+        public string? SaleSupport { get; set; }
         public int ItemCount { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal Vat { get; set; }

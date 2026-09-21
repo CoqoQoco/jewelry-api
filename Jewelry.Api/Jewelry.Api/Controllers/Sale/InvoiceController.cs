@@ -97,6 +97,48 @@ namespace Jewelry.Api.Controllers.Sale
             }
         }
 
+        [HttpPost("MoldSuggest")]
+        public async Task<IActionResult> MoldSuggest(jewelry.Model.Sale.Invoice.MoldSuggest.Request request)
+        {
+            try
+            {
+                var result = await _service.MoldSuggest(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error suggesting mold designs");
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error suggesting mold designs");
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while suggesting mold designs" });
+            }
+        }
+
+        [HttpPost("SaleTeamSuggest")]
+        public async Task<IActionResult> SaleTeamSuggest()
+        {
+            try
+            {
+                var result = await _service.SaleTeamSuggest();
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                _logger.LogError(ex, "Error suggesting sale team");
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error suggesting sale team");
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    new { message = "An error occurred while suggesting sale team" });
+            }
+        }
+
         [HttpPost("Delete")]
         public async Task<IActionResult> Delete(jewelry.Model.Sale.Invoice.Delete.Request request)
         {

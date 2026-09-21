@@ -197,9 +197,112 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                 _jewelryContext.TbtSaleOrder.Update(saleOrder);
                 await _jewelryContext.SaveChangesAsync();
+
+                var changedInvoices = await ApplySaleTeamToInvoicesAsync(saleOrder, writeExact: false);
+                if (changedInvoices.Any())
+                {
+                    _jewelryContext.TbtSaleInvoiceHeader.UpdateRange(changedInvoices);
+                    await _jewelryContext.SaveChangesAsync();
+                }
             }
 
             return soNumber;
+        }
+
+        // ที่ร้านมักกรอกชื่อผู้ขาย/ผู้ช่วยขายที่ใบสั่งขายทีหลังออกใบแจ้งหนี้ไปแล้ว
+        // ถ้าไม่ sync ชื่อจะไม่มีวันขึ้นบนใบแจ้งหนี้ที่ออกไปแล้ว — กติกา: SO มีค่า -> เขียนทับใบแจ้งหนี้, SO ว่าง -> ไม่แตะค่าเดิมบนใบ
+        // writeExact = true (แก้จากหน้า invoice detail ตรงๆ ผ่าน SO): เขียนค่า SalePerson/SaleSupport ของ SO ลงใบตรงๆ รวมถึง null
+        // เพราะกรณีนี้ผู้ใช้ตั้งใจลบชื่อออกเอง ไม่ใช่ SO ที่ยังไม่เคยกรอก — ไม่แตะ SalePersonUsername ในโหมดนี้
+        // ไม่เรียก SaveChangesAsync ในนี้ — ผู้เรียกเป็นคนบันทึก
+        private async Task<List<TbtSaleInvoiceHeader>> ApplySaleTeamToInvoicesAsync(TbtSaleOrder saleOrder, bool writeExact)
+        {
+            var invoicesToSyncSalePerson = await _jewelryContext.TbtSaleInvoiceHeader
+                .Where(x => x.SoRunning == saleOrder.SoNumber && x.IsDelete == false)
+                .ToListAsync();
+
+            var changedInvoices = new List<TbtSaleInvoiceHeader>();
+            foreach (var inv in invoicesToSyncSalePerson)
+            {
+                var changed = false;
+
+                if (writeExact)
+                {
+                    if (inv.SalePerson != saleOrder.SalePerson)
+                    {
+                        inv.SalePerson = saleOrder.SalePerson;
+                        changed = true;
+                    }
+
+                    if (inv.SaleSupport != saleOrder.SaleSupport)
+                    {
+                        inv.SaleSupport = saleOrder.SaleSupport;
+                        changed = true;
+                    }
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(saleOrder.SalePerson) && inv.SalePerson != saleOrder.SalePerson)
+                    {
+                        inv.SalePerson = saleOrder.SalePerson;
+                        changed = true;
+                    }
+
+                    if (!string.IsNullOrEmpty(saleOrder.SaleSupport) && inv.SaleSupport != saleOrder.SaleSupport)
+                    {
+                        inv.SaleSupport = saleOrder.SaleSupport;
+                        changed = true;
+                    }
+
+                    if (!string.IsNullOrEmpty(saleOrder.SalePersonUsername) && inv.SalePersonUsername != saleOrder.SalePersonUsername)
+                    {
+                        inv.SalePersonUsername = saleOrder.SalePersonUsername;
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                {
+                    changedInvoices.Add(inv);
+                }
+            }
+
+            return changedInvoices;
+        }
+
+        public async Task<jewelry.Model.Sale.SaleOrder.UpdateSaleTeam.Response> UpdateSaleTeam(jewelry.Model.Sale.SaleOrder.UpdateSaleTeam.Request request)
+        {
+            if (string.IsNullOrEmpty(request.SoNumber))
+            {
+                throw new HandleException("กรุณาระบุเลขที่ใบสั่งขาย");
+            }
+
+            var saleOrder = await _jewelryContext.TbtSaleOrder
+                .FirstOrDefaultAsync(x => x.SoNumber == request.SoNumber.ToUpper());
+
+            if (saleOrder == null)
+            {
+                throw new HandleException($"ไม่พบใบสั่งขาย {request.SoNumber}");
+            }
+
+            saleOrder.SalePerson = string.IsNullOrWhiteSpace(request.SalePerson) ? null : request.SalePerson.Trim();
+            saleOrder.SaleSupport = string.IsNullOrWhiteSpace(request.SaleSupport) ? null : request.SaleSupport.Trim();
+
+            saleOrder.UpdateBy = CurrentUsername;
+            saleOrder.UpdateDate = DateTime.UtcNow;
+
+            // entity โหลดมาแบบ tracked อยู่แล้ว (ไม่ได้ AsNoTracking) — ห้ามเรียก Update()/UpdateRange() ซ้ำ
+            // เพราะจะ mark ทุกคอลัมน์เป็น modified แล้วเขียนทับยอดเงิน/VAT ของ SO ทั้งแถวถ้ามีคนบันทึกพร้อมกัน
+            var changedInvoices = await ApplySaleTeamToInvoicesAsync(saleOrder, writeExact: true);
+
+            await _jewelryContext.SaveChangesAsync();
+
+            return new jewelry.Model.Sale.SaleOrder.UpdateSaleTeam.Response
+            {
+                SoNumber = saleOrder.SoNumber,
+                SalePerson = saleOrder.SalePerson,
+                SaleSupport = saleOrder.SaleSupport,
+                UpdatedInvoiceCount = changedInvoices.Count
+            };
         }
 
         public async Task<jewelry.Model.Sale.SaleOrder.Get.Response> Get(jewelry.Model.Sale.SaleOrder.Get.Request request)

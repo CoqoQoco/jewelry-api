@@ -9,6 +9,7 @@ namespace Jewelry.Service.Sale.SaleOrder
     public interface ISaleOrderService
     {
         Task<string> Upsert(jewelry.Model.Sale.SaleOrder.Create.Request request);
+        Task<jewelry.Model.Sale.SaleOrder.UpdateSaleTeam.Response> UpdateSaleTeam(jewelry.Model.Sale.SaleOrder.UpdateSaleTeam.Request request);
         Task<jewelry.Model.Sale.SaleOrder.Get.Response> Get(jewelry.Model.Sale.SaleOrder.Get.Request request);
         IQueryable<jewelry.Model.Sale.SaleOrder.List.Response> List(jewelry.Model.Sale.SaleOrder.List.Request request);
         Task<string> GenerateRunningNumber();

@@ -11,6 +11,8 @@ namespace Jewelry.Service.Sale.Invoice
         Task<string> Create(jewelry.Model.Sale.Invoice.Create.Request request);
         Task<jewelry.Model.Sale.Invoice.Get.Response> Get(jewelry.Model.Sale.Invoice.Get.Request request);
         IQueryable<jewelry.Model.Sale.Invoice.List.Response> List(jewelry.Model.Sale.Invoice.List.Request request);
+        Task<List<jewelry.Model.Sale.Invoice.MoldSuggest.Response>> MoldSuggest(jewelry.Model.Sale.Invoice.MoldSuggest.Request request);
+        Task<jewelry.Model.Sale.Invoice.SaleTeamSuggest.Response> SaleTeamSuggest();
         Task<string> Delete(jewelry.Model.Sale.Invoice.Delete.Request request);
         Task<jewelry.Model.Sale.Invoice.CancelWithSaleOrder.Response> CancelWithSaleOrder(jewelry.Model.Sale.Invoice.CancelWithSaleOrder.Request request);
         Task<jewelry.Model.Sale.Invoice.CancelAndUnconfirm.Response> CancelAndUnconfirm(jewelry.Model.Sale.Invoice.CancelAndUnconfirm.Request request);

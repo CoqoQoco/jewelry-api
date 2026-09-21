@@ -30,5 +30,8 @@ namespace jewelry.Model.Sale.Invoice.List
         public string? PaymentStatus { get; set; }
         public bool? OverdueOnly { get; set; }
         public string? OwnerUsername { get; set; }
+
+        public string? SalePerson { get; set; }
+        public string? SaleSupport { get; set; }
     }
 }

@@ -48,6 +48,25 @@ namespace Jewelry.Api.Controllers.Sale
             }
         }
 
+        [Route("UpdateSaleTeam")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Sale.SaleOrder.UpdateSaleTeam.Response))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UpdateSaleTeam([FromBody] jewelry.Model.Sale.SaleOrder.UpdateSaleTeam.Request request)
+        {
+            try
+            {
+                var response = await _service.UpdateSaleTeam(request);
+                return Ok(response);
+
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("Get")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Sale.SaleOrder.Get.Response))]
