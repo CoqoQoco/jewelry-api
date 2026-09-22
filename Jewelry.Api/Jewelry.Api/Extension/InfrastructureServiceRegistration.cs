@@ -35,6 +35,7 @@ using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
 using Jewelry.Service.Stock.Product;
 using Jewelry.Service.Stock.StockConvert;
+using Jewelry.Service.Stock.StockProductGallery;
 using Jewelry.Service.Stock.ProductImage;
 using Jewelry.Service.TransferStock;
 using Jewelry.Service.Permission;
@@ -150,6 +151,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IStockMovementService, StockMovementService>();
             services.AddScoped<IStockReconciliationService, StockReconciliationService>();
             services.AddScoped<IStockConvertService, StockConvertService>();
+            services.AddScoped<IStockProductGalleryService, StockProductGalleryService>();
 
             services.AddScoped<ICatalogService, CatalogService>();
 

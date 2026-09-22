@@ -62,6 +62,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtMyJob> TbtMyJob { get; set; }
 
+    public virtual DbSet<TbtProductGallery> TbtProductGallery { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
 
     public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
@@ -1078,6 +1080,47 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
             entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtProductGallery>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_product_gallery_pk");
+            entity.ToTable("tbt_product_gallery");
+
+            entity.HasIndex(e => new { e.ScopeType, e.ScopeKey, e.SortOrder })
+                .HasFilter("is_active")
+                .HasDatabaseName("idx_tbt_product_gallery_scope_active");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.ScopeType)
+                .HasColumnType("character varying")
+                .HasColumnName("scope_type");
+            entity.Property(e => e.ScopeKey)
+                .HasColumnType("character varying")
+                .HasColumnName("scope_key");
+            entity.Property(e => e.BlobPath)
+                .HasColumnType("character varying")
+                .HasColumnName("blob_path");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.Width).HasColumnName("width");
+            entity.Property(e => e.Height).HasColumnName("height");
+            entity.Property(e => e.SizeBytes).HasColumnName("size_bytes");
+            entity.Property(e => e.ContentType)
+                .HasColumnType("character varying")
+                .HasColumnName("content_type");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
         });
 
         modelBuilder.Entity<TbtProductMold>(entity =>

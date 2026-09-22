@@ -108,6 +108,7 @@ namespace Jewelry.Service.PublicProduct
                     StockNumber = x.StockNumber,
                     StockNumberOrigin = x.StockNumberOrigin,
                     ProductCode = x.ProductCode,
+                    SkuCode = x.SkuCode,
                     SizeActual = x.SizeActual,
                     Status = x.Status,
                     Qty = x.Qty,
@@ -116,6 +117,7 @@ namespace Jewelry.Service.PublicProduct
                     ProductNameTh = x.SkuCodeNavigation.ProductNameTh,
                     ProductNameEn = x.SkuCodeNavigation.ProductNameEn,
                     ProductTypeName = x.SkuCodeNavigation.ProductTypeName,
+                    Mold = x.SkuCodeNavigation.Mold,
                     ProductionTypeSize = x.SkuCodeNavigation.ProductionTypeSize,
                     Size = x.SkuCodeNavigation.Size,
                     EarringStemSize = x.SkuCodeNavigation.EarringStemSize,
@@ -180,7 +182,8 @@ namespace Jewelry.Service.PublicProduct
                 displayPrice = computed > 0 ? computed : (decimal?)null;
             }
 
-            var imagePath = StockImagePath.Build(matched.ImagePath, matched.ImageName);
+            // รูป internal เดิม (tbt_sku.image_*) ห้ามหลุดออกหน้าสาธารณะ — ใช้เฉพาะแกลเลอรีลูกค้า (tbt_product_gallery) เท่านั้น
+            var gallery = ProductGalleryHelper.Resolve(_jewelryContext, matched.SkuCode, matched.Mold);
 
             var availableQty = matched.Qty - matched.QtyReserved;
             if (availableQty < 0) availableQty = 0;
@@ -193,7 +196,8 @@ namespace Jewelry.Service.PublicProduct
                 ProductNameTh = matched.ProductNameTh,
                 ProductNameEn = matched.ProductNameEn,
                 ProductTypeName = matched.ProductTypeName,
-                ImagePath = imagePath,
+                ImagePath = null,
+                Images = gallery.Images,
                 MetalKarat = matched.ProductionTypeSize,
                 MetalColorCode = metalColorCode,
                 MetalWeight = metalWeight,
@@ -275,6 +279,7 @@ namespace Jewelry.Service.PublicProduct
             public string StockNumber { get; set; } = null!;
             public string? StockNumberOrigin { get; set; }
             public string ProductCode { get; set; } = null!;
+            public string SkuCode { get; set; } = null!;
             public string? SizeActual { get; set; }
             public string? Status { get; set; }
             public decimal Qty { get; set; }
@@ -284,6 +289,7 @@ namespace Jewelry.Service.PublicProduct
             public string ProductNameTh { get; set; } = null!;
             public string ProductNameEn { get; set; } = null!;
             public string? ProductTypeName { get; set; }
+            public string? Mold { get; set; }
             public string? ProductionTypeSize { get; set; }
             public string? Size { get; set; }
             public string? EarringStemSize { get; set; }

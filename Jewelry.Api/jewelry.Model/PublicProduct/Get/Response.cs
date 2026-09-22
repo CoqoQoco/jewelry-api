@@ -15,6 +15,8 @@ namespace jewelry.Model.PublicProduct.Get
 
         public string? ImagePath { get; set; }
 
+        public List<string> Images { get; set; } = new List<string>();
+
         public string? MetalKarat { get; set; }
         public string? MetalColorCode { get; set; }
         public decimal? MetalWeight { get; set; }
