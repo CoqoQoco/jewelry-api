@@ -97,5 +97,16 @@ namespace Jewelry.Api.Controllers.Stock
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("MissingList")]
+        [HttpPost]
+        [RequirePermission("stock-product-gr-image:create")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.StockProductGallery.MissingList.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> MissingList([FromBody] jewelry.Model.Stock.StockProductGallery.MissingList.Request request)
+        {
+            var response = await _service.MissingList(request);
+            return Ok(response);
+        }
     }
 }

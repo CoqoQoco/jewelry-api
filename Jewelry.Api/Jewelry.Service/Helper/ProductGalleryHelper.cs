@@ -78,4 +78,57 @@ public static class ProductGalleryHelper
             Images = CombineDisplayImages(skuImages, moldImages)
         };
     }
+
+    // input อาจเป็น stock_number (เว้น/ไม่เว้นขีด) หรือ stock_number_origin (เลขที่ผลิตเก่า)
+    // ถ้าเจอหลายชิ้น เลือกที่ status = IN_STOCK ก่อน แล้วเอาชิ้นล่าสุด
+    public static async Task<TbtStockPiece?> ResolvePieceAsync(JewelryContext context, string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return null;
+        }
+
+        var trimmed = input.Trim();
+
+        var candidates = await context.TbtStockPiece
+            .Include(p => p.SkuCodeNavigation)
+            .Where(p => p.StockNumber == trimmed)
+            .ToListAsync();
+
+        if (candidates.Count == 0)
+        {
+            var normalized = StockNumberSearch.Normalize(trimmed);
+            if (!string.IsNullOrEmpty(normalized))
+            {
+                candidates = await context.TbtStockPiece
+                    .Include(p => p.SkuCodeNavigation)
+                    .Where(p => p.StockNumber.Replace("-", "") == normalized)
+                    .ToListAsync();
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            var upperTrimmed = trimmed.ToUpper();
+            candidates = await context.TbtStockPiece
+                .Include(p => p.SkuCodeNavigation)
+                .Where(p => p.StockNumberOrigin != null && p.StockNumberOrigin.Trim().ToUpper() == upperTrimmed)
+                .ToListAsync();
+        }
+
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        if (candidates.Count == 1)
+        {
+            return candidates[0];
+        }
+
+        return candidates
+            .OrderByDescending(p => p.Status == "IN_STOCK")
+            .ThenByDescending(p => p.CreateDate)
+            .First();
+    }
 }

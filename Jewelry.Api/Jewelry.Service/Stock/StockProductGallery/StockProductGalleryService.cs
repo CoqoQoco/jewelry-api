@@ -3,6 +3,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
+using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,14 +28,7 @@ public class StockProductGalleryService : BaseService, IStockProductGalleryServi
 
     public async Task<jewelry.Model.Stock.StockProductGallery.Get.Response> Get(jewelry.Model.Stock.StockProductGallery.Get.Request request)
     {
-        if (string.IsNullOrWhiteSpace(request.StockNumber))
-        {
-            throw new HandleException("ไม่พบสินค้า");
-        }
-
-        var piece = await _jewelryContext.TbtStockPiece
-            .Include(p => p.SkuCodeNavigation)
-            .FirstOrDefaultAsync(p => p.StockNumber == request.StockNumber.Trim());
+        var piece = await ProductGalleryHelper.ResolvePieceAsync(_jewelryContext, request.StockNumber);
 
         if (piece == null)
         {
@@ -249,11 +243,119 @@ public class StockProductGalleryService : BaseService, IStockProductGalleryServi
         await transaction.CommitAsync();
     }
 
+    public async Task<jewelry.Model.Stock.StockProductGallery.MissingList.Response> MissingList(jewelry.Model.Stock.StockProductGallery.MissingList.Request request)
+    {
+        // one round-trip: flat IN_STOCK piece x sku rows (no GroupBy+First on IQueryable — EF8 gotcha)
+        var pieceRows = await (
+            from p in _jewelryContext.TbtStockPiece.AsNoTracking()
+            join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode
+            where p.Status == "IN_STOCK" && s.Mold != null && s.Mold != ""
+            select new
+            {
+                p.StockNumber,
+                p.StockNumberOrigin,
+                p.SkuCode,
+                Mold = s.Mold!,
+                s.ProductNameTh,
+                s.ProductNameEn,
+                s.ProductType,
+                s.ProductTypeName,
+                s.ImagePath,
+                s.ImageName
+            }
+        ).ToListAsync();
+
+        // second round-trip: active gallery scope keys (small table) → build lookup sets in memory
+        var activeGallery = await _jewelryContext.TbtProductGallery
+            .AsNoTracking()
+            .Where(g => g.IsActive && (g.ScopeType == ProductGalleryHelper.ScopeSku || g.ScopeType == ProductGalleryHelper.ScopeMold))
+            .Select(g => new { g.ScopeType, g.ScopeKey })
+            .ToListAsync();
+
+        var skuKeysWithImage = activeGallery
+            .Where(g => g.ScopeType == ProductGalleryHelper.ScopeSku)
+            .Select(g => g.ScopeKey)
+            .ToHashSet();
+
+        var moldKeysWithImage = activeGallery
+            .Where(g => g.ScopeType == ProductGalleryHelper.ScopeMold)
+            .Select(g => g.ScopeKey)
+            .ToHashSet();
+
+        var allBacklog = pieceRows
+            .Select(x => new { Row = x, MoldKey = ProductGalleryHelper.NormalizeMoldKey(x.Mold) })
+            .Where(x => x.MoldKey != null)
+            .GroupBy(x => x.MoldKey!)
+            .Select(g =>
+            {
+                var all = g.Select(x => x.Row).ToList();
+                var missing = all.Where(x => !skuKeysWithImage.Contains(x.SkuCode)).ToList();
+                return new { MoldKey = g.Key, All = all, Missing = missing };
+            })
+            .Where(x => !moldKeysWithImage.Contains(x.MoldKey) && x.Missing.Count > 0)
+            .Select(x =>
+            {
+                var sample = x.Missing.OrderBy(p => p.StockNumber, StringComparer.Ordinal).First();
+                return new jewelry.Model.Stock.StockProductGallery.MissingList.Item
+                {
+                    Mold = x.MoldKey,
+                    MissingPieceCount = x.Missing.Count,
+                    InStockPieceCount = x.All.Count,
+                    SampleStockNumber = sample.StockNumber,
+                    SampleStockNumberOrigin = sample.StockNumberOrigin,
+                    ProductNameTh = sample.ProductNameTh,
+                    ProductNameEn = sample.ProductNameEn,
+                    ProductType = sample.ProductType,
+                    ProductTypeName = sample.ProductTypeName,
+                    InternalImagePath = StockImagePath.Build(sample.ImagePath, sample.ImageName)
+                };
+            })
+            .ToList();
+
+        var summary = new jewelry.Model.Stock.StockProductGallery.MissingList.Summary
+        {
+            MoldCount = allBacklog.Count,
+            MissingPieceCount = allBacklog.Sum(x => x.MissingPieceCount)
+        };
+
+        IEnumerable<jewelry.Model.Stock.StockProductGallery.MissingList.Item> filtered = allBacklog;
+
+        var search = request.Search;
+        if (search != null)
+        {
+            if (!string.IsNullOrWhiteSpace(search.Text))
+            {
+                var text = search.Text.Trim();
+                filtered = filtered.Where(x =>
+                    x.Mold.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                    x.ProductNameTh.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                    x.ProductNameEn.Contains(text, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (search.ProductTypes != null && search.ProductTypes.Count > 0)
+            {
+                filtered = filtered.Where(x => x.ProductType != null && search.ProductTypes.Contains(x.ProductType));
+            }
+        }
+
+        var ordered = filtered
+            .OrderByDescending(x => x.MissingPieceCount)
+            .ThenBy(x => x.Mold, StringComparer.Ordinal)
+            .ToList();
+
+        var dataSource = ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+
+        return new jewelry.Model.Stock.StockProductGallery.MissingList.Response
+        {
+            Data = dataSource.Data.Cast<jewelry.Model.Stock.StockProductGallery.MissingList.Item>().ToList(),
+            Total = dataSource.Total,
+            Summary = summary
+        };
+    }
+
     private async Task<(TbtStockPiece Piece, string ScopeKey)> ResolvePieceAndScopeKeyAsync(string stockNumber, string scopeType)
     {
-        var piece = await _jewelryContext.TbtStockPiece
-            .Include(p => p.SkuCodeNavigation)
-            .FirstOrDefaultAsync(p => p.StockNumber == stockNumber.Trim());
+        var piece = await ProductGalleryHelper.ResolvePieceAsync(_jewelryContext, stockNumber);
 
         if (piece == null)
         {
