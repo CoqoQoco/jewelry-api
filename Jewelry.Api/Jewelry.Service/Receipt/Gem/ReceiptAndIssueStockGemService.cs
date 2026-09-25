@@ -595,8 +595,7 @@ namespace Jewelry.Service.Receipt.Gem
         public IQueryable<PicklistResponse> Picklist(PicklistFilter request)
         {
 
-            var query = (from item in _jewelryContext.TbtStockGemTransection
-                         select item);
+            var query = _jewelryContext.TbtStockGemTransection.AsNoTracking().AsQueryable();
 
             // Apply all filters before executing the query
             if (!string.IsNullOrEmpty(request.Running))
@@ -649,61 +648,105 @@ namespace Jewelry.Service.Receipt.Gem
                 query = query.Where(item => item.Running == request.GetRunning);
             }
 
+            // Flat projection: single round-trip, no correlated subqueries.
+            var flat = (from item in query
+                        join gem in _jewelryContext.TbtStockGem.AsNoTracking() on item.Code equals gem.Code
+                        select new
+                        {
+                            item.Id,
+                            item.Running,
+                            item.Type,
+                            item.RequestDate,
+                            item.ReturnDate,
+                            item.Remark1,
+                            item.Stastus,
+                            item.CreateBy,
+                            item.CreateDate,
+                            item.UpdateBy,
+                            item.UpdateDate,
+                            item.OperatorBy,
+                            item.Code,
+                            item.JobOrPo,
+                            item.SupplierCost,
+                            item.Remark2,
+                            item.Qty,
+                            item.QtyWeight,
+                            item.SubpplierName,
+                            item.ProductionPlanWo,
+                            item.ProductionPlanWoNumber,
+                            item.ProductionPlanWoText,
+                            item.ProductionPlanMold,
+                            GemShape = gem.Shape,
+                            GemSize = gem.Size,
+                            GemGrade = gem.Grade,
+                            GemGradeDia = gem.GradeDia,
+                            GemGroupName = gem.GroupName,
+                            GemPrice = gem.Price,
+                            GemPriceQty = gem.PriceQty,
+                            GemUnit = gem.Unit,
+                            GemUnitCode = gem.UnitCode,
+                        }).ToList();
 
-            var response = (from item in query
-                            join gem in _jewelryContext.TbtStockGem on item.Code equals gem.Code
-                            group new { item, gem } by item.Running into grouped
-                            select new PicklistResponse
-                            {
-                                Running = grouped.Key,
-                                Type = grouped.First().item.Type,
-                                RequestDate = grouped.First().item.RequestDate,
-                                ReturnDate = grouped.First().item.ReturnDate,
-                                Remark = grouped.First().item.Remark1,
-                                Stastus = grouped.First().item.Stastus,
-                                CreateBy = grouped.First().item.CreateBy,
-                                CreateDate = grouped.First().item.CreateDate,
-                                UpdateBy = grouped.First().item.UpdateBy,
-                                UpdateDate = grouped.First().item.UpdateDate,
-                                IsOverPick = grouped.First().item.ReturnDate != null && grouped.First().item.ReturnDate < DateTime.UtcNow,
-                                OperatorBy = grouped.First().item.OperatorBy,
-                                Items = grouped.Select(g => new PicklistItem
-                                {
-                                    Code = g.item.Code,
-                                    GroupName = g.item.Code,
-                                    Name = $"{g.item.Code}-{g.gem.Shape}-{g.gem.Size}-{g.gem.Grade}-{g.gem.GroupName}",
-                                    Size = g.gem.Size,
-                                    Shape = g.gem.Shape,
-                                    Grade = g.gem.Grade,
-                                    GradeDia = g.gem.GradeDia,
-                                    Status = g.item.Stastus,
-                                    RequestDate = g.item.RequestDate,
-                                    Running = g.item.Running,
-                                    Type = g.item.Type,
-                                    JobOrPo = g.item.JobOrPo,
-                                    SupplierCost = g.item.SupplierCost,
-                                    Remark1 = g.item.Remark1,
-                                    Remark2 = g.item.Remark2,
-                                    Qty = g.item.Qty,
-                                    QtyWeight = g.item.QtyWeight,
-                                    SubpplierName = g.item.SubpplierName,
-                                    CreateDate = g.item.CreateDate,
-                                    CreateBy = g.item.CreateBy,
-                                    UpdateDate = g.item.UpdateDate,
-                                    UpdateBy = g.item.UpdateBy,
+            // Grouping and shaping happen in memory now that data is already fetched.
+            var response = flat
+                .GroupBy(x => x.Running)
+                .Select(grouped =>
+                {
+                    var ordered = grouped.OrderBy(g => g.Id).ToList();
+                    var first = ordered[0];
 
-                                    WO = g.item.ProductionPlanWo,
-                                    WONumber = g.item.ProductionPlanWoNumber,
-                                    WOText = g.item.ProductionPlanWoText,
-                                    Mold = g.item.ProductionPlanMold,
+                    return new PicklistResponse
+                    {
+                        Running = grouped.Key,
+                        Type = first.Type,
+                        RequestDate = first.RequestDate,
+                        ReturnDate = first.ReturnDate,
+                        Remark = first.Remark1,
+                        Stastus = first.Stastus,
+                        CreateBy = first.CreateBy,
+                        CreateDate = first.CreateDate,
+                        UpdateBy = first.UpdateBy,
+                        UpdateDate = first.UpdateDate,
+                        IsOverPick = first.ReturnDate != null && first.ReturnDate < DateTime.UtcNow,
+                        OperatorBy = first.OperatorBy,
+                        Items = ordered.Select(g => new PicklistItem
+                        {
+                            Code = g.Code,
+                            GroupName = g.Code,
+                            Name = $"{g.Code}-{g.GemShape}-{g.GemSize}-{g.GemGrade}-{g.GemGroupName}",
+                            Size = g.GemSize,
+                            Shape = g.GemShape,
+                            Grade = g.GemGrade,
+                            GradeDia = g.GemGradeDia,
+                            Status = g.Stastus,
+                            RequestDate = g.RequestDate,
+                            Running = g.Running,
+                            Type = g.Type,
+                            JobOrPo = g.JobOrPo,
+                            SupplierCost = g.SupplierCost,
+                            Remark1 = g.Remark1,
+                            Remark2 = g.Remark2,
+                            Qty = g.Qty,
+                            QtyWeight = g.QtyWeight,
+                            SubpplierName = g.SubpplierName,
+                            CreateDate = g.CreateDate,
+                            CreateBy = g.CreateBy,
+                            UpdateDate = g.UpdateDate,
+                            UpdateBy = g.UpdateBy,
 
-                                    Price = g.gem.Price,
-                                    PriceQty = g.gem.PriceQty,
-                                    Unit = g.gem.Unit,
-                                    UnitCode = g.gem.UnitCode,
-                                    OperatorBy = g.item.OperatorBy,
-                                })
-                            }).ToList();
+                            WO = g.ProductionPlanWo,
+                            WONumber = g.ProductionPlanWoNumber,
+                            WOText = g.ProductionPlanWoText,
+                            Mold = g.ProductionPlanMold,
+
+                            Price = g.GemPrice,
+                            PriceQty = g.GemPriceQty,
+                            Unit = g.GemUnit,
+                            UnitCode = g.GemUnitCode,
+                            OperatorBy = g.OperatorBy,
+                        }).ToList()
+                    };
+                }).ToList();
 
             if (!string.IsNullOrEmpty(request.Code))
             {
