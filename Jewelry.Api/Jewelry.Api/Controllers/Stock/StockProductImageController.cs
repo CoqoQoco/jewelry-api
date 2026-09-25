@@ -66,6 +66,42 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("BulkPreview")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Stock.Product.Image.BulkPreview.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> BulkPreview([FromBody] jewelry.Model.Stock.Product.Image.BulkPreview.Request request)
+        {
+            try
+            {
+                var response = await _service.BulkPreview(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("CreateBulk")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.Image.CreateBulk.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CreateBulk([FromForm] jewelry.Model.Stock.Product.Image.CreateBulk.Request request)
+        {
+            try
+            {
+                var response = await _service.CreateBulk(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("List")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.Image.List.Response>))]

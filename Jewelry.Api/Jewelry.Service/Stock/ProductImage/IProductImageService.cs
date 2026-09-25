@@ -14,5 +14,9 @@ namespace Jewelry.Service.Stock.ProductImage
         IQueryable<jewelry.Model.Stock.Product.Image.List.Response> List(jewelry.Model.Stock.Product.Image.List.Search request);
 
         Task<jewelry.Model.Stock.Product.Image.Replace.Response> Replace(jewelry.Model.Stock.Product.Image.Replace.Request request);
+
+        Task<List<jewelry.Model.Stock.Product.Image.BulkPreview.Response>> BulkPreview(jewelry.Model.Stock.Product.Image.BulkPreview.Request request);
+
+        Task<jewelry.Model.Stock.Product.Image.CreateBulk.Response> CreateBulk(jewelry.Model.Stock.Product.Image.CreateBulk.Request request);
     }
 }
