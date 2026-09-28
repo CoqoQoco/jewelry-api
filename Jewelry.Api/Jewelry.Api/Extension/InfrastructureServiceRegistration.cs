@@ -15,6 +15,7 @@ using Jewelry.Service.Production.Plan;
 using Jewelry.Service.Production.PlanBOM;
 using Jewelry.Service.Production.PrePlan;
 using Jewelry.Service.ProductionPlan;
+using Jewelry.Service.Report.Executive;
 using Jewelry.Service.Receipt.Gem;
 using Jewelry.Service.Receipt.Outsource;
 using Jewelry.Service.Receipt.Production;
@@ -154,6 +155,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IStockConvertService, StockConvertService>();
             services.AddScoped<IStockProductGalleryService, StockProductGalleryService>();
             services.AddScoped<IStockReportService, StockReportService>();
+            services.AddScoped<IExecutiveReportService, ExecutiveReportService>();
 
             services.AddScoped<ICatalogService, CatalogService>();
 
