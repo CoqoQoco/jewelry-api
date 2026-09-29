@@ -13,7 +13,7 @@ namespace Jewelry.Api.Controllers.Production
 {
     [Route("Production/[controller]")]
     [ApiController]
-    //[Authorize]
+    [Authorize]
     public class PlanController : ApiControllerBase
     {
         private readonly ILogger<PlanController> _logger;
