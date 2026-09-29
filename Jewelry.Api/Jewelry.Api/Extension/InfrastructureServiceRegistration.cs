@@ -11,9 +11,11 @@ using Jewelry.Service.Master.SaleChannel;
 using Jewelry.Service.Mold;
 using Jewelry.Service.Notification;
 using Jewelry.Service.Notification.Rules;
+using Jewelry.Service.Production.Insight;
 using Jewelry.Service.Production.Plan;
 using Jewelry.Service.Production.PlanBOM;
 using Jewelry.Service.Production.PrePlan;
+using Jewelry.Service.Production.Shared;
 using Jewelry.Service.ProductionPlan;
 using Jewelry.Service.Report.Executive;
 using Jewelry.Service.Receipt.Gem;
@@ -155,7 +157,9 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IStockConvertService, StockConvertService>();
             services.AddScoped<IStockProductGalleryService, StockProductGalleryService>();
             services.AddScoped<IStockReportService, StockReportService>();
+            services.AddScoped<IProductionPlanWipHelper, ProductionPlanWipHelper>();
             services.AddScoped<IExecutiveReportService, ExecutiveReportService>();
+            services.AddScoped<IProductionInsightService, ProductionInsightService>();
 
             services.AddScoped<ICatalogService, CatalogService>();
 

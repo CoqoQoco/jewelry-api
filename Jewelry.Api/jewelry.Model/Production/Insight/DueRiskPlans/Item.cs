@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace jewelry.Model.Report.Executive.StalePlans
+namespace jewelry.Model.Production.Insight.DueRiskPlans
 {
     public class Item
     {
@@ -19,6 +19,10 @@ namespace jewelry.Model.Report.Executive.StalePlans
         public DateTime CreateDate { get; set; }
         public DateTime LastMoveDate { get; set; }
         public int DaysSinceMove { get; set; }
+        public DateTime DueDate { get; set; }
+
+        // ติดลบ = เกินกำหนดแล้ว, บวก = ยังไม่ถึงกำหนด
+        public int DaysToDue { get; set; }
 
         // เสริมหลัง paging เท่านั้น — มาจาก header ล่าสุดของแผน (ดู ProductionPlanWipHelper.GetLastActionInfoAsync)
         public string? LastUpdateBy { get; set; }

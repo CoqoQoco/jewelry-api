@@ -40,7 +40,7 @@ namespace Jewelry.Api.Extension
                                       where userRoles.Contains(role.Name)
                                           && role.IsActive
                                           && perm.IsActive
-                                          && perm.Code == requirement.Permission
+                                          && requirement.Permissions.Contains(perm.Code)
                                       select rp.Id)
                                       .AnyAsync();
 

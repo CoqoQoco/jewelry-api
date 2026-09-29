@@ -1,10 +1,10 @@
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
+using Jewelry.Service.Production.Shared;
 using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,122 +21,16 @@ namespace Jewelry.Service.Report.Executive
     public class ExecutiveReportService : BaseService, IExecutiveReportService
     {
         private readonly JewelryContext _jewelryContext;
-        private readonly IMemoryCache _cache;
+        private readonly IProductionPlanWipHelper _wipHelper;
 
         private const int StatusDone = 100;
-        private const int StatusMelted = 500;
         private const string InStockStatus = "IN_STOCK";
-        private const string LastMoveDatesCacheKey = "ExecutiveReport:LastMoveDates";
-        private static readonly TimeSpan LastMoveDatesCacheTtl = TimeSpan.FromMinutes(5);
 
-        // แผนก -> status ids ของ tbt_production_plan (ยกเว้น 100=เสร็จ, 500=หลอม)
-        private static readonly (string Key, int[] StatusIds)[] Departments = new[]
-        {
-            ("design", new[] { 10 }),
-            ("trim", new[] { 49, 50 }),
-            ("rawPolish", new[] { 59, 60 }),
-            ("gemSort", new[] { 69, 70 }),
-            ("setting", new[] { 79, 80 }),
-            ("plating", new[] { 89, 90 }),
-            ("costCard", new[] { 94, 95 }),
-        };
-
-        public ExecutiveReportService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor, IMemoryCache cache)
+        public ExecutiveReportService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor, IProductionPlanWipHelper wipHelper)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
-            _cache = cache;
-        }
-
-        private static string? DepartmentKeyOf(int status)
-        {
-            foreach (var department in Departments)
-            {
-                if (department.StatusIds.Contains(status))
-                {
-                    return department.Key;
-                }
-            }
-
-            return null;
-        }
-
-        private class OpenPlanRow
-        {
-            public int Id { get; set; }
-            public string Wo { get; set; } = null!;
-            public int WoNumber { get; set; }
-            public string WoText { get; set; } = null!;
-            public string Mold { get; set; } = null!;
-            public string ProductNumber { get; set; } = null!;
-            public string ProductName { get; set; } = null!;
-            public int ProductQty { get; set; }
-            public int Status { get; set; }
-            public DateTime CreateDate { get; set; }
-            public DateTime? UpdateDate { get; set; }
-        }
-
-        // เฉพาะ plan ที่ active และยังไม่จบ/ไม่ถูกหลอม (status นอก {100,500})
-        private async Task<List<OpenPlanRow>> GetOpenPlansAsync()
-        {
-            return await _jewelryContext.TbtProductionPlan
-                .AsNoTracking()
-                .Where(p => p.IsActive == true && p.Status != StatusDone && p.Status != StatusMelted)
-                .Select(p => new OpenPlanRow
-                {
-                    Id = p.Id,
-                    Wo = p.Wo,
-                    WoNumber = p.WoNumber,
-                    WoText = p.WoText,
-                    Mold = p.Mold,
-                    ProductNumber = p.ProductNumber,
-                    ProductName = p.ProductName,
-                    ProductQty = p.ProductQty,
-                    Status = p.Status,
-                    CreateDate = p.CreateDate,
-                    UpdateDate = p.UpdateDate
-                })
-                .ToListAsync();
-        }
-
-        private async Task<int> GetMeltedOpenCountAsync()
-        {
-            return await _jewelryContext.TbtProductionPlan
-                .AsNoTracking()
-                .CountAsync(p => p.IsActive == true && p.Status == StatusMelted);
-        }
-
-        // Max(create_date) ของ tbt_production_plan_status_header ต่อ production_plan_id
-        // GroupBy + Max เท่านั้น (ห้าม First() ในนี้ — เคยทำ CPU DB พุ่งมาแล้ว)
-        // cache 5 นาที — หน้าเดียวยิง Summary/ProductionWip/StalePlans พร้อมกัน ไม่ต้อง scan ~52k rows ซ้ำ 3 รอบ
-        private async Task<Dictionary<int, DateTime>> GetLastMoveDatesAsync()
-        {
-            if (_cache.TryGetValue<Dictionary<int, DateTime>>(LastMoveDatesCacheKey, out var cached) && cached != null)
-            {
-                return cached;
-            }
-
-            var rows = await _jewelryContext.TbtProductionPlanStatusHeader
-                .AsNoTracking()
-                .GroupBy(h => h.ProductionPlanId)
-                .Select(g => new { PlanId = g.Key, LastDate = g.Max(x => x.CreateDate) })
-                .ToListAsync();
-
-            var result = rows.ToDictionary(x => x.PlanId, x => x.LastDate);
-            _cache.Set(LastMoveDatesCacheKey, result, LastMoveDatesCacheTtl);
-            return result;
-        }
-
-        private static DateTime LastMoveOf(OpenPlanRow plan, Dictionary<int, DateTime> lastMoveDates)
-        {
-            return lastMoveDates.TryGetValue(plan.Id, out var lastMove) ? lastMove : (plan.UpdateDate ?? plan.CreateDate);
-        }
-
-        private async Task<Dictionary<int, string>> GetStatusNamesAsync()
-        {
-            return await _jewelryContext.TbmProductionPlanStatus
-                .AsNoTracking()
-                .ToDictionaryAsync(x => x.Id, x => x.NameTh);
+            _wipHelper = wipHelper;
         }
 
         private IQueryable<TbtSaleInvoiceHeader> InScopeInvoices()
@@ -179,9 +73,9 @@ namespace Jewelry.Service.Report.Executive
             var now = DateTime.UtcNow;
 
             // ---- Production ----
-            var openPlans = await GetOpenPlansAsync();
-            var meltedOpenCount = await GetMeltedOpenCountAsync();
-            var lastMoveDates = await GetLastMoveDatesAsync();
+            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var meltedOpenCount = await _wipHelper.GetMeltedOpenCountAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
 
             var moved30dCutoff = now.AddDays(-30);
             var stale180dCutoff = now.AddDays(-180);
@@ -189,8 +83,8 @@ namespace Jewelry.Service.Report.Executive
             var production = new Summary.ProductionData
             {
                 OpenCount = openPlans.Count,
-                Moved30dCount = openPlans.Count(p => LastMoveOf(p, lastMoveDates) > moved30dCutoff),
-                Stale180dCount = openPlans.Count(p => LastMoveOf(p, lastMoveDates) < stale180dCutoff),
+                Moved30dCount = openPlans.Count(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) > moved30dCutoff),
+                Stale180dCount = openPlans.Count(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) < stale180dCutoff),
                 MeltedOpenCount = meltedOpenCount
             };
 
@@ -352,23 +246,23 @@ namespace Jewelry.Service.Report.Executive
         {
             var now = DateTime.UtcNow;
 
-            var openPlans = await GetOpenPlansAsync();
-            var lastMoveDates = await GetLastMoveDatesAsync();
+            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
 
             var moved30dCutoff = now.AddDays(-30);
             var stale180dCutoff = now.AddDays(-180);
 
             var departments = new List<ProductionWip.DepartmentData>();
 
-            foreach (var department in Departments)
+            foreach (var department in ProductionPlanDepartments.Departments)
             {
                 var deptPlans = openPlans.Where(p => department.StatusIds.Contains(p.Status)).ToList();
 
-                var moved30d = deptPlans.Count(p => LastMoveOf(p, lastMoveDates) > moved30dCutoff);
-                var stale180d = deptPlans.Count(p => LastMoveOf(p, lastMoveDates) < stale180dCutoff);
+                var moved30d = deptPlans.Count(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) > moved30dCutoff);
+                var stale180d = deptPlans.Count(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) < stale180dCutoff);
                 var moved30to180d = deptPlans.Count(p =>
                 {
-                    var lastMove = LastMoveOf(p, lastMoveDates);
+                    var lastMove = ProductionPlanDepartments.LastMoveOf(p, lastMoveDates);
                     return lastMove <= moved30dCutoff && lastMove >= stale180dCutoff;
                 });
 
@@ -422,13 +316,13 @@ namespace Jewelry.Service.Report.Executive
         {
             var now = DateTime.UtcNow;
 
-            var openPlans = await GetOpenPlansAsync();
-            var lastMoveDates = await GetLastMoveDatesAsync();
-            var statusNames = await GetStatusNamesAsync();
+            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+            var statusNames = await _wipHelper.GetStatusNamesAsync();
 
             var items = openPlans.Select(p =>
             {
-                var lastMove = LastMoveOf(p, lastMoveDates);
+                var lastMove = ProductionPlanDepartments.LastMoveOf(p, lastMoveDates);
                 return new StalePlans.Item
                 {
                     PlanId = p.Id,
@@ -441,7 +335,7 @@ namespace Jewelry.Service.Report.Executive
                     ProductQty = p.ProductQty,
                     StatusId = p.Status,
                     StatusName = statusNames.TryGetValue(p.Status, out var name) ? name : null,
-                    DepartmentKey = DepartmentKeyOf(p.Status),
+                    DepartmentKey = ProductionPlanDepartments.DepartmentKeyOf(p.Status),
                     CreateDate = p.CreateDate,
                     LastMoveDate = lastMove,
                     DaysSinceMove = (int)(now - lastMove).TotalDays
@@ -462,7 +356,30 @@ namespace Jewelry.Service.Report.Executive
                 ordered = items.OrderByDescending(x => x.DaysSinceMove);
             }
 
-            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+            var dataSource = ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+
+            // enrich เฉพาะหน้าปัจจุบันหลัง paging (paging skill: post-processing pattern) — ไม่ query ทั้งตาราง
+            var pageItems = dataSource.Data?.Cast<StalePlans.Item>().ToList() ?? new List<StalePlans.Item>();
+            if (pageItems.Count > 0)
+            {
+                var plansById = openPlans.ToDictionary(p => p.Id);
+                var pagePlans = pageItems.Select(i => plansById[i.PlanId]).ToList();
+                var lastActionInfo = await _wipHelper.GetLastActionInfoAsync(pagePlans);
+
+                foreach (var item in pageItems)
+                {
+                    if (!lastActionInfo.TryGetValue(item.PlanId, out var info)) continue;
+                    item.LastUpdateBy = info.LastUpdateBy;
+                    item.LastAction = info.LastAction;
+                    item.LastActionRemark = info.LastActionRemark;
+                    item.LastActionDate = info.LastActionDate;
+                    item.Workers = info.Workers;
+                }
+
+                dataSource.Data = pageItems;
+            }
+
+            return dataSource;
         }
 
         public async Task<DataSourceResult> Receivables(Receivables.Request request)
