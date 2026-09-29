@@ -57,7 +57,11 @@ namespace jewelry.Model.Report.Executive.Summary
         public int SlipCount { get; set; }
         public decimal IssuedGram { get; set; }
         public decimal RawLossGram { get; set; }
+        public decimal AllowedGram { get; set; }
         public decimal OverAllowedGram { get; set; }
+        public int OverSlipCount { get; set; }
+        public decimal LossPercent { get; set; }
+        public decimal AllowedPercent { get; set; }
         public decimal OverAllowedPercent { get; set; }
     }
 }

@@ -4,6 +4,7 @@ using Jewelry.Service.Base;
 using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,10 +21,13 @@ namespace Jewelry.Service.Report.Executive
     public class ExecutiveReportService : BaseService, IExecutiveReportService
     {
         private readonly JewelryContext _jewelryContext;
+        private readonly IMemoryCache _cache;
 
         private const int StatusDone = 100;
         private const int StatusMelted = 500;
         private const string InStockStatus = "IN_STOCK";
+        private const string LastMoveDatesCacheKey = "ExecutiveReport:LastMoveDates";
+        private static readonly TimeSpan LastMoveDatesCacheTtl = TimeSpan.FromMinutes(5);
 
         // แผนก -> status ids ของ tbt_production_plan (ยกเว้น 100=เสร็จ, 500=หลอม)
         private static readonly (string Key, int[] StatusIds)[] Departments = new[]
@@ -37,10 +41,11 @@ namespace Jewelry.Service.Report.Executive
             ("costCard", new[] { 94, 95 }),
         };
 
-        public ExecutiveReportService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor)
+        public ExecutiveReportService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor, IMemoryCache cache)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
+            _cache = cache;
         }
 
         private static string? DepartmentKeyOf(int status)
@@ -103,15 +108,23 @@ namespace Jewelry.Service.Report.Executive
 
         // Max(create_date) ของ tbt_production_plan_status_header ต่อ production_plan_id
         // GroupBy + Max เท่านั้น (ห้าม First() ในนี้ — เคยทำ CPU DB พุ่งมาแล้ว)
+        // cache 5 นาที — หน้าเดียวยิง Summary/ProductionWip/StalePlans พร้อมกัน ไม่ต้อง scan ~52k rows ซ้ำ 3 รอบ
         private async Task<Dictionary<int, DateTime>> GetLastMoveDatesAsync()
         {
+            if (_cache.TryGetValue<Dictionary<int, DateTime>>(LastMoveDatesCacheKey, out var cached) && cached != null)
+            {
+                return cached;
+            }
+
             var rows = await _jewelryContext.TbtProductionPlanStatusHeader
                 .AsNoTracking()
                 .GroupBy(h => h.ProductionPlanId)
                 .Select(g => new { PlanId = g.Key, LastDate = g.Max(x => x.CreateDate) })
                 .ToListAsync();
 
-            return rows.ToDictionary(x => x.PlanId, x => x.LastDate);
+            var result = rows.ToDictionary(x => x.PlanId, x => x.LastDate);
+            _cache.Set(LastMoveDatesCacheKey, result, LastMoveDatesCacheTtl);
+            return result;
         }
 
         private static DateTime LastMoveOf(OpenPlanRow plan, Dictionary<int, DateTime> lastMoveDates)
@@ -196,9 +209,10 @@ namespace Jewelry.Service.Report.Executive
                 .ToListAsync();
 
             var invoiceTotalThb = invoiceRows.Sum(x => x.GrandTotal * x.Rate);
-            // unpaid = ยังไม่มีเงินเข้าเลย ทั้ง payment_item และมัดจำ (deposit>0 แต่ยังไม่มี payment_item ก็ไม่ถือว่า unpaid)
-            var unpaidRows = invoiceRows.Where(x => x.Paid == 0 && x.Deposit <= 0).ToList();
-            var paidOrPartialThb = invoiceRows.Where(x => !(x.Paid == 0 && x.Deposit <= 0)).Sum(x => x.GrandTotal * x.Rate);
+            // unpaid = มียอดจริง (grand_total>0) และยังไม่มีเงินเข้าเลย ทั้ง payment_item และมัดจำ
+            // (grand_total=0 หรือ deposit>0 แต่ยังไม่มี payment_item ไม่ถือว่า unpaid)
+            var unpaidRows = invoiceRows.Where(x => x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0).ToList();
+            var paidOrPartialThb = invoiceRows.Where(x => !(x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0)).Sum(x => x.GrandTotal * x.Rate);
             var unpaidThb = unpaidRows.Sum(x => x.GrandTotal * x.Rate);
             var overdueRows = unpaidRows.Where(x => x.DueDate.HasValue && x.DueDate.Value < now).ToList();
             var overdueThb = overdueRows.Sum(x => x.GrandTotal * x.Rate);
@@ -258,22 +272,36 @@ namespace Jewelry.Service.Report.Executive
             var nowThai = now.AddHours(7);
             var currentMonthStartThai = new DateTime(nowThai.Year, nowThai.Month, 1);
             var windowStartThai = currentMonthStartThai.AddMonths(-2);
-            var windowStartUtc = windowStartThai.AddHours(-7);
+            var windowStartUtc = DateTime.SpecifyKind(windowStartThai.AddHours(-7), DateTimeKind.Utc);
 
             var slipRows = await _jewelryContext.TbtGoldLossTangSlip
                 .AsNoTracking()
                 .Where(x => x.IsActive && x.RequestDateEnd != null && x.RequestDateEnd >= windowStartUtc)
-                .Select(x => new { x.RequestDateEnd, x.IssuedTotal, x.RawLoss, x.DiffLoss })
+                .Select(x => new { x.RequestDateEnd, x.IssuedTotal, x.RawLoss, x.AllowedLoss })
                 .ToListAsync();
 
+            // diff_loss ของตาราง = allowed_loss - raw_loss (บวก = ต่ำกว่าเกณฑ์ ไม่ใช่เกินเกณฑ์) — ห้ามใช้ตรง ๆ
+            // over = max(raw - allowed, 0) ต่อใบ แล้วค่อย sum ต่อเดือน
             var slipByMonth = slipRows
                 .GroupBy(x => x.RequestDateEnd!.Value.AddHours(7).ToString("yyyy-MM"))
-                .ToDictionary(g => g.Key, g => new
+                .ToDictionary(g => g.Key, g =>
                 {
-                    SlipCount = g.Count(),
-                    IssuedGram = g.Sum(x => x.IssuedTotal ?? 0),
-                    RawLossGram = g.Sum(x => x.RawLoss ?? 0),
-                    OverAllowedGram = g.Sum(x => x.DiffLoss ?? 0)
+                    var list = g.Select(x => new
+                    {
+                        Issued = x.IssuedTotal ?? 0,
+                        Raw = x.RawLoss ?? 0,
+                        Allowed = x.AllowedLoss ?? 0
+                    }).ToList();
+
+                    return new
+                    {
+                        SlipCount = list.Count,
+                        IssuedGram = list.Sum(x => x.Issued),
+                        RawLossGram = list.Sum(x => x.Raw),
+                        AllowedGram = list.Sum(x => x.Allowed),
+                        OverAllowedGram = list.Sum(x => Math.Max(x.Raw - x.Allowed, 0)),
+                        OverSlipCount = list.Count(x => x.Raw > x.Allowed)
+                    };
                 });
 
             var goldLoss = new List<Summary.GoldLossMonthData>();
@@ -289,7 +317,15 @@ namespace Jewelry.Service.Report.Executive
                         SlipCount = g.SlipCount,
                         IssuedGram = g.IssuedGram,
                         RawLossGram = g.RawLossGram,
+                        AllowedGram = g.AllowedGram,
                         OverAllowedGram = g.OverAllowedGram,
+                        OverSlipCount = g.OverSlipCount,
+                        LossPercent = g.IssuedGram > 0
+                            ? Math.Round(g.RawLossGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
+                            : 0,
+                        AllowedPercent = g.IssuedGram > 0
+                            ? Math.Round(g.AllowedGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
+                            : 0,
                         OverAllowedPercent = g.IssuedGram > 0
                             ? Math.Round(g.OverAllowedGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
                             : 0
@@ -351,7 +387,7 @@ namespace Jewelry.Service.Report.Executive
             var nowThai = now.AddHours(7);
             var currentMonthStartThai = new DateTime(nowThai.Year, nowThai.Month, 1);
             var windowStartThai = currentMonthStartThai.AddMonths(-12);
-            var windowStartUtc = windowStartThai.AddHours(-7);
+            var windowStartUtc = DateTime.SpecifyKind(windowStartThai.AddHours(-7), DateTimeKind.Utc);
 
             var completedDates = await _jewelryContext.TbtProductionPlan
                 .AsNoTracking()
@@ -445,6 +481,7 @@ namespace Jewelry.Service.Report.Executive
                     x.CustomerCode,
                     x.CustomerName,
                     x.CreateDate,
+                    x.CreateBy,
                     x.DueDate,
                     x.CurrencyUnit,
                     x.Deposit,
@@ -458,13 +495,13 @@ namespace Jewelry.Service.Report.Executive
                 })
                 .ToListAsync();
 
-            // unpaid (strict) = ยังไม่มีเงินเข้าเลย ทั้ง payment_item และมัดจำ — ใช้เกณฑ์เดียวกับ Summary
+            // unpaid (strict) = มียอดจริง (grand_total>0) และยังไม่มีเงินเข้าเลย ทั้ง payment_item และมัดจำ — ใช้เกณฑ์เดียวกับ Summary
             // เก็บคู่กับ Item ไว้ใช้กรอง filter 'unpaid'/'overdue' เท่านั้น ไม่ขึ้น contract (paymentState ยังใช้สูตร paid/partial/unpaid เดิม)
             var mapped = rows.Select(x =>
             {
                 var outstanding = x.GrandTotal - x.Deposit - x.Paid;
                 var isOverdue = x.DueDate.HasValue && x.DueDate.Value < now;
-                var isUnpaidStrict = x.Paid == 0 && x.Deposit <= 0;
+                var isUnpaidStrict = x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0;
 
                 var item = new Receivables.Item
                 {
@@ -483,7 +520,8 @@ namespace Jewelry.Service.Report.Executive
                     PaymentState = outstanding <= 0 ? "paid" : (x.Paid > 0 || x.Deposit > 0 ? "partial" : "unpaid"),
                     IsOverdue = isOverdue,
                     DaysOverdue = isOverdue ? (int)(now - x.DueDate!.Value).TotalDays : 0,
-                    SalePerson = x.SalePerson,
+                    // ลูกค้าไม่มี sale_person ผูกไว้เสมอ — fallback ไปคนสร้างเอกสาร (business rule: เจ้าของลูกค้า derive จาก create_by)
+                    SalePerson = !string.IsNullOrEmpty(x.SalePerson) ? x.SalePerson : x.CreateBy,
                     SaleChannelCode = x.SaleChannelCode
                 };
 
@@ -538,6 +576,7 @@ namespace Jewelry.Service.Report.Executive
                     x.DeliveryDate,
                     x.CurrencyUnit,
                     x.SalePerson,
+                    x.CreateBy,
                     x.SaleChannelCode,
                     GrandTotal = x.GrandTotalRounded ?? 0,
                     Rate = x.CurrencyRate > 0 ? x.CurrencyRate : 1
@@ -558,7 +597,8 @@ namespace Jewelry.Service.Report.Executive
                     GrandTotal = x.GrandTotal,
                     GrandTotalThb = x.GrandTotal * x.Rate,
                     IsOverdue = x.DeliveryDate.HasValue && x.DeliveryDate.Value < now,
-                    SalePerson = x.SalePerson,
+                    // ลูกค้าไม่มี sale_person ผูกไว้เสมอ — fallback ไปคนสร้างเอกสาร (business rule: เจ้าของลูกค้า derive จาก create_by)
+                    SalePerson = !string.IsNullOrEmpty(x.SalePerson) ? x.SalePerson : x.CreateBy,
                     SaleChannelCode = x.SaleChannelCode
                 })
                 .ToList();
