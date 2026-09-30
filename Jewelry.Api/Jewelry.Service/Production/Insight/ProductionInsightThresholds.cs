@@ -18,5 +18,31 @@ namespace Jewelry.Service.Production.Insight
 
         // FC_DUE_SOON_AT_RISK: จำนวนแผนที่เสี่ยง >= ค่านี้ ถือว่า critical (ไม่ถึง = warning)
         public const int FcDueSoonAtRiskCountCritical = 20;
+
+        // ค่ามาตรฐานเริ่มต้น (วัน) ถ้าแผนกไหนไม่มี saved standard เลย (กันพัง ไม่ควรเกิดจริงเพราะ seed migration ใส่ไว้ครบ)
+        public const decimal DefaultStageStandardDays = 14;
+
+        // dwell ปัจจุบัน > ตัวคูณนี้ × standard ถือว่า "ผิดปกติ" (ใช้ทั้ง StageLeadTime.abnormalCount และ
+        // STAGE_ABNORMAL_DWELL — AbnormalDwellPlans endpoint รับ multiplier จาก request ได้ ค่า default เดียวกัน)
+        public const decimal DefaultAbnormalDwellMultiplier = 2;
+
+        // STAGE_OVER_STANDARD: (median-standard)/standard*100 >= ค่านี้ ถือว่า critical (ไม่ถึง = warning)
+        public const int StageOverStandardPercentCritical = 50;
+
+        // STAGE_WAIT_DOMINANT: waitDays/(waitDays+workDays) >= ค่านี้ % ถือว่า wait ครอบงำ
+        public const int StageWaitDominantSharePercent = 50;
+
+        // FC_STAGE_LEADTIME_RISING: จำนวน bucket ที่ "ผ่านเกณฑ์" (qualifying) ล่าสุดที่ต้องเรียงเพิ่มขึ้นต่อเนื่อง
+        // (เทียบ bucket ต่อ bucket แบบ strictly increasing) — bucket ที่ count < MinSamplesPerBucket ถูกข้ามไปเลย
+        // ไม่ถูกนับเป็นหนึ่งใน 3 ตัวนี้ (กัน bucket ว่าง medianTotal=0 หลอกว่า "เพิ่มขึ้น")
+        public const int StageLeadtimeRisingBucketCount = 3;
+
+        // bucket ที่มี exited visit น้อยกว่านี้ ถือว่าข้อมูลไม่พอ (ไม่ใช่ "medianTotal=0" จริง) — ข้ามจากการเช็ค
+        // FC_STAGE_LEADTIME_RISING และแสดงเป็น null ใน StageLeadTime.series แทนการโชว์ 0 หลอกตา
+        public const int MinSamplesPerBucket = 3;
+
+        // STAGE_WAIT_DOMINANT: ต้องมี SplitSampleCount (exited visit ที่แยก wait/work ได้จริงจาก receive_date)
+        // อย่างน้อยเท่านี้ถึงจะเชื่อถือได้ — กันแจ้งเตือนจากข้อมูลน้อยเกินไปตอนเพิ่งเริ่มเก็บ receive_date
+        public const int MinSplitSamples = 10;
     }
 }

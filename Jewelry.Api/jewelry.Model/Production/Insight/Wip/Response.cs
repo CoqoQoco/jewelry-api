@@ -25,7 +25,7 @@ namespace jewelry.Model.Production.Insight.Wip
 
         public Dictionary<string, object> Params { get; set; } = new Dictionary<string, object>();
 
-        // 'departments' | 'flow' | 'stalePlans' | 'dueRisk' | 'trend'
+        // 'departments' | 'flow' | 'stalePlans' | 'dueRisk' | 'trend' | 'leadTime' | 'abnormalDwell'
         public string ReportRef { get; set; } = null!;
     }
 

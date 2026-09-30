@@ -582,9 +582,11 @@ namespace Jewelry.Service.Production.Plan
             string receiptRunning,
             bool isSkibByCVD)
         {
+            TbtProductionPlanStatusHeader? newStatus = null;
+
             if (isSkibByCVD == false)
             {
-                var newStatus = CreateNewStatus(plan, request, data.DateNow);
+                newStatus = CreateNewStatus(plan, request, data.DateNow);
                 data.NewStatuses.Add(newStatus);
 
                 //new status detial
@@ -618,7 +620,12 @@ namespace Jewelry.Service.Production.Plan
             plan.Status = currentStatus.GetWatingStatus(isCvd);
             plan.UpdateDate = data.DateNow;
 
-
+            // ไม่มีสถานะรอสำหรับ target นี้ (เช่น CVD→ราคา, สำเร็จ, ออกแบบ) — plan.Status ลงเอยเท่ากับ
+            // request.TargetStatus ตรงๆ ถือว่า "รับงาน" ทันทีที่โอน บันทึกเวลารับงานลง header ที่เพิ่งสร้าง
+            if (newStatus != null && plan.Status == request.TargetStatus)
+            {
+                newStatus.ReceiveDate = data.DateNow;
+            }
 
             plan.UpdateBy = CurrentUsername;
             data.UpdatePlans.Add(plan);

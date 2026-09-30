@@ -5,11 +5,16 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Wip = jewelry.Model.Production.Insight.Wip;
 using WipTrend = jewelry.Model.Production.Insight.WipTrend;
 using DueRiskPlans = jewelry.Model.Production.Insight.DueRiskPlans;
+using StageLeadTime = jewelry.Model.Production.Insight.StageLeadTime;
+using AbnormalDwellPlans = jewelry.Model.Production.Insight.AbnormalDwellPlans;
+using StageStandards = jewelry.Model.Production.Insight.StageStandards;
+using SaveStageStandards = jewelry.Model.Production.Insight.SaveStageStandards;
 using StalePlans = jewelry.Model.Report.Executive.StalePlans;
 
 namespace Jewelry.Api.Controllers.Production
@@ -93,6 +98,96 @@ namespace Jewelry.Api.Controllers.Production
             {
                 var response = await _service.DueRiskPlans(request);
                 return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("StageLeadTime")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(StageLeadTime.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> StageLeadTime([FromBody] StageLeadTime.Request request)
+        {
+            try
+            {
+                var response = await _service.StageLeadTime(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("AbnormalDwellPlans")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> AbnormalDwellPlans([FromBody] AbnormalDwellPlans.Request request)
+        {
+            try
+            {
+                var response = await _service.AbnormalDwellPlans(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("StageStandards")]
+        [HttpGet]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<StageStandards.Item>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> StageStandards()
+        {
+            try
+            {
+                var response = await _service.GetStageStandards();
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("StageStandardHistory")]
+        [HttpGet]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<StageStandards.Item>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> StageStandardHistory([FromQuery] string deptKey)
+        {
+            try
+            {
+                var response = await _service.GetStageStandardHistory(deptKey);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("SaveStageStandards")]
+        [HttpPost]
+        [RequirePermission("production:standard-edit")]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> SaveStageStandards([FromBody] SaveStageStandards.Request request)
+        {
+            try
+            {
+                await _service.SaveStageStandards(request);
+                return Ok();
             }
             catch (Exception ex)
             {

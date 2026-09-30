@@ -1427,6 +1427,10 @@ namespace Jewelry.Service.ProductionPlan
             var newStatus = CreateNewStatus(plan, request, data.DateNow);
             data.NewStatuses.Add(newStatus);
 
+            // flow เก่านี้ (ProductionPlanController.ProductionPlanTransfer — ไม่มี UI caller ปัจจุบัน แต่ handle
+            // ไว้เพื่อ consistency) ไม่มีแนวคิดสถานะ "รอ" เลย — plan.Status = target ตรงๆ เสมอ ถือว่า "รับงาน" ทันที
+            newStatus.ReceiveDate = data.DateNow;
+
             var transferStatus = CreateTransferStatus(plan, request, data.Running, data.DateNow);
             data.TransferStatuses.Add(transferStatus);
 
@@ -1836,9 +1840,25 @@ namespace Jewelry.Service.ProductionPlan
 
             if (currentStatus.IsUpdateByWatingStatus(targetStatus))
             {
-                plan.Status = currentStatus.GetNextStatus();
-                plan.UpdateDate = DateTime.UtcNow;
+                var now = DateTime.UtcNow;
+                var nextStatus = currentStatus.GetNextStatus();
+
+                plan.Status = nextStatus;
+                plan.UpdateDate = now;
                 plan.UpdateBy = CurrentUsername;
+
+                // พ้นสถานะรอ (wait) เข้าสถานะทำงานจริงแล้ว — บันทึกเวลา "รับงาน" ลง header ที่ active อยู่ ณ
+                // สถานะใหม่นี้ที่ยังไม่เคยรับมาก่อน (ReceiveDate เป็น null) — query เดียว ไม่ใช้ GroupBy.First()
+                var activeHeader = await _jewelryContext.TbtProductionPlanStatusHeader
+                    .Where(h => h.ProductionPlanId == plan.Id && h.Status == nextStatus && h.IsActive && h.ReceiveDate == null)
+                    .OrderByDescending(h => h.CreateDate)
+                    .FirstOrDefaultAsync();
+
+                if (activeHeader != null)
+                {
+                    activeHeader.ReceiveDate = now;
+                    _jewelryContext.TbtProductionPlanStatusHeader.Update(activeHeader);
+                }
 
                 _jewelryContext.TbtProductionPlan.Update(plan);
                 await _jewelryContext.SaveChangesAsync();
@@ -3030,6 +3050,19 @@ namespace Jewelry.Service.ProductionPlan
                 if (plan.Status == ProductionPlanStatus.WaitPrice)
                 {
                     plan.Status = ProductionPlanStatus.Price;
+
+                    // พ้นสถานะรอ (WaitPrice 94) เข้าทำบัตรต้นทุนจริง (Price 95) แล้ว — บันทึกเวลารับงาน
+                    // ลง header ที่ active อยู่ ณ สถานะใหม่นี้ที่ยังไม่เคยรับมาก่อน — query เดียว ไม่ใช้ GroupBy.First()
+                    var priceHeader = await _jewelryContext.TbtProductionPlanStatusHeader
+                        .Where(h => h.ProductionPlanId == plan.Id && h.Status == ProductionPlanStatus.Price && h.IsActive && h.ReceiveDate == null)
+                        .OrderByDescending(h => h.CreateDate)
+                        .FirstOrDefaultAsync();
+
+                    if (priceHeader != null)
+                    {
+                        priceHeader.ReceiveDate = plan.UpdateDate;
+                        _jewelryContext.TbtProductionPlanStatusHeader.Update(priceHeader);
+                    }
                 }
 
                 _jewelryContext.TbtProductionPlan.Update(plan);

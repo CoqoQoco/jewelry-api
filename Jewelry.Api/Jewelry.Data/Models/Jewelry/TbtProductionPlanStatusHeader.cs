@@ -33,6 +33,9 @@ public partial class TbtProductionPlanStatusHeader
 
     public decimal? GoldLossPrice { get; set; }
 
+    // เวลาที่พ้นสถานะรอ (wait) เข้าทำงานจริง (work) — null = ยังไม่รับงาน หรือเป็นข้อมูลเก่าก่อน migration นี้
+    public DateTime? ReceiveDate { get; set; }
+
     public virtual TbtProductionPlan ProductionPlan { get; set; } = null!;
 
     public virtual TbmProductionPlanStatus StatusNavigation { get; set; } = null!;

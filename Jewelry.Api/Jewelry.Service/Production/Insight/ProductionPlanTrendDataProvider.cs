@@ -24,9 +24,9 @@ namespace Jewelry.Service.Production.Insight
             _cache = cache;
         }
 
-        public async Task<(List<ProductionPlanTrendEvaluator.PlanTrendRow> Plans, List<ProductionPlanFlowCalculator.HeaderRow> Headers)> GetTrendDataAsync()
+        public async Task<(List<ProductionPlanTrendEvaluator.PlanTrendRow> Plans, List<ProductionPlanFlowCalculator.HeaderRow> Headers, DateTime? MinReceiveDate)> GetTrendDataAsync()
         {
-            if (_cache.TryGetValue<(List<ProductionPlanTrendEvaluator.PlanTrendRow>, List<ProductionPlanFlowCalculator.HeaderRow>)>(CacheKey, out var cached))
+            if (_cache.TryGetValue<(List<ProductionPlanTrendEvaluator.PlanTrendRow>, List<ProductionPlanFlowCalculator.HeaderRow>, DateTime?)>(CacheKey, out var cached))
             {
                 return cached;
             }
@@ -38,7 +38,8 @@ namespace Jewelry.Service.Production.Insight
                 {
                     Id = p.Id,
                     CreateDate = p.CreateDate,
-                    CompletedDate = p.CompletedDate
+                    CompletedDate = p.CompletedDate,
+                    Status = p.Status
                 })
                 .ToListAsync();
 
@@ -49,11 +50,16 @@ namespace Jewelry.Service.Production.Insight
                 {
                     ProductionPlanId = h.ProductionPlanId,
                     Status = h.Status,
-                    CreateDate = h.CreateDate
+                    CreateDate = h.CreateDate,
+                    ReceiveDate = h.ReceiveDate
                 })
                 .ToListAsync();
 
-            var result = (plans, headers);
+            // MinReceiveDate: คำนวณจาก headers ที่โหลดมาแล้วในหน่วยความจำเลย ไม่ query DB เพิ่ม (ฟรี — ข้อมูลมีอยู่แล้ว)
+            var receiveDates = headers.Where(h => h.ReceiveDate.HasValue).Select(h => h.ReceiveDate!.Value).ToList();
+            var minReceiveDate = receiveDates.Count > 0 ? receiveDates.Min() : (DateTime?)null;
+
+            var result = (plans, headers, minReceiveDate);
             _cache.Set(CacheKey, result, CacheTtl);
             return result;
         }

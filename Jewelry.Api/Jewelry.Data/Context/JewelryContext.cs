@@ -152,6 +152,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionPrePlanMaterial> TbtProductionPrePlanMaterial { get; set; }
 
+    public virtual DbSet<TbtProductionStageStandard> TbtProductionStageStandard { get; set; }
+
     public virtual DbSet<TbtStockBasket> TbtStockBasket { get; set; }
 
     public virtual DbSet<TbtStockBasketItem> TbtStockBasketItem { get; set; }
@@ -2068,6 +2070,7 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("worker_name");
             entity.Property(e => e.GoldLossPrice).HasColumnName("gold_loss_price");
+            entity.Property(e => e.ReceiveDate).HasColumnName("receive_date");
 
             entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TbtProductionPlanStatusHeader)
                 .HasForeignKey(d => d.ProductionPlanId)
@@ -3799,6 +3802,31 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(d => d.PrePlanItemId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("tbt_production_pre_plan_material_item_fk");
+        });
+
+        modelBuilder.Entity<TbtProductionStageStandard>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_production_stage_standard_pk");
+            entity.ToTable("tbt_production_stage_standard");
+
+            entity.HasIndex(e => new { e.DeptKey, e.EffectiveFrom })
+                .HasDatabaseName("idx_tbt_production_stage_standard_dept_effective");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.DeptKey)
+                .HasColumnType("character varying")
+                .HasColumnName("dept_key");
+            entity.Property(e => e.StandardDays).HasColumnName("standard_days");
+            entity.Property(e => e.EffectiveFrom).HasColumnName("effective_from");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
         });
 
         modelBuilder.Entity<TbmPrintLayout>(entity =>

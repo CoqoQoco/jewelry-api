@@ -1249,6 +1249,7 @@ namespace Jewelry.Service.Receipt.Gem
                         }
 
                         var headerByStatus = new Dictionary<int, int>();
+                        var headerEntityByStatus = new Dictionary<int, TbtProductionPlanStatusHeader>();
                         async Task<int> GetOrCreateHeaderId(int targetStatus)
                         {
                             if (headerByStatus.TryGetValue(targetStatus, out var cachedId))
@@ -1261,6 +1262,7 @@ namespace Jewelry.Service.Receipt.Gem
                                 existing.UpdateBy = CurrentUsername;
                                 updatePlanHeader.Add(existing);
                                 headerByStatus[targetStatus] = existing.Id;
+                                headerEntityByStatus[targetStatus] = existing;
                                 return existing.Id;
                             }
 
@@ -1280,6 +1282,7 @@ namespace Jewelry.Service.Receipt.Gem
                             await _jewelryContext.SaveChangesAsync();
                             updatePlanHeader.Add(addStatusHeader);
                             headerByStatus[targetStatus] = addStatusHeader.Id;
+                            headerEntityByStatus[targetStatus] = addStatusHeader;
                             return addStatusHeader.Id;
                         }
 
@@ -1318,6 +1321,14 @@ namespace Jewelry.Service.Receipt.Gem
                                 matchPlanGroup.UpdateDate = DateTime.UtcNow;
                                 matchPlanGroup.UpdateBy = CurrentUsername;
                                 updatePlan.Add(matchPlanGroup);
+
+                                // เส้นทางนี้ไม่มีสถานะ "รอ" เลย (ออกแบบ 10 -> คัดพลอย 70 ตรงๆ ตอนเบิกพลอย)
+                                // ถือว่า "รับงาน" ทันที — header ตัวนี้ถูก track ไว้ใน updatePlanHeader แล้วจาก
+                                // GetOrCreateHeaderId ไม่ต้อง add ซ้ำ
+                                if (headerEntityByStatus.TryGetValue(targetStatus, out var gemHeader) && gemHeader.ReceiveDate == null)
+                                {
+                                    gemHeader.ReceiveDate = matchPlanGroup.UpdateDate;
+                                }
                             }
                         }
                     }

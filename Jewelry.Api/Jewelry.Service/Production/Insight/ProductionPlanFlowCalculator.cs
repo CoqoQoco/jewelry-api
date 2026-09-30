@@ -15,6 +15,10 @@ namespace Jewelry.Service.Production.Insight
             public int ProductionPlanId { get; set; }
             public int Status { get; set; }
             public DateTime CreateDate { get; set; }
+
+            // เวลาที่พ้นสถานะรอ (wait) เข้าทำงานจริง — null = ยังไม่รับงาน หรือเป็นข้อมูลเก่าก่อนเริ่มเก็บ (ดู
+            // ProductionStageLeadTimeEvaluator สำหรับการใช้งาน — ไฟล์นี้เองไม่ใช้ ReceiveDate เลย แค่ขนผ่าน)
+            public DateTime? ReceiveDate { get; set; }
         }
 
         public class PlanCreationRow

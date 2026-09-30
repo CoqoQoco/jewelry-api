@@ -1,8 +1,13 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Kendo.DynamicLinqCore;
 using Wip = jewelry.Model.Production.Insight.Wip;
 using WipTrend = jewelry.Model.Production.Insight.WipTrend;
 using DueRiskPlans = jewelry.Model.Production.Insight.DueRiskPlans;
+using StageLeadTime = jewelry.Model.Production.Insight.StageLeadTime;
+using AbnormalDwellPlans = jewelry.Model.Production.Insight.AbnormalDwellPlans;
+using StageStandards = jewelry.Model.Production.Insight.StageStandards;
+using SaveStageStandards = jewelry.Model.Production.Insight.SaveStageStandards;
 using StalePlans = jewelry.Model.Report.Executive.StalePlans;
 
 namespace Jewelry.Service.Production.Insight
@@ -13,5 +18,10 @@ namespace Jewelry.Service.Production.Insight
         Task<WipTrend.Response> WipTrend(WipTrend.Request request);
         Task<DataSourceResult> StalePlans(StalePlans.Request request);
         Task<DataSourceResult> DueRiskPlans(DueRiskPlans.Request request);
+        Task<StageLeadTime.Response> StageLeadTime(StageLeadTime.Request request);
+        Task<DataSourceResult> AbnormalDwellPlans(AbnormalDwellPlans.Request request);
+        Task<List<StageStandards.Item>> GetStageStandards();
+        Task<List<StageStandards.Item>> GetStageStandardHistory(string deptKey);
+        Task SaveStageStandards(SaveStageStandards.Request request);
     }
 }

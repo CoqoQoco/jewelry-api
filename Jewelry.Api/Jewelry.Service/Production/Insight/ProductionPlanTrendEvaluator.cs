@@ -33,6 +33,10 @@ namespace Jewelry.Service.Production.Insight
             public int Id { get; set; }
             public DateTime CreateDate { get; set; }
             public DateTime? CompletedDate { get; set; }
+
+            // สถานะปัจจุบัน (snapshot ณ เวลาที่โหลดข้อมูล) — ใช้เฉพาะ ProductionStageLeadTimeEvaluator สำหรับ
+            // เช็ค visit ที่ยังไม่จบว่า "ยังรออยู่" หรือ "เริ่มทำงานแล้วแต่ไม่มี ReceiveDate" (ข้อมูลเก่า)
+            public int Status { get; set; }
         }
 
         public class WipSnapshot
@@ -41,10 +45,15 @@ namespace Jewelry.Service.Production.Insight
             public Dictionary<string, int> ByDept { get; set; } = new Dictionary<string, int>();
         }
 
-        private class TimelineEntry
+        // internal — reused โดย ProductionStageLeadTimeEvaluator (visit computation) เพื่อไม่ให้ต้องสร้าง
+        // timeline (synthetic design entry + exit fallback) ซ้ำ
+        internal class TimelineEntry
         {
             public DateTime Time;
             public int Status;
+
+            // มีค่าเฉพาะ entry ที่มาจาก header จริง (ไม่ใช่ synthetic ออกแบบ/exit) — null ถ้ายังไม่รับงาน
+            public DateTime? ReceiveDate;
         }
 
         // ---- Bucket generation ----
@@ -113,7 +122,7 @@ namespace Jewelry.Service.Production.Insight
 
         // ---- Timeline (สถานะของแผนตามเวลา) ----
 
-        private static Dictionary<int, List<TimelineEntry>> BuildTimelines(
+        internal static Dictionary<int, List<TimelineEntry>> BuildTimelines(
             IReadOnlyList<PlanTrendRow> plans,
             IReadOnlyList<ProductionPlanFlowCalculator.HeaderRow> headers)
         {
@@ -131,7 +140,7 @@ namespace Jewelry.Service.Production.Insight
                 {
                     foreach (var h in planHeaders)
                     {
-                        timeline.Add(new TimelineEntry { Time = h.CreateDate, Status = h.Status });
+                        timeline.Add(new TimelineEntry { Time = h.CreateDate, Status = h.Status, ReceiveDate = h.ReceiveDate });
                         if (h.Status == StatusCompleted || h.Status == StatusMelted) hasTerminalHeader = true;
                     }
                 }
