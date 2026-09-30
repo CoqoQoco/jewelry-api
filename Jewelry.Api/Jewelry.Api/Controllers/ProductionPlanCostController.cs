@@ -93,6 +93,7 @@ namespace Jewelry.Api.Controllers
 
         [Route("CreateGoldCost")]
         [HttpPost]
+        [RequirePermission("production:edit", "production:create")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -110,6 +111,7 @@ namespace Jewelry.Api.Controllers
         }
         [Route("UpdateGoldCost")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]

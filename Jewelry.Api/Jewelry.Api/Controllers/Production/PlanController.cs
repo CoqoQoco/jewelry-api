@@ -90,6 +90,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("Transfer")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.Transfer.Response))]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -162,6 +163,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("GoldLossMonthlyReportSave")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]

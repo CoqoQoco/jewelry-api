@@ -44,6 +44,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("ProductionPlanCreate")]
         [HttpPost]
+        [RequirePermission("production:edit", "production:create")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(ProductionPlanCreateResponse))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -61,6 +62,7 @@ namespace Jewelry.Api.Controllers.Production
         }
         [Route("ProductionPlanCreateImage")]
         [HttpPost]
+        [RequirePermission("production:edit", "production:create")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(ProductionPlanCreateResponse))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -177,6 +179,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("ProductionPlanUpdateStatus")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -218,6 +221,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("ProductionPlanUpdateHeader")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -236,6 +240,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("ProductionPlanDeleteMaterial")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -254,6 +259,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("ProductionPlanUpdateMaterial")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -273,6 +279,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("ProductionPlanTransfer")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(TransferResponse))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -291,6 +298,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("ProductionPlanUpdateStatusDetail")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -310,6 +318,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("ProductionPlanAddStatusDetail")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -327,6 +336,7 @@ namespace Jewelry.Api.Controllers.Production
         }
         [Route("OldProductionPlanUpdateStatusDetail")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -344,6 +354,7 @@ namespace Jewelry.Api.Controllers.Production
         }
         [Route("ProductionPlanDeleteStatusDetail")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -400,6 +411,7 @@ namespace Jewelry.Api.Controllers.Production
         }
         [Route("CreatePrice")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(string))]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -419,6 +431,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("GoldLossUpdate")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
         public async Task<IActionResult> GoldLossUpdate([FromBody] GoldLossUpdateRequest request)

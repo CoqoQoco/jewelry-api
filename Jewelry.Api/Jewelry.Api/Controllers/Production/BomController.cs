@@ -50,6 +50,7 @@ namespace Jewelry.Api.Controllers.Production
 
         [Route("Save")]
         [HttpPost]
+        [RequirePermission("production:edit")]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Base.Response))]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
