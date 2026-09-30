@@ -8,6 +8,7 @@ using System;
 using System.Net;
 using System.Threading.Tasks;
 using Wip = jewelry.Model.Production.Insight.Wip;
+using WipTrend = jewelry.Model.Production.Insight.WipTrend;
 using DueRiskPlans = jewelry.Model.Production.Insight.DueRiskPlans;
 using StalePlans = jewelry.Model.Report.Executive.StalePlans;
 
@@ -37,6 +38,24 @@ namespace Jewelry.Api.Controllers.Production
             try
             {
                 var response = await _service.Wip(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("WipTrend")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(WipTrend.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> WipTrend([FromBody] WipTrend.Request request)
+        {
+            try
+            {
+                var response = await _service.WipTrend(request);
                 return Ok(response);
             }
             catch (Exception ex)

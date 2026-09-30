@@ -25,7 +25,7 @@ namespace jewelry.Model.Production.Insight.Wip
 
         public Dictionary<string, object> Params { get; set; } = new Dictionary<string, object>();
 
-        // 'departments' | 'flow' | 'stalePlans' | 'dueRisk'
+        // 'departments' | 'flow' | 'stalePlans' | 'dueRisk' | 'trend'
         public string ReportRef { get; set; } = null!;
     }
 
@@ -61,8 +61,14 @@ namespace jewelry.Model.Production.Insight.Wip
     public class FlowReportItem
     {
         public string Key { get; set; } = null!;
+
+        // ชื่อเดิม (compat) — ค่าเดียวกับ Inflow/Outflow เสมอ ไม่ใช่ fix 90 วันอีกต่อไป (ตาม range ของ request)
         public int Inflow90d { get; set; }
         public int Outflow90d { get; set; }
+
+        // ฟิลด์ใหม่ทั่วไป — UI จะสลับมาใช้ตัวนี้แทน
+        public int Inflow { get; set; }
+        public int Outflow { get; set; }
         public int Net { get; set; }
     }
 }

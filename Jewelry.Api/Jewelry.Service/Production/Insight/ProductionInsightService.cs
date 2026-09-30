@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using ProductionPlanStatusConst = jewelry.Model.Constant.ProductionPlanStatus;
 using Wip = jewelry.Model.Production.Insight.Wip;
+using WipTrend = jewelry.Model.Production.Insight.WipTrend;
 using DueRiskPlans = jewelry.Model.Production.Insight.DueRiskPlans;
 using StalePlans = jewelry.Model.Report.Executive.StalePlans;
 using ExecutiveProductionWip = jewelry.Model.Report.Executive.ProductionWip;
@@ -22,17 +23,20 @@ namespace Jewelry.Service.Production.Insight
         private readonly JewelryContext _jewelryContext;
         private readonly IProductionPlanWipHelper _wipHelper;
         private readonly IExecutiveReportService _executiveReportService;
+        private readonly IProductionPlanTrendDataProvider _trendDataProvider;
 
         public ProductionInsightService(
             JewelryContext jewelryContext,
             IHttpContextAccessor httpContextAccessor,
             IProductionPlanWipHelper wipHelper,
-            IExecutiveReportService executiveReportService)
+            IExecutiveReportService executiveReportService,
+            IProductionPlanTrendDataProvider trendDataProvider)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _wipHelper = wipHelper;
             _executiveReportService = executiveReportService;
+            _trendDataProvider = trendDataProvider;
         }
 
         public async Task<Wip.Response> Wip(Wip.Request request)
@@ -40,6 +44,11 @@ namespace Jewelry.Service.Production.Insight
             var now = DateTime.UtcNow;
             var staleDays = request.StaleDays > 0 ? request.StaleDays : ProductionInsightThresholds.DefaultStaleDays;
             var riskWindowDays = request.RiskWindowDays > 0 ? request.RiskWindowDays : ProductionInsightThresholds.DefaultRiskWindowDays;
+            var growthThresholdPercent = request.GrowthThresholdPercent > 0 ? request.GrowthThresholdPercent : ProductionInsightThresholds.DefaultGrowthThresholdPercent;
+
+            // ช่วงของ report.flow/FC_BOTTLENECK/WIP_DEPT_GROWING เท่านั้น — กฎ snapshot อื่นยึด "ตอนนี้" เสมอ
+            var rangeStart = request.Start?.UtcDateTime ?? now.AddDays(-ProductionInsightThresholds.DefaultFlowRangeDays);
+            var rangeEnd = request.End?.UtcDateTime ?? now;
 
             var openPlans = await _wipHelper.GetOpenPlansAsync();
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
@@ -88,11 +97,13 @@ namespace Jewelry.Service.Production.Insight
                 }
             }
 
-            // ---- Flow (inflow/outflow 90 วันล่าสุด ต่อแผนก) ----
-            var headerWindowStartUtc = now.AddDays(-180);
+            // ---- Flow (inflow/outflow ในช่วง [rangeStart, rangeEnd] ต่อแผนก — ค่า default คือ 90 วันล่าสุดเหมือนเดิม) ----
+            // buffer โหลด header ย้อนก่อน rangeStart เท่ากับความยาวช่วงเอง (เดิม 90/180 คือ x2 พอดี) เผื่อหา prev ของ transition แรกในช่วง
+            var rangeSpan = rangeEnd > rangeStart ? rangeEnd - rangeStart : TimeSpan.Zero;
+            var headerWindowStartUtc = rangeStart - rangeSpan;
             var headerRows = await _jewelryContext.TbtProductionPlanStatusHeader
                 .AsNoTracking()
-                .Where(h => h.CreateDate >= headerWindowStartUtc && h.ProductionPlan.IsActive == true)
+                .Where(h => h.CreateDate >= headerWindowStartUtc && h.CreateDate <= rangeEnd && h.ProductionPlan.IsActive == true)
                 .Select(h => new ProductionPlanFlowCalculator.HeaderRow
                 {
                     ProductionPlanId = h.ProductionPlanId,
@@ -101,8 +112,14 @@ namespace Jewelry.Service.Production.Insight
                 })
                 .ToListAsync();
 
-            var flowWindowStartUtc = now.AddDays(-90);
-            var flowByDept = ProductionPlanFlowCalculator.ComputeFlow(headerRows, ProductionPlanDepartments.DepartmentKeyOf, flowWindowStartUtc);
+            // แผนที่ถือกำเนิดในช่วงนี้ (ไม่ต้อง buffer — ใช้ rangeStart ตรงๆ) → inflow เข้าแผนกออกแบบ
+            var planCreationRows = await _jewelryContext.TbtProductionPlan
+                .AsNoTracking()
+                .Where(p => p.IsActive == true && p.CreateDate >= rangeStart && p.CreateDate <= rangeEnd)
+                .Select(p => new ProductionPlanFlowCalculator.PlanCreationRow { ProductionPlanId = p.Id, CreateDate = p.CreateDate })
+                .ToListAsync();
+
+            var flowByDept = ProductionPlanFlowCalculator.ComputeFlow(headerRows, planCreationRows, ProductionPlanDepartments.DepartmentKeyOf, rangeStart);
 
             // ---- report.departments — reuse ExecutiveReport/ProductionWip ตรงๆ (fixed 30d/180d เหมือนเดิม) ----
             var executiveWip = await _executiveReportService.ProductionWip(new ExecutiveProductionWip.Request());
@@ -123,9 +140,18 @@ namespace Jewelry.Service.Production.Insight
                     Key = d.Key,
                     Inflow90d = flow.Inflow,
                     Outflow90d = flow.Outflow,
+                    Inflow = flow.Inflow,
+                    Outflow = flow.Outflow,
                     Net = flow.Inflow - flow.Outflow
                 };
             }).ToList();
+
+            // ---- WIP_DEPT_GROWING (ใช้ WipTrend evaluator แค่ 2 จุดเวลา start/end ไม่ต้องทำ bucket) ----
+            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var growthSnapshots = ProductionPlanTrendEvaluator.ComputeWipCountsAtTimes(
+                trendData.Plans, trendData.Headers, ProductionPlanDepartments.DepartmentKeyOf, new[] { rangeStart, rangeEnd });
+            var growthStartSnapshot = growthSnapshots[rangeStart];
+            var growthEndSnapshot = growthSnapshots[rangeEnd];
 
             // ---- Rules ----
             var problems = new List<Wip.Finding>();
@@ -133,6 +159,13 @@ namespace Jewelry.Service.Production.Insight
             AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateWipOverdue(overdueCount, openCount));
             AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateWipDeptStaleTop(staleByDept, staleCount));
             AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateWipMeltedOpen(meltedOpenCount));
+
+            foreach (var dept in ProductionPlanDepartments.Departments)
+            {
+                var startWip = growthStartSnapshot.ByDept.GetValueOrDefault(dept.Key, 0);
+                var endWip = growthEndSnapshot.ByDept.GetValueOrDefault(dept.Key, 0);
+                AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateWipDeptGrowing(dept.Key, startWip, endWip, growthThresholdPercent));
+            }
 
             var forecasts = new List<Wip.Finding>();
             AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcBecomingStale(becomingStaleCount, riskWindowDays));
@@ -162,6 +195,24 @@ namespace Jewelry.Service.Production.Insight
                     MeltedOpenCount = meltedOpenCount
                 }
             };
+        }
+
+        public async Task<WipTrend.Response> WipTrend(WipTrend.Request request)
+        {
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var bucket = string.Equals(request.Bucket, "month", StringComparison.OrdinalIgnoreCase) ? "month" : "week";
+
+            var trendData = await _trendDataProvider.GetTrendDataAsync();
+
+            return ProductionPlanTrendEvaluator.EvaluateTrend(
+                trendData.Plans,
+                trendData.Headers,
+                ProductionPlanDepartments.DepartmentKeyOf,
+                ProductionPlanDepartments.Departments,
+                start,
+                end,
+                bucket);
         }
 
         // contract เดียวกับ ExecutiveReport/StalePlans เป๊ะๆ — delegate ตรงๆ ให้ผู้ใช้ที่มีแค่ production:view เข้าถึงได้

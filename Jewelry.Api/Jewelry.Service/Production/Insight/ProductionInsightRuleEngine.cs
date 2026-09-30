@@ -140,6 +140,33 @@ namespace Jewelry.Service.Production.Insight
             };
         }
 
+        // deltaPercent = null เมื่อ startWip = 0 (คำนวณ % การเติบโตไม่ได้) — ถือว่าไม่ trigger
+        // เรียกได้หลายครั้งต่อแผนก (ต่างจาก rule อื่นที่ trigger ได้ครั้งเดียว) — Code ซ้ำกันได้ในรายการ problems
+        public static Wip.Finding? EvaluateWipDeptGrowing(string deptKey, int startWip, int endWip, int thresholdPercent)
+        {
+            if (startWip <= 0) return null;
+
+            var deltaPercent = Math.Round((decimal)(endWip - startWip) / startWip * 100, 2);
+            if (deltaPercent < thresholdPercent) return null;
+
+            var severity = deltaPercent >= thresholdPercent * 2 ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "WIP_DEPT_GROWING",
+                Severity = severity,
+                ReportRef = "trend",
+                Params = new Dictionary<string, object>
+                {
+                    ["deptKey"] = deptKey,
+                    ["startWip"] = startWip,
+                    ["endWip"] = endWip,
+                    ["deltaPercent"] = deltaPercent,
+                    ["thresholdPercent"] = thresholdPercent
+                }
+            };
+        }
+
         // 'critical' | 'warning' | 'ok' (ไม่มี finding เลย = ok)
         public static string WorstSeverity(IEnumerable<Wip.Finding> findings)
         {
@@ -154,23 +181,23 @@ namespace Jewelry.Service.Production.Insight
         {
             ("ACT_CLOSE_STALE", "deptHead", new[] { "WIP_STALE", "FC_BECOMING_STALE" }),
             ("ACT_PRIORITIZE_DUE", "planner", new[] { "WIP_OVERDUE", "FC_DUE_SOON_AT_RISK" }),
-            ("ACT_STAGE_SLA", "productionManager", new[] { "WIP_DEPT_STALE_TOP", "FC_BOTTLENECK" }),
+            ("ACT_STAGE_SLA", "productionManager", new[] { "WIP_DEPT_STALE_TOP", "FC_BOTTLENECK", "WIP_DEPT_GROWING" }),
             ("ACT_CLOSE_MELTED", "goldControl", new[] { "WIP_MELTED_OPEN" })
         };
 
         // priority: เรียงตาม severity ที่แย่ที่สุดของ finding ที่เกี่ยวข้องก่อน (critical > warning) แล้วตามลำดับ
         // ที่ประกาศไว้ใน ActionDefinitions — ข้าม action ที่ไม่มี related code ไหนถูก trigger เลย
+        // ใช้ ILookup ไม่ใช่ Dictionary เพราะ WIP_DEPT_GROWING trigger ได้หลายครั้ง (Code ซ้ำกันได้ในรายการ)
         public static List<Wip.ActionItem> BuildActions(IReadOnlyList<Wip.Finding> problems, IReadOnlyList<Wip.Finding> forecasts)
         {
-            var findingsByCode = problems.Concat(forecasts).ToDictionary(f => f.Code, f => f);
+            var findingsByCode = problems.Concat(forecasts).ToLookup(f => f.Code);
             var built = new List<(Wip.ActionItem Action, int SeverityRank, int DeclaredIndex)>();
 
             for (var i = 0; i < ActionDefinitions.Length; i++)
             {
                 var def = ActionDefinitions[i];
                 var relatedFindings = def.RelatedCodes
-                    .Where(findingsByCode.ContainsKey)
-                    .Select(code => findingsByCode[code])
+                    .SelectMany(code => findingsByCode[code])
                     .ToList();
 
                 if (relatedFindings.Count == 0) continue;
@@ -204,7 +231,7 @@ namespace Jewelry.Service.Production.Insight
             _ => 2
         };
 
-        private static Dictionary<string, object> BuildActionParams(string actionCode, Dictionary<string, Wip.Finding> findings)
+        private static Dictionary<string, object> BuildActionParams(string actionCode, ILookup<string, Wip.Finding> findings)
         {
             switch (actionCode)
             {
@@ -221,7 +248,9 @@ namespace Jewelry.Service.Production.Insight
                 }
                 case "ACT_STAGE_SLA":
                 {
-                    var deptKey = GetParam(findings, "WIP_DEPT_STALE_TOP", "deptKey") ?? GetParam(findings, "FC_BOTTLENECK", "deptKey");
+                    var deptKey = GetParam(findings, "WIP_DEPT_STALE_TOP", "deptKey")
+                        ?? GetParam(findings, "FC_BOTTLENECK", "deptKey")
+                        ?? GetParam(findings, "WIP_DEPT_GROWING", "deptKey");
                     return new Dictionary<string, object> { ["deptKey"] = deptKey ?? string.Empty };
                 }
                 case "ACT_CLOSE_MELTED":
@@ -234,9 +263,11 @@ namespace Jewelry.Service.Production.Insight
             }
         }
 
-        private static object? GetParam(Dictionary<string, Wip.Finding> findings, string code, string paramKey)
+        // เอา finding แรกของ code นั้น (เรียงตามลำดับแผนกที่ declare ไว้ — เพียงพอสำหรับ param เดี่ยวแบบนี้)
+        private static object? GetParam(ILookup<string, Wip.Finding> findings, string code, string paramKey)
         {
-            return findings.TryGetValue(code, out var finding) && finding.Params.TryGetValue(paramKey, out var value) ? value : null;
+            var finding = findings[code].FirstOrDefault();
+            return finding != null && finding.Params.TryGetValue(paramKey, out var value) ? value : null;
         }
 
         private static decimal PercentOf(int part, int total)

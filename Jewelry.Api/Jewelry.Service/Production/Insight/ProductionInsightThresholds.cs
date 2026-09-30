@@ -5,6 +5,10 @@ namespace Jewelry.Service.Production.Insight
     {
         public const int DefaultStaleDays = 180;
         public const int DefaultRiskWindowDays = 30;
+        public const int DefaultFlowRangeDays = 90;
+
+        // WIP_DEPT_GROWING: deltaPercent >= ค่านี้ ถือว่า trigger (warning), >= 2 เท่า ถือว่า critical
+        public const int DefaultGrowthThresholdPercent = 20;
 
         // WIP_STALE: percent ของ stale ต่อ open ทั้งหมด >= ค่านี้ ถือว่า critical (ไม่ถึง = warning)
         public const int WipStalePercentCritical = 10;
