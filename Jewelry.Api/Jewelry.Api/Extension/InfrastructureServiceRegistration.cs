@@ -160,6 +160,8 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionPlanWipHelper, ProductionPlanWipHelper>();
             services.AddScoped<IProductionPlanTrendDataProvider, ProductionPlanTrendDataProvider>();
             services.AddScoped<IProductionStageStandardService, ProductionStageStandardService>();
+            services.AddScoped<IProductionDeliveryDataProvider, ProductionDeliveryDataProvider>();
+            services.AddScoped<IProductionDeliveryTargetService, ProductionDeliveryTargetService>();
             services.AddScoped<IExecutiveReportService, ExecutiveReportService>();
             services.AddScoped<IProductionInsightService, ProductionInsightService>();
 

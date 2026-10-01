@@ -154,6 +154,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionStageStandard> TbtProductionStageStandard { get; set; }
 
+    public virtual DbSet<TbtProductionDeliveryTarget> TbtProductionDeliveryTarget { get; set; }
+
     public virtual DbSet<TbtStockBasket> TbtStockBasket { get; set; }
 
     public virtual DbSet<TbtStockBasketItem> TbtStockBasketItem { get; set; }
@@ -3819,6 +3821,28 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("dept_key");
             entity.Property(e => e.StandardDays).HasColumnName("standard_days");
+            entity.Property(e => e.EffectiveFrom).HasColumnName("effective_from");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+        });
+
+        modelBuilder.Entity<TbtProductionDeliveryTarget>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_production_delivery_target_pk");
+            entity.ToTable("tbt_production_delivery_target");
+
+            entity.HasIndex(e => e.EffectiveFrom)
+                .HasDatabaseName("idx_tbt_production_delivery_target_effective");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.TargetPercent).HasColumnName("target_percent");
             entity.Property(e => e.EffectiveFrom).HasColumnName("effective_from");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")

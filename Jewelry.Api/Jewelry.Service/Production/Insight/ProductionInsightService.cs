@@ -19,6 +19,12 @@ using StageStandards = jewelry.Model.Production.Insight.StageStandards;
 using SaveStageStandards = jewelry.Model.Production.Insight.SaveStageStandards;
 using StalePlans = jewelry.Model.Report.Executive.StalePlans;
 using ExecutiveProductionWip = jewelry.Model.Report.Executive.ProductionWip;
+using Delivery = jewelry.Model.Production.Insight.Delivery;
+using DeliveryAtRiskPlans = jewelry.Model.Production.Insight.DeliveryAtRiskPlans;
+using DeliveryLatePlans = jewelry.Model.Production.Insight.DeliveryLatePlans;
+using StuckAfterCostCardPlans = jewelry.Model.Production.Insight.StuckAfterCostCardPlans;
+using DeliveryTarget = jewelry.Model.Production.Insight.DeliveryTarget;
+using SaveDeliveryTarget = jewelry.Model.Production.Insight.SaveDeliveryTarget;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -29,6 +35,8 @@ namespace Jewelry.Service.Production.Insight
         private readonly IExecutiveReportService _executiveReportService;
         private readonly IProductionPlanTrendDataProvider _trendDataProvider;
         private readonly IProductionStageStandardService _stageStandardService;
+        private readonly IProductionDeliveryDataProvider _deliveryDataProvider;
+        private readonly IProductionDeliveryTargetService _deliveryTargetService;
 
         public ProductionInsightService(
             JewelryContext jewelryContext,
@@ -36,7 +44,9 @@ namespace Jewelry.Service.Production.Insight
             IProductionPlanWipHelper wipHelper,
             IExecutiveReportService executiveReportService,
             IProductionPlanTrendDataProvider trendDataProvider,
-            IProductionStageStandardService stageStandardService)
+            IProductionStageStandardService stageStandardService,
+            IProductionDeliveryDataProvider deliveryDataProvider,
+            IProductionDeliveryTargetService deliveryTargetService)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
@@ -44,6 +54,8 @@ namespace Jewelry.Service.Production.Insight
             _executiveReportService = executiveReportService;
             _trendDataProvider = trendDataProvider;
             _stageStandardService = stageStandardService;
+            _deliveryDataProvider = deliveryDataProvider;
+            _deliveryTargetService = deliveryTargetService;
         }
 
         public async Task<Wip.Response> Wip(Wip.Request request)
@@ -563,6 +575,464 @@ namespace Jewelry.Service.Production.Insight
 
             var items = request.Items.Select(i => (i.DeptKey, i.StandardDays)).ToList();
             await _stageStandardService.SaveAsync(items, request.Remark, CurrentUsername);
+        }
+
+        // ---- Delivery (ส่งงานตรงเวลา) ----
+
+        // รวมข้อมูลที่ endpoint Delivery/DeliveryAtRiskPlans/DeliveryLatePlans/StuckAfterCostCardPlans ใช้ร่วมกัน
+        // โหลดครั้งเดียวต่อ request (ไม่ query ซ้ำข้าม endpoint — ตาม instruction "one pass loads")
+        private class DeliveryContext
+        {
+            public List<ProductionStageLeadTimeEvaluator.VisitRecord> Visits = null!;
+            public Dictionary<int, ProductionStageLeadTimeEvaluator.VisitRecord> OngoingVisitByPlanId = null!;
+            public Dictionary<string, double> MedianTotalByDept = null!;
+            public double CostCardExitToDoneMedian;
+            public HashSet<int> StalePlanIds = null!;
+            public List<OpenPlanRow> OpenPlans = null!;
+            public Dictionary<int, OpenPlanRow> OpenPlansById = null!;
+            public Dictionary<int, DateTime> LastMoveDates = null!;
+            public List<ProductionPlanTrendEvaluator.PlanTrendRow> AllPlans = null!;
+            public List<ProductionPlanFlowCalculator.HeaderRow> Headers = null!;
+            public Dictionary<int, DateTime> DoneDates = null!;
+        }
+
+        private async Task<DeliveryContext> LoadDeliveryContextAsync(DateTime now)
+        {
+            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var doneDates = await _deliveryDataProvider.GetDoneDatesAsync();
+            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+
+            var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
+            var stalePlanIds = new HashSet<int>(
+                openPlans.Where(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) < staleCutoff).Select(p => p.Id));
+
+            var visits = ProductionStageLeadTimeEvaluator.ComputeVisits(trendData.Plans, trendData.Headers, ProductionPlanDepartments.Departments, now);
+            var ongoingVisitByPlanId = visits.Where(v => !v.End.HasValue).ToDictionary(v => v.PlanId);
+
+            // median รวม (wait+work) ต่อแผนก ย้อนหลัง 90 วัน (DefaultFlowRangeDays) — ใช้คำนวณ projectedFinishDate
+            var medianWindowStart = now.AddDays(-ProductionInsightThresholds.DefaultFlowRangeDays);
+            var medianTotalByDept = new Dictionary<string, double>();
+            foreach (var dept in ProductionPlanDepartments.Departments)
+            {
+                var deptExitedTotals = visits
+                    .Where(v => v.DeptKey == dept.Key && v.End.HasValue && v.End.Value >= medianWindowStart && v.End.Value <= now)
+                    .Select(v => v.TotalDays)
+                    .ToList();
+                medianTotalByDept[dept.Key] = ProductionStageLeadTimeEvaluator.Median(deptExitedTotals);
+            }
+
+            var costCardExitToDoneMedian = ProductionDeliveryEvaluator.ComputeCostCardExitToDoneMedian(visits, doneDates) ?? 0;
+
+            return new DeliveryContext
+            {
+                Visits = visits,
+                OngoingVisitByPlanId = ongoingVisitByPlanId,
+                MedianTotalByDept = medianTotalByDept,
+                CostCardExitToDoneMedian = costCardExitToDoneMedian,
+                StalePlanIds = stalePlanIds,
+                OpenPlans = openPlans,
+                OpenPlansById = openPlans.ToDictionary(p => p.Id),
+                LastMoveDates = lastMoveDates,
+                AllPlans = trendData.Plans,
+                Headers = trendData.Headers,
+                DoneDates = doneDates
+            };
+        }
+
+        // at-risk = open, ไม่ stale, request_date อยู่ระหว่าง [now, now+horizon], projectedFinish > request_date
+        // (เทียบวันที่ไทย) — reuse โดย Delivery() (เอาแค่ count) และ DeliveryAtRiskPlans() (เอา list เต็ม)
+        private static List<(OpenPlanRow Plan, string? CurrentDeptKey, double DaysInCurrentDept, ProductionDeliveryEvaluator.AtRiskProjection Projection)>
+            ComputeAtRiskList(DeliveryContext ctx, DateTime now, int riskHorizonDays, string[]? departmentKeysFilter)
+        {
+            var windowEnd = now.AddDays(riskHorizonDays);
+            var deptFilter = departmentKeysFilter != null && departmentKeysFilter.Length > 0 ? new HashSet<string>(departmentKeysFilter) : null;
+            var result = new List<(OpenPlanRow, string?, double, ProductionDeliveryEvaluator.AtRiskProjection)>();
+
+            foreach (var plan in ctx.OpenPlans)
+            {
+                if (ctx.StalePlanIds.Contains(plan.Id)) continue;
+                if (plan.RequestDate < now || plan.RequestDate > windowEnd) continue;
+
+                var currentDeptKey = ProductionPlanDepartments.DepartmentKeyOf(plan.Status);
+                if (deptFilter != null && (currentDeptKey == null || !deptFilter.Contains(currentDeptKey))) continue;
+                if (!ctx.OngoingVisitByPlanId.TryGetValue(plan.Id, out var visit) || visit.DeptKey != currentDeptKey) continue;
+
+                var projection = ProductionDeliveryEvaluator.ComputeAtRiskProjection(
+                    currentDeptKey, visit.TotalDays, plan.RequestDate, now,
+                    ProductionPlanDepartments.Departments, ctx.MedianTotalByDept, ctx.CostCardExitToDoneMedian);
+
+                if (projection.ProjectedFinishDate.AddHours(7).Date <= plan.RequestDate.AddHours(7).Date) continue;
+
+                result.Add((plan, currentDeptKey, visit.TotalDays, projection));
+            }
+
+            return result;
+        }
+
+        public async Task<Delivery.Response> Delivery(Delivery.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var bucket = string.Equals(request.Bucket, "month", StringComparison.OrdinalIgnoreCase) ? "month" : "week";
+            var riskHorizonDays = request.RiskHorizonDays > 0 ? request.RiskHorizonDays : ProductionInsightThresholds.DefaultRiskWindowDays;
+
+            var ctx = await LoadDeliveryContextAsync(now);
+            var customerNames = await _deliveryDataProvider.GetCustomerNamesAsync();
+
+            var savedTarget = await _deliveryTargetService.GetCurrentTargetAsync();
+            decimal targetPercent;
+            string targetSource;
+            DateTime? targetEffectiveFrom;
+            if (request.DraftTargetPercent.HasValue)
+            {
+                targetPercent = request.DraftTargetPercent.Value;
+                targetSource = "draft";
+                targetEffectiveFrom = savedTarget?.EffectiveFrom;
+            }
+            else if (savedTarget != null)
+            {
+                targetPercent = savedTarget.TargetPercent;
+                targetSource = "saved";
+                targetEffectiveFrom = savedTarget.EffectiveFrom;
+            }
+            else
+            {
+                targetPercent = ProductionInsightThresholds.DefaultDeliveryTargetPercent;
+                targetSource = "saved";
+                targetEffectiveFrom = null;
+            }
+
+            // completed-in-range = done (transfer แรกเข้า 100 หรือ fallback completed_date) อยู่ใน [start,end]
+            var completedInRange = new List<ProductionDeliveryEvaluator.CompletedPlanRow>();
+            foreach (var plan in ctx.AllPlans)
+            {
+                if (plan.Status != ProductionPlanStatusConst.Completed) continue;
+                if (!ctx.DoneDates.TryGetValue(plan.Id, out var doneDate)) continue;
+                if (doneDate < start || doneDate > end) continue;
+
+                completedInRange.Add(new ProductionDeliveryEvaluator.CompletedPlanRow
+                {
+                    CustomerNumber = plan.CustomerNumber,
+                    CreateDate = plan.CreateDate,
+                    RequestDate = plan.RequestDate,
+                    DoneDate = doneDate
+                });
+            }
+
+            var onTimeStats = ProductionDeliveryEvaluator.ComputeOnTimeStats(completedInRange);
+            var suggestedLeadDays = ProductionDeliveryEvaluator.SuggestedLeadDays(onTimeStats.ActualLeadMedianDays);
+
+            var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, bucket).Select(b => b.End).ToList();
+            var seriesRaw = ProductionDeliveryEvaluator.ComputeSeries(completedInRange, start, bucketEnds);
+            var series = seriesRaw.Select(s => new Delivery.SeriesPoint
+            {
+                BucketEnd = s.BucketEnd,
+                CompletedCount = s.Stats.CompletedCount,
+                OnTimeCount = s.Stats.OnTimeCount,
+                OnTimePercent = s.Stats.OnTimePercent,
+                PlannedLeadMedianDays = s.Stats.PlannedLeadMedianDays,
+                ActualLeadMedianDays = s.Stats.ActualLeadMedianDays
+            }).ToList();
+
+            var lateCustomersRaw = ProductionDeliveryEvaluator.ComputeLateCustomers(completedInRange);
+            var lateCustomers = lateCustomersRaw.Select(c => new Delivery.LateCustomerItem
+            {
+                CustomerCode = c.CustomerCode,
+                CustomerName = customerNames.TryGetValue(c.CustomerCode, out var name) ? name : null,
+                CompletedCount = c.CompletedCount,
+                LateCount = c.LateCount,
+                LatePercent = c.LatePercent,
+                LateMedianDays = c.LateMedianDays
+            }).ToList();
+
+            var openCount = ctx.OpenPlans.Count;
+            var openOverdueCount = 0;
+            var openOverdueActiveCount = 0;
+            foreach (var plan in ctx.OpenPlans)
+            {
+                var isNotYetDone = plan.Status != ProductionPlanStatusConst.WaitCVD && plan.Status != ProductionPlanStatusConst.CVD;
+                if (isNotYetDone && plan.RequestDate < now)
+                {
+                    openOverdueCount++;
+                    if (!ctx.StalePlanIds.Contains(plan.Id)) openOverdueActiveCount++;
+                }
+            }
+
+            var atRiskList = ComputeAtRiskList(ctx, now, riskHorizonDays, null);
+            var atRiskCount = atRiskList.Count;
+
+            var costCard95PlanIds = new HashSet<int>(ctx.Headers.Where(h => h.Status == ProductionPlanStatusConst.Price).Select(h => h.ProductionPlanId));
+            var excludedForStuck = new HashSet<int> { ProductionPlanStatusConst.Completed, ProductionPlanStatusConst.Melted, ProductionPlanStatusConst.WaitCVD, ProductionPlanStatusConst.CVD };
+            var stuckAfterCostCardCount = ctx.AllPlans.Count(p => costCard95PlanIds.Contains(p.Id) && !excludedForStuck.Contains(p.Status));
+
+            var savedStandards = await _stageStandardService.GetCurrentStandardsAsync();
+            var standardByDept = ProductionPlanDepartments.Departments.ToDictionary(
+                d => d.Key,
+                d => savedStandards.TryGetValue(d.Key, out var s) ? s.StandardDays : ProductionInsightThresholds.DefaultStageStandardDays);
+            var medianWindowStart = now.AddDays(-ProductionInsightThresholds.DefaultFlowRangeDays);
+            var capacity = ProductionStageLeadTimeEvaluator.BuildCapacity(ctx.Visits, ProductionPlanDepartments.Departments, standardByDept, medianWindowStart, now);
+            var bottleneckDeptKey = capacity.Current.BottleneckDept;
+
+            var kpi = new Delivery.KpiData
+            {
+                CompletedCount = onTimeStats.CompletedCount,
+                OnTimeCount = onTimeStats.OnTimeCount,
+                OnTimePercent = onTimeStats.OnTimePercent,
+                LateMedianDays = onTimeStats.LateMedianDays,
+                PlannedLeadMedianDays = onTimeStats.PlannedLeadMedianDays,
+                ActualLeadMedianDays = onTimeStats.ActualLeadMedianDays,
+                SuggestedLeadDays = suggestedLeadDays,
+                OpenCount = openCount,
+                OpenOverdueCount = openOverdueCount,
+                OpenOverdueActiveCount = openOverdueActiveCount,
+                AtRiskCount = atRiskCount,
+                StuckAfterCostCardCount = stuckAfterCostCardCount
+            };
+
+            var problems = new List<Wip.Finding>();
+            var forecasts = new List<Wip.Finding>();
+
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateDlvOnTimeBelowTarget(onTimeStats.OnTimePercent, targetPercent, bottleneckDeptKey));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateDlvLeadUnderestimated(onTimeStats.PlannedLeadMedianDays, onTimeStats.ActualLeadMedianDays, suggestedLeadDays));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateDlvOpenOverdue(openOverdueActiveCount, openCount));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateDlvStuckAfterCostCard(stuckAfterCostCardCount));
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcDlvAtRisk(atRiskCount, riskHorizonDays));
+
+            var seriesForRule = seriesRaw.Select(s => (s.Stats.CompletedCount, s.Stats.OnTimePercent)).ToList();
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcDlvOnTimeDeclining(seriesForRule, bottleneckDeptKey));
+
+            var actions = ProductionInsightRuleEngine.BuildActions(problems, forecasts);
+            var worstSeverity = ProductionInsightRuleEngine.WorstSeverity(problems.Concat(forecasts));
+            var status = worstSeverity == "critical" || worstSeverity == "warning" ? worstSeverity : "ok";
+
+            return new Delivery.Response
+            {
+                AsOf = now,
+                Status = status,
+                Problems = problems,
+                Forecasts = forecasts,
+                Actions = actions,
+                TargetPercent = targetPercent,
+                TargetSource = targetSource,
+                TargetEffectiveFrom = targetEffectiveFrom,
+                Kpi = kpi,
+                Series = series,
+                LateCustomers = lateCustomers
+            };
+        }
+
+        public async Task<DataSourceResult> DeliveryAtRiskPlans(DeliveryAtRiskPlans.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var riskHorizonDays = request.RiskHorizonDays > 0 ? request.RiskHorizonDays : ProductionInsightThresholds.DefaultRiskWindowDays;
+
+            var ctx = await LoadDeliveryContextAsync(now);
+            var statusNames = await _wipHelper.GetStatusNamesAsync();
+
+            var atRiskRows = ComputeAtRiskList(ctx, now, riskHorizonDays, request.DepartmentKeys);
+
+            var items = atRiskRows.Select(r =>
+            {
+                var lastMove = ProductionPlanDepartments.LastMoveOf(r.Plan, ctx.LastMoveDates);
+                return new DeliveryAtRiskPlans.Item
+                {
+                    PlanId = r.Plan.Id,
+                    Wo = r.Plan.Wo,
+                    WoNumber = r.Plan.WoNumber,
+                    WoText = r.Plan.WoText,
+                    Mold = r.Plan.Mold,
+                    ProductNumber = r.Plan.ProductNumber,
+                    ProductName = r.Plan.ProductName,
+                    ProductQty = r.Plan.ProductQty,
+                    StatusId = r.Plan.Status,
+                    StatusName = statusNames.TryGetValue(r.Plan.Status, out var name) ? name : null,
+                    DepartmentKey = r.CurrentDeptKey,
+                    CreateDate = r.Plan.CreateDate,
+                    LastMoveDate = lastMove,
+                    DaysSinceMove = (int)(now - lastMove).TotalDays,
+                    RequestDate = r.Plan.RequestDate,
+                    CurrentDeptKey = r.CurrentDeptKey,
+                    DaysInCurrentDept = Math.Round(r.DaysInCurrentDept, 1),
+                    RemainingDays = r.Projection.RemainingDays,
+                    ProjectedFinishDate = r.Projection.ProjectedFinishDate,
+                    ProjectedLateDays = r.Projection.ProjectedLateDays
+                };
+            }).ToList();
+
+            IEnumerable<DeliveryAtRiskPlans.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.ProjectedLateDays);
+            }
+
+            var dataSource = ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+
+            var pageItems = dataSource.Data?.Cast<DeliveryAtRiskPlans.Item>().ToList() ?? new List<DeliveryAtRiskPlans.Item>();
+            if (pageItems.Count > 0)
+            {
+                var pagePlans = pageItems.Select(i => ctx.OpenPlansById[i.PlanId]).ToList();
+                var lastActionInfo = await _wipHelper.GetLastActionInfoAsync(pagePlans);
+
+                foreach (var item in pageItems)
+                {
+                    if (!lastActionInfo.TryGetValue(item.PlanId, out var info)) continue;
+                    item.LastUpdateBy = info.LastUpdateBy;
+                    item.LastAction = info.LastAction;
+                    item.LastActionRemark = info.LastActionRemark;
+                    item.LastActionDate = info.LastActionDate;
+                    item.Workers = info.Workers;
+                }
+
+                dataSource.Data = pageItems;
+            }
+
+            return dataSource;
+        }
+
+        // ไม่เติม LastUpdateBy/LastAction/Workers (enrichment สำหรับแผนเปิด) — ดู comment บน DeliveryLatePlans.Item
+        public async Task<DataSourceResult> DeliveryLatePlans(DeliveryLatePlans.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+
+            var ctx = await LoadDeliveryContextAsync(now);
+            var statusNames = await _wipHelper.GetStatusNamesAsync();
+
+            var items = new List<DeliveryLatePlans.Item>();
+            foreach (var plan in ctx.AllPlans)
+            {
+                if (plan.Status != ProductionPlanStatusConst.Completed) continue;
+                if (!ctx.DoneDates.TryGetValue(plan.Id, out var doneDate)) continue;
+                if (doneDate < start || doneDate > end) continue;
+                if (ProductionDeliveryEvaluator.IsOnTimeThai(doneDate, plan.RequestDate)) continue;
+
+                var lateDays = (doneDate.AddHours(7).Date - plan.RequestDate.AddHours(7).Date).TotalDays;
+                var lastMove = ctx.LastMoveDates.TryGetValue(plan.Id, out var lm) ? lm : plan.CreateDate;
+
+                items.Add(new DeliveryLatePlans.Item
+                {
+                    PlanId = plan.Id,
+                    Wo = plan.Wo,
+                    WoNumber = plan.WoNumber,
+                    WoText = plan.WoText,
+                    Mold = plan.Mold,
+                    ProductNumber = plan.ProductNumber,
+                    ProductName = plan.ProductName,
+                    ProductQty = plan.ProductQty,
+                    StatusId = plan.Status,
+                    StatusName = statusNames.TryGetValue(plan.Status, out var name) ? name : null,
+                    DepartmentKey = ProductionPlanDepartments.DepartmentKeyOf(plan.Status),
+                    CreateDate = plan.CreateDate,
+                    LastMoveDate = lastMove,
+                    DaysSinceMove = (int)(now - lastMove).TotalDays,
+                    RequestDate = plan.RequestDate,
+                    DoneDate = doneDate,
+                    LateDays = Math.Round(lateDays, 1)
+                });
+            }
+
+            IEnumerable<DeliveryLatePlans.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.LateDays);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        // "เคยเข้า" = มี active header Status=Price(95) อย่างน้อย 1 ครั้ง (เอาครั้งล่าสุดถ้าเข้าซ้ำ) — ไม่เคยถึง 100
+        // และสถานะปัจจุบันไม่ใช่ 500/84/85 (ดู FACTS ในสเปก) — ไม่เติม LastUpdateBy/LastAction/Workers เช่นกัน
+        public async Task<DataSourceResult> StuckAfterCostCardPlans(StuckAfterCostCardPlans.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var ctx = await LoadDeliveryContextAsync(now);
+            var statusNames = await _wipHelper.GetStatusNamesAsync();
+
+            var excluded = new HashSet<int> { ProductionPlanStatusConst.Completed, ProductionPlanStatusConst.Melted, ProductionPlanStatusConst.WaitCVD, ProductionPlanStatusConst.CVD };
+
+            var costCardDateByPlan = ctx.Headers
+                .Where(h => h.Status == ProductionPlanStatusConst.Price)
+                .GroupBy(h => h.ProductionPlanId)
+                .ToDictionary(g => g.Key, g => g.Max(h => h.CreateDate));
+
+            var items = new List<StuckAfterCostCardPlans.Item>();
+            foreach (var plan in ctx.AllPlans)
+            {
+                if (excluded.Contains(plan.Status)) continue;
+                if (!costCardDateByPlan.TryGetValue(plan.Id, out var costCardDate)) continue;
+
+                var lastMove = ctx.LastMoveDates.TryGetValue(plan.Id, out var lm) ? lm : plan.CreateDate;
+
+                items.Add(new StuckAfterCostCardPlans.Item
+                {
+                    PlanId = plan.Id,
+                    Wo = plan.Wo,
+                    WoNumber = plan.WoNumber,
+                    WoText = plan.WoText,
+                    Mold = plan.Mold,
+                    ProductNumber = plan.ProductNumber,
+                    ProductName = plan.ProductName,
+                    ProductQty = plan.ProductQty,
+                    StatusId = plan.Status,
+                    StatusName = statusNames.TryGetValue(plan.Status, out var name) ? name : null,
+                    DepartmentKey = ProductionPlanDepartments.DepartmentKeyOf(plan.Status),
+                    CreateDate = plan.CreateDate,
+                    LastMoveDate = lastMove,
+                    DaysSinceMove = (int)(now - lastMove).TotalDays,
+                    CostCardDate = costCardDate,
+                    DaysSinceCostCard = Math.Round((now - costCardDate).TotalDays, 1)
+                });
+            }
+
+            IEnumerable<StuckAfterCostCardPlans.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.DaysSinceCostCard);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        public async Task<DeliveryTarget.Item?> GetDeliveryTarget()
+        {
+            var current = await _deliveryTargetService.GetCurrentTargetAsync();
+            return current == null ? null : new DeliveryTarget.Item
+            {
+                TargetPercent = current.TargetPercent,
+                EffectiveFrom = current.EffectiveFrom,
+                CreateBy = current.CreateBy,
+                Remark = current.Remark
+            };
+        }
+
+        public async Task<List<DeliveryTarget.Item>> GetDeliveryTargetHistory()
+        {
+            var rows = await _deliveryTargetService.GetHistoryAsync();
+            return rows.Select(r => new DeliveryTarget.Item
+            {
+                TargetPercent = r.TargetPercent,
+                EffectiveFrom = r.EffectiveFrom,
+                CreateBy = r.CreateBy,
+                Remark = r.Remark
+            }).ToList();
+        }
+
+        public async Task SaveDeliveryTarget(SaveDeliveryTarget.Request request)
+        {
+            if (request.TargetPercent < 0 || request.TargetPercent > 100)
+            {
+                throw new ArgumentException("เป้าหมาย % ต้องอยู่ระหว่าง 0-100");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Remark))
+            {
+                throw new ArgumentException("ต้องระบุหมายเหตุ");
+            }
+
+            await _deliveryTargetService.SaveAsync(request.TargetPercent, request.Remark, CurrentUsername);
         }
 
         private static void AddIfNotNull(List<Wip.Finding> list, Wip.Finding? finding)

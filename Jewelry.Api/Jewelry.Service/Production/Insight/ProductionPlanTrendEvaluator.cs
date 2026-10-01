@@ -37,6 +37,18 @@ namespace Jewelry.Service.Production.Insight
             // สถานะปัจจุบัน (snapshot ณ เวลาที่โหลดข้อมูล) — ใช้เฉพาะ ProductionStageLeadTimeEvaluator สำหรับ
             // เช็ค visit ที่ยังไม่จบว่า "ยังรออยู่" หรือ "เริ่มทำงานแล้วแต่ไม่มี ReceiveDate" (ข้อมูลเก่า)
             public int Status { get; set; }
+
+            // เพิ่มสำหรับ ProductionInsight/Delivery (ส่งงานตรงเวลา) — reuse ชุด active plan เดียวกันนี้แทนที่จะ
+            // query ซ้ำ (plans ที่นี่คือ active plan ทั้งหมด ไม่กรอง status อยู่แล้ว ตรงกับที่ Delivery ต้องใช้)
+            public string Wo { get; set; } = null!;
+            public int WoNumber { get; set; }
+            public string WoText { get; set; } = null!;
+            public string Mold { get; set; } = null!;
+            public string ProductNumber { get; set; } = null!;
+            public string ProductName { get; set; } = null!;
+            public int ProductQty { get; set; }
+            public DateTime RequestDate { get; set; }
+            public string CustomerNumber { get; set; } = null!;
         }
 
         public class WipSnapshot

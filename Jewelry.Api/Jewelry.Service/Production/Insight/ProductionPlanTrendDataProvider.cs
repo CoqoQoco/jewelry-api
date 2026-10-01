@@ -39,7 +39,16 @@ namespace Jewelry.Service.Production.Insight
                     Id = p.Id,
                     CreateDate = p.CreateDate,
                     CompletedDate = p.CompletedDate,
-                    Status = p.Status
+                    Status = p.Status,
+                    Wo = p.Wo,
+                    WoNumber = p.WoNumber,
+                    WoText = p.WoText,
+                    Mold = p.Mold,
+                    ProductNumber = p.ProductNumber,
+                    ProductName = p.ProductName,
+                    ProductQty = p.ProductQty,
+                    RequestDate = p.RequestDate,
+                    CustomerNumber = p.CustomerNumber
                 })
                 .ToListAsync();
 

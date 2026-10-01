@@ -275,6 +275,137 @@ namespace Jewelry.Service.Production.Insight
             };
         }
 
+        // ---- Delivery (ส่งงานตรงเวลา) ----
+
+        // DLV_ONTIME_BELOW_TARGET: onTimePercent < target — warning, < target/2 = critical
+        // bottleneckDeptKey แนบมาด้วยเผื่อ ACT_FIX_BOTTLENECK ใช้ (ไม่มีข้อมูลเป็น null)
+        public static Wip.Finding? EvaluateDlvOnTimeBelowTarget(decimal? onTimePercent, decimal targetPercent, string? bottleneckDeptKey)
+        {
+            if (!onTimePercent.HasValue) return null;
+            if (onTimePercent.Value >= targetPercent) return null;
+
+            var severity = onTimePercent.Value < targetPercent / 2 ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "DLV_ONTIME_BELOW_TARGET",
+                Severity = severity,
+                ReportRef = "deliveryTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["onTimePercent"] = onTimePercent.Value,
+                    ["targetPercent"] = targetPercent,
+                    ["bottleneckDept"] = bottleneckDeptKey ?? string.Empty
+                }
+            };
+        }
+
+        // DLV_LEAD_UNDERESTIMATED: planned median < 0.8 × actual median — เวลาที่ตกลงกับลูกค้าสั้นกว่าที่ทำได้จริงมาก
+        public static Wip.Finding? EvaluateDlvLeadUnderestimated(double? plannedMedianDays, double? actualMedianDays, int suggestedLeadDays)
+        {
+            if (!plannedMedianDays.HasValue || !actualMedianDays.HasValue) return null;
+            if (actualMedianDays.Value <= 0) return null;
+            if (plannedMedianDays.Value >= actualMedianDays.Value * 0.8) return null;
+
+            return new Wip.Finding
+            {
+                Code = "DLV_LEAD_UNDERESTIMATED",
+                Severity = "warning",
+                ReportRef = "deliveryTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["planned"] = plannedMedianDays.Value,
+                    ["actual"] = actualMedianDays.Value,
+                    ["suggested"] = suggestedLeadDays
+                }
+            };
+        }
+
+        // DLV_OPEN_OVERDUE: แผน open ที่เกินกำหนดแล้วและยัง active (ไม่นับ stale — มี WIP_STALE ของตัวเองแล้ว)
+        public static Wip.Finding? EvaluateDlvOpenOverdue(int activeOverdueCount, int openCount)
+        {
+            if (activeOverdueCount <= 0) return null;
+
+            var percent = openCount > 0 ? Math.Round((decimal)activeOverdueCount / openCount * 100, 1) : 0m;
+            var severity = percent >= ProductionInsightThresholds.WipOverduePercentCritical ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "DLV_OPEN_OVERDUE",
+                Severity = severity,
+                ReportRef = "atRisk",
+                Params = new Dictionary<string, object> { ["count"] = activeOverdueCount, ["openCount"] = openCount, ["percent"] = percent }
+            };
+        }
+
+        // DLV_STUCK_AFTER_COSTCARD: เคยเข้าแผนกบัตรต้นทุน (95) แต่ไม่เคยถึง 100 (ไม่ใช่ 500/84/85)
+        public static Wip.Finding? EvaluateDlvStuckAfterCostCard(int count)
+        {
+            if (count <= 0) return null;
+
+            var severity = count >= ProductionInsightThresholds.DlvStuckAfterCostCardCountCritical ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "DLV_STUCK_AFTER_COSTCARD",
+                Severity = severity,
+                ReportRef = "stuckCostCard",
+                Params = new Dictionary<string, object> { ["count"] = count }
+            };
+        }
+
+        // FC_DLV_AT_RISK: จำนวนแผนที่ "เสี่ยงส่งช้า" (ยังไม่ถึงกำหนดแต่คาดว่าจะเสร็จช้ากว่ากำหนด) ภายในช่วงที่ขอ
+        public static Wip.Finding? EvaluateFcDlvAtRisk(int count, int riskHorizonDays)
+        {
+            if (count <= 0) return null;
+
+            var severity = count >= ProductionInsightThresholds.FcDueSoonAtRiskCountCritical ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "FC_DLV_AT_RISK",
+                Severity = severity,
+                ReportRef = "atRisk",
+                Params = new Dictionary<string, object> { ["count"] = count, ["days"] = riskHorizonDays }
+            };
+        }
+
+        // FC_DLV_ONTIME_DECLINING: onTimePercent ของ bucket ที่ "ผ่านเกณฑ์" (completedCount >= MinSamplesPerBucket)
+        // ล่าสุด 3 ตัว ต้องเรียงลดลงต่อเนื่อง (ตรงข้ามกับ FC_STAGE_LEADTIME_RISING ที่เรียงเพิ่มขึ้น)
+        public static Wip.Finding? EvaluateFcDlvOnTimeDeclining(
+            IReadOnlyList<(int CompletedCount, decimal? OnTimePercent)> series, string? bottleneckDeptKey)
+        {
+            var n = ProductionInsightThresholds.StageLeadtimeRisingBucketCount;
+            var minSamples = ProductionInsightThresholds.MinSamplesPerBucket;
+
+            var qualifying = series
+                .Where(s => s.CompletedCount >= minSamples && s.OnTimePercent.HasValue)
+                .Select(s => s.OnTimePercent!.Value)
+                .ToList();
+
+            if (qualifying.Count < n) return null;
+
+            var window = qualifying.Skip(qualifying.Count - n).ToList();
+            for (var i = 1; i < window.Count; i++)
+            {
+                if (window[i] >= window[i - 1]) return null;
+            }
+
+            return new Wip.Finding
+            {
+                Code = "FC_DLV_ONTIME_DECLINING",
+                Severity = "warning",
+                ReportRef = "deliveryTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["fromPercent"] = window[0],
+                    ["toPercent"] = window[window.Count - 1],
+                    ["buckets"] = n,
+                    ["bottleneckDept"] = bottleneckDeptKey ?? string.Empty
+                }
+            };
+        }
+
         // 'critical' | 'warning' | 'ok' (ไม่มี finding เลย = ok)
         public static string WorstSeverity(IEnumerable<Wip.Finding> findings)
         {
@@ -292,7 +423,11 @@ namespace Jewelry.Service.Production.Insight
             ("ACT_STAGE_SLA", "productionManager", new[] { "WIP_DEPT_STALE_TOP", "FC_BOTTLENECK", "WIP_DEPT_GROWING", "STAGE_OVER_STANDARD", "FC_STAGE_LEADTIME_RISING" }),
             ("ACT_CLOSE_MELTED", "goldControl", new[] { "WIP_MELTED_OPEN" }),
             ("ACT_REDUCE_WAIT", "productionManager", new[] { "STAGE_WAIT_DOMINANT" }),
-            ("ACT_REVIEW_ABNORMAL", "deptHead", new[] { "STAGE_ABNORMAL_DWELL" })
+            ("ACT_REVIEW_ABNORMAL", "deptHead", new[] { "STAGE_ABNORMAL_DWELL" }),
+            ("ACT_SET_REALISTIC_DUE", "planner", new[] { "DLV_LEAD_UNDERESTIMATED" }),
+            ("ACT_EXPEDITE_AT_RISK", "planner", new[] { "FC_DLV_AT_RISK", "DLV_OPEN_OVERDUE" }),
+            ("ACT_CLOSE_COSTCARD", "goldControl", new[] { "DLV_STUCK_AFTER_COSTCARD" }),
+            ("ACT_FIX_BOTTLENECK", "productionManager", new[] { "DLV_ONTIME_BELOW_TARGET", "FC_DLV_ONTIME_DECLINING" })
         };
 
         // priority: เรียงตาม severity ที่แย่ที่สุดของ finding ที่เกี่ยวข้องก่อน (critical > warning) แล้วตามลำดับ
@@ -379,6 +514,28 @@ namespace Jewelry.Service.Production.Insight
                 {
                     var count = GetParam(findings, "STAGE_ABNORMAL_DWELL", "count") ?? 0;
                     return new Dictionary<string, object> { ["count"] = count };
+                }
+                case "ACT_SET_REALISTIC_DUE":
+                {
+                    var suggested = GetParam(findings, "DLV_LEAD_UNDERESTIMATED", "suggested") ?? 0;
+                    return new Dictionary<string, object> { ["suggestedLeadDays"] = suggested };
+                }
+                case "ACT_EXPEDITE_AT_RISK":
+                {
+                    var atRisk = GetParam(findings, "FC_DLV_AT_RISK", "count") ?? 0;
+                    var overdue = GetParam(findings, "DLV_OPEN_OVERDUE", "count") ?? 0;
+                    return new Dictionary<string, object> { ["atRisk"] = atRisk, ["overdue"] = overdue };
+                }
+                case "ACT_CLOSE_COSTCARD":
+                {
+                    var count = GetParam(findings, "DLV_STUCK_AFTER_COSTCARD", "count") ?? 0;
+                    return new Dictionary<string, object> { ["count"] = count };
+                }
+                case "ACT_FIX_BOTTLENECK":
+                {
+                    var deptKey = GetParam(findings, "DLV_ONTIME_BELOW_TARGET", "bottleneckDept")
+                        ?? GetParam(findings, "FC_DLV_ONTIME_DECLINING", "bottleneckDept");
+                    return new Dictionary<string, object> { ["deptKey"] = deptKey ?? string.Empty };
                 }
                 default:
                     return new Dictionary<string, object>();

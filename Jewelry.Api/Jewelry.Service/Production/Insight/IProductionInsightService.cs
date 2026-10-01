@@ -9,6 +9,12 @@ using AbnormalDwellPlans = jewelry.Model.Production.Insight.AbnormalDwellPlans;
 using StageStandards = jewelry.Model.Production.Insight.StageStandards;
 using SaveStageStandards = jewelry.Model.Production.Insight.SaveStageStandards;
 using StalePlans = jewelry.Model.Report.Executive.StalePlans;
+using Delivery = jewelry.Model.Production.Insight.Delivery;
+using DeliveryAtRiskPlans = jewelry.Model.Production.Insight.DeliveryAtRiskPlans;
+using DeliveryLatePlans = jewelry.Model.Production.Insight.DeliveryLatePlans;
+using StuckAfterCostCardPlans = jewelry.Model.Production.Insight.StuckAfterCostCardPlans;
+using DeliveryTarget = jewelry.Model.Production.Insight.DeliveryTarget;
+using SaveDeliveryTarget = jewelry.Model.Production.Insight.SaveDeliveryTarget;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -23,5 +29,13 @@ namespace Jewelry.Service.Production.Insight
         Task<List<StageStandards.Item>> GetStageStandards();
         Task<List<StageStandards.Item>> GetStageStandardHistory(string deptKey);
         Task SaveStageStandards(SaveStageStandards.Request request);
+
+        Task<Delivery.Response> Delivery(Delivery.Request request);
+        Task<DataSourceResult> DeliveryAtRiskPlans(DeliveryAtRiskPlans.Request request);
+        Task<DataSourceResult> DeliveryLatePlans(DeliveryLatePlans.Request request);
+        Task<DataSourceResult> StuckAfterCostCardPlans(StuckAfterCostCardPlans.Request request);
+        Task<DeliveryTarget.Item?> GetDeliveryTarget();
+        Task<List<DeliveryTarget.Item>> GetDeliveryTargetHistory();
+        Task SaveDeliveryTarget(SaveDeliveryTarget.Request request);
     }
 }

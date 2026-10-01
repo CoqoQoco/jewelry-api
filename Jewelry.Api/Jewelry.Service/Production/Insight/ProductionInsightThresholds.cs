@@ -44,5 +44,13 @@ namespace Jewelry.Service.Production.Insight
         // STAGE_WAIT_DOMINANT: ต้องมี SplitSampleCount (exited visit ที่แยก wait/work ได้จริงจาก receive_date)
         // อย่างน้อยเท่านี้ถึงจะเชื่อถือได้ — กันแจ้งเตือนจากข้อมูลน้อยเกินไปตอนเพิ่งเริ่มเก็บ receive_date
         public const int MinSplitSamples = 10;
+
+        // DLV_STUCK_AFTER_COSTCARD: จำนวนแผนที่ค้างหลังบัตรต้นทุน (เคยเข้า 95, ไม่เคยถึง 100, สถานะปัจจุบันไม่ใช่
+        // 500/84/85) >= ค่านี้ ถือว่า critical (ไม่ถึง = warning)
+        public const int DlvStuckAfterCostCardCountCritical = 50;
+
+        // ค่าเป้าหมาย % ส่งตรงเวลา เริ่มต้น ถ้าตาราง tbt_production_delivery_target ว่างเปล่าจริงๆ (กันพังเฉยๆ
+        // ไม่ควรเกิดจริงเพราะ seed migration ใส่ไว้แล้ว)
+        public const decimal DefaultDeliveryTargetPercent = 80;
     }
 }
