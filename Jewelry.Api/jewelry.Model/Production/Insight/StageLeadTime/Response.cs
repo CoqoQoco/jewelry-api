@@ -87,6 +87,15 @@ namespace jewelry.Model.Production.Insight.StageLeadTime
         public double MedianTotal { get; set; }
         public double StandardDays { get; set; }
         public double AtStandardPerDay { get; set; }
+
+        // รอบแก้ไข 2026-10-01: bottleneck ใหม่ = คิวยาวสุด (activeWip ÷ per-day) ไม่ใช่ throughput ต่ำสุดอีกต่อไป
+        // (แผนไม่ได้ผ่านทุกแผนกเท่ากัน — แผนกที่ exit น้อยสุดอาจมีคิวสั้นที่สุดก็ได้ ดู comment บน BuildCapacity)
+        public int ActiveWip { get; set; }
+
+        // null ถ้า exitedPerDay/atStandardPerDay = 0 (คำนวณคิวไม่ได้ — ไม่มี exit เลยในช่วงที่ขอ)
+        public double? QueueDaysCurrent { get; set; }
+        public double? QueueDaysAtStandard { get; set; }
+
         public bool IsBottleneckCurrent { get; set; }
         public bool IsBottleneckAtStandard { get; set; }
     }

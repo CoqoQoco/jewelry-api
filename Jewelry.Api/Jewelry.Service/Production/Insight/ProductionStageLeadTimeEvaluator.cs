@@ -227,30 +227,36 @@ namespace Jewelry.Service.Production.Insight
             };
         }
 
-        // ---- Capacity (Little's Law) — Round 2: ใช้อัตรา exit ที่วัดได้จริง ไม่ใช้ WIP ----
-        // WIP-based (Round 1) ผิด: WIP รวมแผนค้างนาน (stale) นับพันตัวเข้าไปด้วย ทำให้ throughput = wip/medianTotal
-        // เพี้ยนมาก (เช่นออกแบบ 2,074 ตัว / 20 วัน = 103 ตัว/วัน ทั้งที่ exit จริง ≈ 9 ตัว/วัน) — Round 2 วัดจาก
-        // exitedCount/rangeDays ตรงๆ (อัตราที่ "ออกจากแผนกจริง" ในช่วงที่ขอ) แทน
+        // ---- Capacity (Little's Law) — Round 3 (2026-10-01): bottleneck = คิวยาวสุด ไม่ใช่ throughput ต่ำสุดอีกต่อไป ----
+        // Round 2 ผิด (ยืนยันจาก prod): bottleneck = min(exitedPerDay) สมมติว่าทุกแผนผ่านทุกแผนกเท่ากัน ซึ่งไม่จริง
+        // — rawPolish มี exit ต่ำสุดแต่คิวสั้นสุด (แผนส่วนใหญ่ไม่ผ่าน rawPolish/gemSort เยอะเท่า trim/costCard) —
+        // นิยามใหม่: queueDays = activeWip (snapshot plan.status ปัจจุบัน ไม่ stale) ÷ per-day throughput ของแผนก
+        // นั้น — แผนกคิวยาวสุด = งานค้างเยอะเทียบกับที่ระบายได้จริง = คอขวดจริง (ไม่ขึ้นกับว่าแผนกนั้น "ผ่านบ่อย
+        // แค่ไหน") — ใช้ได้ทั้ง current (exitedPerDay วัดจริง) และ atStandard (atStandardPerDay ถ้าทำได้ตาม
+        // standard) — สูตร atStandard เหมือนเดิมทุกจุด มีแค่ตัวตัดสิน bottleneck ที่เปลี่ยน
         //
         // exitedPerDay = exitedCount / rangeDays (throughput ที่วัดได้จริงในช่วงนี้)
         // atStandardPerDay = ถ้าตอนนี้ช้ากว่า standard (medianTotal > standard) จะเร็วขึ้นตามสัดส่วนถ้าทำได้ตาม
         //   standard (Little's Law, WIP คงที่: L = λW → λ = L/W ใหม่ = exitedPerDay × medianTotal/standard) —
         //   ถ้าเร็วกว่า standard อยู่แล้วหรือไม่มี standard ก็ไม่เปลี่ยน (ใช้ exitedPerDay เดิม)
-        // bottleneck = แผนกที่ per-day ต่ำสุด "ในบรรดาแผนกที่มี exit จริงในช่วงนี้" (exitedCount>0) — แผนกที่ไม่มี
-        //   exit เลยไม่มีข้อมูลวัด ไม่ควรถูกเข้าใจผิดว่าเป็นคอขวด
+        // bottleneck = แผนกที่ queueDays (activeWip/per-day) สูงสุด "ในบรรดาแผนกที่คำนวณคิวได้" (per-day > 0) —
+        //   แผนกที่ไม่มี exit เลยในช่วง คำนวณคิวไม่ได้ (null) ไม่ควรถูกเข้าใจผิดว่าเป็นหรือไม่เป็นคอขวด
         // TotalLeadDays = Σ medianTotal (current) / Σ min(medianTotal, standard) (atStandard) — เวลารวมถ้าแผน
         //   เดินทางผ่านทุกแผนกตามลำดับครั้งละหนึ่งรอบ (สมมติฐานง่ายๆ ไม่ได้ตามแผนจริงทีละตัว)
-        // MonthlyThroughput = 30 × bottleneck per-day
+        // MonthlyThroughput = 30 × per-day ของแผนกคอขวด (ยังเป็น throughput ของแผนกคอขวดเหมือนเดิม แค่เลือก
+        //   แผนกต่างไปตามนิยามใหม่)
         public static StageLeadTime.CapacityData BuildCapacity(
             IReadOnlyList<VisitRecord> allVisits,
             IReadOnlyList<(string Key, int[] StatusIds)> departments,
             IReadOnlyDictionary<string, decimal> standardByDept,
+            IReadOnlyDictionary<string, int> activeWipByDept,
             DateTime start,
             DateTime end)
         {
             var rangeDays = Math.Max((end - start).TotalDays, 1);
 
-            var rows = new List<(string Key, int ExitedCount, double ExitedPerDay, double MedianTotal, double StandardDays, double AtStandardPerDay)>();
+            var rows = new List<(string Key, int ExitedCount, double ExitedPerDay, double MedianTotal, double StandardDays,
+                double AtStandardPerDay, int ActiveWip, double? QueueDaysCurrent, double? QueueDaysAtStandard)>();
 
             foreach (var dept in departments)
             {
@@ -268,16 +274,21 @@ namespace Jewelry.Service.Production.Insight
                     ? exitedPerDay * medianTotal / standard
                     : exitedPerDay;
 
-                rows.Add((dept.Key, exitedCount, exitedPerDay, medianTotal, standard, atStandardPerDay));
+                var activeWip = activeWipByDept.TryGetValue(dept.Key, out var w) ? w : 0;
+                double? queueDaysCurrent = exitedPerDay > 0 ? activeWip / exitedPerDay : (double?)null;
+                double? queueDaysAtStandard = atStandardPerDay > 0 ? activeWip / atStandardPerDay : (double?)null;
+
+                rows.Add((dept.Key, exitedCount, exitedPerDay, medianTotal, standard, atStandardPerDay, activeWip, queueDaysCurrent, queueDaysAtStandard));
             }
 
-            var withExits = rows.Where(r => r.ExitedCount > 0).ToList();
-
-            var bottleneckCurrentKey = withExits.Count > 0
-                ? withExits.OrderBy(r => r.ExitedPerDay).First().Key
+            var withQueueCurrent = rows.Where(r => r.QueueDaysCurrent.HasValue).ToList();
+            var bottleneckCurrentKey = withQueueCurrent.Count > 0
+                ? withQueueCurrent.OrderByDescending(r => r.QueueDaysCurrent!.Value).First().Key
                 : (string?)null;
-            var bottleneckAtStandardKey = withExits.Count > 0
-                ? withExits.OrderBy(r => r.AtStandardPerDay).First().Key
+
+            var withQueueAtStandard = rows.Where(r => r.QueueDaysAtStandard.HasValue).ToList();
+            var bottleneckAtStandardKey = withQueueAtStandard.Count > 0
+                ? withQueueAtStandard.OrderByDescending(r => r.QueueDaysAtStandard!.Value).First().Key
                 : (string?)null;
 
             var departmentsOut = rows.Select(r => new StageLeadTime.CapacityDepartmentData
@@ -288,6 +299,9 @@ namespace Jewelry.Service.Production.Insight
                 MedianTotal = Round1(r.MedianTotal),
                 StandardDays = Round1(r.StandardDays),
                 AtStandardPerDay = Round1(r.AtStandardPerDay),
+                ActiveWip = r.ActiveWip,
+                QueueDaysCurrent = r.QueueDaysCurrent.HasValue ? Round1(r.QueueDaysCurrent.Value) : (double?)null,
+                QueueDaysAtStandard = r.QueueDaysAtStandard.HasValue ? Round1(r.QueueDaysAtStandard.Value) : (double?)null,
                 IsBottleneckCurrent = r.Key == bottleneckCurrentKey,
                 IsBottleneckAtStandard = r.Key == bottleneckAtStandardKey
             }).ToList();

@@ -10,6 +10,8 @@ namespace jewelry.Model.Production.Insight.SaveGoldLossTargets
 
     public class Item
     {
+        // 'SLIP' (default) | 'STAGE'
+        public string Scope { get; set; } = "SLIP";
         public int WorkerType { get; set; }
         public string Metal { get; set; } = "GOLD";
         public decimal TargetPercent { get; set; }

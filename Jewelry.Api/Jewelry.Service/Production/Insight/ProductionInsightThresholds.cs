@@ -84,5 +84,53 @@ namespace Jewelry.Service.Production.Insight
         // GOLD_LOSS_ABOVE_TARGET / GOLD_ALLOWANCE_ABOVE_TARGET: ต้องเกิน target ด้วยมากกว่าค่านี้ถึง trigger
         // (กันแจ้งเตือนจากส่วนต่างเล็กน้อยระดับ rounding error)
         public const decimal GoldTargetTolerancePercent = 0.1m;
+
+        // ---- Capacity (กำลังการผลิต) ----
+
+        // CAP_BACKLOG_MONTHS: activeWip ÷ outputPerMonth (เดือน) > ค่านี้ถึง trigger (warning), > critical = critical
+        public const decimal CapBacklogMonthsWarn = 2m;
+        public const decimal CapBacklogMonthsCritical = 4m;
+
+        // CAP_QUEUE_BOTTLENECK: จำนวนแผนกคิวยาวสุดที่ใส่ใน params.depts
+        public const int CapQueueBottleneckTopCount = 2;
+
+        // CAP_INFLOW_OVER_OUTPUT: จำนวนเดือนในช่วงที่ inflow > output ต้อง >= ค่านี้ถึง trigger
+        public const int CapOverloadMonthsThreshold = 2;
+
+        // CAP_COSTCARD_SLOW: median 95→100 (วัน) > ค่านี้ หรือ pendingOver30d > ค่านี้ ถึง trigger (OR เงื่อนไข)
+        public const int CapCostCardSlowMedianDaysThreshold = 7;
+        public const int CapCostCardSlowPendingOver30dThreshold = 50;
+
+        // pendingOver30d (ทั้งใน kpi.costCardToDone และ CAP_COSTCARD_SLOW) — "ค้างนาน" = เข้า 95 มาแล้วเกินกี่วัน
+        public const int CapCostCardPendingOver30dDays = 30;
+
+        // FC_BACKLOG_PROJECTED: จำนวนเดือนที่ใช้ project ไปข้างหน้า
+        public const int FcBacklogProjectedMonths = 3;
+
+        // FC_PEAK_RISK: inflow เดือนพีค > ค่านี้ × output ถึง trigger
+        public const decimal FcPeakRiskMultiplier = 1.5m;
+
+        // ---- Gold Loss by Stage (Loss ตามใบงานรายแผนก จ่าย-รับ) ----
+
+        // outlier: diff% ของแถว > ค่านี้ × median diff% ของแผนก (เฉพาะแถวคืนแล้วในช่วง) — ปรับจาก 2× เป็น 3×
+        // (2× ให้ 291 แถวใน 3 เดือน สัญญาณรบกวนเยอะเกินไป)
+        public const decimal GoldStageOutlierMedianMultiplier = 3m;
+
+        // outlier: diffGram ของแถวต้อง >= ค่านี้ (กรัม) ด้วย (กันแถวเล็กจิ๋วที่ % สูงลิบแต่กรัมแทบไม่มีนัยสำคัญ) —
+        // ปรับจาก 0.10g เป็น 0.20g
+        public const decimal GoldStageOutlierMinDiffGram = 0.20m;
+
+        // GOLD_STAGE_PENDING_RETURN / GoldStagePendingReturn default: งานที่ยังไม่คืนเกินกี่วันถือว่า "ค้าง"
+        public const int GoldStagePendingOlderThanDaysDefault = 14;
+
+        // GOLD_STAGE_OUTLIER_JOBS: จำนวน outlier รวมทุกแผนก (ที่ไม่ยกเว้น) >= ค่านี้ถึง trigger
+        public const int GoldStageOutlierJobsCountThreshold = 5;
+
+        // GOLD_STAGE_ABOVE_TARGET: ต้องเกิน target ด้วยมากกว่าค่านี้ถึง trigger (เหมือน GoldTargetTolerancePercent)
+        public const decimal GoldStageTargetTolerancePercent = 0.1m;
+
+        // worker breakdown ของ GoldByStage.departments[].workers: ต้องมีงาน >= เท่านี้แถวถึงนับ, top กี่คน
+        public const int GoldStageWorkerMinRows = 5;
+        public const int GoldStageWorkerTopCount = 10;
     }
 }

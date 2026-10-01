@@ -3860,12 +3860,15 @@ public partial class JewelryContext : DbContext
             entity.HasKey(e => e.Id).HasName("tbt_production_gold_loss_target_pk");
             entity.ToTable("tbt_production_gold_loss_target");
 
-            entity.HasIndex(e => new { e.WorkerType, e.Metal, e.EffectiveFrom })
-                .HasDatabaseName("idx_tbt_production_gold_loss_target_type_metal_effective");
+            entity.HasIndex(e => new { e.Scope, e.WorkerType, e.Metal, e.EffectiveFrom })
+                .HasDatabaseName("idx_tbt_production_gold_loss_target_scope_type_metal_effective");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedOnAdd()
                 .HasColumnName("id");
+            entity.Property(e => e.Scope)
+                .HasColumnType("character varying")
+                .HasColumnName("scope");
             entity.Property(e => e.WorkerType).HasColumnName("worker_type");
             entity.Property(e => e.Metal)
                 .HasColumnType("character varying")

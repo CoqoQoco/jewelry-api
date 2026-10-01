@@ -627,6 +627,250 @@ namespace Jewelry.Service.Production.Insight
             };
         }
 
+        // ---- Capacity (กำลังการผลิต) ----
+
+        // CAP_BACKLOG_MONTHS: activeWip ÷ outputPerMonth (เดือน) > 2 = warning, > 4 = critical
+        public static Wip.Finding? EvaluateCapBacklogMonths(decimal? backlogMonths, int activeWip, decimal outputPerMonth)
+        {
+            if (!backlogMonths.HasValue) return null;
+            if (backlogMonths.Value <= ProductionInsightThresholds.CapBacklogMonthsWarn) return null;
+
+            var severity = backlogMonths.Value > ProductionInsightThresholds.CapBacklogMonthsCritical ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "CAP_BACKLOG_MONTHS",
+                Severity = severity,
+                ReportRef = "capKpi",
+                Params = new Dictionary<string, object>
+                {
+                    ["backlogMonths"] = Math.Round(backlogMonths.Value, 1),
+                    ["activeWip"] = activeWip,
+                    ["outputPerMonth"] = Math.Round(outputPerMonth, 1)
+                }
+            };
+        }
+
+        // CAP_QUEUE_BOTTLENECK: 1 finding รวม top 2 แผนกคิวยาวสุด (queueDays = activeWip ÷ per-day — ดู
+        // BuildCapacity) — ไม่แยก trigger ต่อแผนกเหมือน WIP_DEPT_GROWING
+        public static Wip.Finding? EvaluateCapQueueBottleneck(IReadOnlyList<(string DeptKey, double QueueDays, int WaitingNow)> topDepts)
+        {
+            if (topDepts.Count == 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "CAP_QUEUE_BOTTLENECK",
+                Severity = "warning",
+                ReportRef = "capDepartments",
+                Params = new Dictionary<string, object>
+                {
+                    ["depts"] = topDepts.Select(d => new Dictionary<string, object>
+                    {
+                        ["deptKey"] = d.DeptKey,
+                        ["queueDays"] = Math.Round(d.QueueDays, 1),
+                        ["waitingNow"] = d.WaitingNow
+                    }).ToList()
+                }
+            };
+        }
+
+        // CAP_INFLOW_OVER_OUTPUT: จำนวนเดือนในช่วงที่ inflow > output >= 2 เดือน
+        public static Wip.Finding? EvaluateCapInflowOverOutput(int overloadMonths, int monthsInRange, string? peakMonth, int peakInflow, decimal outputPerMonth)
+        {
+            if (overloadMonths < ProductionInsightThresholds.CapOverloadMonthsThreshold) return null;
+
+            return new Wip.Finding
+            {
+                Code = "CAP_INFLOW_OVER_OUTPUT",
+                Severity = "warning",
+                ReportRef = "capTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["overloadMonths"] = overloadMonths,
+                    ["monthsInRange"] = monthsInRange,
+                    ["peakMonth"] = peakMonth ?? string.Empty,
+                    ["peakInflow"] = peakInflow,
+                    ["outputPerMonth"] = Math.Round(outputPerMonth, 1)
+                }
+            };
+        }
+
+        // CAP_COSTCARD_SLOW: median 95→100 > 7 วัน หรือค้างเกิน 30 วันมากกว่า 50 แผน (OR เงื่อนไข)
+        public static Wip.Finding? EvaluateCapCostCardSlow(double? medianDays, double? p90Days, int pendingNow, int pendingActive, int pendingOver30d)
+        {
+            var triggered = (medianDays.HasValue && medianDays.Value > ProductionInsightThresholds.CapCostCardSlowMedianDaysThreshold)
+                || pendingOver30d > ProductionInsightThresholds.CapCostCardSlowPendingOver30dThreshold;
+            if (!triggered) return null;
+
+            return new Wip.Finding
+            {
+                Code = "CAP_COSTCARD_SLOW",
+                Severity = "warning",
+                ReportRef = "capCostCard",
+                Params = new Dictionary<string, object>
+                {
+                    ["medianDays"] = medianDays.HasValue ? Math.Round(medianDays.Value, 1) : 0,
+                    ["p90Days"] = p90Days.HasValue ? Math.Round(p90Days.Value, 1) : 0,
+                    ["pendingNow"] = pendingNow,
+                    ["pendingActive"] = pendingActive,
+                    ["pendingOver30d"] = pendingOver30d
+                }
+            };
+        }
+
+        // FC_BACKLOG_PROJECTED: WIP คาดการณ์อีก 3 เดือน (activeWip + 3×netPerMonth) — trigger เมื่อ net เป็นบวก
+        // (WIP กำลังโตตามเทรนด์ปัจจุบัน) เท่านั้น — net ติดลบ/0 = ไม่ต้องเตือนล่วงหน้า
+        public static Wip.Finding? EvaluateFcBacklogProjected(int activeWip, decimal netPerMonth)
+        {
+            if (netPerMonth <= 0) return null;
+
+            var months = ProductionInsightThresholds.FcBacklogProjectedMonths;
+            var projectedWip = activeWip + months * netPerMonth;
+
+            return new Wip.Finding
+            {
+                Code = "FC_BACKLOG_PROJECTED",
+                Severity = "warning",
+                ReportRef = "capTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["projectedWip"] = Math.Round(projectedWip, 1),
+                    ["months"] = months,
+                    ["netPerMonth"] = Math.Round(netPerMonth, 1)
+                }
+            };
+        }
+
+        // FC_PEAK_RISK: มีเดือนในอดีตที่ inflow > 1.5×output — extraQueueDays คำนวณมาแล้วจาก service (ส่วนเกินของ
+        // peak ÷ per-day ของแผนกคอขวดอันดับ 1)
+        public static Wip.Finding? EvaluateFcPeakRisk(string? peakMonth, int peakInflow, decimal outputPerMonth, double extraQueueDays)
+        {
+            if (string.IsNullOrEmpty(peakMonth)) return null;
+            if (peakInflow <= (double)outputPerMonth * (double)ProductionInsightThresholds.FcPeakRiskMultiplier) return null;
+
+            return new Wip.Finding
+            {
+                Code = "FC_PEAK_RISK",
+                Severity = "warning",
+                ReportRef = "capTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["peakMonth"] = peakMonth,
+                    ["peakInflow"] = peakInflow,
+                    ["extraQueueDays"] = Math.Round(extraQueueDays, 1)
+                }
+            };
+        }
+
+        // ---- Gold Loss by Stage (Loss ตามใบงานรายแผนก จ่าย-รับ) ----
+
+        // GOLD_STAGE_ABOVE_TARGET: diffPercent (รายแผนก) > targetPercent (STAGE) + tolerance — trigger ได้หลาย
+        // ครั้ง (คนละแผนก) เหมือน WIP_DEPT_GROWING — trim/gemSort ไม่มี targetPercent (null) จึงไม่ trigger เอง
+        public static Wip.Finding? EvaluateGoldStageAboveTarget(string deptKey, string metal, decimal? diffPercent, decimal? targetPercent)
+        {
+            if (!diffPercent.HasValue || !targetPercent.HasValue) return null;
+            if (diffPercent.Value <= targetPercent.Value + ProductionInsightThresholds.GoldStageTargetTolerancePercent) return null;
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_STAGE_ABOVE_TARGET",
+                Severity = "warning",
+                ReportRef = "goldStage",
+                Params = new Dictionary<string, object>
+                {
+                    ["deptKey"] = deptKey,
+                    ["metal"] = metal,
+                    ["diffPercent"] = Math.Round(diffPercent.Value, 2),
+                    ["targetPercent"] = Math.Round(targetPercent.Value, 2)
+                }
+            };
+        }
+
+        // GOLD_STAGE_PENDING_RETURN: 1 finding รวมทุกแผนก — งานที่ยังไม่คืนค้างเกิน 14 วัน
+        public static Wip.Finding? EvaluateGoldStagePendingReturn(string metal, int count, decimal gram, string? topDeptKey)
+        {
+            if (count <= 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_STAGE_PENDING_RETURN",
+                Severity = "warning",
+                ReportRef = "goldStagePending",
+                Params = new Dictionary<string, object>
+                {
+                    ["metal"] = metal,
+                    ["count"] = count,
+                    ["gram"] = Math.Round(gram, 2),
+                    ["topDeptKey"] = topDeptKey ?? string.Empty
+                }
+            };
+        }
+
+        // GOLD_STAGE_QUEUED: ของที่ "รอจ่าย" (placeholder/ไม่มีช่างถือครอง) สะสมอยู่ — info-level (ไม่ใช่ปัญหาต้อง
+        // แก้ด่วนเหมือน PENDING_RETURN ที่มีคนถือของจริงแต่ยังไม่คืน — นี่คือของที่ "ยังไม่ออกให้ใครเลย")
+        public static Wip.Finding? EvaluateGoldStageQueued(string metal, int count, decimal gram, string? topDeptKey)
+        {
+            if (count <= 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_STAGE_QUEUED",
+                Severity = "info",
+                ReportRef = "goldStagePending",
+                Params = new Dictionary<string, object>
+                {
+                    ["metal"] = metal,
+                    ["count"] = count,
+                    ["gram"] = Math.Round(gram, 2),
+                    ["topDeptKey"] = topDeptKey ?? string.Empty
+                }
+            };
+        }
+
+        // GOLD_STAGE_OUTLIER_JOBS: จำนวนงานผิดปกติรวมทุกแผนก (ไม่รวม trim/gemSort) >= 5
+        public static Wip.Finding? EvaluateGoldStageOutlierJobs(string metal, int count)
+        {
+            if (count < ProductionInsightThresholds.GoldStageOutlierJobsCountThreshold) return null;
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_STAGE_OUTLIER_JOBS",
+                Severity = "warning",
+                ReportRef = "goldStageOutliers",
+                Params = new Dictionary<string, object> { ["metal"] = metal, ["count"] = count }
+            };
+        }
+
+        // FC_GOLD_STAGE_RISING: diffPercent ของ bucket ที่มีค่า (ไม่ null) ล่าสุด 3 ตัว ต้องเรียงเพิ่มขึ้นต่อเนื่อง
+        // — series ของหน้านี้ไม่มี "count" ต่อ bucket ให้กรองแบบ MinSamplesPerBucket เหมือนที่อื่น จึงใช้
+        // diffPercent.HasValue เป็นตัวกรอง "qualifying" แทน (bucket ที่ไม่มีแถวคืนแล้วเลยถูกข้าม)
+        public static Wip.Finding? EvaluateFcGoldStageRising(string deptKey, string metal, IReadOnlyList<decimal?> seriesDiffPercent)
+        {
+            var n = ProductionInsightThresholds.StageLeadtimeRisingBucketCount;
+            var qualifying = seriesDiffPercent.Where(p => p.HasValue).Select(p => p!.Value).ToList();
+            if (qualifying.Count < n) return null;
+
+            var window = qualifying.Skip(qualifying.Count - n).ToList();
+            for (var i = 1; i < window.Count; i++)
+            {
+                if (window[i] <= window[i - 1]) return null;
+            }
+
+            return new Wip.Finding
+            {
+                Code = "FC_GOLD_STAGE_RISING",
+                Severity = "warning",
+                ReportRef = "goldStage",
+                Params = new Dictionary<string, object>
+                {
+                    ["deptKey"] = deptKey,
+                    ["metal"] = metal,
+                    ["fromPercent"] = Math.Round(window[0], 2),
+                    ["toPercent"] = Math.Round(window[window.Count - 1], 2)
+                }
+            };
+        }
+
         // 'critical' | 'warning' | 'ok' (ไม่มี finding เลย = ok)
         public static string WorstSeverity(IEnumerable<Wip.Finding> findings)
         {
@@ -652,7 +896,13 @@ namespace Jewelry.Service.Production.Insight
             ("ACT_COMPLETE_SLIPS", "deptHead", new[] { "GOLD_SLIP_COVERAGE_LOW" }),
             ("ACT_TALK_WORKER", "deptHead", new[] { "GOLD_REPEAT_OFFENDER" }),
             ("ACT_REVIEW_ALLOWANCE", "productionManager", new[] { "GOLD_ALLOWANCE_ABOVE_TARGET", "GOLD_LOSS_ABOVE_TARGET" }),
-            ("ACT_CHECK_WEIGHING", "deptHead", new[] { "GOLD_EXCESS_OVER_ALLOWANCE", "GOLD_MOST_WORKERS_OVER" })
+            ("ACT_CHECK_WEIGHING", "deptHead", new[] { "GOLD_EXCESS_OVER_ALLOWANCE", "GOLD_MOST_WORKERS_OVER" }),
+            ("ACT_ADD_WORKER", "productionManager", new[] { "CAP_QUEUE_BOTTLENECK" }),
+            ("ACT_SPEED_COSTCARD", "goldControl", new[] { "CAP_COSTCARD_SLOW" }),
+            ("ACT_CLEAN_STALE", "deptHead", new[] { "CAP_BACKLOG_MONTHS", "CAP_QUEUE_BOTTLENECK" }),
+            ("ACT_SMOOTH_INFLOW", "planner", new[] { "CAP_INFLOW_OVER_OUTPUT", "FC_PEAK_RISK" }),
+            ("ACT_RECEIVE_PENDING", "deptHead", new[] { "GOLD_STAGE_PENDING_RETURN" }),
+            ("ACT_CHECK_STAGE", "productionManager", new[] { "GOLD_STAGE_ABOVE_TARGET" })
         };
 
         // priority: เรียงตาม severity ที่แย่ที่สุดของ finding ที่เกี่ยวข้องก่อน (critical > warning) แล้วตามลำดับ
@@ -808,6 +1058,46 @@ namespace Jewelry.Service.Production.Insight
                         ?? GetParam(findings, "GOLD_MOST_WORKERS_OVER", "metal") ?? string.Empty;
                     var excessGram = GetParam(findings, "GOLD_EXCESS_OVER_ALLOWANCE", "excessGram") ?? 0m;
                     return new Dictionary<string, object> { ["workerType"] = workerType, ["metal"] = metalCheck, ["excessGram"] = excessGram };
+                }
+                // ACT_ADD_WORKER/ACT_SPEED_COSTCARD/ACT_CLEAN_STALE/ACT_SMOOTH_INFLOW: ค่า fallback ที่นี่ใช้แค่กัน
+                // พัง — ค่าจริงทั้งหมดถูกเติมทับจาก kpi/departments ตรงๆ ใน ProductionInsightService.EnrichCapacityActionParams
+                // เสมอ (บทเรียนจาก ACT_REVIEW_ALLOWANCE ที่เคยพึ่ง finding param เดียวแล้วเป็น 0 หลอกๆ)
+                case "ACT_ADD_WORKER":
+                {
+                    var deptsObj = GetParam(findings, "CAP_QUEUE_BOTTLENECK", "depts");
+                    var deptsList = deptsObj as List<Dictionary<string, object>>;
+                    var top = deptsList?.FirstOrDefault();
+                    var deptKey = top != null && top.TryGetValue("deptKey", out var dk) ? dk : string.Empty;
+                    return new Dictionary<string, object> { ["deptKey"] = deptKey ?? string.Empty, ["workersNow"] = 0, ["queueDaysNow"] = 0, ["queueDaysPlusOne"] = 0 };
+                }
+                case "ACT_SPEED_COSTCARD":
+                {
+                    var pendingActive = GetParam(findings, "CAP_COSTCARD_SLOW", "pendingActive") ?? 0;
+                    var pendingNow = GetParam(findings, "CAP_COSTCARD_SLOW", "pendingNow") ?? 0;
+                    var medianDays = GetParam(findings, "CAP_COSTCARD_SLOW", "medianDays") ?? 0;
+                    return new Dictionary<string, object> { ["pendingActive"] = pendingActive, ["pendingNow"] = pendingNow, ["medianDays"] = medianDays };
+                }
+                case "ACT_CLEAN_STALE":
+                    return new Dictionary<string, object> { ["staleWip"] = 0 };
+                case "ACT_SMOOTH_INFLOW":
+                {
+                    var outputPerMonth = GetParam(findings, "CAP_INFLOW_OVER_OUTPUT", "outputPerMonth") ?? 0m;
+                    return new Dictionary<string, object> { ["outputPerMonth"] = outputPerMonth };
+                }
+                // ACT_RECEIVE_PENDING/ACT_CHECK_STAGE: ค่า fallback ที่นี่ใช้แค่กันพัง — ค่าจริงถูกเติมทับจากข้อมูล
+                // ที่คำนวณไว้แล้วตรงๆ ใน ProductionInsightService.EnrichGoldStageActionParams เสมอ
+                case "ACT_RECEIVE_PENDING":
+                {
+                    var count = GetParam(findings, "GOLD_STAGE_PENDING_RETURN", "count") ?? 0;
+                    var gram = GetParam(findings, "GOLD_STAGE_PENDING_RETURN", "gram") ?? 0m;
+                    return new Dictionary<string, object> { ["count"] = count, ["gram"] = gram };
+                }
+                case "ACT_CHECK_STAGE":
+                {
+                    var deptKey = GetParam(findings, "GOLD_STAGE_ABOVE_TARGET", "deptKey") ?? string.Empty;
+                    var diffPercent = GetParam(findings, "GOLD_STAGE_ABOVE_TARGET", "diffPercent") ?? 0m;
+                    var targetPercent = GetParam(findings, "GOLD_STAGE_ABOVE_TARGET", "targetPercent") ?? 0m;
+                    return new Dictionary<string, object> { ["deptKey"] = deptKey, ["diffPercent"] = diffPercent, ["targetPercent"] = targetPercent };
                 }
                 default:
                     return new Dictionary<string, object>();

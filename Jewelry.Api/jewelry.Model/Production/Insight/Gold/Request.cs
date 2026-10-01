@@ -24,6 +24,9 @@ namespace jewelry.Model.Production.Insight.Gold
 
     public class DraftTargetItem
     {
+        // 'SLIP' (default) | 'STAGE' — Gold() ใช้เฉพาะ scope=SLIP เท่านั้น (STAGE เก็บไว้เผื่อ UI ส่งมาพร้อมกัน
+        // จากหน้าแก้เป้าหมายเดียวกัน ไม่ error แต่ไม่มีผลต่อ Gold() — ดู report)
+        public string Scope { get; set; } = "SLIP";
         public int WorkerType { get; set; }
         public string Metal { get; set; } = "GOLD";
         public decimal TargetPercent { get; set; }

@@ -32,6 +32,11 @@ using GoldOverSlips = jewelry.Model.Production.Insight.GoldOverSlips;
 using GoldUncoveredJobs = jewelry.Model.Production.Insight.GoldUncoveredJobs;
 using GoldLossTarget = jewelry.Model.Production.Insight.GoldLossTarget;
 using SaveGoldLossTargets = jewelry.Model.Production.Insight.SaveGoldLossTargets;
+using Capacity = jewelry.Model.Production.Insight.Capacity;
+using CostCardPendingPlans = jewelry.Model.Production.Insight.CostCardPendingPlans;
+using GoldByStage = jewelry.Model.Production.Insight.GoldByStage;
+using GoldStageOutlierJobs = jewelry.Model.Production.Insight.GoldStageOutlierJobs;
+using GoldStagePendingReturn = jewelry.Model.Production.Insight.GoldStagePendingReturn;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -45,6 +50,7 @@ namespace Jewelry.Service.Production.Insight
         private readonly IProductionDeliveryDataProvider _deliveryDataProvider;
         private readonly IProductionDeliveryTargetService _deliveryTargetService;
         private readonly IProductionGoldLossTargetService _goldLossTargetService;
+        private readonly IProductionWorkerLookupService _workerLookupService;
 
         public ProductionInsightService(
             JewelryContext jewelryContext,
@@ -55,7 +61,8 @@ namespace Jewelry.Service.Production.Insight
             IProductionStageStandardService stageStandardService,
             IProductionDeliveryDataProvider deliveryDataProvider,
             IProductionDeliveryTargetService deliveryTargetService,
-            IProductionGoldLossTargetService goldLossTargetService)
+            IProductionGoldLossTargetService goldLossTargetService,
+            IProductionWorkerLookupService workerLookupService)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
@@ -66,6 +73,7 @@ namespace Jewelry.Service.Production.Insight
             _deliveryDataProvider = deliveryDataProvider;
             _deliveryTargetService = deliveryTargetService;
             _goldLossTargetService = goldLossTargetService;
+            _workerLookupService = workerLookupService;
         }
 
         public async Task<Wip.Response> Wip(Wip.Request request)
@@ -428,8 +436,9 @@ namespace Jewelry.Service.Production.Insight
                 departmentsOut.Add(stats);
             }
 
+            var activeWipByDept = ComputeActiveWipByDept(openPlans, stalePlanIds);
             var capacity = ProductionStageLeadTimeEvaluator.BuildCapacity(
-                visits, ProductionPlanDepartments.Departments, standardByDeptForCapacity, start, end);
+                visits, ProductionPlanDepartments.Departments, standardByDeptForCapacity, activeWipByDept, start, end);
 
             return new StageLeadTime.Response
             {
@@ -782,7 +791,8 @@ namespace Jewelry.Service.Production.Insight
                 d => d.Key,
                 d => savedStandards.TryGetValue(d.Key, out var s) ? s.StandardDays : ProductionInsightThresholds.DefaultStageStandardDays);
             var medianWindowStart = now.AddDays(-ProductionInsightThresholds.DefaultFlowRangeDays);
-            var capacity = ProductionStageLeadTimeEvaluator.BuildCapacity(ctx.Visits, ProductionPlanDepartments.Departments, standardByDept, medianWindowStart, now);
+            var activeWipByDeptForDelivery = ComputeActiveWipByDept(ctx.OpenPlans, ctx.StalePlanIds);
+            var capacity = ProductionStageLeadTimeEvaluator.BuildCapacity(ctx.Visits, ProductionPlanDepartments.Departments, standardByDept, activeWipByDeptForDelivery, medianWindowStart, now);
             var bottleneckDeptKey = capacity.Current.BottleneckDept;
 
             var kpi = new Delivery.KpiData
@@ -1052,7 +1062,8 @@ namespace Jewelry.Service.Production.Insight
         private static bool IsValidMetal(string? metal) =>
             metal == ProductionGoldLossEvaluator.MetalGold || metal == ProductionGoldLossEvaluator.MetalSilver;
 
-        private static decimal DefaultGoldLossTargetPercent(int workerType, string metal)
+        // scope='SLIP' — worker_type ของใบ gold loss (50 ช่างแต่ง, 80 ช่างฝัง)
+        private static decimal DefaultSlipGoldLossTargetPercent(int workerType, string metal)
         {
             if (metal == ProductionGoldLossEvaluator.MetalSilver)
             {
@@ -1064,6 +1075,20 @@ namespace Jewelry.Service.Production.Insight
             return workerType == ProductionGoldLossEvaluator.WorkerTypeTang
                 ? ProductionInsightThresholds.DefaultGoldLossTargetPercentTangGold
                 : ProductionInsightThresholds.DefaultGoldLossTargetPercentSettingGold;
+        }
+
+        // scope='STAGE' — worker_type ในที่นี้คือสถานะทำงานของแผนก (60 ขัดมัน/rawPolish, 80 ฝัง/setting,
+        // 90 ชุบ/plating) ไม่ใช่ worker_type ของใบ gold loss — ตรงกับค่า seed migration 20261001_03
+        private static decimal DefaultStageGoldLossTargetPercent(int deptWorkerType, string metal)
+        {
+            var isSilver = metal == ProductionGoldLossEvaluator.MetalSilver;
+            return deptWorkerType switch
+            {
+                60 => 3.2m,
+                80 => isSilver ? 2.4m : 4.3m,
+                90 => isSilver ? 4.7m : 2.1m,
+                _ => 0m
+            };
         }
 
         // แผนทดสอบ (TEST) — exclude ออกจาก coverage/uncovered ทั้งคู่เพื่อให้ตัวเลขตรงกัน (เช็คที่ wo/ชื่อสินค้า/
@@ -1103,8 +1128,11 @@ namespace Jewelry.Service.Production.Insight
                 : null;
 
             var savedTargets = await _goldLossTargetService.GetCurrentTargetsAsync();
+            // Gold() ใช้เฉพาะ scope=SLIP — รายการ draft ที่ส่ง scope=STAGE มาด้วย (เช่นจากหน้าแก้เป้าหมายรวม) ถูก
+            // กรองทิ้งเงียบๆ ตรงนี้ ไม่ error (ดู report)
             var draftByType = request.DraftTargets?
-                .Where(d => (d.WorkerType == ProductionGoldLossEvaluator.WorkerTypeTang || d.WorkerType == ProductionGoldLossEvaluator.WorkerTypeSetting) && IsValidMetal(d.Metal))
+                .Where(d => (d.WorkerType == ProductionGoldLossEvaluator.WorkerTypeTang || d.WorkerType == ProductionGoldLossEvaluator.WorkerTypeSetting)
+                    && IsValidMetal(d.Metal) && (string.IsNullOrEmpty(d.Scope) || d.Scope == "SLIP"))
                 .ToDictionary(d => (d.WorkerType, d.Metal), d => d.TargetPercent) ?? new Dictionary<(int, string), decimal>();
 
             var targets = new List<Gold.TargetItem>();
@@ -1112,13 +1140,13 @@ namespace Jewelry.Service.Production.Insight
 
             foreach (var wt in new[] { ProductionGoldLossEvaluator.WorkerTypeTang, ProductionGoldLossEvaluator.WorkerTypeSetting })
             {
-                var key = (wt, metal);
+                var key = ("SLIP", wt, metal);
                 var hasSaved = savedTargets.TryGetValue(key, out var saved);
                 decimal targetPercent;
                 string source;
                 DateTime? effectiveFrom;
 
-                if (draftByType.TryGetValue(key, out var draft))
+                if (draftByType.TryGetValue((wt, metal), out var draft))
                 {
                     targetPercent = draft;
                     source = "draft";
@@ -1132,7 +1160,7 @@ namespace Jewelry.Service.Production.Insight
                 }
                 else
                 {
-                    targetPercent = DefaultGoldLossTargetPercent(wt, metal);
+                    targetPercent = DefaultSlipGoldLossTargetPercent(wt, metal);
                     source = "saved";
                     effectiveFrom = null;
                 }
@@ -1189,8 +1217,64 @@ namespace Jewelry.Service.Production.Insight
                     start, end, bucketEnds, rangeDays, codeSet, kpiList, seriesList, workerList, problems, forecasts);
             }
 
+            // ---- Loss ตามใบงานรายแผนก (จ่าย-รับ) — เพิ่มกฎเข้า problems/forecasts/actions ชุดเดียวกันนี้
+            // bucket บังคับเป็น month เสมอ (FC_GOLD_STAGE_RISING ระบุ "3 monthly buckets" ชัดเจน ไม่ขึ้นกับ
+            // request.Bucket ของ Gold() ที่อาจเป็น week) ----
+            var stageBucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, "month").Select(b => b.End).ToList();
+            // scope=STAGE draft (what-if) ขับ GOLD_STAGE_ABOVE_TARGET/ACT_CHECK_STAGE แทนค่า saved — scope=SLIP
+            // ยังขับกฎฝั่งใบ gold loss ตามเดิม (ดู draftByType ด้านบน ซึ่งกรองเฉพาะ SLIP)
+            var stageDraftByWorkerTypeForGold = request.DraftTargets?
+                .Where(d => d.Scope == "STAGE" && d.Metal == metal)
+                .GroupBy(d => d.WorkerType)
+                .ToDictionary(g => g.Key, g => g.Last().TargetPercent);
+            var stageSummary = await ComputeGoldStageSummaryAsync(metal, start, end, stageBucketEnds, stageDraftByWorkerTypeForGold);
+
+            foreach (var deptKey in ProductionGoldStageEvaluator.AllDepartments)
+            {
+                var stats = stageSummary.DeptStatsByDept[deptKey];
+                var targetPercent = stageSummary.TargetPercentByDept[deptKey];
+                AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldStageAboveTarget(deptKey, metal, stats.DiffPercent, targetPercent));
+
+                var seriesPercents = stageSummary.SeriesByDept[deptKey].Select(s => s.DiffPercent).ToList();
+                AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcGoldStageRising(deptKey, metal, seriesPercents));
+            }
+
+            // GOLD_STAGE_PENDING_RETURN/ACT_RECEIVE_PENDING ใช้เฉพาะของที่มีช่างจริงถือครอง (pendingWithWorker) —
+            // ของที่ค้าง "คิว" (placeholder/ไม่มีช่าง) ไม่ใช่ของที่ "มีคนลืมคืน" จึงแยกไปเป็น GOLD_STAGE_QUEUED ต่างหาก
+            var workerNamesForStage = await _workerLookupService.GetWorkerNamesAsync();
+            var pendingOverRowsAll = ProductionGoldStageEvaluator.ComputePendingOverDays(
+                stageSummary.AllRows, ProductionInsightThresholds.GoldStagePendingOlderThanDaysDefault, now);
+            var pendingOverWithWorker = pendingOverRowsAll
+                .Where(r => !ProductionGoldStageEvaluator.IsQueueOrEmptyWorker(r.WorkerCode, workerNamesForStage))
+                .ToList();
+            var pendingOverCount = pendingOverWithWorker.Count;
+            var pendingOverGram = pendingOverWithWorker.Sum(r => r.SendGram);
+            var pendingTopDeptKey = pendingOverWithWorker
+                .GroupBy(r => r.DeptKey)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key)
+                .FirstOrDefault();
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldStagePendingReturn(metal, pendingOverCount, pendingOverGram, pendingTopDeptKey));
+
+            // GOLD_STAGE_QUEUED — ของทั้งหมดที่ยังค้างคิวอยู่ตอนนี้ (ไม่จำกัดอายุ ต่างจาก PENDING_RETURN ที่กรอง
+            // เฉพาะเกิน 14 วัน) รวมทุกแผนก — info level แค่แจ้งให้รู้สต็อกของที่ยังไม่ออก
+            var queueCount = stageSummary.DeptStatsByDept.Values.Sum(d => d.PendingQueueCount);
+            var queueGram = stageSummary.DeptStatsByDept.Values.Sum(d => d.PendingQueueGram);
+            var queueTopDeptKey = stageSummary.DeptStatsByDept.Values
+                .Where(d => d.PendingQueueCount > 0)
+                .OrderByDescending(d => d.PendingQueueCount)
+                .Select(d => d.DeptKey)
+                .FirstOrDefault();
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldStageQueued(metal, queueCount, queueGram, queueTopDeptKey));
+
+            // GOLD_STAGE_OUTLIER_JOBS นับเฉพาะ outlier ที่มีช่างจริงถือครอง (โทษได้) — ของ unassigned ยัง loss จริง
+            // แต่หาตัวคนรับผิดชอบไม่ได้ ไม่ควรเอาไปรวมกับของที่มีคนรับผิดชอบ
+            var totalOutliers = stageSummary.OutliersAttributedByDept.Values.Sum(v => v.Count);
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldStageOutlierJobs(metal, totalOutliers));
+
             var actions = ProductionInsightRuleEngine.BuildActions(problems, forecasts);
             EnrichGoldActionParams(actions, kpiList);
+            EnrichGoldStageActionParams(actions, stageSummary, pendingOverCount, pendingOverGram);
             var worstSeverity = ProductionInsightRuleEngine.WorstSeverity(problems.Concat(forecasts));
             var status = worstSeverity == "critical" || worstSeverity == "warning" ? worstSeverity : "ok";
 
@@ -1670,24 +1754,48 @@ namespace Jewelry.Service.Production.Insight
             return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
         }
 
+        // worker_type ที่ valid ต่อ scope — SLIP = worker_type ของใบ gold loss, STAGE = สถานะทำงานของแผนก
+        private static readonly int[] SlipWorkerTypes = { ProductionGoldLossEvaluator.WorkerTypeTang, ProductionGoldLossEvaluator.WorkerTypeSetting };
+        private static readonly int[] StageWorkerTypes = { 60, 80, 90 };
+
         public async Task<List<GoldLossTarget.Item>> GetGoldLossTargets()
         {
             var current = await _goldLossTargetService.GetCurrentTargetsAsync();
-            var types = new[] { ProductionGoldLossEvaluator.WorkerTypeTang, ProductionGoldLossEvaluator.WorkerTypeSetting };
             var metals = new[] { ProductionGoldLossEvaluator.MetalGold, ProductionGoldLossEvaluator.MetalSilver };
 
             var result = new List<GoldLossTarget.Item>();
-            foreach (var wt in types)
+
+            foreach (var wt in SlipWorkerTypes)
             {
                 foreach (var metal in metals)
                 {
-                    result.Add(current.TryGetValue((wt, metal), out var row)
-                        ? new GoldLossTarget.Item { WorkerType = wt, Metal = metal, TargetPercent = row.TargetPercent, EffectiveFrom = row.EffectiveFrom, CreateBy = row.CreateBy, Remark = row.Remark }
+                    result.Add(current.TryGetValue(("SLIP", wt, metal), out var row)
+                        ? new GoldLossTarget.Item { Scope = "SLIP", WorkerType = wt, Metal = metal, TargetPercent = row.TargetPercent, EffectiveFrom = row.EffectiveFrom, CreateBy = row.CreateBy, Remark = row.Remark }
                         : new GoldLossTarget.Item
                         {
+                            Scope = "SLIP",
                             WorkerType = wt,
                             Metal = metal,
-                            TargetPercent = DefaultGoldLossTargetPercent(wt, metal),
+                            TargetPercent = DefaultSlipGoldLossTargetPercent(wt, metal),
+                            EffectiveFrom = default,
+                            CreateBy = "system",
+                            Remark = "ไม่มีข้อมูลในตาราง ใช้ค่า default"
+                        });
+                }
+            }
+
+            foreach (var wt in StageWorkerTypes)
+            {
+                foreach (var metal in metals)
+                {
+                    result.Add(current.TryGetValue(("STAGE", wt, metal), out var row)
+                        ? new GoldLossTarget.Item { Scope = "STAGE", WorkerType = wt, Metal = metal, TargetPercent = row.TargetPercent, EffectiveFrom = row.EffectiveFrom, CreateBy = row.CreateBy, Remark = row.Remark }
+                        : new GoldLossTarget.Item
+                        {
+                            Scope = "STAGE",
+                            WorkerType = wt,
+                            Metal = metal,
+                            TargetPercent = DefaultStageGoldLossTargetPercent(wt, metal),
                             EffectiveFrom = default,
                             CreateBy = "system",
                             Remark = "ไม่มีข้อมูลในตาราง ใช้ค่า default"
@@ -1698,12 +1806,14 @@ namespace Jewelry.Service.Production.Insight
             return result;
         }
 
-        public async Task<List<GoldLossTarget.Item>> GetGoldLossTargetHistory(int workerType, string metal)
+        public async Task<List<GoldLossTarget.Item>> GetGoldLossTargetHistory(string scope, int workerType, string metal)
         {
+            var normalizedScope = scope == "STAGE" ? "STAGE" : "SLIP";
             var normalizedMetal = IsValidMetal(metal) ? metal : ProductionGoldLossEvaluator.MetalGold;
-            var rows = await _goldLossTargetService.GetHistoryAsync(workerType, normalizedMetal);
+            var rows = await _goldLossTargetService.GetHistoryAsync(normalizedScope, workerType, normalizedMetal);
             return rows.Select(r => new GoldLossTarget.Item
             {
+                Scope = r.Scope,
                 WorkerType = r.WorkerType,
                 Metal = r.Metal,
                 TargetPercent = r.TargetPercent,
@@ -1715,18 +1825,23 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task SaveGoldLossTargets(SaveGoldLossTargets.Request request)
         {
-            var validTypes = new HashSet<int> { ProductionGoldLossEvaluator.WorkerTypeTang, ProductionGoldLossEvaluator.WorkerTypeSetting };
-
             if (request.Items == null || request.Items.Count == 0)
             {
-                throw new ArgumentException("ต้องระบุอย่างน้อย 1 ประเภทช่าง");
+                throw new ArgumentException("ต้องระบุอย่างน้อย 1 รายการ");
             }
 
             foreach (var item in request.Items)
             {
+                var scope = string.IsNullOrWhiteSpace(item.Scope) ? "SLIP" : item.Scope;
+                if (scope != "SLIP" && scope != "STAGE")
+                {
+                    throw new ArgumentException($"ไม่รู้จัก scope '{item.Scope}'");
+                }
+
+                var validTypes = scope == "STAGE" ? StageWorkerTypes : SlipWorkerTypes;
                 if (!validTypes.Contains(item.WorkerType))
                 {
-                    throw new ArgumentException($"ไม่รู้จักประเภทช่าง '{item.WorkerType}'");
+                    throw new ArgumentException($"ไม่รู้จักประเภทช่าง/แผนก '{item.WorkerType}' สำหรับ scope '{scope}'");
                 }
 
                 if (!IsValidMetal(item.Metal))
@@ -1736,7 +1851,7 @@ namespace Jewelry.Service.Production.Insight
 
                 if (item.TargetPercent < 0 || item.TargetPercent > 100)
                 {
-                    throw new ArgumentException($"เป้าหมาย % ของประเภทช่าง '{item.WorkerType}' ({item.Metal}) ต้องอยู่ระหว่าง 0-100");
+                    throw new ArgumentException($"เป้าหมาย % ของ '{scope}/{item.WorkerType}' ({item.Metal}) ต้องอยู่ระหว่าง 0-100");
                 }
             }
 
@@ -1745,8 +1860,840 @@ namespace Jewelry.Service.Production.Insight
                 throw new ArgumentException("ต้องระบุหมายเหตุ");
             }
 
-            var items = request.Items.Select(i => (i.WorkerType, i.Metal, i.TargetPercent)).ToList();
+            var items = request.Items
+                .Select(i => (string.IsNullOrWhiteSpace(i.Scope) ? "SLIP" : i.Scope, i.WorkerType, i.Metal, i.TargetPercent))
+                .ToList();
             await _goldLossTargetService.SaveAsync(items, request.Remark, CurrentUsername);
+        }
+
+        // ---- Capacity (กำลังการผลิต) ----
+
+        public async Task<Capacity.Response> Capacity(Capacity.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+
+            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var doneDates = await _deliveryDataProvider.GetDoneDatesAsync();
+            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+            var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
+            var stalePlanIds = new HashSet<int>(
+                openPlans.Where(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) < staleCutoff).Select(p => p.Id));
+
+            var visits = ProductionStageLeadTimeEvaluator.ComputeVisits(trendData.Plans, trendData.Headers, ProductionPlanDepartments.Departments, now);
+            var activeWipByDept = ComputeActiveWipByDept(openPlans, stalePlanIds);
+            var nonStaleOpenPlans = openPlans.Where(p => !stalePlanIds.Contains(p.Id)).ToList();
+
+            var savedStandards = await _stageStandardService.GetCurrentStandardsAsync();
+            var standardByDept = ProductionPlanDepartments.Departments.ToDictionary(
+                d => d.Key,
+                d => savedStandards.TryGetValue(d.Key, out var s) ? s.StandardDays : ProductionInsightThresholds.DefaultStageStandardDays);
+
+            // บังคับ bucket เป็น month เสมอ ("Monthly buckets by Thai date" — request.Bucket ไม่ได้ใช้เลือก week)
+            var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, "month").Select(b => b.End).ToList();
+
+            // ---- จุดเริ่ม/ความยาว (วัน) ของแต่ละ bucket — ใช้ 3 เรื่อง: (1) peakMonth label เอาจาก "วันที่เริ่ม"
+            // ไม่ใช่ "วันที่จบ" ของ bucket (ชื่อเดือนของวันที่จบมักเป็นเดือนถัดไปเสมอ ไม่ตรงกับข้อมูลในนั้น)
+            // (2) overloadMonths ไม่นับ bucket ที่สั้นกว่า 15 วัน (3) ไม่ใช้ bucketEnds.Count เป็นตัวหารค่าเฉลี่ย/เดือน
+            // อีกต่อไป (bucket เดือนสุดท้ายอาจสั้นกว่า 1 เดือนมาก ถ้า end ตรงกับวันที่ 1 พอดี ทำให้เฉลี่ยเพี้ยน) ----
+            var bucketStarts = new List<DateTime>();
+            var bucketDurationDays = new List<double>();
+            {
+                var prevBoundary = start;
+                foreach (var be in bucketEnds)
+                {
+                    bucketStarts.Add(prevBoundary);
+                    bucketDurationDays.Add((be - prevBoundary).TotalDays);
+                    prevBoundary = be;
+                }
+            }
+
+            var rangeDaysForMonths = Math.Max((end - start).TotalDays, 1);
+            var monthsForRates = Math.Max(rangeDaysForMonths / 30.44, 0.1);
+            var monthsInRangeRounded = Math.Max((int)Math.Round(rangeDaysForMonths / 30.44, MidpointRounding.AwayFromZero), 1);
+
+            var capacity = ProductionStageLeadTimeEvaluator.BuildCapacity(
+                visits, ProductionPlanDepartments.Departments, standardByDept, activeWipByDept, start, end);
+
+            var first95Dates = ProductionCapacityEvaluator.ComputeFirst95Dates(trendData.Headers);
+            var meltedDates = ProductionCapacityEvaluator.ComputeMeltedDates(trendData.Plans, trendData.Headers);
+            var wipTimes = ProductionPlanTrendEvaluator.ComputeWipCountsAtTimes(trendData.Plans, trendData.Headers, ProductionPlanDepartments.DepartmentKeyOf, bucketEnds);
+            var seriesRaw = ProductionCapacityEvaluator.ComputeSeries(trendData.Plans, first95Dates, doneDates, meltedDates, wipTimes, start, bucketEnds, now);
+
+            var totalInflow = seriesRaw.Sum(s => s.Inflow);
+            var totalInflowPieces = seriesRaw.Sum(s => s.InflowPieces);
+            var totalOutput = seriesRaw.Sum(s => s.Output);
+            var totalCompleted = seriesRaw.Sum(s => s.Completed);
+
+            var inflowPerMonth = (decimal)totalInflow / (decimal)monthsForRates;
+            var inflowPiecesPerMonth = (decimal)totalInflowPieces / (decimal)monthsForRates;
+            var outputPerMonth = (decimal)totalOutput / (decimal)monthsForRates;
+            var completedPerMonth = (decimal)totalCompleted / (decimal)monthsForRates;
+            // netPerMonth = inflow - output (ไม่ใช่ - completed) ให้สอดคล้องกับ backlogMonths ที่สเปกระบุให้หาร
+            // ด้วย outputPerMonth ตรงๆ — มองสายการผลิตจบที่บัตรต้นทุน ส่วนช้า 95→100 แยกติดตามที่ costCardToDone
+            var netPerMonth = inflowPerMonth - outputPerMonth;
+
+            // = Σ activeWipByDept (แผนกที่ไม่มี deptKey เช่น CVD 84/85 ไม่ถูกนับ — ตรงกับนิยาม "status ไม่ใช่
+            // 100/500/84/85" ที่ใช้ตลอดทั้งหน้านี้) — ไม่ใช้ openPlans.Count ตรงๆ อีกต่อไป (นับ 84/85 ปนเข้ามาทำให้
+            // ตัวเลขรวมไม่ตรงกับผลรวมรายแผนก)
+            var activeWip = activeWipByDept.Values.Sum();
+            var staleWip = stalePlanIds.Count;
+            var backlogMonths = outputPerMonth > 0 ? (decimal?)Math.Round(activeWip / outputPerMonth, 1) : null;
+
+            // ไม่นับ bucket สั้นกว่า 15 วัน (bucket ท้ายๆ ที่ถูกตัดสั้นเพราะ end ตรงกับวันที่ 1 พอดี ไม่ควรถูกเข้าใจ
+            // ผิดว่าเป็น "เดือนที่ inflow เกิน output" ทั้งที่จริงมีข้อมูลแค่ไม่กี่วัน)
+            var overloadMonths = seriesRaw
+                .Where((s, i) => bucketDurationDays[i] >= 15 && s.Inflow > s.Output)
+                .Count();
+
+            var workerNames = await _workerLookupService.GetWorkerNamesAsync();
+            var activityRowsRaw = await GetWorkerActivityRowsAsync(start, end);
+            // ไม่นับรหัส placeholder ("รอจ่าย...") หรือไม่มีรหัสช่างเลย เป็น "ช่าง" ในการนับ/หา median — รหัสพวกนี้
+            // คือคิวรองาน ไม่ใช่คนจริง
+            var activityRows = activityRowsRaw
+                .Where(r => !ProductionGoldStageEvaluator.IsQueueOrEmptyWorker(r.WorkerCode, workerNames))
+                .ToList();
+            var workersByDept = ProductionCapacityEvaluator.ComputeWorkersByDept(activityRows, ProductionPlanDepartments.Departments, start, bucketEnds);
+
+            var departmentsOut = new List<Capacity.DepartmentItem>();
+            foreach (var dept in ProductionPlanDepartments.Departments)
+            {
+                var capRow = capacity.Departments.First(d => d.Key == dept.Key);
+                var waitStatus = dept.StatusIds.Length >= 2 ? dept.StatusIds[0] : (int?)null;
+                var workStatus = dept.StatusIds.Length >= 2 ? dept.StatusIds[1] : dept.StatusIds[0];
+                // waitingNow/workingNow/activeWip (capRow.ActiveWip) ต้องตัด stale ออกเหมือนกันหมด (นิยามเดียวกับ
+                // kpi.activeWip) — ก่อนหน้านี้นับจาก trendData.Plans ตรงๆ ซึ่งรวม stale ด้วย ทำให้ตัวเลขพองเกินจริง
+                var waitingNow = waitStatus.HasValue ? nonStaleOpenPlans.Count(p => p.Status == waitStatus.Value) : 0;
+                var workingNow = nonStaleOpenPlans.Count(p => p.Status == workStatus);
+                var exitsPerMonth = (decimal)capRow.ExitedCount / (decimal)monthsForRates;
+                var workersInfo = workersByDept.TryGetValue(dept.Key, out var wi) ? wi : new ProductionCapacityEvaluator.WorkersResult();
+                decimal? plansPerWorker = workersInfo.WorkersMedian.HasValue && workersInfo.WorkersMedian.Value > 0
+                    ? Math.Round(exitsPerMonth / (decimal)workersInfo.WorkersMedian.Value, 1)
+                    : (decimal?)null;
+                var deptVisitsForExits = visits.Where(v => v.DeptKey == dept.Key).ToList();
+                var exitsSeries = ProductionCapacityEvaluator.ComputeExitsSeries(deptVisitsForExits, start, bucketEnds);
+
+                departmentsOut.Add(new Capacity.DepartmentItem
+                {
+                    Key = dept.Key,
+                    ExitsPerMonth = Math.Round(exitsPerMonth, 1),
+                    ExitsSeries = exitsSeries.Select(s => new Capacity.ExitsSeriesPoint { BucketEnd = s.BucketEnd, Exits = s.Exits }).ToList(),
+                    WorkersMedian = workersInfo.WorkersMedian,
+                    WorkersSeries = workersInfo.Series.Select(s => new Capacity.WorkersSeriesPoint { BucketEnd = s.BucketEnd, Workers = s.Workers }).ToList(),
+                    PlansPerWorker = plansPerWorker,
+                    WaitingNow = waitingNow,
+                    WorkingNow = workingNow,
+                    ActiveWip = capRow.ActiveWip,
+                    QueueDays = capRow.QueueDaysCurrent,
+                    IsBottleneck = false
+                });
+            }
+
+            var bottleneckDepts = departmentsOut
+                .Where(d => d.QueueDays.HasValue)
+                .OrderByDescending(d => d.QueueDays!.Value)
+                .Take(ProductionInsightThresholds.CapQueueBottleneckTopCount)
+                .Select(d => d.Key)
+                .ToList();
+            foreach (var d in departmentsOut)
+            {
+                d.IsBottleneck = bottleneckDepts.Contains(d.Key);
+            }
+
+            var cc = ProductionCapacityEvaluator.ComputeCostCardToDone(
+                first95Dates, doneDates, trendData.Plans, start, bucketEnds, now, ProductionInsightThresholds.CapCostCardPendingOver30dDays, stalePlanIds);
+
+            var problems = new List<Wip.Finding>();
+            var forecasts = new List<Wip.Finding>();
+
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateCapBacklogMonths(backlogMonths, activeWip, outputPerMonth));
+
+            var bottleneckRows = departmentsOut.Where(d => d.IsBottleneck).OrderByDescending(d => d.QueueDays ?? 0).ToList();
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateCapQueueBottleneck(
+                bottleneckRows.Select(d => (d.Key, d.QueueDays ?? 0, d.WaitingNow)).ToList()));
+
+            // peakMonth label ต้องมาจาก "วันเริ่ม" ของ bucket ไม่ใช่วันจบ — bucket (1พ.ค.,1มิ.ย.] เก็บข้อมูลของ
+            // เดือนพฤษภาคม แต่วันจบ (1มิ.ย.) format เป็น "yyyy-MM" จะได้ "06" (มิถุนายน) ผิดเดือนเสมอ
+            var peakIndex = -1;
+            var peakInflowValue = -1;
+            for (var i = 0; i < seriesRaw.Count; i++)
+            {
+                if (seriesRaw[i].Inflow > peakInflowValue)
+                {
+                    peakInflowValue = seriesRaw[i].Inflow;
+                    peakIndex = i;
+                }
+            }
+            var peak = peakIndex >= 0 ? seriesRaw[peakIndex] : null;
+            var peakMonthLabel = peakIndex >= 0 ? bucketStarts[peakIndex].AddHours(7).ToString("yyyy-MM") : null;
+
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateCapInflowOverOutput(overloadMonths, monthsInRangeRounded, peakMonthLabel, peak?.Inflow ?? 0, outputPerMonth));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateCapCostCardSlow(cc.MedianDays, cc.P90Days, cc.PendingNow, cc.PendingActive, cc.PendingOver30d));
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcBacklogProjected(activeWip, netPerMonth));
+
+            var topBottleneck = bottleneckRows.FirstOrDefault();
+            var extraQueueDays = 0.0;
+            if (topBottleneck != null && peak != null && outputPerMonth > 0)
+            {
+                var excessPlans = (double)(peak.Inflow - outputPerMonth);
+                var topBottleneckCapRow = capacity.Departments.First(d => d.Key == topBottleneck.Key);
+                if (excessPlans > 0 && topBottleneckCapRow.ExitedPerDay > 0)
+                {
+                    extraQueueDays = excessPlans / topBottleneckCapRow.ExitedPerDay;
+                }
+            }
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcPeakRisk(peakMonthLabel, peak?.Inflow ?? 0, outputPerMonth, extraQueueDays));
+
+            var actions = ProductionInsightRuleEngine.BuildActions(problems, forecasts);
+            EnrichCapacityActionParams(actions, departmentsOut, cc, staleWip, outputPerMonth);
+
+            var worstSeverity = ProductionInsightRuleEngine.WorstSeverity(problems.Concat(forecasts));
+            var status = worstSeverity == "critical" || worstSeverity == "warning" ? worstSeverity : "ok";
+
+            return new Capacity.Response
+            {
+                AsOf = now,
+                Status = status,
+                Problems = problems,
+                Forecasts = forecasts,
+                Actions = actions,
+                Kpi = new Capacity.KpiData
+                {
+                    InflowPerMonth = Math.Round(inflowPerMonth, 1),
+                    InflowPiecesPerMonth = Math.Round(inflowPiecesPerMonth, 1),
+                    OutputPerMonth = Math.Round(outputPerMonth, 1),
+                    CompletedPerMonth = Math.Round(completedPerMonth, 1),
+                    NetPerMonth = Math.Round(netPerMonth, 1),
+                    ActiveWip = activeWip,
+                    BacklogMonths = backlogMonths,
+                    StaleWip = staleWip,
+                    BottleneckDepts = bottleneckDepts,
+                    OverloadMonths = overloadMonths,
+                    MonthsInRange = monthsInRangeRounded
+                },
+                Series = seriesRaw.Select(s => new Capacity.SeriesItem
+                {
+                    BucketEnd = s.BucketEnd,
+                    Inflow = s.Inflow,
+                    InflowPieces = s.InflowPieces,
+                    Output = s.Output,
+                    Completed = s.Completed,
+                    Melted = s.Melted,
+                    ActiveWipEnd = s.ActiveWipEnd
+                }).ToList(),
+                Departments = departmentsOut,
+                CostCardToDone = new Capacity.CostCardToDoneData
+                {
+                    MedianDays = cc.MedianDays,
+                    P90Days = cc.P90Days,
+                    PendingNow = cc.PendingNow,
+                    PendingActive = cc.PendingActive,
+                    PendingStale = cc.PendingStale,
+                    PendingOver30d = cc.PendingOver30d,
+                    Series = cc.Series.Select(s => new Capacity.CostCardSeriesPoint
+                    {
+                        BucketEnd = s.BucketEnd,
+                        Count = s.Count,
+                        MedianDays = s.MedianDays,
+                        P90Days = s.P90Days
+                    }).ToList()
+                }
+            };
+        }
+
+        // activeWip ต่อแผนก = แผนเปิดที่ไม่ stale (นิยามเดียวกับ WIP_STALE) นับตาม plan.status ปัจจุบัน รวมทั้งสถานะ
+        // รอ+ทำงานของแผนกนั้น (เช่น trim = 49+50) — ใช้เป็น input ของ BuildCapacity (queue-days bottleneck)
+        private static Dictionary<string, int> ComputeActiveWipByDept(IReadOnlyList<OpenPlanRow> openPlans, HashSet<int> stalePlanIds)
+        {
+            var result = new Dictionary<string, int>();
+            foreach (var plan in openPlans)
+            {
+                if (stalePlanIds.Contains(plan.Id)) continue;
+                var deptKey = ProductionPlanDepartments.DepartmentKeyOf(plan.Status);
+                if (deptKey == null) continue;
+                result.TryGetValue(deptKey, out var c);
+                result[deptKey] = c + 1;
+            }
+            return result;
+        }
+
+        // ดึง (deptKey, header.create_date, header.worker_code) ของทุก header ที่ active ในช่วง — ใช้
+        // header.worker_code (ไม่ใช่ status_detail.worker/worker_sub) เป็นแหล่งข้อมูลช่าง: query เดียวเบากว่า
+        // พอสำหรับภาพรวมรายเดือน — ตัวเลขอาจคลาดเคลื่อนเล็กน้อยจาก prod ที่ coordinator ตรวจด้วย status_detail.worker
+        // (เอกสารไว้ใน report)
+        // ช่างจริงต่อ header มาจาก status_detail.worker/worker_sub (ของ detail ที่ active ในหัวนั้น) ไม่ใช่
+        // header.worker_code เฉยๆ (undercounts — header.worker_code มีแค่ "ช่างหลัก" คนเดียว ขณะที่งานหนึ่งหัวอาจ
+        // มีหลายช่างทำจริงที่ detail level — ตรวจแล้วบน prod เช่นแผนกฝังมีช่าง distinct 10-12 คน/เดือน ไม่ใช่
+        // ไม่กี่คนแบบนับจาก worker_code) — LEFT JOIN header-detail เป็น query เดียว (set-based) แล้ว group/fallback
+        // ในหน่วยความจำ: header ไหนไม่มี worker ระดับ detail เลย (ไม่มี record หรือ worker/worker_sub ว่างหมด)
+        // fallback ไปใช้ header.worker_code แทน — header ที่มี detail worker จะได้ 1 แถวต่อช่าง distinct 1 คน
+        private async Task<List<(string DeptKey, DateTime CreateDate, string? WorkerCode)>> GetWorkerActivityRowsAsync(DateTime start, DateTime end)
+        {
+            var raw = await (
+                from h in _jewelryContext.TbtProductionPlanStatusHeader
+                where h.IsActive && h.CreateDate >= start && h.CreateDate <= end
+                join d in _jewelryContext.TbtProductionPlanStatusDetail.Where(x => x.IsActive)
+                    on h.Id equals d.HeaderId into details
+                from d in details.DefaultIfEmpty()
+                select new
+                {
+                    h.Id,
+                    h.Status,
+                    h.CreateDate,
+                    h.WorkerCode,
+                    DetailWorker = d.Worker,
+                    DetailWorkerSub = d.WorkerSub
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            var result = new List<(string, DateTime, string?)>();
+
+            foreach (var headerGroup in raw.GroupBy(r => r.Id))
+            {
+                var first = headerGroup.First();
+                var deptKey = ProductionPlanDepartments.DepartmentKeyOf(first.Status);
+                if (deptKey == null) continue;
+
+                var detailWorkers = headerGroup
+                    .SelectMany(r => new[] { r.DetailWorker, r.DetailWorkerSub })
+                    .Where(w => !string.IsNullOrWhiteSpace(w))
+                    .Select(w => w!.Trim())
+                    .Distinct()
+                    .ToList();
+
+                if (detailWorkers.Count > 0)
+                {
+                    foreach (var w in detailWorkers)
+                    {
+                        result.Add((deptKey, first.CreateDate, w));
+                    }
+                }
+                else
+                {
+                    result.Add((deptKey, first.CreateDate, first.WorkerCode));
+                }
+            }
+
+            return result;
+        }
+
+        // ACT_ADD_WORKER/ACT_SPEED_COSTCARD/ACT_CLEAN_STALE/ACT_SMOOTH_INFLOW: เติมทับ param จาก kpi/departments
+        // ตรงๆ เสมอ (ไม่พึ่ง finding param ที่อาจไม่ fire) — บทเรียนเดียวกับ Gold.ACT_REVIEW_ALLOWANCE
+        private static void EnrichCapacityActionParams(
+            List<Wip.ActionItem> actions, List<Capacity.DepartmentItem> departments,
+            ProductionCapacityEvaluator.CostCardToDoneStats cc, int staleWip, decimal outputPerMonth)
+        {
+            foreach (var action in actions)
+            {
+                switch (action.Code)
+                {
+                    case "ACT_ADD_WORKER":
+                    {
+                        var top = departments
+                            .Where(d => d.Key != "costCard" && d.QueueDays.HasValue)
+                            .OrderByDescending(d => d.QueueDays!.Value)
+                            .FirstOrDefault();
+                        if (top == null) break;
+
+                        var workersNow = top.WorkersMedian ?? 0;
+                        var queueDaysNow = top.QueueDays ?? 0;
+                        var queueDaysPlusOne = workersNow > 0 ? queueDaysNow * workersNow / (workersNow + 1) : queueDaysNow;
+
+                        action.Params["deptKey"] = top.Key;
+                        action.Params["workersNow"] = Math.Round(workersNow, 1);
+                        action.Params["queueDaysNow"] = Math.Round(queueDaysNow, 1);
+                        action.Params["queueDaysPlusOne"] = Math.Round(queueDaysPlusOne, 1);
+                        break;
+                    }
+                    case "ACT_SPEED_COSTCARD":
+                        // เร่งรัดเฉพาะของที่ยังเคลื่อนไหวจริง (ไม่ stale) — pendingNow (รวม stale) แค่ให้บริบท
+                        action.Params["pendingActive"] = cc.PendingActive;
+                        action.Params["pendingNow"] = cc.PendingNow;
+                        action.Params["medianDays"] = cc.MedianDays.HasValue ? Math.Round(cc.MedianDays.Value, 1) : 0.0;
+                        break;
+                    case "ACT_CLEAN_STALE":
+                        action.Params["staleWip"] = staleWip;
+                        break;
+                    case "ACT_SMOOTH_INFLOW":
+                        action.Params["outputPerMonth"] = Math.Round(outputPerMonth, 1);
+                        break;
+                }
+            }
+        }
+
+        // ไม่กรอง stale ออก (ตามสั่ง "keep all") — ไม่เติม LastUpdateBy/LastAction/Workers (ดู comment เดียวกับ
+        // DeliveryLatePlans.Item) — costCardDate ใช้ "เข้า 95 ครั้งแรก" ให้ตรงกับนิยาม output ใหม่ (ต่างจาก
+        // StuckAfterCostCardPlans เดิมของ Delivery ที่ใช้ "ล่าสุด" MAX — ดู report)
+        public async Task<DataSourceResult> CostCardPendingPlans(CostCardPendingPlans.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var doneDates = await _deliveryDataProvider.GetDoneDatesAsync();
+            var statusNames = await _wipHelper.GetStatusNamesAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+
+            var first95Dates = ProductionCapacityEvaluator.ComputeFirst95Dates(trendData.Headers);
+            var excluded = new HashSet<int> { ProductionPlanStatusConst.Completed, ProductionPlanStatusConst.Melted, ProductionPlanStatusConst.WaitCVD, ProductionPlanStatusConst.CVD };
+
+            var items = new List<CostCardPendingPlans.Item>();
+            foreach (var plan in trendData.Plans)
+            {
+                if (!first95Dates.TryGetValue(plan.Id, out var costCardDate)) continue;
+                if (doneDates.ContainsKey(plan.Id)) continue;
+                if (excluded.Contains(plan.Status)) continue;
+
+                var lastMove = lastMoveDates.TryGetValue(plan.Id, out var lm) ? lm : plan.CreateDate;
+
+                items.Add(new CostCardPendingPlans.Item
+                {
+                    PlanId = plan.Id,
+                    Wo = plan.Wo,
+                    WoNumber = plan.WoNumber,
+                    WoText = plan.WoText,
+                    Mold = plan.Mold,
+                    ProductNumber = plan.ProductNumber,
+                    ProductName = plan.ProductName,
+                    ProductQty = plan.ProductQty,
+                    StatusId = plan.Status,
+                    StatusName = statusNames.TryGetValue(plan.Status, out var name) ? name : null,
+                    DepartmentKey = ProductionPlanDepartments.DepartmentKeyOf(plan.Status),
+                    CreateDate = plan.CreateDate,
+                    LastMoveDate = lastMove,
+                    DaysSinceMove = (int)(now - lastMove).TotalDays,
+                    CostCardDate = costCardDate,
+                    DaysSinceCostCard = Math.Round((now - costCardDate).TotalDays, 1)
+                });
+            }
+
+            IEnumerable<CostCardPendingPlans.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.DaysSinceCostCard);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        // ---- Loss ตามใบงานรายแผนก (จ่าย-รับ) ----
+
+        private class GoldStageSummary
+        {
+            public List<ProductionGoldStageEvaluator.StageRow> AllRows { get; set; } = new List<ProductionGoldStageEvaluator.StageRow>();
+            public Dictionary<string, ProductionGoldStageEvaluator.DeptStats> DeptStatsByDept { get; set; } = new Dictionary<string, ProductionGoldStageEvaluator.DeptStats>();
+            public Dictionary<string, List<ProductionGoldStageEvaluator.SeriesPoint>> SeriesByDept { get; set; } = new Dictionary<string, List<ProductionGoldStageEvaluator.SeriesPoint>>();
+            // "โทษได้" (มีช่างจริงถือครอง) / "หาตัวไม่ได้" (placeholder/ไม่มีช่าง) — แยกกันตามที่สั่ง
+            public Dictionary<string, List<ProductionGoldStageEvaluator.OutlierRow>> OutliersAttributedByDept { get; set; } = new Dictionary<string, List<ProductionGoldStageEvaluator.OutlierRow>>();
+            public Dictionary<string, List<ProductionGoldStageEvaluator.OutlierRow>> OutliersUnassignedByDept { get; set; } = new Dictionary<string, List<ProductionGoldStageEvaluator.OutlierRow>>();
+            public Dictionary<string, decimal?> TargetPercentByDept { get; set; } = new Dictionary<string, decimal?>();
+
+            // 'saved' | 'draft' — มีความหมายเฉพาะแผนกที่มี targetPercent ไม่ null
+            public Dictionary<string, string> TargetSourceByDept { get; set; } = new Dictionary<string, string>();
+            public Dictionary<string, decimal?> SlipLossPercentByDept { get; set; } = new Dictionary<string, decimal?>();
+        }
+
+        // scope=STAGE worker_type (สถานะทำงานของแผนก ไม่ใช่ worker_type ของใบ gold loss) ต่อแผนกที่มีเป้าหมาย —
+        // trim/gemSort ไม่มี (ไม่อยู่ใน map นี้ -> TargetPercentByDept เป็น null)
+        private static readonly Dictionary<string, int> StageDeptTargetWorkerTypeMap = new Dictionary<string, int>
+        {
+            [ProductionGoldStageEvaluator.DeptRawPolish] = 60,
+            [ProductionGoldStageEvaluator.DeptSetting] = 80,
+            [ProductionGoldStageEvaluator.DeptPlating] = 90
+        };
+
+        // แผนกที่มีใบ gold loss (slip) คู่กันสำหรับเทียบ slipLossPercent — เฉพาะ trim(50)/setting(80)
+        private static readonly Dictionary<string, int> StageDeptSlipWorkerTypeMap = new Dictionary<string, int>
+        {
+            [ProductionGoldStageEvaluator.DeptTrim] = ProductionGoldLossEvaluator.WorkerTypeTang,
+            [ProductionGoldStageEvaluator.DeptSetting] = ProductionGoldLossEvaluator.WorkerTypeSetting
+        };
+
+        // query เดียว (LEFT join header-detail ผ่าน HeaderId) — ตรง rule เดียวกับ Production/Plan
+        // GetGoldLossByStageReport (header active, detail active, gold_weight_send>0) + เพิ่ม "gold ไม่ว่าง" และ
+        // กรองโลหะ (ตาม request) ที่ของเดิมไม่มี — ขอบเขตวันที่ = header.create_date (Thai ผ่าน start/end ที่
+        // caller แปลงมาแล้ว)
+        private async Task<List<ProductionGoldStageEvaluator.StageRow>> GetGoldStageRowsAsync(DateTime start, DateTime end, string metal)
+        {
+            var statuses = new[] { 50, 60, 70, 80, 90 };
+
+            var raw = await (
+                from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                join header in _jewelryContext.TbtProductionPlanStatusHeader on detail.HeaderId equals header.Id
+                where header.IsActive && detail.IsActive && detail.GoldWeightSend > 0
+                    && detail.Gold != null && detail.Gold != ""
+                    && statuses.Contains(header.Status)
+                    && header.CreateDate >= start && header.CreateDate <= end
+                select new
+                {
+                    header.Id,
+                    header.Status,
+                    header.CreateDate,
+                    header.WorkerCode,
+                    detail.Worker,
+                    detail.WorkerSub,
+                    detail.RequestDate,
+                    detail.Gold,
+                    GoldWeightSend = detail.GoldWeightSend ?? 0,
+                    detail.GoldWeightCheck,
+                    detail.ProductionPlanId,
+                    header.ProductionPlan.Wo,
+                    header.ProductionPlan.WoNumber,
+                    header.ProductionPlan.WoText,
+                    header.ProductionPlan.ProductName,
+                    header.ProductionPlan.ProductNumber,
+                    header.ProductionPlan.CustomerNumber
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            return raw
+                .Where(r => ProductionGoldLossEvaluator.ClassifyMetal(r.Gold) == metal)
+                .Select(r => new ProductionGoldStageEvaluator.StageRow
+                {
+                    DeptKey = ProductionPlanDepartments.DepartmentKeyOf(r.Status) ?? string.Empty,
+                    HeaderId = r.Id,
+                    HeaderCreateDate = r.CreateDate,
+                    DetailRequestDate = r.RequestDate,
+                    WorkerCode = !string.IsNullOrWhiteSpace(r.Worker) ? r.Worker : (!string.IsNullOrWhiteSpace(r.WorkerSub) ? r.WorkerSub : r.WorkerCode),
+                    SendGram = r.GoldWeightSend,
+                    CheckGram = r.GoldWeightCheck,
+                    IsReturned = r.GoldWeightCheck.HasValue,
+                    PlanId = r.ProductionPlanId,
+                    Wo = r.Wo,
+                    WoNumber = r.WoNumber,
+                    WoText = r.WoText,
+                    ProductName = r.ProductName,
+                    ProductNumber = r.ProductNumber,
+                    CustomerNumber = r.CustomerNumber
+                })
+                .ToList();
+        }
+
+        // % loss จากฝั่งใบ gold loss (scope=SLIP) ของ workerType/metal/ช่วงเดียวกัน — ไว้เทียบกับ diffPercent ฝั่ง
+        // รายแผนก (trim=50, setting=80 เท่านั้นที่มีใบคู่กัน) — สูตรเดียวกับ ProductionGoldLossEvaluator.ComputeKpi.LossPercent
+        private async Task<decimal?> GetSlipLossPercentAsync(int workerType, string metal, DateTime start, DateTime end)
+        {
+            List<ProductionGoldLossEvaluator.LossUnit> units;
+
+            if (workerType == ProductionGoldLossEvaluator.WorkerTypeTang)
+            {
+                var tangSlipsRaw = await _jewelryContext.TbtGoldLossTangSlip
+                    .AsNoTracking()
+                    .Where(s => s.IsActive && s.RequestDateEnd != null && s.RequestDateEnd >= start && s.RequestDateEnd <= end)
+                    .ToListAsync();
+                var tangItemsBySlip = await GetTangItemsBySlipAsync(tangSlipsRaw.Select(s => s.Id).ToList());
+                var tangRows = tangSlipsRaw.Select(s => new ProductionGoldLossEvaluator.TangSlipRow
+                {
+                    SlipId = s.Id,
+                    DocumentNo = s.DocumentNo,
+                    WorkerCode = s.WorkerCode,
+                    WorkerName = s.WorkerName,
+                    RequestDateStart = s.RequestDateStart,
+                    RequestDateEnd = s.RequestDateEnd,
+                    ReturnedTotal = s.ReturnedTotal,
+                    RawLoss = s.RawLoss,
+                    AllowedLoss = s.AllowedLoss,
+                    PricePerGram = s.PricePerGram,
+                    TotalMoneyDiff = s.TotalMoneyDiff,
+                    Items = tangItemsBySlip.TryGetValue(s.Id, out var its) ? its : new List<ProductionGoldLossEvaluator.TangSlipItemMetalRow>()
+                }).ToList();
+                units = ProductionGoldLossEvaluator.NormalizeTang(tangRows).Where(u => u.Metal == metal).ToList();
+            }
+            else
+            {
+                units = (await GetSettingUnitsAsync(start, end, null)).Where(u => u.Metal == metal).ToList();
+            }
+
+            if (units.Count == 0) return null;
+
+            var receivedGram = units.Sum(u => u.ReceivedGram);
+            var rawLossGram = units.Sum(u => u.RawLossGram);
+            return receivedGram > 0 ? Math.Round(rawLossGram / receivedGram * 100, 2) : (decimal?)null;
+        }
+
+        // stageDraftByWorkerType: what-if override ของ scope=STAGE เฉพาะ metal นี้ (key = worker_type แผนก
+        // 60/80/90) — null/ไม่มี key = ใช้ค่า saved/default ตามปกติ
+        private async Task<GoldStageSummary> ComputeGoldStageSummaryAsync(
+            string metal, DateTime start, DateTime end, List<DateTime> bucketEnds,
+            Dictionary<int, decimal>? stageDraftByWorkerType = null)
+        {
+            var allRows = await GetGoldStageRowsAsync(start, end, metal);
+            var savedTargets = await _goldLossTargetService.GetCurrentTargetsAsync();
+            var workerNames = await _workerLookupService.GetWorkerNamesAsync();
+
+            var summary = new GoldStageSummary { AllRows = allRows };
+
+            foreach (var deptKey in ProductionGoldStageEvaluator.AllDepartments)
+            {
+                var deptRows = allRows.Where(r => r.DeptKey == deptKey).ToList();
+                var stats = ProductionGoldStageEvaluator.ComputeDeptStats(deptKey, deptRows, workerNames);
+                summary.DeptStatsByDept[deptKey] = stats;
+                summary.SeriesByDept[deptKey] = ProductionGoldStageEvaluator.ComputeSeries(deptKey, stats.NotWeighed, deptRows, start, bucketEnds);
+
+                if (!ProductionGoldStageEvaluator.OutlierExcludedDepts.Contains(deptKey))
+                {
+                    var returned = deptRows.Where(r => r.IsReturned).ToList();
+                    var (attributed, unassigned) = ProductionGoldStageEvaluator.ComputeOutliers(
+                        returned, workerNames, ProductionInsightThresholds.GoldStageOutlierMedianMultiplier, ProductionInsightThresholds.GoldStageOutlierMinDiffGram);
+                    summary.OutliersAttributedByDept[deptKey] = attributed;
+                    summary.OutliersUnassignedByDept[deptKey] = unassigned;
+                }
+                else
+                {
+                    summary.OutliersAttributedByDept[deptKey] = new List<ProductionGoldStageEvaluator.OutlierRow>();
+                    summary.OutliersUnassignedByDept[deptKey] = new List<ProductionGoldStageEvaluator.OutlierRow>();
+                }
+
+                decimal? target = null;
+                var targetSource = "saved";
+                if (StageDeptTargetWorkerTypeMap.TryGetValue(deptKey, out var stageWt))
+                {
+                    if (stageDraftByWorkerType != null && stageDraftByWorkerType.TryGetValue(stageWt, out var draftVal))
+                    {
+                        target = draftVal;
+                        targetSource = "draft";
+                    }
+                    else
+                    {
+                        target = savedTargets.TryGetValue(("STAGE", stageWt, metal), out var row)
+                            ? row.TargetPercent
+                            : DefaultStageGoldLossTargetPercent(stageWt, metal);
+                        targetSource = "saved";
+                    }
+                }
+                summary.TargetPercentByDept[deptKey] = target;
+                summary.TargetSourceByDept[deptKey] = targetSource;
+
+                decimal? slipLoss = null;
+                if (StageDeptSlipWorkerTypeMap.TryGetValue(deptKey, out var slipWt))
+                {
+                    slipLoss = await GetSlipLossPercentAsync(slipWt, metal, start, end);
+                }
+                summary.SlipLossPercentByDept[deptKey] = slipLoss;
+            }
+
+            return summary;
+        }
+
+        // ACT_RECEIVE_PENDING/ACT_CHECK_STAGE: เติมทับ param จากข้อมูลที่คำนวณไว้แล้วตรงๆ เสมอ (ไม่พึ่ง finding
+        // param ที่อาจไม่ fire) — บทเรียนเดียวกับ Gold.ACT_REVIEW_ALLOWANCE/Capacity
+        private static void EnrichGoldStageActionParams(
+            List<Wip.ActionItem> actions, GoldStageSummary summary, int pendingOverCount, decimal pendingOverGram)
+        {
+            foreach (var action in actions)
+            {
+                switch (action.Code)
+                {
+                    case "ACT_RECEIVE_PENDING":
+                        action.Params["count"] = pendingOverCount;
+                        action.Params["gram"] = Math.Round(pendingOverGram, 2);
+                        break;
+                    case "ACT_CHECK_STAGE":
+                    {
+                        var worst = summary.DeptStatsByDept.Values
+                            .Where(d => summary.TargetPercentByDept.TryGetValue(d.DeptKey, out var t) && t.HasValue && d.DiffPercent.HasValue
+                                && d.DiffPercent.Value > t!.Value + ProductionInsightThresholds.GoldStageTargetTolerancePercent)
+                            .OrderByDescending(d => d.DiffPercent!.Value - summary.TargetPercentByDept[d.DeptKey]!.Value)
+                            .FirstOrDefault();
+                        if (worst == null) break;
+
+                        action.Params["deptKey"] = worst.DeptKey;
+                        action.Params["diffPercent"] = Math.Round(worst.DiffPercent!.Value, 2);
+                        action.Params["targetPercent"] = Math.Round(summary.TargetPercentByDept[worst.DeptKey]!.Value, 2);
+                        break;
+                    }
+                }
+            }
+        }
+
+        public async Task<GoldByStage.Response> GoldByStage(GoldByStage.Request request)
+        {
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var metal = IsValidMetal(request.Metal) ? request.Metal : ProductionGoldLossEvaluator.MetalGold;
+
+            var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, "month").Select(b => b.End).ToList();
+            var stageDraftByWorkerType = request.DraftTargets?
+                .Where(d => d.Scope == "STAGE" && d.Metal == metal)
+                .GroupBy(d => d.WorkerType)
+                .ToDictionary(g => g.Key, g => g.Last().TargetPercent);
+            var summary = await ComputeGoldStageSummaryAsync(metal, start, end, bucketEnds, stageDraftByWorkerType);
+            var workerNames = await _workerLookupService.GetWorkerNamesAsync();
+
+            var departmentsOut = new List<GoldByStage.DepartmentItem>();
+            var seriesOut = new List<GoldByStage.SeriesItem>();
+
+            foreach (var deptKey in ProductionGoldStageEvaluator.AllDepartments)
+            {
+                var stats = summary.DeptStatsByDept[deptKey];
+                var deptRows = summary.AllRows.Where(r => r.DeptKey == deptKey).ToList();
+                var returnedRows = deptRows.Where(r => r.IsReturned).ToList();
+                var topWorkers = ProductionGoldStageEvaluator.ComputeTopWorkers(
+                    returnedRows, workerNames, ProductionInsightThresholds.GoldStageWorkerMinRows, ProductionInsightThresholds.GoldStageWorkerTopCount);
+
+                departmentsOut.Add(new GoldByStage.DepartmentItem
+                {
+                    DeptKey = deptKey,
+                    NotWeighed = stats.NotWeighed,
+                    IncludesScrap = stats.IncludesScrap,
+                    SendGram = stats.SendGram,
+                    ReceivedGram = stats.ReceivedGram,
+                    ReturnedSendGram = stats.ReturnedSendGram,
+                    DiffGram = stats.DiffGram,
+                    DiffPercent = stats.DiffPercent,
+                    TargetPercent = summary.TargetPercentByDept[deptKey],
+                    TargetSource = summary.TargetPercentByDept[deptKey].HasValue ? summary.TargetSourceByDept[deptKey] : null,
+                    SlipLossPercent = summary.SlipLossPercentByDept[deptKey],
+                    PendingCount = stats.PendingCount,
+                    PendingGram = stats.PendingGram,
+                    PendingWithWorkerCount = stats.PendingWithWorkerCount,
+                    PendingWithWorkerGram = stats.PendingWithWorkerGram,
+                    PendingQueueCount = stats.PendingQueueCount,
+                    PendingQueueGram = stats.PendingQueueGram,
+                    OutlierCount = summary.OutliersAttributedByDept[deptKey].Count,
+                    OutlierUnassignedCount = summary.OutliersUnassignedByDept[deptKey].Count,
+                    Workers = topWorkers.Select(w => new GoldByStage.WorkerItem
+                    {
+                        WorkerCode = w.WorkerCode,
+                        Rows = w.Rows,
+                        ReturnedSendGram = w.ReturnedSendGram,
+                        DiffGram = w.DiffGram,
+                        DiffPercent = w.DiffPercent
+                    }).ToList()
+                });
+
+                seriesOut.AddRange(summary.SeriesByDept[deptKey].Select(s => new GoldByStage.SeriesItem
+                {
+                    BucketEnd = s.BucketEnd,
+                    DeptKey = s.DeptKey,
+                    DiffPercent = s.DiffPercent,
+                    ReturnedSendGram = s.ReturnedSendGram
+                }));
+            }
+
+            return new GoldByStage.Response { Departments = departmentsOut, Series = seriesOut };
+        }
+
+        // row diff% > 2×dept median diff% (เฉพาะแถวคืนแล้วในช่วง) AND diffGram >= 0.10g — ไม่รวม trim/gemSort
+        public async Task<DataSourceResult> GoldStageOutlierJobs(GoldStageOutlierJobs.Request request)
+        {
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var metal = IsValidMetal(request.Metal) ? request.Metal : ProductionGoldLossEvaluator.MetalGold;
+
+            var allRows = await GetGoldStageRowsAsync(start, end, metal);
+            var workerNames = await _workerLookupService.GetWorkerNamesAsync();
+            var deptFilter = request.DepartmentKeys != null && request.DepartmentKeys.Length > 0
+                ? new HashSet<string>(request.DepartmentKeys)
+                : null;
+
+            // แสดงทุกแถว outlier ไม่ว่าจะมีช่างจริงถือครองหรือ placeholder/ไม่มีช่าง (เกณฑ์ unassigned ใช้แค่
+            // แยกนับใน GoldByStage.OutlierCount/OutlierUnassignedCount ไม่ได้ใช้ซ่อนแถวจากตารางนี้) — ใส่
+            // workerName ให้ UI โชว์ชื่อ/ชื่อ placeholder ได้
+            var items = new List<GoldStageOutlierJobs.Item>();
+            foreach (var deptKey in ProductionGoldStageEvaluator.AllDepartments)
+            {
+                if (ProductionGoldStageEvaluator.OutlierExcludedDepts.Contains(deptKey)) continue;
+                if (deptFilter != null && !deptFilter.Contains(deptKey)) continue;
+
+                var returnedRows = allRows.Where(r => r.DeptKey == deptKey && r.IsReturned).ToList();
+                var (attributed, unassigned) = ProductionGoldStageEvaluator.ComputeOutliers(
+                    returnedRows, workerNames, ProductionInsightThresholds.GoldStageOutlierMedianMultiplier, ProductionInsightThresholds.GoldStageOutlierMinDiffGram);
+
+                foreach (var o in attributed.Concat(unassigned))
+                {
+                    items.Add(new GoldStageOutlierJobs.Item
+                    {
+                        PlanId = o.Row.PlanId,
+                        Wo = o.Row.Wo ?? string.Empty,
+                        WoNumber = o.Row.WoNumber,
+                        WoText = o.Row.WoText ?? string.Empty,
+                        DeptKey = deptKey,
+                        WorkerCode = o.Row.WorkerCode,
+                        WorkerName = !string.IsNullOrWhiteSpace(o.Row.WorkerCode) && workerNames.TryGetValue(o.Row.WorkerCode.Trim(), out var wn) ? wn : null,
+                        Date = o.Row.DetailRequestDate ?? o.Row.HeaderCreateDate,
+                        SendGram = o.Row.SendGram,
+                        CheckGram = o.Row.CheckGram ?? 0,
+                        DiffGram = o.DiffGram,
+                        DiffPercent = o.DiffPercent,
+                        DeptMedianPercent = o.DeptMedianPercent
+                    });
+                }
+            }
+
+            IEnumerable<GoldStageOutlierJobs.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.DiffPercent);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        // งานที่ยังไม่คืน (pending) ในช่วง ไม่กรอง stale — exclude แผนทดสอบเหมือน GoldUncoveredJobs — default
+        // (includeQueue=false) แสดงเฉพาะของที่มีช่างจริงถือครอง (pendingWithWorker) — includeQueue=true รวมของ
+        // ที่ยังค้างคิว (placeholder/ไม่มีช่าง) ด้วย แต่ละแถวมี isQueue บอกชัดเจน
+        public async Task<DataSourceResult> GoldStagePendingReturn(GoldStagePendingReturn.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var metal = IsValidMetal(request.Metal) ? request.Metal : ProductionGoldLossEvaluator.MetalGold;
+            var olderThanDays = request.OlderThanDays > 0 ? request.OlderThanDays : ProductionInsightThresholds.GoldStagePendingOlderThanDaysDefault;
+
+            var allRows = await GetGoldStageRowsAsync(start, end, metal);
+            var workerNames = await _workerLookupService.GetWorkerNamesAsync();
+            var deptFilter = request.DepartmentKeys != null && request.DepartmentKeys.Length > 0
+                ? new HashSet<string>(request.DepartmentKeys)
+                : null;
+
+            var pendingRows = ProductionGoldStageEvaluator.ComputePendingOverDays(allRows, olderThanDays, now);
+            if (deptFilter != null)
+            {
+                pendingRows = pendingRows.Where(r => deptFilter.Contains(r.DeptKey)).ToList();
+            }
+
+            pendingRows = pendingRows.Where(r =>
+                !(r.Wo != null && r.Wo.ToUpper().Contains("TEST"))
+                && !(r.ProductName != null && r.ProductName.ToUpper().Contains("TEST"))
+                && !(r.ProductNumber != null && r.ProductNumber.ToUpper().Contains("TEST"))
+                && !(r.CustomerNumber != null && r.CustomerNumber.ToUpper().Contains("TEST"))
+            ).ToList();
+
+            // ช่าง TEST (code/name_th มีคำว่า TEST ปน) = ข้อมูลทดสอบ ไม่ใช่คิวรองานที่ถูกต้องตามกระบวนการ —
+            // ตัดทิ้งเสมอไม่ว่า includeQueue จะเป็น true/false (ต่างจาก placeholder "รอจ่าย..." ที่ includeQueue=true
+            // ยังโชว์ได้ปกติ)
+            pendingRows = pendingRows.Where(r => !ProductionGoldStageEvaluator.IsTestWorker(r.WorkerCode, workerNames)).ToList();
+
+            if (!request.IncludeQueue)
+            {
+                pendingRows = pendingRows.Where(r => !ProductionGoldStageEvaluator.IsQueueOrEmptyWorker(r.WorkerCode, workerNames)).ToList();
+            }
+
+            var items = pendingRows.Select(r => new GoldStagePendingReturn.Item
+            {
+                PlanId = r.PlanId,
+                Wo = r.Wo ?? string.Empty,
+                WoNumber = r.WoNumber,
+                WoText = r.WoText ?? string.Empty,
+                DeptKey = r.DeptKey,
+                WorkerCode = r.WorkerCode,
+                WorkerName = !string.IsNullOrWhiteSpace(r.WorkerCode) && workerNames.TryGetValue(r.WorkerCode.Trim(), out var wn) ? wn : null,
+                IsQueue = ProductionGoldStageEvaluator.IsQueueOrEmptyWorker(r.WorkerCode, workerNames),
+                SentDate = r.HeaderCreateDate,
+                SendGram = r.SendGram,
+                DaysSince = Math.Round((now - r.HeaderCreateDate).TotalDays, 1)
+            }).ToList();
+
+            IEnumerable<GoldStagePendingReturn.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.DaysSince);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
         }
 
         private static void AddIfNotNull(List<Wip.Finding> list, Wip.Finding? finding)

@@ -163,6 +163,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionDeliveryDataProvider, ProductionDeliveryDataProvider>();
             services.AddScoped<IProductionDeliveryTargetService, ProductionDeliveryTargetService>();
             services.AddScoped<IProductionGoldLossTargetService, ProductionGoldLossTargetService>();
+            services.AddScoped<IProductionWorkerLookupService, ProductionWorkerLookupService>();
             services.AddScoped<IExecutiveReportService, ExecutiveReportService>();
             services.AddScoped<IProductionInsightService, ProductionInsightService>();
 

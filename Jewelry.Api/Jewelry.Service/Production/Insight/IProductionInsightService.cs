@@ -20,6 +20,11 @@ using GoldOverSlips = jewelry.Model.Production.Insight.GoldOverSlips;
 using GoldUncoveredJobs = jewelry.Model.Production.Insight.GoldUncoveredJobs;
 using GoldLossTarget = jewelry.Model.Production.Insight.GoldLossTarget;
 using SaveGoldLossTargets = jewelry.Model.Production.Insight.SaveGoldLossTargets;
+using Capacity = jewelry.Model.Production.Insight.Capacity;
+using CostCardPendingPlans = jewelry.Model.Production.Insight.CostCardPendingPlans;
+using GoldByStage = jewelry.Model.Production.Insight.GoldByStage;
+using GoldStageOutlierJobs = jewelry.Model.Production.Insight.GoldStageOutlierJobs;
+using GoldStagePendingReturn = jewelry.Model.Production.Insight.GoldStagePendingReturn;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -47,7 +52,14 @@ namespace Jewelry.Service.Production.Insight
         Task<DataSourceResult> GoldOverSlips(GoldOverSlips.Request request);
         Task<DataSourceResult> GoldUncoveredJobs(GoldUncoveredJobs.Request request);
         Task<List<GoldLossTarget.Item>> GetGoldLossTargets();
-        Task<List<GoldLossTarget.Item>> GetGoldLossTargetHistory(int workerType, string metal);
+        Task<List<GoldLossTarget.Item>> GetGoldLossTargetHistory(string scope, int workerType, string metal);
         Task SaveGoldLossTargets(SaveGoldLossTargets.Request request);
+
+        Task<Capacity.Response> Capacity(Capacity.Request request);
+        Task<DataSourceResult> CostCardPendingPlans(CostCardPendingPlans.Request request);
+
+        Task<GoldByStage.Response> GoldByStage(GoldByStage.Request request);
+        Task<DataSourceResult> GoldStageOutlierJobs(GoldStageOutlierJobs.Request request);
+        Task<DataSourceResult> GoldStagePendingReturn(GoldStagePendingReturn.Request request);
     }
 }

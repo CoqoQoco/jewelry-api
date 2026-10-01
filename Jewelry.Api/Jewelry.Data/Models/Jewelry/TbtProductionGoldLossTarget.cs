@@ -6,6 +6,8 @@ public partial class TbtProductionGoldLossTarget
 {
     public long Id { get; set; }
 
+    public string Scope { get; set; } = null!;
+
     public int WorkerType { get; set; }
 
     public string Metal { get; set; } = null!;
