@@ -52,5 +52,37 @@ namespace Jewelry.Service.Production.Insight
         // ค่าเป้าหมาย % ส่งตรงเวลา เริ่มต้น ถ้าตาราง tbt_production_delivery_target ว่างเปล่าจริงๆ (กันพังเฉยๆ
         // ไม่ควรเกิดจริงเพราะ seed migration ใส่ไว้แล้ว)
         public const decimal DefaultDeliveryTargetPercent = 80;
+
+        // ---- Gold Loss (ทองและ Loss) ----
+
+        // GOLD_EXCESS_OVER_ALLOWANCE: ส่วนเกิน allowance รวม (กรัม) ต่อประเภทช่าง > ค่านี้ ถือว่า critical
+        public const decimal GoldExcessOverAllowanceCriticalGram = 50;
+
+        // GOLD_LOSS_ABOVE_TARGET: lossPercent >= targetPercent × ค่านี้ ถือว่า critical (เกินแต่ไม่ถึง = warning)
+        public const decimal GoldLossAboveTargetCriticalMultiplier = 1.5m;
+
+        // GOLD_MOST_WORKERS_OVER: % ช่างที่เกิน allowance ของตัวเอง >= ค่านี้ ถือว่า trigger, >= ค่า critical ด้านล่าง = critical
+        public const int GoldMostWorkersOverPercent = 70;
+        public const int GoldMostWorkersOverPercentCritical = 90;
+
+        // GOLD_REPEAT_OFFENDER: ช่างที่เกิน allowance ทุก bucket ที่ผ่านเกณฑ์ (qualifying) ติดต่อกันอย่างน้อยเท่านี้
+        // ถึง trigger (warning), >= ค่า critical ด้านล่าง = critical
+        public const int GoldRepeatOffenderMinBuckets = 3;
+        public const int GoldRepeatOffenderCriticalBuckets = 6;
+
+        // GOLD_SLIP_COVERAGE_LOW: % งานที่ถูกตัดใบ gold loss ไปแล้ว < ค่านี้ ถือว่า trigger (warning), < ค่า critical ด้านล่าง = critical
+        public const int GoldSlipCoverageLowPercent = 80;
+        public const int GoldSlipCoverageLowPercentCritical = 50;
+
+        // ค่าเป้าหมาย % เสียทอง เริ่มต้นต่อประเภทช่าง×โลหะ ถ้าตาราง tbt_production_gold_loss_target ว่างเปล่า
+        // จริงๆ (กันพังเฉยๆ ไม่ควรเกิดจริงเพราะ seed migration ใส่ไว้แล้วครบ 4 ชุด) — ตรงกับค่า seed ล่าสุด
+        public const decimal DefaultGoldLossTargetPercentTangGold = 2.2m;
+        public const decimal DefaultGoldLossTargetPercentSettingGold = 3.4m;
+        public const decimal DefaultGoldLossTargetPercentTangSilver = 2.5m;
+        public const decimal DefaultGoldLossTargetPercentSettingSilver = 2.3m;
+
+        // GOLD_LOSS_ABOVE_TARGET / GOLD_ALLOWANCE_ABOVE_TARGET: ต้องเกิน target ด้วยมากกว่าค่านี้ถึง trigger
+        // (กันแจ้งเตือนจากส่วนต่างเล็กน้อยระดับ rounding error)
+        public const decimal GoldTargetTolerancePercent = 0.1m;
     }
 }

@@ -1,4 +1,5 @@
 using Jewelry.Data.Context;
+using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Production.Shared;
 using Jewelry.Service.Report.Executive;
@@ -8,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using ProductionPlanStatusConst = jewelry.Model.Constant.ProductionPlanStatus;
 using Wip = jewelry.Model.Production.Insight.Wip;
@@ -25,6 +27,11 @@ using DeliveryLatePlans = jewelry.Model.Production.Insight.DeliveryLatePlans;
 using StuckAfterCostCardPlans = jewelry.Model.Production.Insight.StuckAfterCostCardPlans;
 using DeliveryTarget = jewelry.Model.Production.Insight.DeliveryTarget;
 using SaveDeliveryTarget = jewelry.Model.Production.Insight.SaveDeliveryTarget;
+using Gold = jewelry.Model.Production.Insight.Gold;
+using GoldOverSlips = jewelry.Model.Production.Insight.GoldOverSlips;
+using GoldUncoveredJobs = jewelry.Model.Production.Insight.GoldUncoveredJobs;
+using GoldLossTarget = jewelry.Model.Production.Insight.GoldLossTarget;
+using SaveGoldLossTargets = jewelry.Model.Production.Insight.SaveGoldLossTargets;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -37,6 +44,7 @@ namespace Jewelry.Service.Production.Insight
         private readonly IProductionStageStandardService _stageStandardService;
         private readonly IProductionDeliveryDataProvider _deliveryDataProvider;
         private readonly IProductionDeliveryTargetService _deliveryTargetService;
+        private readonly IProductionGoldLossTargetService _goldLossTargetService;
 
         public ProductionInsightService(
             JewelryContext jewelryContext,
@@ -46,7 +54,8 @@ namespace Jewelry.Service.Production.Insight
             IProductionPlanTrendDataProvider trendDataProvider,
             IProductionStageStandardService stageStandardService,
             IProductionDeliveryDataProvider deliveryDataProvider,
-            IProductionDeliveryTargetService deliveryTargetService)
+            IProductionDeliveryTargetService deliveryTargetService,
+            IProductionGoldLossTargetService goldLossTargetService)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
@@ -56,6 +65,7 @@ namespace Jewelry.Service.Production.Insight
             _stageStandardService = stageStandardService;
             _deliveryDataProvider = deliveryDataProvider;
             _deliveryTargetService = deliveryTargetService;
+            _goldLossTargetService = goldLossTargetService;
         }
 
         public async Task<Wip.Response> Wip(Wip.Request request)
@@ -1033,6 +1043,710 @@ namespace Jewelry.Service.Production.Insight
             }
 
             await _deliveryTargetService.SaveAsync(request.TargetPercent, request.Remark, CurrentUsername);
+        }
+
+        // ---- Gold Loss (ทองและ Loss) ----
+        // รอบแก้ไข 2026-10-01: เพิ่มมิติ metal ('GOLD'|'SILVER') — ใบปนทอง/เงิน ราคาต่างกันมาก คำนวณทีละโลหะ
+        // เท่านั้น (เลือกจาก request.Metal) และ exclude แผนทดสอบ (TEST) ออกจาก coverage/uncovered ให้ตรงกัน
+
+        private static bool IsValidMetal(string? metal) =>
+            metal == ProductionGoldLossEvaluator.MetalGold || metal == ProductionGoldLossEvaluator.MetalSilver;
+
+        private static decimal DefaultGoldLossTargetPercent(int workerType, string metal)
+        {
+            if (metal == ProductionGoldLossEvaluator.MetalSilver)
+            {
+                return workerType == ProductionGoldLossEvaluator.WorkerTypeTang
+                    ? ProductionInsightThresholds.DefaultGoldLossTargetPercentTangSilver
+                    : ProductionInsightThresholds.DefaultGoldLossTargetPercentSettingSilver;
+            }
+
+            return workerType == ProductionGoldLossEvaluator.WorkerTypeTang
+                ? ProductionInsightThresholds.DefaultGoldLossTargetPercentTangGold
+                : ProductionInsightThresholds.DefaultGoldLossTargetPercentSettingGold;
+        }
+
+        // แผนทดสอบ (TEST) — exclude ออกจาก coverage/uncovered ทั้งคู่เพื่อให้ตัวเลขตรงกัน (เช็คที่ wo/ชื่อสินค้า/
+        // รหัสสินค้า/รหัสลูกค้า มีคำว่า "TEST" ปนอยู่ — case-insensitive)
+        private static IQueryable<TbtProductionPlanStatusDetail> ExcludeTestPlans(IQueryable<TbtProductionPlanStatusDetail> query)
+        {
+            return query.Where(d =>
+                !(d.Header.ProductionPlan.Wo != null && d.Header.ProductionPlan.Wo.ToUpper().Contains("TEST"))
+                && !(d.Header.ProductionPlan.ProductName != null && d.Header.ProductionPlan.ProductName.ToUpper().Contains("TEST"))
+                && !(d.Header.ProductionPlan.ProductNumber != null && d.Header.ProductionPlan.ProductNumber.ToUpper().Contains("TEST"))
+                && !(d.Header.ProductionPlan.CustomerNumber != null && d.Header.ProductionPlan.CustomerNumber.ToUpper().Contains("TEST")));
+        }
+
+        // metal filter แบบ SQL-translatable (ไม่เรียก ProductionGoldLossEvaluator.ClassifyMetal ตรงๆ เพราะ EF
+        // แปล method เรียกเองของเราไม่ได้) — ตรรกะเดียวกัน: Gold == "SV" (case-insensitive) = เงิน, อื่นๆ/null = ทอง
+        private static IQueryable<TbtProductionPlanStatusDetail> FilterByMetal(IQueryable<TbtProductionPlanStatusDetail> query, string metal)
+        {
+            var wantSilver = metal == ProductionGoldLossEvaluator.MetalSilver;
+            return query.Where(d => ((d.Gold != null && d.Gold.Trim().ToUpper() == "SV") == wantSilver));
+        }
+
+        public async Task<Gold.Response> Gold(Gold.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var bucket = string.Equals(request.Bucket, "month", StringComparison.OrdinalIgnoreCase) ? "month" : "week";
+            var rangeDays = Math.Max((end - start).TotalDays, 1);
+            var metal = IsValidMetal(request.Metal) ? request.Metal : ProductionGoldLossEvaluator.MetalGold;
+
+            var includeTang = request.WorkerTypes == null || request.WorkerTypes.Length == 0
+                || request.WorkerTypes.Contains(ProductionGoldLossEvaluator.WorkerTypeTang);
+            var includeSetting = request.WorkerTypes == null || request.WorkerTypes.Length == 0
+                || request.WorkerTypes.Contains(ProductionGoldLossEvaluator.WorkerTypeSetting);
+            var codeSet = request.WorkerCodes != null && request.WorkerCodes.Length > 0
+                ? new HashSet<string>(request.WorkerCodes, StringComparer.OrdinalIgnoreCase)
+                : null;
+
+            var savedTargets = await _goldLossTargetService.GetCurrentTargetsAsync();
+            var draftByType = request.DraftTargets?
+                .Where(d => (d.WorkerType == ProductionGoldLossEvaluator.WorkerTypeTang || d.WorkerType == ProductionGoldLossEvaluator.WorkerTypeSetting) && IsValidMetal(d.Metal))
+                .ToDictionary(d => (d.WorkerType, d.Metal), d => d.TargetPercent) ?? new Dictionary<(int, string), decimal>();
+
+            var targets = new List<Gold.TargetItem>();
+            var targetPercentByType = new Dictionary<int, decimal>();
+
+            foreach (var wt in new[] { ProductionGoldLossEvaluator.WorkerTypeTang, ProductionGoldLossEvaluator.WorkerTypeSetting })
+            {
+                var key = (wt, metal);
+                var hasSaved = savedTargets.TryGetValue(key, out var saved);
+                decimal targetPercent;
+                string source;
+                DateTime? effectiveFrom;
+
+                if (draftByType.TryGetValue(key, out var draft))
+                {
+                    targetPercent = draft;
+                    source = "draft";
+                    effectiveFrom = hasSaved ? (DateTime?)saved.EffectiveFrom : null;
+                }
+                else if (hasSaved)
+                {
+                    targetPercent = saved.TargetPercent;
+                    source = "saved";
+                    effectiveFrom = saved.EffectiveFrom;
+                }
+                else
+                {
+                    targetPercent = DefaultGoldLossTargetPercent(wt, metal);
+                    source = "saved";
+                    effectiveFrom = null;
+                }
+
+                targetPercentByType[wt] = targetPercent;
+                targets.Add(new Gold.TargetItem { WorkerType = wt, Metal = metal, TargetPercent = targetPercent, Source = source, EffectiveFrom = effectiveFrom });
+            }
+
+            var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, bucket).Select(b => b.End).ToList();
+
+            var kpiList = new List<Gold.KpiItem>();
+            var seriesList = new List<Gold.SeriesItem>();
+            var workerList = new List<Gold.WorkerItem>();
+            var problems = new List<Wip.Finding>();
+            var forecasts = new List<Wip.Finding>();
+
+            if (includeTang)
+            {
+                var tangSlipsRaw = await _jewelryContext.TbtGoldLossTangSlip
+                    .AsNoTracking()
+                    .Where(s => s.IsActive && s.RequestDateEnd != null && s.RequestDateEnd >= start && s.RequestDateEnd <= end)
+                    .ToListAsync();
+
+                var tangFiltered = codeSet != null ? tangSlipsRaw.Where(s => codeSet.Contains(s.WorkerCode)).ToList() : tangSlipsRaw;
+                var tangItemsBySlip = await GetTangItemsBySlipAsync(tangFiltered.Select(s => s.Id).ToList());
+
+                var tangRows = tangFiltered.Select(s => new ProductionGoldLossEvaluator.TangSlipRow
+                {
+                    SlipId = s.Id,
+                    DocumentNo = s.DocumentNo,
+                    WorkerCode = s.WorkerCode,
+                    WorkerName = s.WorkerName,
+                    RequestDateStart = s.RequestDateStart,
+                    RequestDateEnd = s.RequestDateEnd,
+                    ReturnedTotal = s.ReturnedTotal,
+                    RawLoss = s.RawLoss,
+                    AllowedLoss = s.AllowedLoss,
+                    PricePerGram = s.PricePerGram,
+                    TotalMoneyDiff = s.TotalMoneyDiff,
+                    Items = tangItemsBySlip.TryGetValue(s.Id, out var its) ? its : new List<ProductionGoldLossEvaluator.TangSlipItemMetalRow>()
+                }).ToList();
+
+                var tangUnits = ProductionGoldLossEvaluator.NormalizeTang(tangRows).Where(u => u.Metal == metal).ToList();
+                await ProcessGoldWorkerType(
+                    ProductionGoldLossEvaluator.WorkerTypeTang, metal, tangUnits, targetPercentByType[ProductionGoldLossEvaluator.WorkerTypeTang],
+                    start, end, bucketEnds, rangeDays, codeSet, kpiList, seriesList, workerList, problems, forecasts);
+            }
+
+            if (includeSetting)
+            {
+                var settingUnits = (await GetSettingUnitsAsync(start, end, codeSet)).Where(u => u.Metal == metal).ToList();
+                await ProcessGoldWorkerType(
+                    ProductionGoldLossEvaluator.WorkerTypeSetting, metal, settingUnits, targetPercentByType[ProductionGoldLossEvaluator.WorkerTypeSetting],
+                    start, end, bucketEnds, rangeDays, codeSet, kpiList, seriesList, workerList, problems, forecasts);
+            }
+
+            var actions = ProductionInsightRuleEngine.BuildActions(problems, forecasts);
+            EnrichGoldActionParams(actions, kpiList);
+            var worstSeverity = ProductionInsightRuleEngine.WorstSeverity(problems.Concat(forecasts));
+            var status = worstSeverity == "critical" || worstSeverity == "warning" ? worstSeverity : "ok";
+
+            return new Gold.Response
+            {
+                AsOf = now,
+                Status = status,
+                Problems = problems,
+                Forecasts = forecasts,
+                Actions = actions,
+                Targets = targets,
+                Kpi = kpiList,
+                Series = seriesList,
+                Workers = workerList
+            };
+        }
+
+        // โหลด item ของใบ tang (เฉพาะที่ active) ไว้จัดประเภทโลหะของทั้งใบ — คืน dictionary ว่างถ้า slipIds ว่าง
+        private async Task<Dictionary<long, List<ProductionGoldLossEvaluator.TangSlipItemMetalRow>>> GetTangItemsBySlipAsync(List<long> slipIds)
+        {
+            if (slipIds.Count == 0) return new Dictionary<long, List<ProductionGoldLossEvaluator.TangSlipItemMetalRow>>();
+
+            var rows = await _jewelryContext.TbtGoldLossTangSlipItem
+                .AsNoTracking()
+                .Where(it => it.IsActive && slipIds.Contains(it.SlipId))
+                .Select(it => new { it.SlipId, it.Gold, it.GoldWeightSend, it.GoldWeightCheck })
+                .ToListAsync();
+
+            return rows
+                .GroupBy(it => it.SlipId)
+                .ToDictionary(g => g.Key, g => g.Select(it => new ProductionGoldLossEvaluator.TangSlipItemMetalRow
+                {
+                    Gold = it.Gold,
+                    WeightSend = it.GoldWeightSend,
+                    WeightCheck = it.GoldWeightCheck
+                }).ToList());
+        }
+
+        // query setting item พร้อม metal ต่อ item ตรงๆ (ไม่ต้อง normalize โลหะระดับใบเหมือน tang) — reuse จาก
+        // Gold()/GoldOverSlips() ทั้งคู่ (ขอบเขต [start,end] ตาม RequestDateEnd ของ header เท่านั้น ยังไม่กรอง metal)
+        private async Task<List<ProductionGoldLossEvaluator.LossUnit>> GetSettingUnitsAsync(DateTime start, DateTime end, HashSet<string>? codeSet)
+        {
+            var settingQuery = _jewelryContext.TbtWorkerGoldLossSlipItem
+                .AsNoTracking()
+                .Where(i => i.IsActive && i.Header.IsActive && i.Header.RequestDateEnd >= start && i.Header.RequestDateEnd <= end);
+
+            if (codeSet != null)
+            {
+                settingQuery = settingQuery.Where(i => codeSet.Contains(i.Header.WorkerCode));
+            }
+
+            var settingRows = await settingQuery
+                .Select(i => new ProductionGoldLossEvaluator.SettingSlipItemRow
+                {
+                    SlipId = i.SlipId,
+                    DocumentNo = i.Header.DocumentNo,
+                    WorkerCode = i.Header.WorkerCode,
+                    WorkerName = i.Header.WorkerName,
+                    RequestDateStart = i.Header.RequestDateStart,
+                    RequestDateEnd = i.Header.RequestDateEnd,
+                    Gold = i.Gold,
+                    GoldWeightCheck = i.GoldWeightCheck,
+                    WeightLossAllowed = i.WeightLossAllowed,
+                    WeightLossActual = i.WeightLossActual,
+                    GoldLossPrice = i.GoldLossPrice,
+                    MoneyDiff = i.MoneyDiff
+                })
+                .ToListAsync();
+
+            return ProductionGoldLossEvaluator.NormalizeSetting(settingRows);
+        }
+
+        // ประมวลผล 1 ประเภทช่าง (tang/setting) — เติม kpi/series/workers + evaluate rule ทั้งหมดของประเภทนี้
+        private async Task ProcessGoldWorkerType(
+            int workerType,
+            string metal,
+            List<ProductionGoldLossEvaluator.LossUnit> units,
+            decimal targetPercent,
+            DateTime start,
+            DateTime end,
+            List<DateTime> bucketEnds,
+            double rangeDays,
+            HashSet<string>? codeSet,
+            List<Gold.KpiItem> kpiList,
+            List<Gold.SeriesItem> seriesList,
+            List<Gold.WorkerItem> workerList,
+            List<Wip.Finding> problems,
+            List<Wip.Finding> forecasts)
+        {
+            var (coverageJobs, coverageTotal) = await ComputeGoldCoverageAsync(workerType, metal, start, end, codeSet);
+            var kpi = ProductionGoldLossEvaluator.ComputeKpi(workerType, metal, units, targetPercent, coverageJobs, coverageTotal);
+            kpiList.Add(MapGoldKpi(kpi));
+
+            var series = ProductionGoldLossEvaluator.ComputeSeries(workerType, units, start, bucketEnds);
+            seriesList.AddRange(series.Select(MapGoldSeries));
+
+            var workers = ProductionGoldLossEvaluator.ComputeWorkers(workerType, units, targetPercent, start, bucketEnds);
+            workerList.AddRange(workers.Select(MapGoldWorker));
+
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldExcessOverAllowance(workerType, metal, kpi.ExcessGram, kpi.ExcessMoney));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldLossAboveTarget(workerType, metal, kpi.LossPercent, targetPercent));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldAllowanceAboveTarget(workerType, metal, kpi.AllowedPercent, targetPercent));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldMostWorkersOver(workerType, metal, kpi.WorkersOverCount, kpi.WorkerCount));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldSlipCoverageLow(workerType, metal, kpi.CoverageJobs, kpi.CoverageTotalJobs));
+
+            var offenderRows = workers.Select(w => (w.WorkerCode, w.WorkerName, w.OverBuckets, w.QualifyingBuckets)).ToList();
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateGoldRepeatOffender(workerType, metal, offenderRows));
+
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcGoldExcessProjected(workerType, metal, kpi.ExcessGram, kpi.ExcessMoney, rangeDays));
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcGoldLossRising(workerType, metal, series.Select(s => (s.SlipCount, s.LossPercent)).ToList()));
+        }
+
+        // coverage = จำนวนงาน (status_detail: header active, status=workerType, gold_weight_check>0, request_date
+        // ในช่วง, ไม่ใช่แผนทดสอบ, โลหะตรงกับที่ขอ) ที่ "คุ้มครอง" แล้ว / จำนวนงานที่เข้าเงื่อนไขทั้งหมด — ใช้
+        // เงื่อนไขชุดเดียวกับ GoldUncoveredJobs ทุกจุด (รวม BuildGoldCoveredExpr) เพื่อให้ตัวเลขตรงกันเป๊ะ
+        //
+        // "คุ้มครอง" (รอบแก้ไข 2026-10-01 รอบ 2 — prod พบ stamp อย่างเดียวนับได้แค่ 155/458 ของ setting ทั้งที่
+        // อีก 303 jobs ก็มี slip item ตรงกันจริง แค่ item.production_plan_id เป็น null ตอนสร้างใบ ไม่เคย stamp
+        // กลับ) = stamp != null OR มี active slip item ที่ match โดย:
+        //   - ProductionPlanId ตรงกัน (ถ้า item มีค่า) หรือ
+        //   - Wo+WoNumber ของ "แผนผลิตของ status_detail" ตรงกับ item.Wo/item.WoNumber (ถ้า item.ProductionPlanId
+        //     เป็น null — กรณีนี้ยืนยันจาก prod ว่า match ครบ 303/303)
+        //   AND Gold ตรงกัน AND วันที่ไทยของ JobDate/RequestDate ตรงกัน (ยืนยันจาก prod ว่าให้ผลเหมือนกับเทียบ
+        //   gold_weight_send ตรงกันเป๊ะ — เลือกใช้วันที่เพราะ index-friendly กว่า decimal equality)
+        // ใช้ได้ทั้ง setting (tbt_worker_gold_loss_slip_item) และ tang (tbt_gold_loss_tang_slip_item — มี field
+        // ชุดเดียวกันครบ จึงใช้กฎเดียวกัน แม้ tang จะ coverage สูงอยู่แล้ว 89% จาก stamp อย่างเดียว)
+        private Expression<Func<TbtProductionPlanStatusDetail, bool>> BuildGoldCoveredExpr(int workerType)
+        {
+            if (workerType == ProductionGoldLossEvaluator.WorkerTypeSetting)
+            {
+                return d => d.WorkerGoldLossSlipId != null
+                    || _jewelryContext.TbtWorkerGoldLossSlipItem.Any(item =>
+                        item.IsActive && item.Header.IsActive
+                        && ((item.ProductionPlanId != null && item.ProductionPlanId == d.ProductionPlanId)
+                            || (item.ProductionPlanId == null && item.Wo == d.Header.ProductionPlan.Wo && item.WoNumber == d.Header.ProductionPlan.WoNumber))
+                        && item.Gold == d.Gold
+                        && item.JobDate.HasValue && d.RequestDate.HasValue
+                        && item.JobDate.Value.AddHours(7).Date == d.RequestDate.Value.AddHours(7).Date);
+            }
+
+            return d => d.GoldLossTangSlipId != null
+                || _jewelryContext.TbtGoldLossTangSlipItem.Any(item =>
+                    item.IsActive && item.Header.IsActive
+                    && ((item.ProductionPlanId != null && item.ProductionPlanId == d.ProductionPlanId)
+                        || (item.ProductionPlanId == null && item.Wo == d.Header.ProductionPlan.Wo && item.WoNumber == d.Header.ProductionPlan.WoNumber))
+                    && item.Gold == d.Gold
+                    && item.JobDate.HasValue && d.RequestDate.HasValue
+                    && item.JobDate.Value.AddHours(7).Date == d.RequestDate.Value.AddHours(7).Date);
+        }
+
+        // ห่อ body เดิมด้วย NOT โดยใช้ parameter ตัวเดียวกัน — ไม่ใช่ Expression.Invoke (EF แปลไม่ได้เสถียร)
+        // จึงแปลเป็น SQL ได้ตรงไปตรงมาเหมือนเขียน !(...) เองตรงๆ
+        private static Expression<Func<TbtProductionPlanStatusDetail, bool>> NegateDetailExpr(
+            Expression<Func<TbtProductionPlanStatusDetail, bool>> expr)
+        {
+            return Expression.Lambda<Func<TbtProductionPlanStatusDetail, bool>>(Expression.Not(expr.Body), expr.Parameters);
+        }
+
+        private async Task<(int CoverageJobs, int CoverageTotalJobs)> ComputeGoldCoverageAsync(
+            int workerType, string metal, DateTime start, DateTime end, HashSet<string>? codeSet)
+        {
+            var query = _jewelryContext.TbtProductionPlanStatusDetail
+                .AsNoTracking()
+                .Where(d => d.IsActive && d.Header.IsActive && d.Header.Status == workerType
+                    && d.GoldWeightCheck > 0 && d.RequestDate != null && d.RequestDate >= start && d.RequestDate <= end);
+
+            query = FilterByMetal(query, metal);
+            query = ExcludeTestPlans(query);
+
+            if (codeSet != null)
+            {
+                query = query.Where(d => (d.Header.WorkerCode != null && codeSet.Contains(d.Header.WorkerCode))
+                    || (d.Worker != null && codeSet.Contains(d.Worker))
+                    || (d.WorkerSub != null && codeSet.Contains(d.WorkerSub)));
+            }
+
+            var total = await query.CountAsync();
+            var covered = await query.CountAsync(BuildGoldCoveredExpr(workerType));
+
+            return (covered, total);
+        }
+
+        // ACT_REVIEW_ALLOWANCE / ACT_CHECK_WEIGHING ผูกกับ 2 finding code (อาจ trigger แค่ตัวเดียว) — ถ้าปล่อยให้
+        // ดึง param จาก finding ที่ trigger อย่างเดียว ค่าที่ไม่ได้มาจาก finding นั้นจะเป็น 0 หลอกๆ (เช่น
+        // allowedPercent=0% ทั้งที่จริงมีค่า แค่ GOLD_ALLOWANCE_ABOVE_TARGET ไม่ trigger) — แก้โดย "เติมทับ" ด้วย
+        // ค่าจริงจาก kpi row ของ workerType+metal นั้นเสมอ (ground truth) หลัง BuildActions คืนค่ามาแล้ว
+        private static void EnrichGoldActionParams(List<Wip.ActionItem> actions, List<Gold.KpiItem> kpiList)
+        {
+            foreach (var action in actions)
+            {
+                if (action.Code != "ACT_REVIEW_ALLOWANCE" && action.Code != "ACT_CHECK_WEIGHING") continue;
+
+                var workerType = action.Params.TryGetValue("workerType", out var wtObj) && wtObj is int wt ? wt : (int?)null;
+                var metal = action.Params.TryGetValue("metal", out var mObj) ? mObj as string : null;
+                if (!workerType.HasValue || string.IsNullOrEmpty(metal)) continue;
+
+                var kpi = kpiList.FirstOrDefault(k => k.WorkerType == workerType.Value && k.Metal == metal);
+                if (kpi == null) continue;
+
+                if (action.Code == "ACT_REVIEW_ALLOWANCE")
+                {
+                    action.Params["lossPercent"] = kpi.LossPercent.HasValue ? Math.Round(kpi.LossPercent.Value, 2, MidpointRounding.AwayFromZero) : 0m;
+                    action.Params["allowedPercent"] = kpi.AllowedPercent.HasValue ? Math.Round(kpi.AllowedPercent.Value, 2, MidpointRounding.AwayFromZero) : 0m;
+                    action.Params["targetPercent"] = Math.Round(kpi.TargetPercent, 2, MidpointRounding.AwayFromZero);
+                }
+                else if (action.Code == "ACT_CHECK_WEIGHING")
+                {
+                    action.Params["excessGram"] = kpi.ExcessGram;
+                }
+            }
+        }
+
+        private static Gold.KpiItem MapGoldKpi(ProductionGoldLossEvaluator.KpiResult r) => new Gold.KpiItem
+        {
+            WorkerType = r.WorkerType,
+            Metal = r.Metal,
+            SlipCount = r.SlipCount,
+            WorkerCount = r.WorkerCount,
+            ReceivedGram = r.ReceivedGram,
+            RawLossGram = r.RawLossGram,
+            AllowedGram = r.AllowedGram,
+            LossPercent = r.LossPercent,
+            AllowedPercent = r.AllowedPercent,
+            TargetPercent = r.TargetPercent,
+            ExcessGram = r.ExcessGram,
+            ExcessMoney = r.ExcessMoney,
+            NetMoney = r.NetMoney,
+            OverCount = r.OverCount,
+            WorkersOverCount = r.WorkersOverCount,
+            CoverageJobs = r.CoverageJobs,
+            CoverageTotalJobs = r.CoverageTotalJobs,
+            CoveragePercent = r.CoveragePercent
+        };
+
+        private static Gold.SeriesItem MapGoldSeries(ProductionGoldLossEvaluator.SeriesResult r) => new Gold.SeriesItem
+        {
+            BucketEnd = r.BucketEnd,
+            WorkerType = r.WorkerType,
+            SlipCount = r.SlipCount,
+            RawLossGram = r.RawLossGram,
+            AllowedGram = r.AllowedGram,
+            LossPercent = r.LossPercent,
+            AllowedPercent = r.AllowedPercent
+        };
+
+        private static Gold.WorkerItem MapGoldWorker(ProductionGoldLossEvaluator.WorkerResult r) => new Gold.WorkerItem
+        {
+            WorkerType = r.WorkerType,
+            WorkerCode = r.WorkerCode,
+            WorkerName = r.WorkerName,
+            SlipCount = r.SlipCount,
+            ReceivedGram = r.ReceivedGram,
+            LossPercent = r.LossPercent,
+            AllowedPercent = r.AllowedPercent,
+            TargetPercent = r.TargetPercent,
+            ExcessGram = r.ExcessGram,
+            ExcessMoney = r.ExcessMoney,
+            NetMoney = r.NetMoney,
+            OverBuckets = r.OverBuckets,
+            QualifyingBuckets = r.QualifyingBuckets
+        };
+
+        // tang (50): 1 แถว = 1 slip เกิน allowance. setting (80): 1 แถว = 1 item เกิน allowance (ใช้ documentNo/
+        // worker ของ slip แม่) — ดู comment บน GoldOverSlips.Item — reuse LossUnit normalization เดียวกับ Gold()
+        // KPI ตรงๆ (รวม metal classification) กัน logic สองที่เพี้ยนไปจากกัน
+        public async Task<DataSourceResult> GoldOverSlips(GoldOverSlips.Request request)
+        {
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var metal = IsValidMetal(request.Metal) ? request.Metal : ProductionGoldLossEvaluator.MetalGold;
+            var includeTang = request.WorkerTypes == null || request.WorkerTypes.Length == 0
+                || request.WorkerTypes.Contains(ProductionGoldLossEvaluator.WorkerTypeTang);
+            var includeSetting = request.WorkerTypes == null || request.WorkerTypes.Length == 0
+                || request.WorkerTypes.Contains(ProductionGoldLossEvaluator.WorkerTypeSetting);
+            var codeSet = request.WorkerCodes != null && request.WorkerCodes.Length > 0
+                ? new HashSet<string>(request.WorkerCodes, StringComparer.OrdinalIgnoreCase)
+                : null;
+
+            var units = new List<ProductionGoldLossEvaluator.LossUnit>();
+
+            if (includeTang)
+            {
+                var tangSlipsRaw = await _jewelryContext.TbtGoldLossTangSlip
+                    .AsNoTracking()
+                    .Where(s => s.IsActive && s.RequestDateEnd != null && s.RequestDateEnd >= start && s.RequestDateEnd <= end)
+                    .ToListAsync();
+
+                var tangFiltered = codeSet != null ? tangSlipsRaw.Where(s => codeSet.Contains(s.WorkerCode)).ToList() : tangSlipsRaw;
+                var tangItemsBySlip = await GetTangItemsBySlipAsync(tangFiltered.Select(s => s.Id).ToList());
+
+                var tangRows = tangFiltered.Select(s => new ProductionGoldLossEvaluator.TangSlipRow
+                {
+                    SlipId = s.Id,
+                    DocumentNo = s.DocumentNo,
+                    WorkerCode = s.WorkerCode,
+                    WorkerName = s.WorkerName,
+                    RequestDateStart = s.RequestDateStart,
+                    RequestDateEnd = s.RequestDateEnd,
+                    ReturnedTotal = s.ReturnedTotal,
+                    RawLoss = s.RawLoss,
+                    AllowedLoss = s.AllowedLoss,
+                    PricePerGram = s.PricePerGram,
+                    TotalMoneyDiff = s.TotalMoneyDiff,
+                    Items = tangItemsBySlip.TryGetValue(s.Id, out var its) ? its : new List<ProductionGoldLossEvaluator.TangSlipItemMetalRow>()
+                }).ToList();
+
+                units.AddRange(ProductionGoldLossEvaluator.NormalizeTang(tangRows).Where(u => u.Metal == metal));
+            }
+
+            if (includeSetting)
+            {
+                units.AddRange((await GetSettingUnitsAsync(start, end, codeSet)).Where(u => u.Metal == metal));
+            }
+
+            var items = units
+                .Where(u => u.RawLossGram > u.AllowedGram)
+                .Select(u =>
+                {
+                    var excessGram = u.RawLossGram - u.AllowedGram;
+                    return new GoldOverSlips.Item
+                    {
+                        SlipId = u.SlipId,
+                        DocumentNo = u.DocumentNo,
+                        WorkerType = u.WorkerType,
+                        WorkerCode = u.WorkerCode,
+                        WorkerName = u.WorkerName,
+                        RequestDateStart = u.BucketStartDate,
+                        RequestDateEnd = u.BucketDate,
+                        RawLossGram = Math.Round(u.RawLossGram, 4),
+                        AllowedGram = Math.Round(u.AllowedGram, 4),
+                        ExcessGram = Math.Round(excessGram, 4),
+                        ExcessMoney = Math.Round(excessGram * (u.Price ?? 0), 2),
+                        NetMoney = Math.Round(u.MoneyDiff, 2)
+                    };
+                })
+                .ToList();
+
+            IEnumerable<GoldOverSlips.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.ExcessGram);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        private class UncoveredJobRow
+        {
+            public int ProductionPlanId { get; set; }
+            public int Status { get; set; }
+            public string? Wo { get; set; }
+            public int WoNumber { get; set; }
+            public string? WoText { get; set; }
+            public string? WorkerCode { get; set; }
+            public string? HeaderWorkerName { get; set; }
+            public string? Worker { get; set; }
+            public string? WorkerSub { get; set; }
+            public DateTime? RequestDate { get; set; }
+            public decimal? GoldWeightSend { get; set; }
+            public decimal? GoldWeightCheck { get; set; }
+        }
+
+        // ดึงงานที่ "ไม่คุ้มครอง" ของ 1 ประเภทช่าง — ใช้เงื่อนไขเดียวกับ ComputeGoldCoverageAsync ทุกจุด (รวม
+        // BuildGoldCoveredExpr negate) เพื่อให้ KPI coverage กับตารางนี้ตรงกันเป๊ะ — 1 query ต่อ workerType
+        // (ไม่ query ทีละแถว, ไม่ GroupBy.First)
+        private async Task<List<UncoveredJobRow>> QueryUncoveredJobsAsync(
+            int workerType, string metal, DateTime start, DateTime end, int olderThanDays, HashSet<string>? codeSet, DateTime now)
+        {
+            var query = _jewelryContext.TbtProductionPlanStatusDetail
+                .AsNoTracking()
+                .Include(d => d.Header)
+                .ThenInclude(h => h.ProductionPlan)
+                .Where(d => d.IsActive && d.Header.IsActive && d.Header.Status == workerType && d.GoldWeightCheck > 0
+                    && d.RequestDate != null && d.RequestDate >= start && d.RequestDate <= end);
+
+            query = FilterByMetal(query, metal);
+            query = ExcludeTestPlans(query);
+
+            if (olderThanDays > 0)
+            {
+                var cutoff = now.AddDays(-olderThanDays);
+                query = query.Where(d => d.RequestDate != null && d.RequestDate <= cutoff);
+            }
+
+            if (codeSet != null)
+            {
+                query = query.Where(d => (d.Header.WorkerCode != null && codeSet.Contains(d.Header.WorkerCode))
+                    || (d.Worker != null && codeSet.Contains(d.Worker))
+                    || (d.WorkerSub != null && codeSet.Contains(d.WorkerSub)));
+            }
+
+            query = query.Where(NegateDetailExpr(BuildGoldCoveredExpr(workerType)));
+
+            return await query
+                .Select(d => new UncoveredJobRow
+                {
+                    ProductionPlanId = d.ProductionPlanId,
+                    Status = d.Header.Status,
+                    Wo = d.Header.ProductionPlan.Wo,
+                    WoNumber = d.Header.ProductionPlan.WoNumber,
+                    WoText = d.Header.ProductionPlan.WoText,
+                    WorkerCode = d.Header.WorkerCode,
+                    HeaderWorkerName = d.Header.WorkerName,
+                    Worker = d.Worker,
+                    WorkerSub = d.WorkerSub,
+                    RequestDate = d.RequestDate,
+                    GoldWeightSend = d.GoldWeightSend,
+                    GoldWeightCheck = d.GoldWeightCheck
+                })
+                .ToListAsync();
+        }
+
+        // uncovered = status_detail (header active, status=50/80, gold_weight_check>0, ไม่ใช่แผนทดสอบ, โลหะตรง,
+        // request_date ใน [start,end] เดียวกับ KPI coverage) ที่ "ไม่คุ้มครอง" ตามนิยามเดียวกับ
+        // ComputeGoldCoverageAsync (stamp หรือ fallback match ด้วย production_plan_id/wo+wo_number+gold+วันที่ไทย)
+        // — olderThanDays เป็นตัวกรองเสริมซ้อนช่วงอีกที — รันทีละประเภทช่าง (สูงสุด 2 query) แล้วรวมผล
+        public async Task<DataSourceResult> GoldUncoveredJobs(GoldUncoveredJobs.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var metal = IsValidMetal(request.Metal) ? request.Metal : ProductionGoldLossEvaluator.MetalGold;
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+
+            var types = new List<int>();
+            if (request.WorkerTypes == null || request.WorkerTypes.Length == 0)
+            {
+                types.Add(ProductionGoldLossEvaluator.WorkerTypeTang);
+                types.Add(ProductionGoldLossEvaluator.WorkerTypeSetting);
+            }
+            else
+            {
+                types.AddRange(request.WorkerTypes.Where(t => t == ProductionGoldLossEvaluator.WorkerTypeTang || t == ProductionGoldLossEvaluator.WorkerTypeSetting));
+            }
+
+            var codeSet = request.WorkerCodes != null && request.WorkerCodes.Length > 0
+                ? new HashSet<string>(request.WorkerCodes, StringComparer.OrdinalIgnoreCase)
+                : null;
+
+            var rows = new List<UncoveredJobRow>();
+            foreach (var wt in types)
+            {
+                rows.AddRange(await QueryUncoveredJobsAsync(wt, metal, start, end, request.OlderThanDays, codeSet, now));
+            }
+
+            var items = rows.Select(r =>
+            {
+                var send = r.GoldWeightSend ?? 0;
+                var check = r.GoldWeightCheck ?? 0;
+                var jobDate = r.RequestDate ?? default;
+                var resolvedCode = !string.IsNullOrWhiteSpace(r.WorkerCode) ? r.WorkerCode
+                    : !string.IsNullOrWhiteSpace(r.Worker) ? r.Worker
+                    : r.WorkerSub;
+
+                return new GoldUncoveredJobs.Item
+                {
+                    PlanId = r.ProductionPlanId,
+                    Wo = r.Wo ?? string.Empty,
+                    WoNumber = r.WoNumber,
+                    WoText = r.WoText ?? string.Empty,
+                    DeptKey = ProductionPlanDepartments.DepartmentKeyOf(r.Status),
+                    WorkerCode = resolvedCode,
+                    WorkerName = r.HeaderWorkerName,
+                    JobDate = jobDate,
+                    SendGram = Math.Round(send, 4),
+                    CheckGram = Math.Round(check, 4),
+                    DiffGram = Math.Round(send - check, 4),
+                    DaysSince = (int)(now - jobDate).TotalDays
+                };
+            }).ToList();
+
+            IEnumerable<GoldUncoveredJobs.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.DaysSince);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        public async Task<List<GoldLossTarget.Item>> GetGoldLossTargets()
+        {
+            var current = await _goldLossTargetService.GetCurrentTargetsAsync();
+            var types = new[] { ProductionGoldLossEvaluator.WorkerTypeTang, ProductionGoldLossEvaluator.WorkerTypeSetting };
+            var metals = new[] { ProductionGoldLossEvaluator.MetalGold, ProductionGoldLossEvaluator.MetalSilver };
+
+            var result = new List<GoldLossTarget.Item>();
+            foreach (var wt in types)
+            {
+                foreach (var metal in metals)
+                {
+                    result.Add(current.TryGetValue((wt, metal), out var row)
+                        ? new GoldLossTarget.Item { WorkerType = wt, Metal = metal, TargetPercent = row.TargetPercent, EffectiveFrom = row.EffectiveFrom, CreateBy = row.CreateBy, Remark = row.Remark }
+                        : new GoldLossTarget.Item
+                        {
+                            WorkerType = wt,
+                            Metal = metal,
+                            TargetPercent = DefaultGoldLossTargetPercent(wt, metal),
+                            EffectiveFrom = default,
+                            CreateBy = "system",
+                            Remark = "ไม่มีข้อมูลในตาราง ใช้ค่า default"
+                        });
+                }
+            }
+
+            return result;
+        }
+
+        public async Task<List<GoldLossTarget.Item>> GetGoldLossTargetHistory(int workerType, string metal)
+        {
+            var normalizedMetal = IsValidMetal(metal) ? metal : ProductionGoldLossEvaluator.MetalGold;
+            var rows = await _goldLossTargetService.GetHistoryAsync(workerType, normalizedMetal);
+            return rows.Select(r => new GoldLossTarget.Item
+            {
+                WorkerType = r.WorkerType,
+                Metal = r.Metal,
+                TargetPercent = r.TargetPercent,
+                EffectiveFrom = r.EffectiveFrom,
+                CreateBy = r.CreateBy,
+                Remark = r.Remark
+            }).ToList();
+        }
+
+        public async Task SaveGoldLossTargets(SaveGoldLossTargets.Request request)
+        {
+            var validTypes = new HashSet<int> { ProductionGoldLossEvaluator.WorkerTypeTang, ProductionGoldLossEvaluator.WorkerTypeSetting };
+
+            if (request.Items == null || request.Items.Count == 0)
+            {
+                throw new ArgumentException("ต้องระบุอย่างน้อย 1 ประเภทช่าง");
+            }
+
+            foreach (var item in request.Items)
+            {
+                if (!validTypes.Contains(item.WorkerType))
+                {
+                    throw new ArgumentException($"ไม่รู้จักประเภทช่าง '{item.WorkerType}'");
+                }
+
+                if (!IsValidMetal(item.Metal))
+                {
+                    throw new ArgumentException($"ไม่รู้จักโลหะ '{item.Metal}'");
+                }
+
+                if (item.TargetPercent < 0 || item.TargetPercent > 100)
+                {
+                    throw new ArgumentException($"เป้าหมาย % ของประเภทช่าง '{item.WorkerType}' ({item.Metal}) ต้องอยู่ระหว่าง 0-100");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Remark))
+            {
+                throw new ArgumentException("ต้องระบุหมายเหตุ");
+            }
+
+            var items = request.Items.Select(i => (i.WorkerType, i.Metal, i.TargetPercent)).ToList();
+            await _goldLossTargetService.SaveAsync(items, request.Remark, CurrentUsername);
         }
 
         private static void AddIfNotNull(List<Wip.Finding> list, Wip.Finding? finding)

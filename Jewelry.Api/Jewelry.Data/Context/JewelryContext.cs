@@ -156,6 +156,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductionDeliveryTarget> TbtProductionDeliveryTarget { get; set; }
 
+    public virtual DbSet<TbtProductionGoldLossTarget> TbtProductionGoldLossTarget { get; set; }
+
     public virtual DbSet<TbtStockBasket> TbtStockBasket { get; set; }
 
     public virtual DbSet<TbtStockBasketItem> TbtStockBasketItem { get; set; }
@@ -3843,6 +3845,34 @@ public partial class JewelryContext : DbContext
                 .ValueGeneratedOnAdd()
                 .HasColumnName("id");
             entity.Property(e => e.TargetPercent).HasColumnName("target_percent");
+            entity.Property(e => e.EffectiveFrom).HasColumnName("effective_from");
+            entity.Property(e => e.Remark)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+        });
+
+        modelBuilder.Entity<TbtProductionGoldLossTarget>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_production_gold_loss_target_pk");
+            entity.ToTable("tbt_production_gold_loss_target");
+
+            entity.HasIndex(e => new { e.WorkerType, e.Metal, e.EffectiveFrom })
+                .HasDatabaseName("idx_tbt_production_gold_loss_target_type_metal_effective");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.WorkerType).HasColumnName("worker_type");
+            entity.Property(e => e.Metal)
+                .HasColumnType("character varying")
+                .HasColumnName("metal");
+            entity.Property(e => e.TargetPercent)
+                .HasColumnType("numeric(6,3)")
+                .HasColumnName("target_percent");
             entity.Property(e => e.EffectiveFrom).HasColumnName("effective_from");
             entity.Property(e => e.Remark)
                 .HasColumnType("character varying")

@@ -406,6 +406,227 @@ namespace Jewelry.Service.Production.Insight
             };
         }
 
+        // ---- Gold Loss (ทองและ Loss) ----
+        // รอบแก้ไข 2026-10-01: เพิ่มมิติ metal ('GOLD'|'SILVER') ทุก finding, ปัดเศษใน params ทั้งหมด
+        // (percent/gram 2 ตำแหน่ง, money 0 ตำแหน่ง), เพิ่ม tolerance ให้ rule เทียบ target, และรวม
+        // GOLD_REPEAT_OFFENDER เป็น 1 finding ต่อ workerType×metal (ไม่ใช่ 1 ต่อช่างแบบเดิม)
+
+        private static decimal RoundPercent(decimal v) => Math.Round(v, 2, MidpointRounding.AwayFromZero);
+        private static decimal RoundGram(decimal v) => Math.Round(v, 2, MidpointRounding.AwayFromZero);
+        private static decimal RoundMoney(decimal v) => Math.Round(v, 0, MidpointRounding.AwayFromZero);
+
+        // GOLD_EXCESS_OVER_ALLOWANCE: ส่วนเกิน allowance รวม (กรัม) ต่อ workerType×metal — trigger ได้ครั้งเดียวต่อคู่
+        public static Wip.Finding? EvaluateGoldExcessOverAllowance(int workerType, string metal, decimal excessGram, decimal excessMoney)
+        {
+            if (excessGram <= 0) return null;
+
+            var severity = excessGram > ProductionInsightThresholds.GoldExcessOverAllowanceCriticalGram ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_EXCESS_OVER_ALLOWANCE",
+                Severity = severity,
+                ReportRef = "goldOverSlips",
+                Params = new Dictionary<string, object>
+                {
+                    ["workerType"] = workerType,
+                    ["metal"] = metal,
+                    ["excessGram"] = RoundGram(excessGram),
+                    ["excessMoney"] = RoundMoney(excessMoney)
+                }
+            };
+        }
+
+        // GOLD_LOSS_ABOVE_TARGET (B): lossPercent (จริง) > targetPercent (เป้าหมายบริษัท) + tolerance
+        public static Wip.Finding? EvaluateGoldLossAboveTarget(int workerType, string metal, decimal? lossPercent, decimal targetPercent)
+        {
+            if (!lossPercent.HasValue) return null;
+            if (lossPercent.Value <= targetPercent + ProductionInsightThresholds.GoldTargetTolerancePercent) return null;
+
+            var severity = lossPercent.Value >= targetPercent * ProductionInsightThresholds.GoldLossAboveTargetCriticalMultiplier
+                ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_LOSS_ABOVE_TARGET",
+                Severity = severity,
+                ReportRef = "goldKpi",
+                Params = new Dictionary<string, object>
+                {
+                    ["workerType"] = workerType,
+                    ["metal"] = metal,
+                    ["lossPercent"] = RoundPercent(lossPercent.Value),
+                    ["targetPercent"] = RoundPercent(targetPercent)
+                }
+            };
+        }
+
+        // GOLD_ALLOWANCE_ABOVE_TARGET (B vs A): allowedPercent (ที่ตั้งไว้บนใบ) > targetPercent (เป้าหมายบริษัท) +
+        // tolerance — allowance ใจกว้างกว่านโยบายบริษัท (single-tier warning — เป็นเรื่อง policy ไม่ใช่ความเสียหายเฉียบพลัน)
+        public static Wip.Finding? EvaluateGoldAllowanceAboveTarget(int workerType, string metal, decimal? allowedPercent, decimal targetPercent)
+        {
+            if (!allowedPercent.HasValue) return null;
+            if (allowedPercent.Value <= targetPercent + ProductionInsightThresholds.GoldTargetTolerancePercent) return null;
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_ALLOWANCE_ABOVE_TARGET",
+                Severity = "warning",
+                ReportRef = "goldKpi",
+                Params = new Dictionary<string, object>
+                {
+                    ["workerType"] = workerType,
+                    ["metal"] = metal,
+                    ["allowedPercent"] = RoundPercent(allowedPercent.Value),
+                    ["targetPercent"] = RoundPercent(targetPercent)
+                }
+            };
+        }
+
+        // GOLD_MOST_WORKERS_OVER: >= 70% ของช่างประเภทนี้ (workerType×metal) เกิน allowance ของตัวเอง (A — "เกินเกณฑ์")
+        public static Wip.Finding? EvaluateGoldMostWorkersOver(int workerType, string metal, int overCount, int workerCount)
+        {
+            if (workerCount <= 0 || overCount <= 0) return null;
+
+            var percent = RoundPercent((decimal)overCount / workerCount * 100);
+            if (percent < ProductionInsightThresholds.GoldMostWorkersOverPercent) return null;
+
+            var severity = percent >= ProductionInsightThresholds.GoldMostWorkersOverPercentCritical ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_MOST_WORKERS_OVER",
+                Severity = severity,
+                ReportRef = "goldWorkers",
+                Params = new Dictionary<string, object>
+                {
+                    ["workerType"] = workerType,
+                    ["metal"] = metal,
+                    ["overCount"] = overCount,
+                    ["workerCount"] = workerCount,
+                    ["percent"] = percent
+                }
+            };
+        }
+
+        // GOLD_REPEAT_OFFENDER: รวม 1 finding ต่อ workerType×metal — คัดช่างที่เกิน allowance ของตัวเอง (A —
+        // "เกินเกณฑ์") ทุก bucket ที่ผ่านเกณฑ์ (qualifying) ติดต่อกัน >= 3 ครั้ง ใส่เป็น array ใน params.workers
+        // (ไม่ trigger แยกต่อคนเหมือนรอบก่อน — UI ต้องวนแสดงเอง)
+        public static Wip.Finding? EvaluateGoldRepeatOffender(
+            int workerType, string metal, IReadOnlyList<(string WorkerCode, string? WorkerName, int OverBuckets, int QualifyingBuckets)> workers)
+        {
+            var minBuckets = ProductionInsightThresholds.GoldRepeatOffenderMinBuckets;
+            var offenders = workers
+                .Where(w => w.QualifyingBuckets >= minBuckets && w.OverBuckets == w.QualifyingBuckets)
+                .ToList();
+
+            if (offenders.Count == 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_REPEAT_OFFENDER",
+                Severity = "warning",
+                ReportRef = "goldWorkers",
+                Params = new Dictionary<string, object>
+                {
+                    ["workerType"] = workerType,
+                    ["metal"] = metal,
+                    ["workers"] = offenders.Select(o => new Dictionary<string, object>
+                    {
+                        ["workerCode"] = o.WorkerCode,
+                        ["workerName"] = o.WorkerName ?? o.WorkerCode
+                    }).ToList(),
+                    ["count"] = offenders.Count,
+                    ["buckets"] = minBuckets
+                }
+            };
+        }
+
+        // GOLD_SLIP_COVERAGE_LOW: % งาน (ที่เข้าเงื่อนไข) ที่ถูกตัดใบ gold loss ไปแล้วแล้ว < 80% (critical < 50%)
+        public static Wip.Finding? EvaluateGoldSlipCoverageLow(int workerType, string metal, int coverageJobs, int coverageTotalJobs)
+        {
+            if (coverageTotalJobs <= 0) return null;
+
+            var percent = RoundPercent((decimal)coverageJobs / coverageTotalJobs * 100);
+            if (percent >= ProductionInsightThresholds.GoldSlipCoverageLowPercent) return null;
+
+            var severity = percent < ProductionInsightThresholds.GoldSlipCoverageLowPercentCritical ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "GOLD_SLIP_COVERAGE_LOW",
+                Severity = severity,
+                ReportRef = "goldUncovered",
+                Params = new Dictionary<string, object>
+                {
+                    ["workerType"] = workerType,
+                    ["metal"] = metal,
+                    ["coveragePercent"] = percent,
+                    ["coverageJobs"] = coverageJobs,
+                    ["coverageTotalJobs"] = coverageTotalJobs
+                }
+            };
+        }
+
+        // FC_GOLD_EXCESS_PROJECTED: ยอดส่วนเกิน allowance เฉลี่ยต่อเดือน (กรัม/บาท) ถ้าแนวโน้มปัจจุบันดำเนินต่อ
+        public static Wip.Finding? EvaluateFcGoldExcessProjected(int workerType, string metal, decimal excessGram, decimal excessMoney, double rangeDays)
+        {
+            if (excessGram <= 0 || rangeDays <= 0) return null;
+
+            var avgMonthlyExcessGram = RoundGram(excessGram / (decimal)rangeDays * 30);
+            var avgMonthlyExcessMoney = RoundMoney(excessMoney / (decimal)rangeDays * 30);
+
+            return new Wip.Finding
+            {
+                Code = "FC_GOLD_EXCESS_PROJECTED",
+                Severity = "warning",
+                ReportRef = "goldTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["workerType"] = workerType,
+                    ["metal"] = metal,
+                    ["avgMonthlyExcessGram"] = avgMonthlyExcessGram,
+                    ["avgMonthlyExcessMoney"] = avgMonthlyExcessMoney
+                }
+            };
+        }
+
+        // FC_GOLD_LOSS_RISING: lossPercent ของ bucket ที่ผ่านเกณฑ์ (slipCount >= MinSamplesPerBucket) ล่าสุด 3 ตัว
+        // ต้องเรียงเพิ่มขึ้นต่อเนื่อง (รูปแบบเดียวกับ FC_STAGE_LEADTIME_RISING)
+        public static Wip.Finding? EvaluateFcGoldLossRising(int workerType, string metal, IReadOnlyList<(int SlipCount, decimal? LossPercent)> series)
+        {
+            var n = ProductionInsightThresholds.StageLeadtimeRisingBucketCount;
+            var minSamples = ProductionInsightThresholds.MinSamplesPerBucket;
+
+            var qualifying = series
+                .Where(s => s.SlipCount >= minSamples && s.LossPercent.HasValue)
+                .Select(s => s.LossPercent!.Value)
+                .ToList();
+
+            if (qualifying.Count < n) return null;
+
+            var window = qualifying.Skip(qualifying.Count - n).ToList();
+            for (var i = 1; i < window.Count; i++)
+            {
+                if (window[i] <= window[i - 1]) return null;
+            }
+
+            return new Wip.Finding
+            {
+                Code = "FC_GOLD_LOSS_RISING",
+                Severity = "warning",
+                ReportRef = "goldTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["workerType"] = workerType,
+                    ["metal"] = metal,
+                    ["fromPercent"] = RoundPercent(window[0]),
+                    ["toPercent"] = RoundPercent(window[window.Count - 1]),
+                    ["buckets"] = n
+                }
+            };
+        }
+
         // 'critical' | 'warning' | 'ok' (ไม่มี finding เลย = ok)
         public static string WorstSeverity(IEnumerable<Wip.Finding> findings)
         {
@@ -427,7 +648,11 @@ namespace Jewelry.Service.Production.Insight
             ("ACT_SET_REALISTIC_DUE", "planner", new[] { "DLV_LEAD_UNDERESTIMATED" }),
             ("ACT_EXPEDITE_AT_RISK", "planner", new[] { "FC_DLV_AT_RISK", "DLV_OPEN_OVERDUE" }),
             ("ACT_CLOSE_COSTCARD", "goldControl", new[] { "DLV_STUCK_AFTER_COSTCARD" }),
-            ("ACT_FIX_BOTTLENECK", "productionManager", new[] { "DLV_ONTIME_BELOW_TARGET", "FC_DLV_ONTIME_DECLINING" })
+            ("ACT_FIX_BOTTLENECK", "productionManager", new[] { "DLV_ONTIME_BELOW_TARGET", "FC_DLV_ONTIME_DECLINING" }),
+            ("ACT_COMPLETE_SLIPS", "deptHead", new[] { "GOLD_SLIP_COVERAGE_LOW" }),
+            ("ACT_TALK_WORKER", "deptHead", new[] { "GOLD_REPEAT_OFFENDER" }),
+            ("ACT_REVIEW_ALLOWANCE", "productionManager", new[] { "GOLD_ALLOWANCE_ABOVE_TARGET", "GOLD_LOSS_ABOVE_TARGET" }),
+            ("ACT_CHECK_WEIGHING", "deptHead", new[] { "GOLD_EXCESS_OVER_ALLOWANCE", "GOLD_MOST_WORKERS_OVER" })
         };
 
         // priority: เรียงตาม severity ที่แย่ที่สุดของ finding ที่เกี่ยวข้องก่อน (critical > warning) แล้วตามลำดับ
@@ -536,6 +761,53 @@ namespace Jewelry.Service.Production.Insight
                     var deptKey = GetParam(findings, "DLV_ONTIME_BELOW_TARGET", "bottleneckDept")
                         ?? GetParam(findings, "FC_DLV_ONTIME_DECLINING", "bottleneckDept");
                     return new Dictionary<string, object> { ["deptKey"] = deptKey ?? string.Empty };
+                }
+                case "ACT_COMPLETE_SLIPS":
+                {
+                    var workerType = GetParam(findings, "GOLD_SLIP_COVERAGE_LOW", "workerType") ?? 0;
+                    var jobsObj = GetParam(findings, "GOLD_SLIP_COVERAGE_LOW", "coverageJobs");
+                    var totalObj = GetParam(findings, "GOLD_SLIP_COVERAGE_LOW", "coverageTotalJobs");
+                    var uncovered = (totalObj is int t ? t : 0) - (jobsObj is int j ? j : 0);
+                    var metalCover = GetParam(findings, "GOLD_SLIP_COVERAGE_LOW", "metal") ?? string.Empty;
+                    return new Dictionary<string, object> { ["workerType"] = workerType, ["metal"] = metalCover, ["uncoveredCount"] = uncovered };
+                }
+                case "ACT_TALK_WORKER":
+                {
+                    var workerType = GetParam(findings, "GOLD_REPEAT_OFFENDER", "workerType") ?? 0;
+                    var metalTalk = GetParam(findings, "GOLD_REPEAT_OFFENDER", "metal") ?? string.Empty;
+                    var workersObj = GetParam(findings, "GOLD_REPEAT_OFFENDER", "workers");
+                    var workersList = workersObj as List<Dictionary<string, object>> ?? new List<Dictionary<string, object>>();
+                    var topWorkers = workersList.Take(5).ToList();
+                    return new Dictionary<string, object>
+                    {
+                        ["workerType"] = workerType,
+                        ["metal"] = metalTalk,
+                        ["workers"] = topWorkers,
+                        ["count"] = workersList.Count
+                    };
+                }
+                case "ACT_REVIEW_ALLOWANCE":
+                {
+                    var workerType = GetParam(findings, "GOLD_ALLOWANCE_ABOVE_TARGET", "workerType")
+                        ?? GetParam(findings, "GOLD_LOSS_ABOVE_TARGET", "workerType") ?? 0;
+                    var metalReview = GetParam(findings, "GOLD_ALLOWANCE_ABOVE_TARGET", "metal")
+                        ?? GetParam(findings, "GOLD_LOSS_ABOVE_TARGET", "metal") ?? string.Empty;
+                    var allowedPercent = GetParam(findings, "GOLD_ALLOWANCE_ABOVE_TARGET", "allowedPercent") ?? 0m;
+                    var lossPercent = GetParam(findings, "GOLD_LOSS_ABOVE_TARGET", "lossPercent") ?? 0m;
+                    var targetPercent = GetParam(findings, "GOLD_ALLOWANCE_ABOVE_TARGET", "targetPercent")
+                        ?? GetParam(findings, "GOLD_LOSS_ABOVE_TARGET", "targetPercent") ?? 0m;
+                    // หมายเหตุ: ค่าทั้งหมดนี้ถูกเติมทับด้วย kpi row จริงอีกรอบใน ProductionInsightService.EnrichGoldActionParams
+                    // (กันกรณี trigger จาก finding เดียว ทำให้ field ที่มาจากอีก finding เป็น 0 หลอกๆ)
+                    return new Dictionary<string, object> { ["workerType"] = workerType, ["metal"] = metalReview, ["lossPercent"] = lossPercent, ["allowedPercent"] = allowedPercent, ["targetPercent"] = targetPercent };
+                }
+                case "ACT_CHECK_WEIGHING":
+                {
+                    var workerType = GetParam(findings, "GOLD_EXCESS_OVER_ALLOWANCE", "workerType")
+                        ?? GetParam(findings, "GOLD_MOST_WORKERS_OVER", "workerType") ?? 0;
+                    var metalCheck = GetParam(findings, "GOLD_EXCESS_OVER_ALLOWANCE", "metal")
+                        ?? GetParam(findings, "GOLD_MOST_WORKERS_OVER", "metal") ?? string.Empty;
+                    var excessGram = GetParam(findings, "GOLD_EXCESS_OVER_ALLOWANCE", "excessGram") ?? 0m;
+                    return new Dictionary<string, object> { ["workerType"] = workerType, ["metal"] = metalCheck, ["excessGram"] = excessGram };
                 }
                 default:
                     return new Dictionary<string, object>();

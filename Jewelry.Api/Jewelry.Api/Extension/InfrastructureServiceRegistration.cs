@@ -162,6 +162,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionStageStandardService, ProductionStageStandardService>();
             services.AddScoped<IProductionDeliveryDataProvider, ProductionDeliveryDataProvider>();
             services.AddScoped<IProductionDeliveryTargetService, ProductionDeliveryTargetService>();
+            services.AddScoped<IProductionGoldLossTargetService, ProductionGoldLossTargetService>();
             services.AddScoped<IExecutiveReportService, ExecutiveReportService>();
             services.AddScoped<IProductionInsightService, ProductionInsightService>();
 

@@ -22,6 +22,11 @@ using DeliveryLatePlans = jewelry.Model.Production.Insight.DeliveryLatePlans;
 using StuckAfterCostCardPlans = jewelry.Model.Production.Insight.StuckAfterCostCardPlans;
 using DeliveryTarget = jewelry.Model.Production.Insight.DeliveryTarget;
 using SaveDeliveryTarget = jewelry.Model.Production.Insight.SaveDeliveryTarget;
+using Gold = jewelry.Model.Production.Insight.Gold;
+using GoldOverSlips = jewelry.Model.Production.Insight.GoldOverSlips;
+using GoldUncoveredJobs = jewelry.Model.Production.Insight.GoldUncoveredJobs;
+using GoldLossTarget = jewelry.Model.Production.Insight.GoldLossTarget;
+using SaveGoldLossTargets = jewelry.Model.Production.Insight.SaveGoldLossTargets;
 
 namespace Jewelry.Api.Controllers.Production
 {
@@ -319,6 +324,114 @@ namespace Jewelry.Api.Controllers.Production
             try
             {
                 await _service.SaveDeliveryTarget(request);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("Gold")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(Gold.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Gold([FromBody] Gold.Request request)
+        {
+            try
+            {
+                var response = await _service.Gold(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("GoldOverSlips")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldOverSlips([FromBody] GoldOverSlips.Request request)
+        {
+            try
+            {
+                var response = await _service.GoldOverSlips(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("GoldUncoveredJobs")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldUncoveredJobs([FromBody] GoldUncoveredJobs.Request request)
+        {
+            try
+            {
+                var response = await _service.GoldUncoveredJobs(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("GoldLossTargets")]
+        [HttpGet]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<GoldLossTarget.Item>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldLossTargets()
+        {
+            try
+            {
+                var response = await _service.GetGoldLossTargets();
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("GoldLossTargetHistory")]
+        [HttpGet]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<GoldLossTarget.Item>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> GoldLossTargetHistory([FromQuery] int workerType, [FromQuery] string metal = "GOLD")
+        {
+            try
+            {
+                var response = await _service.GetGoldLossTargetHistory(workerType, metal);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("SaveGoldLossTargets")]
+        [HttpPost]
+        [RequirePermission("production:standard-edit")]
+        [ProducesResponseType((int)HttpStatusCode.OK)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> SaveGoldLossTargets([FromBody] SaveGoldLossTargets.Request request)
+        {
+            try
+            {
+                await _service.SaveGoldLossTargets(request);
                 return Ok();
             }
             catch (Exception ex)

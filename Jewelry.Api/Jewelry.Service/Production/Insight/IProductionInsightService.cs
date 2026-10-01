@@ -15,6 +15,11 @@ using DeliveryLatePlans = jewelry.Model.Production.Insight.DeliveryLatePlans;
 using StuckAfterCostCardPlans = jewelry.Model.Production.Insight.StuckAfterCostCardPlans;
 using DeliveryTarget = jewelry.Model.Production.Insight.DeliveryTarget;
 using SaveDeliveryTarget = jewelry.Model.Production.Insight.SaveDeliveryTarget;
+using Gold = jewelry.Model.Production.Insight.Gold;
+using GoldOverSlips = jewelry.Model.Production.Insight.GoldOverSlips;
+using GoldUncoveredJobs = jewelry.Model.Production.Insight.GoldUncoveredJobs;
+using GoldLossTarget = jewelry.Model.Production.Insight.GoldLossTarget;
+using SaveGoldLossTargets = jewelry.Model.Production.Insight.SaveGoldLossTargets;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -37,5 +42,12 @@ namespace Jewelry.Service.Production.Insight
         Task<DeliveryTarget.Item?> GetDeliveryTarget();
         Task<List<DeliveryTarget.Item>> GetDeliveryTargetHistory();
         Task SaveDeliveryTarget(SaveDeliveryTarget.Request request);
+
+        Task<Gold.Response> Gold(Gold.Request request);
+        Task<DataSourceResult> GoldOverSlips(GoldOverSlips.Request request);
+        Task<DataSourceResult> GoldUncoveredJobs(GoldUncoveredJobs.Request request);
+        Task<List<GoldLossTarget.Item>> GetGoldLossTargets();
+        Task<List<GoldLossTarget.Item>> GetGoldLossTargetHistory(int workerType, string metal);
+        Task SaveGoldLossTargets(SaveGoldLossTargets.Request request);
     }
 }
