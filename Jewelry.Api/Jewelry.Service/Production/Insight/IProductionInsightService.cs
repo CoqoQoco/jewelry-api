@@ -25,6 +25,9 @@ using CostCardPendingPlans = jewelry.Model.Production.Insight.CostCardPendingPla
 using GoldByStage = jewelry.Model.Production.Insight.GoldByStage;
 using GoldStageOutlierJobs = jewelry.Model.Production.Insight.GoldStageOutlierJobs;
 using GoldStagePendingReturn = jewelry.Model.Production.Insight.GoldStagePendingReturn;
+using Workers = jewelry.Model.Production.Insight.Workers;
+using WorkerMonthly = jewelry.Model.Production.Insight.WorkerMonthly;
+using UnpaidPieceJobs = jewelry.Model.Production.Insight.UnpaidPieceJobs;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -61,5 +64,9 @@ namespace Jewelry.Service.Production.Insight
         Task<GoldByStage.Response> GoldByStage(GoldByStage.Request request);
         Task<DataSourceResult> GoldStageOutlierJobs(GoldStageOutlierJobs.Request request);
         Task<DataSourceResult> GoldStagePendingReturn(GoldStagePendingReturn.Request request);
+
+        Task<Workers.Response> Workers(Workers.Request request);
+        Task<WorkerMonthly.Response> WorkerMonthly(WorkerMonthly.Request request);
+        Task<DataSourceResult> UnpaidPieceJobs(UnpaidPieceJobs.Request request);
     }
 }

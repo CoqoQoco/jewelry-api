@@ -871,6 +871,170 @@ namespace Jewelry.Service.Production.Insight
             };
         }
 
+        // ---- ช่างและค่าแรง (Workers) ----
+
+        // WRK_CONCENTRATION: trigger ได้หลายครั้ง (คนละแผนก) เหมือน WIP_DEPT_GROWING — top2SharePercent เป็นสเกล 0-100
+        public static Wip.Finding? EvaluateWrkConcentration(
+            string deptKey, int activeWorkerCount, decimal top2SharePercent, IReadOnlyList<(string Code, string Name)> topWorkers)
+        {
+            if (activeWorkerCount < ProductionInsightThresholds.WrkConcentrationMinWorkers) return null;
+            if (top2SharePercent < ProductionInsightThresholds.WrkConcentrationTop2SharePercent) return null;
+
+            return new Wip.Finding
+            {
+                Code = "WRK_CONCENTRATION",
+                Severity = "warning",
+                ReportRef = "wrkTable",
+                Params = new Dictionary<string, object>
+                {
+                    ["deptKey"] = deptKey,
+                    ["top2Share"] = Math.Round(top2SharePercent, 2),
+                    ["workers"] = topWorkers.Select(w => new Dictionary<string, object> { ["code"] = w.Code, ["name"] = w.Name }).ToList()
+                }
+            };
+        }
+
+        // WRK_RATE_OUTLIER: 1 finding รวม — count ทั้งหมด + top 3 (เรียงตามอัตราส่วน wagePerJob/medianPerJob มากสุด)
+        public static Wip.Finding? EvaluateWrkRateOutlier(IReadOnlyList<(string Code, string Name, decimal WagePerJob, decimal MedianPerJob)> outliers)
+        {
+            if (outliers.Count == 0) return null;
+
+            var top3 = outliers
+                .OrderByDescending(o => o.MedianPerJob > 0 ? o.WagePerJob / o.MedianPerJob : o.WagePerJob)
+                .Take(3)
+                .ToList();
+
+            return new Wip.Finding
+            {
+                Code = "WRK_RATE_OUTLIER",
+                Severity = "warning",
+                ReportRef = "wrkTable",
+                Params = new Dictionary<string, object>
+                {
+                    ["count"] = outliers.Count,
+                    ["workers"] = top3.Select(o => new Dictionary<string, object>
+                    {
+                        ["code"] = o.Code,
+                        ["name"] = o.Name,
+                        ["wagePerJob"] = Math.Round(o.WagePerJob, 2),
+                        ["medianPerJob"] = Math.Round(o.MedianPerJob, 2)
+                    }).ToList()
+                }
+            };
+        }
+
+        // WRK_WAGE_PER_PLAN_RISING: wagePerPlan ของ bucket เต็มเดือน (full-month) ล่าสุด 3 ตัว ต้องเรียงเพิ่มขึ้นต่อเนื่อง
+        public static Wip.Finding? EvaluateWrkWagePerPlanRising(IReadOnlyList<(bool IsFullMonth, decimal? WagePerPlan)> series)
+        {
+            var n = ProductionInsightThresholds.StageLeadtimeRisingBucketCount;
+            var qualifying = series.Where(s => s.IsFullMonth && s.WagePerPlan.HasValue).Select(s => s.WagePerPlan!.Value).ToList();
+            if (qualifying.Count < n) return null;
+
+            var window = qualifying.Skip(qualifying.Count - n).ToList();
+            for (var i = 1; i < window.Count; i++)
+            {
+                if (window[i] <= window[i - 1]) return null;
+            }
+
+            return new Wip.Finding
+            {
+                Code = "WRK_WAGE_PER_PLAN_RISING",
+                Severity = "warning",
+                ReportRef = "wrkTrend",
+                Params = new Dictionary<string, object>
+                {
+                    ["fromValue"] = Math.Round(window[0], 2),
+                    ["toValue"] = Math.Round(window[window.Count - 1], 2)
+                }
+            };
+        }
+
+        // WRK_UNPAID_JOBS: มีงานที่ยังไม่บันทึกค่าแรงอย่างน้อย 1 ชิ้น
+        public static Wip.Finding? EvaluateWrkUnpaidJobs(int count)
+        {
+            if (count <= 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "WRK_UNPAID_JOBS",
+                Severity = "warning",
+                ReportRef = "wrkUnpaid",
+                Params = new Dictionary<string, object> { ["count"] = count }
+            };
+        }
+
+        // WRK_GOLD_REPEAT: reuse เกณฑ์เดียวกับ GOLD_REPEAT_OFFENDER (เกิน allowance ตัวเองทุก bucket ที่ผ่านเกณฑ์
+        // ติดต่อกัน >= 3 ครั้ง) metal=GOLD เท่านั้น — คัดจาก tang(50)+setting(80) รวมกัน
+        public static Wip.Finding? EvaluateWrkGoldRepeat(IReadOnlyList<(string Code, string Name)> workers)
+        {
+            if (workers.Count == 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "WRK_GOLD_REPEAT",
+                Severity = "warning",
+                ReportRef = "wrkTable",
+                Params = new Dictionary<string, object>
+                {
+                    ["workers"] = workers.Select(w => new Dictionary<string, object> { ["code"] = w.Code, ["name"] = w.Name }).ToList(),
+                    ["count"] = workers.Count
+                }
+            };
+        }
+
+        // FC_WAGES_NEXT_MONTH: เฉลี่ย 3 เดือนเต็มล่าสุด + แนวโน้มเชิงเส้น (simple linear regression บน 3 จุด) —
+        // severity info (เป็นตัวเลขคาดการณ์เฉยๆ ไม่ใช่ปัญหาที่ต้องแก้)
+        public static Wip.Finding? EvaluateFcWagesNextMonth(IReadOnlyList<decimal> lastFullMonthsWages)
+        {
+            var n = lastFullMonthsWages.Count;
+            if (n < 3) return null;
+
+            var avgWages = Math.Round(lastFullMonthsWages.Average(), 0);
+
+            var xs = Enumerable.Range(0, n).Select(i => (decimal)i).ToList();
+            var xMean = xs.Average();
+            var yMean = lastFullMonthsWages.Average();
+            var numerator = 0m;
+            var denominator = 0m;
+            for (var i = 0; i < n; i++)
+            {
+                numerator += (xs[i] - xMean) * (lastFullMonthsWages[i] - yMean);
+                denominator += (xs[i] - xMean) * (xs[i] - xMean);
+            }
+            var slope = denominator != 0 ? numerator / denominator : 0m;
+            var projectedWages = Math.Round(lastFullMonthsWages[n - 1] + slope, 0);
+
+            return new Wip.Finding
+            {
+                Code = "FC_WAGES_NEXT_MONTH",
+                Severity = "info",
+                ReportRef = "wrkTrend",
+                Params = new Dictionary<string, object> { ["projectedWages"] = projectedWages, ["avgWages"] = avgWages }
+            };
+        }
+
+        // FC_KEY_PERSON_RISK: สำหรับแผนกที่กระจุกตัวที่สุด — ถ้าช่างอันดับ 1 หายไป exits/วัน ลดลงตามสัดส่วนงานของเขา
+        // → คิวยาวขึ้น (activeWip เดิม ÷ exits/วันที่ลดลง) — trigger เฉพาะกรณีที่คิวยาวขึ้นจริง (queueDaysWithout > queueDaysNow)
+        public static Wip.Finding? EvaluateFcKeyPersonRisk(string deptKey, string workerName, double? queueDaysNow, double? queueDaysWithout)
+        {
+            if (!queueDaysNow.HasValue || !queueDaysWithout.HasValue) return null;
+            if (queueDaysWithout.Value <= queueDaysNow.Value) return null;
+
+            return new Wip.Finding
+            {
+                Code = "FC_KEY_PERSON_RISK",
+                Severity = "warning",
+                ReportRef = "wrkKpi",
+                Params = new Dictionary<string, object>
+                {
+                    ["deptKey"] = deptKey,
+                    ["workerName"] = workerName,
+                    ["queueDaysNow"] = Math.Round(queueDaysNow.Value, 1),
+                    ["queueDaysWithout"] = Math.Round(queueDaysWithout.Value, 1)
+                }
+            };
+        }
+
         // 'critical' | 'warning' | 'ok' (ไม่มี finding เลย = ok)
         public static string WorstSeverity(IEnumerable<Wip.Finding> findings)
         {
@@ -902,7 +1066,11 @@ namespace Jewelry.Service.Production.Insight
             ("ACT_CLEAN_STALE", "deptHead", new[] { "CAP_BACKLOG_MONTHS", "CAP_QUEUE_BOTTLENECK" }),
             ("ACT_SMOOTH_INFLOW", "planner", new[] { "CAP_INFLOW_OVER_OUTPUT", "FC_PEAK_RISK" }),
             ("ACT_RECEIVE_PENDING", "deptHead", new[] { "GOLD_STAGE_PENDING_RETURN" }),
-            ("ACT_CHECK_STAGE", "productionManager", new[] { "GOLD_STAGE_ABOVE_TARGET" })
+            ("ACT_CHECK_STAGE", "productionManager", new[] { "GOLD_STAGE_ABOVE_TARGET" }),
+            ("ACT_CROSS_TRAIN", "productionManager", new[] { "WRK_CONCENTRATION" }),
+            ("ACT_REVIEW_RATE", "deptHead", new[] { "WRK_RATE_OUTLIER" }),
+            ("ACT_RECORD_WAGES", "deptHead", new[] { "WRK_UNPAID_JOBS" }),
+            ("ACT_TALK_WORKER_GOLD", "deptHead", new[] { "WRK_GOLD_REPEAT" })
         };
 
         // priority: เรียงตาม severity ที่แย่ที่สุดของ finding ที่เกี่ยวข้องก่อน (critical > warning) แล้วตามลำดับ
@@ -1098,6 +1266,34 @@ namespace Jewelry.Service.Production.Insight
                     var diffPercent = GetParam(findings, "GOLD_STAGE_ABOVE_TARGET", "diffPercent") ?? 0m;
                     var targetPercent = GetParam(findings, "GOLD_STAGE_ABOVE_TARGET", "targetPercent") ?? 0m;
                     return new Dictionary<string, object> { ["deptKey"] = deptKey, ["diffPercent"] = diffPercent, ["targetPercent"] = targetPercent };
+                }
+                // ACT_CROSS_TRAIN/ACT_REVIEW_RATE/ACT_RECORD_WAGES/ACT_TALK_WORKER_GOLD: ค่า fallback ที่นี่ใช้แค่กัน
+                // พัง (WRK_CONCENTRATION trigger ได้หลายครั้ง การหยิบ finding แรกตัวเดียวไม่ครบ) — ค่าจริงทั้งหมด
+                // ถูกเติมทับจากข้อมูลที่คำนวณไว้แล้วตรงๆ ใน ProductionInsightService.EnrichWorkerActionParams เสมอ
+                case "ACT_CROSS_TRAIN":
+                {
+                    var deptKey = GetParam(findings, "WRK_CONCENTRATION", "deptKey") ?? string.Empty;
+                    var workersObj = GetParam(findings, "WRK_CONCENTRATION", "workers");
+                    var workersList = workersObj as List<Dictionary<string, object>> ?? new List<Dictionary<string, object>>();
+                    var workerNames = workersList.Select(w => w.TryGetValue("name", out var nm) ? nm : null).Where(nm => nm != null).ToList();
+                    return new Dictionary<string, object> { ["deptKey"] = deptKey, ["workerNames"] = workerNames! };
+                }
+                case "ACT_REVIEW_RATE":
+                {
+                    var workersObj = GetParam(findings, "WRK_RATE_OUTLIER", "workers");
+                    var workersList = workersObj as List<Dictionary<string, object>> ?? new List<Dictionary<string, object>>();
+                    return new Dictionary<string, object> { ["workers"] = workersList };
+                }
+                case "ACT_RECORD_WAGES":
+                {
+                    var count = GetParam(findings, "WRK_UNPAID_JOBS", "count") ?? 0;
+                    return new Dictionary<string, object> { ["count"] = count };
+                }
+                case "ACT_TALK_WORKER_GOLD":
+                {
+                    var workersObj = GetParam(findings, "WRK_GOLD_REPEAT", "workers");
+                    var workersList = workersObj as List<Dictionary<string, object>> ?? new List<Dictionary<string, object>>();
+                    return new Dictionary<string, object> { ["workers"] = workersList };
                 }
                 default:
                     return new Dictionary<string, object>();

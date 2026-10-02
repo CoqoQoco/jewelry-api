@@ -22,4 +22,7 @@ public partial class TbmWorker
     public string? UpdateBy { get; set; }
 
     public bool IsActive { get; set; }
+
+    // 'IN_HOUSE' | 'OUTSIDE' | 'SHOP' — null = ยังไม่จัดประเภท (เช่น placeholder/TEST)
+    public string? EmploymentType { get; set; }
 }

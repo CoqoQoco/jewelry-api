@@ -132,5 +132,18 @@ namespace Jewelry.Service.Production.Insight
         // worker breakdown ของ GoldByStage.departments[].workers: ต้องมีงาน >= เท่านี้แถวถึงนับ, top กี่คน
         public const int GoldStageWorkerMinRows = 5;
         public const int GoldStageWorkerTopCount = 10;
+
+        // ---- ช่างและค่าแรง (Workers) ----
+
+        // WRK_CONCENTRATION: แผนกต้องมีช่างจริง (ไม่รวม placeholder/TEST) >= เท่านี้คน และ top2Share (0-100) >= เท่านี้ถึง trigger
+        public const int WrkConcentrationMinWorkers = 3;
+        public const decimal WrkConcentrationTop2SharePercent = 50m;
+
+        // WRK_RATE_OUTLIER: wagePerJob > ค่านี้ × median ของกลุ่มแผนก+ประเภทการจ้างเดียวกัน และต้องมีงาน >= เท่านี้ชิ้น
+        public const decimal WrkRateOutlierMultiplier = 3m;
+        public const int WrkRateOutlierMinJobs = 5;
+
+        // WRK_WAGE_PER_PLAN_RISING/FC_WAGES_NEXT_MONTH: bucket เดือนที่สั้นกว่านี้ (วัน) ไม่ถือว่าเป็น "เต็มเดือน"
+        public const double WrkFullMonthMinDays = 28;
     }
 }

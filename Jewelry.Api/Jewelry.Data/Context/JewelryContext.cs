@@ -946,6 +946,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("create_by");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.EmploymentType)
+                .HasColumnType("character varying")
+                .HasColumnName("employment_type");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")

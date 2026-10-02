@@ -16,6 +16,9 @@ namespace jewelry.Model.Worker.List
         public int Type { get; set; }
         public string? TypeName { get; set; }
 
+        // 'IN_HOUSE' | 'OUTSIDE' | 'SHOP' | null
+        public string? EmploymentType { get; set; }
+
         public bool IsActive { get; set; }
 
         public DateTime CreateDate { get; set; }

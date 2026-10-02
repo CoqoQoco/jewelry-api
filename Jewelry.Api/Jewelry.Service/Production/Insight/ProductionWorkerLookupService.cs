@@ -15,6 +15,7 @@ namespace Jewelry.Service.Production.Insight
         private readonly IMemoryCache _cache;
 
         private const string CacheKey = "ProductionInsight:WorkerNames";
+        private const string EmploymentTypeCacheKey = "ProductionInsight:WorkerEmploymentTypes";
         private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
 
         public ProductionWorkerLookupService(JewelryContext jewelryContext, IMemoryCache cache)
@@ -35,6 +36,21 @@ namespace Jewelry.Service.Production.Insight
                 .ToDictionaryAsync(w => w.Code, w => w.NameTh);
 
             _cache.Set(CacheKey, result, CacheTtl);
+            return result;
+        }
+
+        public async Task<Dictionary<string, string?>> GetWorkerEmploymentTypesAsync()
+        {
+            if (_cache.TryGetValue<Dictionary<string, string?>>(EmploymentTypeCacheKey, out var cached) && cached != null)
+            {
+                return cached;
+            }
+
+            var result = await _jewelryContext.TbmWorker
+                .AsNoTracking()
+                .ToDictionaryAsync(w => w.Code, w => w.EmploymentType);
+
+            _cache.Set(EmploymentTypeCacheKey, result, CacheTtl);
             return result;
         }
     }

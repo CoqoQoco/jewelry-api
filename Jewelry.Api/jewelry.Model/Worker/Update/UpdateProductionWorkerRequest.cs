@@ -12,5 +12,8 @@ namespace jewelry.Model.Worker.Update
         public string NameTh { get; set; }
         public string? NameEn { get; set; }
         public int Type { get; set; }
+
+        // 'IN_HOUSE' | 'OUTSIDE' | 'SHOP' — optional
+        public string? EmploymentType { get; set; }
     }
 }

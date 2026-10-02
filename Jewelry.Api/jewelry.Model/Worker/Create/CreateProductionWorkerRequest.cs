@@ -14,5 +14,8 @@ namespace jewelry.Model.Worker.Create
         public string? NameEn { get; set; }
 
         public int Type { get; set; }
+
+        // 'IN_HOUSE' | 'OUTSIDE' | 'SHOP' — optional
+        public string? EmploymentType { get; set; }
     }
 }

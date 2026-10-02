@@ -3,6 +3,13 @@ using System.Collections.Generic;
 
 namespace jewelry.Model.Production.Insight.DueRiskPlans
 {
+    public class WorkerItem
+    {
+        public string Code { get; set; } = null!;
+        public string Name { get; set; } = null!;
+        public bool IsQueue { get; set; }
+    }
+
     public class Item
     {
         public int PlanId { get; set; }
@@ -30,5 +37,6 @@ namespace jewelry.Model.Production.Insight.DueRiskPlans
         public string? LastActionRemark { get; set; }
         public DateTime LastActionDate { get; set; }
         public List<string> Workers { get; set; } = new List<string>();
+        public List<WorkerItem> WorkerItems { get; set; } = new List<WorkerItem>();
     }
 }

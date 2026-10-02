@@ -32,6 +32,9 @@ using CostCardPendingPlans = jewelry.Model.Production.Insight.CostCardPendingPla
 using GoldByStage = jewelry.Model.Production.Insight.GoldByStage;
 using GoldStageOutlierJobs = jewelry.Model.Production.Insight.GoldStageOutlierJobs;
 using GoldStagePendingReturn = jewelry.Model.Production.Insight.GoldStagePendingReturn;
+using Workers = jewelry.Model.Production.Insight.Workers;
+using WorkerMonthly = jewelry.Model.Production.Insight.WorkerMonthly;
+using UnpaidPieceJobs = jewelry.Model.Production.Insight.UnpaidPieceJobs;
 
 namespace Jewelry.Api.Controllers.Production
 {
@@ -527,6 +530,60 @@ namespace Jewelry.Api.Controllers.Production
             try
             {
                 var response = await _service.GoldStagePendingReturn(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("Workers")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(Workers.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Workers([FromBody] Workers.Request request)
+        {
+            try
+            {
+                var response = await _service.Workers(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("WorkerMonthly")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(WorkerMonthly.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> WorkerMonthly([FromBody] WorkerMonthly.Request request)
+        {
+            try
+            {
+                var response = await _service.WorkerMonthly(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("UnpaidPieceJobs")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UnpaidPieceJobs([FromBody] UnpaidPieceJobs.Request request)
+        {
+            try
+            {
+                var response = await _service.UnpaidPieceJobs(request);
                 return Ok(response);
             }
             catch (Exception ex)

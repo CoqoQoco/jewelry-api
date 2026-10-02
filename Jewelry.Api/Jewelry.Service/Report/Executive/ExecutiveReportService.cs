@@ -374,6 +374,7 @@ namespace Jewelry.Service.Report.Executive
                     item.LastActionRemark = info.LastActionRemark;
                     item.LastActionDate = info.LastActionDate;
                     item.Workers = info.Workers;
+                    item.WorkerItems = info.WorkerItems.Select(w => new StalePlans.WorkerItem { Code = w.Code, Name = w.Name, IsQueue = w.IsQueue }).ToList();
                 }
 
                 dataSource.Data = pageItems;

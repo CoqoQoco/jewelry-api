@@ -65,6 +65,24 @@ namespace Jewelry.Service.Worker
             return query;
         }
 
+        private static readonly HashSet<string> ValidEmploymentTypes = new HashSet<string> { "IN_HOUSE", "OUTSIDE", "SHOP" };
+
+        private static string ValidateEmploymentType(string employmentType)
+        {
+            var normalized = employmentType.Trim().ToUpper();
+            if (!ValidEmploymentTypes.Contains(normalized))
+            {
+                throw new HandleException($"ประเภทการจ้าง {employmentType} ไม่ถูกต้อง (ต้องเป็น IN_HOUSE, OUTSIDE หรือ SHOP)");
+            }
+            return normalized;
+        }
+
+        // Create: ไม่ส่งมา/ว่าง = null (ไม่มี field เดิมให้รักษาไว้อยู่แล้ว)
+        private static string? NormalizeEmploymentTypeForCreate(string? employmentType)
+        {
+            return string.IsNullOrWhiteSpace(employmentType) ? null : ValidateEmploymentType(employmentType);
+        }
+
         public async Task<string> Create(CreateProductionWorkerRequest request)
         {
             var dub = (from item in _jewelryContext.TbmWorker
@@ -82,6 +100,7 @@ namespace Jewelry.Service.Worker
                 NameEn = request.NameEn,
                 NameTh = request.NameTh,
                 TypeId = request.Type,
+                EmploymentType = NormalizeEmploymentTypeForCreate(request.EmploymentType),
                 IsActive = true,
 
                 CreateBy = CurrentUsername,
@@ -109,6 +128,12 @@ namespace Jewelry.Service.Worker
             dub.NameEn = request.NameEn;
             dub.NameTh = request.NameTh;
             dub.TypeId = request.Type;
+            // null/ไม่ส่งมา = คงค่าเดิมไว้ (หน้าจอแก้ไขอื่นที่ยังไม่ส่ง field นี้มาจะได้ไม่ไปลบ backfill ทิ้ง) —
+            // "" (ว่างชัดเจน) = ล้างค่า — ค่าที่ถูกต้อง = ตั้งค่าใหม่ (validate)
+            if (request.EmploymentType != null)
+            {
+                dub.EmploymentType = request.EmploymentType.Trim().Length == 0 ? null : ValidateEmploymentType(request.EmploymentType);
+            }
             dub.UpdateDate = DateTime.UtcNow;
             dub.UpdateBy = CurrentUsername;
 
@@ -155,6 +180,7 @@ namespace Jewelry.Service.Worker
                             NameTh = item.NameTh,
                             Type = item.TypeId,
                             TypeName = tj.Description,
+                            EmploymentType = item.EmploymentType,
                             IsActive = item.IsActive,
                             CreateDate = item.CreateDate,
                             CreateBy = item.CreateBy,

@@ -37,6 +37,9 @@ using CostCardPendingPlans = jewelry.Model.Production.Insight.CostCardPendingPla
 using GoldByStage = jewelry.Model.Production.Insight.GoldByStage;
 using GoldStageOutlierJobs = jewelry.Model.Production.Insight.GoldStageOutlierJobs;
 using GoldStagePendingReturn = jewelry.Model.Production.Insight.GoldStagePendingReturn;
+using Workers = jewelry.Model.Production.Insight.Workers;
+using WorkerMonthly = jewelry.Model.Production.Insight.WorkerMonthly;
+using UnpaidPieceJobs = jewelry.Model.Production.Insight.UnpaidPieceJobs;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -361,6 +364,7 @@ namespace Jewelry.Service.Production.Insight
                     item.LastActionRemark = info.LastActionRemark;
                     item.LastActionDate = info.LastActionDate;
                     item.Workers = info.Workers;
+                    item.WorkerItems = info.WorkerItems.Select(w => new DueRiskPlans.WorkerItem { Code = w.Code, Name = w.Name, IsQueue = w.IsQueue }).ToList();
                 }
 
                 dataSource.Data = pageItems;
@@ -538,6 +542,7 @@ namespace Jewelry.Service.Production.Insight
                     item.LastActionRemark = info.LastActionRemark;
                     item.LastActionDate = info.LastActionDate;
                     item.Workers = info.Workers;
+                    item.WorkerItems = info.WorkerItems.Select(w => new StalePlans.WorkerItem { Code = w.Code, Name = w.Name, IsQueue = w.IsQueue }).ToList();
                 }
 
                 dataSource.Data = pageItems;
@@ -903,6 +908,7 @@ namespace Jewelry.Service.Production.Insight
                     item.LastActionRemark = info.LastActionRemark;
                     item.LastActionDate = info.LastActionDate;
                     item.Workers = info.Workers;
+                    item.WorkerItems = info.WorkerItems.Select(w => new StalePlans.WorkerItem { Code = w.Code, Name = w.Name, IsQueue = w.IsQueue }).ToList();
                 }
 
                 dataSource.Data = pageItems;
@@ -2691,6 +2697,605 @@ namespace Jewelry.Service.Production.Insight
             if (request.Sort == null || !request.Sort.Any())
             {
                 ordered = items.OrderByDescending(x => x.DaysSince);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        // ---- ช่างและค่าแรง (Workers) ----
+
+        private class WorkerWageRow
+        {
+            public string DeptKey { get; set; } = null!;
+            public int PlanId { get; set; }
+            public string? WorkerCode { get; set; }
+            public DateTime RequestDate { get; set; }
+            public decimal Wages { get; set; }
+            public decimal? GoldWeightSend { get; set; }
+            public decimal? GoldWeightCheck { get; set; }
+            public string? Gold { get; set; }
+        }
+
+        // ฐานเดียวกับ GetGoldStageRowsAsync (status_detail/header, 5 แผนกจ่ายค่าแรง: trim/rawPolish/gemSort/
+        // setting/plating) แต่ไม่กรอง gold_weight_send>0/gold!=null (ไม่ใช่ทุกงานมีการชั่งทอง) — ขอบเขตวันที่ =
+        // detail.request_date (ตามสั่ง ต่างจาก GetGoldStageRowsAsync ที่ใช้ header.create_date)
+        private async Task<List<WorkerWageRow>> GetWorkerWageRowsAsync(DateTime start, DateTime end)
+        {
+            var statuses = new[] { 50, 60, 70, 80, 90 };
+
+            var raw = await (
+                from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                join header in _jewelryContext.TbtProductionPlanStatusHeader on detail.HeaderId equals header.Id
+                where header.IsActive && detail.IsActive
+                    && statuses.Contains(header.Status)
+                    && detail.RequestDate != null && detail.RequestDate >= start && detail.RequestDate <= end
+                select new
+                {
+                    header.Status,
+                    header.WorkerCode,
+                    detail.Worker,
+                    detail.WorkerSub,
+                    detail.RequestDate,
+                    detail.TotalWages,
+                    detail.GoldWeightSend,
+                    detail.GoldWeightCheck,
+                    detail.Gold,
+                    detail.ProductionPlanId
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            return raw
+                .Select(r => new WorkerWageRow
+                {
+                    DeptKey = ProductionPlanDepartments.DepartmentKeyOf(r.Status) ?? string.Empty,
+                    PlanId = r.ProductionPlanId,
+                    WorkerCode = !string.IsNullOrWhiteSpace(r.Worker) ? r.Worker : (!string.IsNullOrWhiteSpace(r.WorkerSub) ? r.WorkerSub : r.WorkerCode),
+                    RequestDate = r.RequestDate!.Value,
+                    Wages = r.TotalWages ?? 0,
+                    GoldWeightSend = r.GoldWeightSend,
+                    GoldWeightCheck = r.GoldWeightCheck,
+                    Gold = r.Gold
+                })
+                .Where(r => !string.IsNullOrEmpty(r.DeptKey))
+                .ToList();
+        }
+
+        // โหลด+normalize หน่วย tang ทุกโลหะ (ไม่กรอง metal ในนี้ — caller กรองเอง) — logic เดียวกับที่ใช้ใน
+        // Gold()/GetSlipLossPercentAsync (ซ้ำโดยตั้งใจ เหมือนรูปแบบเดิมในไฟล์นี้ที่โหลด tang ซ้ำกันหลายจุด)
+        private async Task<List<ProductionGoldLossEvaluator.LossUnit>> GetTangUnitsAsync(DateTime start, DateTime end)
+        {
+            var tangSlipsRaw = await _jewelryContext.TbtGoldLossTangSlip
+                .AsNoTracking()
+                .Where(s => s.IsActive && s.RequestDateEnd != null && s.RequestDateEnd >= start && s.RequestDateEnd <= end)
+                .ToListAsync();
+
+            var tangItemsBySlip = await GetTangItemsBySlipAsync(tangSlipsRaw.Select(s => s.Id).ToList());
+            var tangRows = tangSlipsRaw.Select(s => new ProductionGoldLossEvaluator.TangSlipRow
+            {
+                SlipId = s.Id,
+                DocumentNo = s.DocumentNo,
+                WorkerCode = s.WorkerCode,
+                WorkerName = s.WorkerName,
+                RequestDateStart = s.RequestDateStart,
+                RequestDateEnd = s.RequestDateEnd,
+                ReturnedTotal = s.ReturnedTotal,
+                RawLoss = s.RawLoss,
+                AllowedLoss = s.AllowedLoss,
+                PricePerGram = s.PricePerGram,
+                TotalMoneyDiff = s.TotalMoneyDiff,
+                Items = tangItemsBySlip.TryGetValue(s.Id, out var its) ? its : new List<ProductionGoldLossEvaluator.TangSlipItemMetalRow>()
+            }).ToList();
+
+            return ProductionGoldLossEvaluator.NormalizeTang(tangRows);
+        }
+
+        private static Dictionary<string, decimal?> ComputeSlipLossPercentByWorker(IReadOnlyList<ProductionGoldLossEvaluator.LossUnit> units)
+        {
+            return units.GroupBy(u => u.WorkerCode).ToDictionary(g => g.Key, g =>
+            {
+                var received = g.Sum(u => u.ReceivedGram);
+                var raw = g.Sum(u => u.RawLossGram);
+                return received > 0 ? (decimal?)Math.Round(raw / received * 100, 2) : null;
+            });
+        }
+
+        private class UnpaidJobRow
+        {
+            public int PlanId { get; set; }
+            public string? Wo { get; set; }
+            public int WoNumber { get; set; }
+            public string? WoText { get; set; }
+            public string DeptKey { get; set; } = null!;
+            public string? WorkerCode { get; set; }
+            public DateTime JobDate { get; set; }
+            public decimal CheckGram { get; set; }
+        }
+
+        // piece-rate context = trim(50)/setting(80) หรือช่างที่ employmentType เป็น OUTSIDE/SHOP (แผนกไหนก็ได้ —
+        // ช่างร้าน/นอกบ้านอาจโผล่แผนกอื่น เช่น plating) — ต้อง checked แล้ว (gold_weight_check ไม่ว่าง) แต่ยังไม่
+        // บันทึกค่าแรง (total_wages ว่าง/0) — ไม่จำกัดเฉพาะ 5 แผนกค่าแรงเหมือน GetWorkerWageRowsAsync
+        private async Task<List<UnpaidJobRow>> GetUnpaidPieceJobRowsAsync(
+            DateTime start, DateTime end, IReadOnlyDictionary<string, string> workerNames, IReadOnlyDictionary<string, string?> employmentTypes)
+        {
+            var raw = await (
+                from detail in _jewelryContext.TbtProductionPlanStatusDetail
+                join header in _jewelryContext.TbtProductionPlanStatusHeader on detail.HeaderId equals header.Id
+                where header.IsActive && detail.IsActive
+                    && detail.RequestDate != null && detail.RequestDate >= start && detail.RequestDate <= end
+                    && detail.GoldWeightCheck != null
+                    && (detail.TotalWages == null || detail.TotalWages == 0)
+                select new
+                {
+                    header.Status,
+                    header.WorkerCode,
+                    detail.Worker,
+                    detail.WorkerSub,
+                    detail.RequestDate,
+                    detail.GoldWeightCheck,
+                    detail.ProductionPlanId,
+                    header.ProductionPlan.Wo,
+                    header.ProductionPlan.WoNumber,
+                    header.ProductionPlan.WoText
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            var result = new List<UnpaidJobRow>();
+            foreach (var r in raw)
+            {
+                var deptKey = ProductionPlanDepartments.DepartmentKeyOf(r.Status);
+                if (deptKey == null) continue;
+
+                var workerCode = !string.IsNullOrWhiteSpace(r.Worker) ? r.Worker : (!string.IsNullOrWhiteSpace(r.WorkerSub) ? r.WorkerSub : r.WorkerCode);
+                if (ProductionGoldStageEvaluator.IsQueueOrEmptyWorker(workerCode, workerNames)) continue;
+
+                var employmentType = employmentTypes.TryGetValue(workerCode!.Trim(), out var et) ? et : null;
+                var isPieceContext = r.Status == 50 || r.Status == 80 || employmentType == "OUTSIDE" || employmentType == "SHOP";
+                if (!isPieceContext) continue;
+
+                result.Add(new UnpaidJobRow
+                {
+                    PlanId = r.ProductionPlanId,
+                    Wo = r.Wo,
+                    WoNumber = r.WoNumber,
+                    WoText = r.WoText,
+                    DeptKey = deptKey,
+                    WorkerCode = workerCode,
+                    JobDate = r.RequestDate!.Value,
+                    CheckGram = r.GoldWeightCheck!.Value
+                });
+            }
+
+            return result;
+        }
+
+        public async Task<Workers.Response> Workers(Workers.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+
+            var deptFilter = request.DepartmentKeys != null && request.DepartmentKeys.Length > 0
+                ? new HashSet<string>(request.DepartmentKeys)
+                : null;
+            var empTypeFilter = request.EmploymentTypes != null && request.EmploymentTypes.Length > 0
+                ? new HashSet<string>(request.EmploymentTypes, StringComparer.OrdinalIgnoreCase)
+                : null;
+
+            var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, "month").Select(b => b.End).ToList();
+            var bucketDurationDays = new List<double>();
+            {
+                var prevBoundary = start;
+                foreach (var be in bucketEnds)
+                {
+                    bucketDurationDays.Add((be - prevBoundary).TotalDays);
+                    prevBoundary = be;
+                }
+            }
+            var rangeDays = Math.Max((end - start).TotalDays, 1);
+            var monthsForRates = Math.Max(rangeDays / 30.44, 0.1);
+
+            var workerNames = await _workerLookupService.GetWorkerNamesAsync();
+            var employmentTypes = await _workerLookupService.GetWorkerEmploymentTypesAsync();
+
+            var allRows = await GetWorkerWageRowsAsync(start, end);
+            var rows = allRows.Where(r => !ProductionGoldStageEvaluator.IsQueueOrEmptyWorker(r.WorkerCode, workerNames)).ToList();
+            if (deptFilter != null) rows = rows.Where(r => deptFilter.Contains(r.DeptKey)).ToList();
+            if (empTypeFilter != null)
+            {
+                rows = rows.Where(r =>
+                {
+                    var et = employmentTypes.TryGetValue(r.WorkerCode!.Trim(), out var v) ? v : null;
+                    return et != null && empTypeFilter.Contains(et);
+                }).ToList();
+            }
+
+            // ---- slip-side (SLIP scope) % loss ต่อช่าง — trim จากใบตั้งฉาก(tang)/setting จากใบฝัง GOLD เท่านั้น ----
+            var tangUnitsGold = (await GetTangUnitsAsync(start, end)).Where(u => u.Metal == ProductionGoldLossEvaluator.MetalGold).ToList();
+            var settingUnitsGold = (await GetSettingUnitsAsync(start, end, null)).Where(u => u.Metal == ProductionGoldLossEvaluator.MetalGold).ToList();
+            var tangLossPercentByWorker = ComputeSlipLossPercentByWorker(tangUnitsGold);
+            var settingLossPercentByWorker = ComputeSlipLossPercentByWorker(settingUnitsGold);
+
+            // ---- worker × dept table rows ----
+            var deptTotalJobs = rows.GroupBy(r => r.DeptKey).ToDictionary(g => g.Key, g => g.Count());
+            var workerRows = new List<Workers.WorkerItem>();
+
+            foreach (var g in rows.GroupBy(r => (Code: r.WorkerCode!.Trim(), Dept: r.DeptKey)))
+            {
+                var list = g.ToList();
+                var jobs = list.Count;
+                var plans = list.Select(r => r.PlanId).Distinct().Count();
+                var wages = list.Sum(r => r.Wages);
+                decimal? wagePerJob = jobs > 0 ? Math.Round(wages / jobs, 2) : (decimal?)null;
+                var deptTotal = deptTotalJobs.TryGetValue(g.Key.Dept, out var dt) ? dt : 0;
+                var shareOfDeptJobs = deptTotal > 0 ? Math.Round((decimal)jobs / deptTotal * 100, 2) : 0m;
+
+                var goldReturned = list.Where(r =>
+                    ProductionGoldLossEvaluator.ClassifyMetal(r.Gold) == ProductionGoldLossEvaluator.MetalGold
+                    && (r.GoldWeightSend ?? 0) > 0 && r.GoldWeightCheck.HasValue).ToList();
+                decimal? goldDiffPercent = null;
+                if (goldReturned.Count > 0)
+                {
+                    var sendSum = goldReturned.Sum(r => r.GoldWeightSend ?? 0);
+                    var checkSum = goldReturned.Sum(r => r.GoldWeightCheck ?? 0);
+                    if (sendSum > 0) goldDiffPercent = Math.Round((sendSum - checkSum) / sendSum * 100, 2);
+                }
+
+                decimal? goldLossPercent = null;
+                if (g.Key.Dept == ProductionGoldStageEvaluator.DeptTrim && tangLossPercentByWorker.TryGetValue(g.Key.Code, out var tl)) goldLossPercent = tl;
+                else if (g.Key.Dept == ProductionGoldStageEvaluator.DeptSetting && settingLossPercentByWorker.TryGetValue(g.Key.Code, out var sl)) goldLossPercent = sl;
+
+                var employmentType = employmentTypes.TryGetValue(g.Key.Code, out var et2) ? et2 : null;
+                var name = workerNames.TryGetValue(g.Key.Code, out var nm) ? nm : g.Key.Code;
+
+                workerRows.Add(new Workers.WorkerItem
+                {
+                    Code = g.Key.Code,
+                    Name = name,
+                    DeptKey = g.Key.Dept,
+                    EmploymentType = employmentType,
+                    Jobs = jobs,
+                    Plans = plans,
+                    Wages = Math.Round(wages, 2),
+                    WagePerJob = wagePerJob,
+                    ShareOfDeptJobs = shareOfDeptJobs,
+                    GoldLossPercent = goldLossPercent,
+                    GoldDiffPercent = goldDiffPercent,
+                    IsRateOutlier = false,
+                    IsConcentrated = false
+                });
+            }
+
+            // ---- WRK_RATE_OUTLIER: wagePerJob > 3×median ของกลุ่มแผนก+ประเภทการจ้างเดียวกัน (jobs >= 5) ----
+            var medianByGroup = workerRows
+                .Where(w => w.WagePerJob.HasValue)
+                .GroupBy(w => (w.DeptKey, Emp: w.EmploymentType ?? "UNKNOWN"))
+                .ToDictionary(g => g.Key, g => (decimal)ProductionStageLeadTimeEvaluator.Median(g.Select(x => (double)x.WagePerJob!.Value).ToList()));
+
+            var rateOutliers = new List<(Workers.WorkerItem Item, decimal MedianPerJob)>();
+            foreach (var w in workerRows)
+            {
+                if (w.Jobs < ProductionInsightThresholds.WrkRateOutlierMinJobs || !w.WagePerJob.HasValue) continue;
+                if (!medianByGroup.TryGetValue((w.DeptKey, w.EmploymentType ?? "UNKNOWN"), out var median) || median <= 0) continue;
+                if (w.WagePerJob.Value <= median * ProductionInsightThresholds.WrkRateOutlierMultiplier) continue;
+
+                w.IsRateOutlier = true;
+                rateOutliers.Add((w, median));
+            }
+
+            // ---- concentration รายแผนก (top2Share ตามจำนวนงาน) ----
+            var concentration = new List<Workers.ConcentrationItem>();
+            foreach (var deptKey in ProductionGoldStageEvaluator.AllDepartments)
+            {
+                var deptWorkers = workerRows.Where(w => w.DeptKey == deptKey).OrderByDescending(w => w.Jobs).ToList();
+                var deptTotal = deptWorkers.Sum(w => w.Jobs);
+                var top2 = deptWorkers.Take(2).ToList();
+                var top2Share = deptTotal > 0 ? Math.Round((decimal)top2.Sum(w => w.Jobs) / deptTotal * 100, 2) : 0m;
+
+                concentration.Add(new Workers.ConcentrationItem
+                {
+                    DeptKey = deptKey,
+                    Top2Share = top2Share,
+                    TopWorkers = top2.Select(w => new Workers.ConcentrationWorkerItem
+                    {
+                        Code = w.Code,
+                        Name = w.Name,
+                        Share = deptTotal > 0 ? Math.Round((decimal)w.Jobs / deptTotal * 100, 2) : 0m
+                    }).ToList()
+                });
+
+                if (deptWorkers.Count >= ProductionInsightThresholds.WrkConcentrationMinWorkers && top2Share >= ProductionInsightThresholds.WrkConcentrationTop2SharePercent)
+                {
+                    foreach (var w in top2) w.IsConcentrated = true;
+                }
+            }
+
+            // ---- series รายแผนก + รวม (wagePerPlan ใช้ first95Dates — "ผลิตเสร็จ" เดียวกับ Capacity.kpi.outputPerMonth) ----
+            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var first95Dates = ProductionCapacityEvaluator.ComputeFirst95Dates(trendData.Headers);
+
+            var seriesOut = new List<Workers.SeriesItem>();
+            foreach (var deptKey in ProductionGoldStageEvaluator.AllDepartments)
+            {
+                var deptRows = rows.Where(r => r.DeptKey == deptKey).ToList();
+                var prevD = start;
+                foreach (var bucketEnd in bucketEnds)
+                {
+                    var w = deptRows.Where(r => r.RequestDate > prevD && r.RequestDate <= bucketEnd).Sum(r => r.Wages);
+                    seriesOut.Add(new Workers.SeriesItem { BucketEnd = bucketEnd, DeptKey = deptKey, Wages = Math.Round(w, 2) });
+                    prevD = bucketEnd;
+                }
+            }
+
+            var seriesTotalOut = new List<Workers.SeriesTotalItem>();
+            var fullMonthWagePerPlan = new List<(bool IsFullMonth, decimal? WagePerPlan)>();
+            var prevT = start;
+            for (var i = 0; i < bucketEnds.Count; i++)
+            {
+                var bucketEnd = bucketEnds[i];
+                var bucketWages = rows.Where(r => r.RequestDate > prevT && r.RequestDate <= bucketEnd).Sum(r => r.Wages);
+                var bucketOutput = first95Dates.Values.Count(d => d > prevT && d <= bucketEnd);
+                decimal? wagePerPlan = bucketOutput > 0 ? Math.Round(bucketWages / bucketOutput, 2) : (decimal?)null;
+                var isFullMonth = bucketDurationDays[i] >= ProductionInsightThresholds.WrkFullMonthMinDays;
+
+                seriesTotalOut.Add(new Workers.SeriesTotalItem { BucketEnd = bucketEnd, Wages = Math.Round(bucketWages, 2), Output = bucketOutput, WagePerPlan = wagePerPlan });
+                fullMonthWagePerPlan.Add((isFullMonth, wagePerPlan));
+                prevT = bucketEnd;
+            }
+
+            // ---- unpaid piece jobs (ไม่กรองตาม request.DepartmentKeys/EmploymentTypes — ขอบเขตกว้างกว่าตาราง workers) ----
+            var unpaidRows = await GetUnpaidPieceJobRowsAsync(start, end, workerNames, employmentTypes);
+            var unpaidCount = unpaidRows.Count;
+
+            // ---- WRK_GOLD_REPEAT: reuse เกณฑ์ GOLD_REPEAT_OFFENDER (tang 50 + setting 80, GOLD) — targetPercent
+            // ไม่มีผลต่อ OverBuckets/QualifyingBuckets (เทียบ allowance ของตัวเอง A ไม่ใช่เป้าหมายบริษัท) ใส่ 0 ได้ ----
+            var tangWorkerResults = ProductionGoldLossEvaluator.ComputeWorkers(ProductionGoldLossEvaluator.WorkerTypeTang, tangUnitsGold, 0m, start, bucketEnds);
+            var settingWorkerResults = ProductionGoldLossEvaluator.ComputeWorkers(ProductionGoldLossEvaluator.WorkerTypeSetting, settingUnitsGold, 0m, start, bucketEnds);
+            var goldRepeatOffenders = tangWorkerResults.Concat(settingWorkerResults)
+                .Where(w => w.QualifyingBuckets >= ProductionInsightThresholds.GoldRepeatOffenderMinBuckets && w.OverBuckets == w.QualifyingBuckets)
+                .Where(w => !ProductionGoldStageEvaluator.IsQueueOrEmptyWorker(w.WorkerCode, workerNames))
+                .Select(w => (Code: w.WorkerCode, Name: w.WorkerName ?? w.WorkerCode))
+                .ToList();
+
+            // ---- kpi ----
+            var totalWages = rows.Sum(r => r.Wages);
+            var wagesPerMonth = Math.Round(totalWages / (decimal)monthsForRates, 2);
+            var wagesByDeptOut = ProductionGoldStageEvaluator.AllDepartments.Select(d =>
+            {
+                var deptWages = rows.Where(r => r.DeptKey == d).Sum(r => r.Wages);
+                return new Workers.DeptWageItem
+                {
+                    DeptKey = d,
+                    WagesPerMonth = Math.Round(deptWages / (decimal)monthsForRates, 2),
+                    Share = totalWages > 0 ? Math.Round(deptWages / totalWages * 100, 2) : 0m
+                };
+            }).ToList();
+
+            var outputInRange = first95Dates.Values.Count(d => d > start && d <= end);
+            decimal? wagePerOutputPlan = outputInRange > 0 ? Math.Round(totalWages / outputInRange, 2) : (decimal?)null;
+
+            var activeWorkers = rows.Select(r => r.WorkerCode!.Trim()).Distinct().Count();
+            var activeWorkersByDeptOut = ProductionGoldStageEvaluator.AllDepartments.Select(d => new Workers.DeptCountItem
+            {
+                DeptKey = d,
+                Count = rows.Where(r => r.DeptKey == d).Select(r => r.WorkerCode!.Trim()).Distinct().Count()
+            }).ToList();
+
+            var outsideShopWages = rows.Where(r =>
+            {
+                var et = employmentTypes.TryGetValue(r.WorkerCode!.Trim(), out var v) ? v : null;
+                return et == "OUTSIDE" || et == "SHOP";
+            }).Sum(r => r.Wages);
+            var outsideWageShare = totalWages > 0 ? Math.Round(outsideShopWages / totalWages * 100, 2) : 0m;
+
+            // ---- FC_KEY_PERSON_RISK: แผนกกระจุกตัวที่สุด (top2Share สูงสุด, มีช่างจริงอย่างน้อย 1 คน) — reuse
+            // pipeline เดียวกับ Capacity ทุกจุด (visits, standardByDept, activeWipByDept, BuildCapacity) เพื่อให้
+            // queueDaysNow ตรงกับที่ผู้ใช้เห็นในแท็บ Capacity เป๊ะ (เทียบกันได้โดยตรง) ไม่ใช้ตัวประมาณจาก jobs/rangeDays
+            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+            var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
+            var stalePlanIdsForWip = new HashSet<int>(
+                openPlans.Where(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) < staleCutoff).Select(p => p.Id));
+            var activeWipByDept = ComputeActiveWipByDept(openPlans, stalePlanIdsForWip);
+
+            var visits = ProductionStageLeadTimeEvaluator.ComputeVisits(trendData.Plans, trendData.Headers, ProductionPlanDepartments.Departments, now);
+            var savedStandards = await _stageStandardService.GetCurrentStandardsAsync();
+            var standardByDept = ProductionPlanDepartments.Departments.ToDictionary(
+                d => d.Key,
+                d => savedStandards.TryGetValue(d.Key, out var s) ? s.StandardDays : ProductionInsightThresholds.DefaultStageStandardDays);
+            var capacity = ProductionStageLeadTimeEvaluator.BuildCapacity(visits, ProductionPlanDepartments.Departments, standardByDept, activeWipByDept, start, end);
+
+            var problems = new List<Wip.Finding>();
+            var forecasts = new List<Wip.Finding>();
+
+            foreach (var c in concentration)
+            {
+                var deptWorkerCount = workerRows.Count(w => w.DeptKey == c.DeptKey);
+                AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateWrkConcentration(
+                    c.DeptKey, deptWorkerCount, c.Top2Share, c.TopWorkers.Select(w => (w.Code, w.Name)).ToList()));
+            }
+
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateWrkRateOutlier(
+                rateOutliers.Select(o => (o.Item.Code, o.Item.Name, o.Item.WagePerJob!.Value, o.MedianPerJob)).ToList()));
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateWrkWagePerPlanRising(fullMonthWagePerPlan));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateWrkUnpaidJobs(unpaidCount));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateWrkGoldRepeat(goldRepeatOffenders));
+
+            var fullMonthWages = fullMonthWagePerPlan
+                .Zip(seriesTotalOut, (f, s) => (f.IsFullMonth, s.Wages))
+                .Where(x => x.IsFullMonth)
+                .Select(x => x.Wages)
+                .ToList();
+            var lastThreeFullMonthWages = fullMonthWages.Count >= 3 ? fullMonthWages.Skip(fullMonthWages.Count - 3).ToList() : fullMonthWages;
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcWagesNextMonth(lastThreeFullMonthWages));
+
+            var mostConcentrated = concentration.Where(c => c.TopWorkers.Count > 0).OrderByDescending(c => c.Top2Share).FirstOrDefault();
+            if (mostConcentrated != null)
+            {
+                var topWorker = mostConcentrated.TopWorkers[0];
+                var deptKeyRisk = mostConcentrated.DeptKey;
+                var capRow = capacity.Departments.FirstOrDefault(d => d.Key == deptKeyRisk);
+                var topShareRatio = (double)(topWorker.Share / 100m);
+
+                double? queueDaysNow = capRow?.QueueDaysCurrent;
+                double? queueDaysWithout = null;
+                if (capRow != null && capRow.ExitedPerDay > 0 && topShareRatio < 1.0)
+                {
+                    var exitsWithout = capRow.ExitedPerDay * (1 - topShareRatio);
+                    queueDaysWithout = exitsWithout > 0 ? capRow.ActiveWip / exitsWithout : (double?)null;
+                }
+
+                AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcKeyPersonRisk(deptKeyRisk, topWorker.Name, queueDaysNow, queueDaysWithout));
+            }
+
+            var actions = ProductionInsightRuleEngine.BuildActions(problems, forecasts);
+            var concentrationQualifying = concentration
+                .Where(c => workerRows.Count(w => w.DeptKey == c.DeptKey) >= ProductionInsightThresholds.WrkConcentrationMinWorkers
+                    && c.Top2Share >= ProductionInsightThresholds.WrkConcentrationTop2SharePercent)
+                .ToList();
+            EnrichWorkerActionParams(actions, concentrationQualifying, rateOutliers.Select(o => o.Item).ToList(), unpaidCount, goldRepeatOffenders);
+
+            var worstSeverity = ProductionInsightRuleEngine.WorstSeverity(problems.Concat(forecasts));
+            var status = worstSeverity == "critical" || worstSeverity == "warning" ? worstSeverity : "ok";
+
+            return new Workers.Response
+            {
+                AsOf = now,
+                Status = status,
+                Problems = problems,
+                Forecasts = forecasts,
+                Actions = actions,
+                Kpi = new Workers.KpiData
+                {
+                    WagesPerMonth = wagesPerMonth,
+                    WagesByDept = wagesByDeptOut,
+                    WagePerOutputPlan = wagePerOutputPlan,
+                    ActiveWorkers = activeWorkers,
+                    ActiveWorkersByDept = activeWorkersByDeptOut,
+                    OutsideWageShare = outsideWageShare,
+                    UnpaidPieceJobs = unpaidCount,
+                    ExcludesSalaried = true
+                },
+                Series = seriesOut,
+                SeriesTotal = seriesTotalOut,
+                Workers = workerRows,
+                Concentration = concentration
+            };
+        }
+
+        private static void EnrichWorkerActionParams(
+            List<Wip.ActionItem> actions,
+            List<Workers.ConcentrationItem> concentrationQualifying,
+            List<Workers.WorkerItem> rateOutliers,
+            int unpaidCount,
+            List<(string Code, string Name)> goldRepeatWorkers)
+        {
+            foreach (var action in actions)
+            {
+                switch (action.Code)
+                {
+                    case "ACT_CROSS_TRAIN":
+                    {
+                        var worst = concentrationQualifying.OrderByDescending(c => c.Top2Share).FirstOrDefault();
+                        action.Params["deptKey"] = worst?.DeptKey ?? string.Empty;
+                        action.Params["workerNames"] = worst?.TopWorkers.Select(w => w.Name).ToList() ?? new List<string>();
+                        break;
+                    }
+                    case "ACT_REVIEW_RATE":
+                        action.Params["workers"] = rateOutliers.Take(3).Select(w => new Dictionary<string, object>
+                        {
+                            ["code"] = w.Code,
+                            ["name"] = w.Name,
+                            ["wagePerJob"] = w.WagePerJob ?? 0m
+                        }).ToList();
+                        break;
+                    case "ACT_RECORD_WAGES":
+                        action.Params["count"] = unpaidCount;
+                        break;
+                    case "ACT_TALK_WORKER_GOLD":
+                        action.Params["workers"] = goldRepeatWorkers.Select(w => new Dictionary<string, object>
+                        {
+                            ["code"] = w.Code,
+                            ["name"] = w.Name
+                        }).ToList();
+                        break;
+                }
+            }
+        }
+
+        public async Task<WorkerMonthly.Response> WorkerMonthly(WorkerMonthly.Request request)
+        {
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, "month").Select(b => b.End).ToList();
+
+            var allRows = await GetWorkerWageRowsAsync(start, end);
+            var code = (request.Code ?? string.Empty).Trim();
+            var rows = allRows
+                .Where(r => string.Equals(r.DeptKey, request.DeptKey, StringComparison.Ordinal))
+                .Where(r => !string.IsNullOrWhiteSpace(r.WorkerCode) && string.Equals(r.WorkerCode.Trim(), code, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var series = new List<WorkerMonthly.SeriesItem>();
+            var prev = start;
+            foreach (var bucketEnd in bucketEnds)
+            {
+                var bucketRows = rows.Where(r => r.RequestDate > prev && r.RequestDate <= bucketEnd).ToList();
+                var jobs = bucketRows.Count;
+                var plans = bucketRows.Select(r => r.PlanId).Distinct().Count();
+                var wages = Math.Round(bucketRows.Sum(r => r.Wages), 2);
+
+                var goldReturned = bucketRows.Where(r =>
+                    ProductionGoldLossEvaluator.ClassifyMetal(r.Gold) == ProductionGoldLossEvaluator.MetalGold
+                    && (r.GoldWeightSend ?? 0) > 0 && r.GoldWeightCheck.HasValue).ToList();
+                decimal? goldDiffPercent = null;
+                if (goldReturned.Count > 0)
+                {
+                    var sendSum = goldReturned.Sum(r => r.GoldWeightSend ?? 0);
+                    var checkSum = goldReturned.Sum(r => r.GoldWeightCheck ?? 0);
+                    if (sendSum > 0) goldDiffPercent = Math.Round((sendSum - checkSum) / sendSum * 100, 2);
+                }
+
+                series.Add(new WorkerMonthly.SeriesItem { BucketEnd = bucketEnd, Jobs = jobs, Plans = plans, Wages = wages, GoldDiffPercent = goldDiffPercent });
+                prev = bucketEnd;
+            }
+
+            return new WorkerMonthly.Response { Series = series };
+        }
+
+        public async Task<DataSourceResult> UnpaidPieceJobs(UnpaidPieceJobs.Request request)
+        {
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+
+            var workerNames = await _workerLookupService.GetWorkerNamesAsync();
+            var employmentTypes = await _workerLookupService.GetWorkerEmploymentTypesAsync();
+            var rows = await GetUnpaidPieceJobRowsAsync(start, end, workerNames, employmentTypes);
+
+            if (request.DepartmentKeys != null && request.DepartmentKeys.Length > 0)
+            {
+                var deptFilter = new HashSet<string>(request.DepartmentKeys);
+                rows = rows.Where(r => deptFilter.Contains(r.DeptKey)).ToList();
+            }
+
+            var items = rows.Select(r => new UnpaidPieceJobs.Item
+            {
+                PlanId = r.PlanId,
+                Wo = r.Wo ?? string.Empty,
+                WoNumber = r.WoNumber,
+                WoText = r.WoText ?? string.Empty,
+                DeptKey = r.DeptKey,
+                WorkerCode = r.WorkerCode,
+                WorkerName = !string.IsNullOrWhiteSpace(r.WorkerCode) && workerNames.TryGetValue(r.WorkerCode.Trim(), out var wn) ? wn : r.WorkerCode,
+                JobDate = r.JobDate,
+                CheckGram = r.CheckGram
+            }).ToList();
+
+            IEnumerable<UnpaidPieceJobs.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.JobDate);
             }
 
             return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
