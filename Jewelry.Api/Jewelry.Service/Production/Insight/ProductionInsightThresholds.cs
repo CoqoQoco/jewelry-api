@@ -145,5 +145,17 @@ namespace Jewelry.Service.Production.Insight
 
         // WRK_WAGE_PER_PLAN_RISING/FC_WAGES_NEXT_MONTH: bucket เดือนที่สั้นกว่านี้ (วัน) ไม่ถือว่าเป็น "เต็มเดือน"
         public const double WrkFullMonthMinDays = 28;
+
+        // ---- วัตถุดิบที่กระทบการผลิต (Materials — gems only) ----
+
+        // MAT_GEM_WAITING: waitingMedianDays > ค่านี้ ถือว่า critical (ไม่ถึง = warning)
+        public const double MatGemWaitingCriticalDays = 30;
+
+        // MaterialGemLowCover/kpi.lowCoverCount: default threshold (วัน) ของ "cover" ที่ถือว่าใกล้หมด
+        public const int MatGemLowCoverDefaultDays = 30;
+
+        // หน้าต่าง usage ย้อนหลัง (วัน) สำหรับ usedPerMonth/MaterialGemLowCover — หารด้วย 3 (เดือน) ให้เป็นค่าเฉลี่ย/เดือน
+        public const int MatGemUsageWindowDays = 90;
+        public const decimal MatGemUsageWindowMonths = 3m;
     }
 }

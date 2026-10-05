@@ -1035,6 +1035,99 @@ namespace Jewelry.Service.Production.Insight
             };
         }
 
+        // ---- วัตถุดิบที่กระทบการผลิต (Materials — gems only) ----
+
+        // MAT_GEM_WAITING: แผนอยู่แผนกตัดพลอย ไม่ stale ยังไม่เบิกพลอยจริงเลย (count/medianDays มาจาก kpi ตรงๆ)
+        public static Wip.Finding? EvaluateMatGemWaiting(int count, double? medianDays)
+        {
+            if (count <= 0) return null;
+
+            var severity = medianDays.HasValue && medianDays.Value > ProductionInsightThresholds.MatGemWaitingCriticalDays ? "critical" : "warning";
+
+            return new Wip.Finding
+            {
+                Code = "MAT_GEM_WAITING",
+                Severity = severity,
+                ReportRef = "matWaiting",
+                Params = new Dictionary<string, object> { ["count"] = count, ["medianDays"] = medianDays.HasValue ? Math.Round(medianDays.Value, 1) : 0 }
+            };
+        }
+
+        // MAT_READY_NOT_ISSUED: แผนที่อยู่แผนกตัดพลอยอยู่แล้ว วัตถุดิบพลอยพร้อมครบ (ready) แต่ยังไม่มีการเบิกจริง —
+        // ปัญหาขั้นตอน/คิวงาน ไม่ใช่ปัญหาของขาด
+        public static Wip.Finding? EvaluateMatReadyNotIssued(int count)
+        {
+            if (count <= 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "MAT_READY_NOT_ISSUED",
+                Severity = "warning",
+                ReportRef = "matKpi",
+                Params = new Dictionary<string, object> { ["count"] = count }
+            };
+        }
+
+        // MAT_GEM_SHORT: แผนที่มีบรรทัดวัตถุดิบพลอยจับคู่ของได้แต่ไม่พอ (short) อย่างน้อย 1 บรรทัด
+        public static Wip.Finding? EvaluateMatGemShort(int plans, int lines)
+        {
+            if (plans <= 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "MAT_GEM_SHORT",
+                Severity = "warning",
+                ReportRef = "matDemand",
+                Params = new Dictionary<string, object> { ["plans"] = plans, ["lines"] = lines }
+            };
+        }
+
+        // MAT_SPEC_UNMATCHED: บรรทัดที่หา stock จับคู่ไม่ได้เลย (ข้อมูล master ไม่ครบ/ไม่ตรง) — info level
+        // (เป็นปัญหาคุณภาพข้อมูล ไม่ใช่ของขาดจริงเสมอไป)
+        public static Wip.Finding? EvaluateMatSpecUnmatched(int lines, int totalLines)
+        {
+            if (lines <= 0) return null;
+
+            var percent = totalLines > 0 ? Math.Round((decimal)lines / totalLines * 100, 1) : 0m;
+
+            return new Wip.Finding
+            {
+                Code = "MAT_SPEC_UNMATCHED",
+                Severity = "info",
+                ReportRef = "matDemand",
+                Params = new Dictionary<string, object> { ["lines"] = lines, ["percent"] = percent }
+            };
+        }
+
+        // FC_GEM_SHORT_UPCOMING: แผนที่ยังไม่ถึงแผนกตัดพลอย (สถานะ 10,49,50,59,60) ต้องการ spec ที่ "short" อยู่แล้ว
+        // ตอนนี้ — เตือนล่วงหน้าก่อนแผนเหล่านี้มาถึงแผนกตัดพลอยจริง
+        public static Wip.Finding? EvaluateFcGemShortUpcoming(int plans, int lines)
+        {
+            if (plans <= 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "FC_GEM_SHORT_UPCOMING",
+                Severity = "warning",
+                ReportRef = "matDemand",
+                Params = new Dictionary<string, object> { ["plans"] = plans, ["lines"] = lines }
+            };
+        }
+
+        // FC_GEM_STOCKOUT: รหัส stock ที่ cover < 30 วัน (quantity ÷ อัตราเบิกเฉลี่ย/วัน 90 วันล่าสุด)
+        public static Wip.Finding? EvaluateFcGemStockout(int count, int days)
+        {
+            if (count <= 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "FC_GEM_STOCKOUT",
+                Severity = "warning",
+                ReportRef = "matLowCover",
+                Params = new Dictionary<string, object> { ["count"] = count, ["days"] = days }
+            };
+        }
+
         // 'critical' | 'warning' | 'ok' (ไม่มี finding เลย = ok)
         public static string WorstSeverity(IEnumerable<Wip.Finding> findings)
         {
@@ -1070,7 +1163,11 @@ namespace Jewelry.Service.Production.Insight
             ("ACT_CROSS_TRAIN", "productionManager", new[] { "WRK_CONCENTRATION" }),
             ("ACT_REVIEW_RATE", "deptHead", new[] { "WRK_RATE_OUTLIER" }),
             ("ACT_RECORD_WAGES", "deptHead", new[] { "WRK_UNPAID_JOBS" }),
-            ("ACT_TALK_WORKER_GOLD", "deptHead", new[] { "WRK_GOLD_REPEAT" })
+            ("ACT_TALK_WORKER_GOLD", "deptHead", new[] { "WRK_GOLD_REPEAT" }),
+            ("ACT_ISSUE_READY", "deptHead", new[] { "MAT_READY_NOT_ISSUED" }),
+            ("ACT_BUY_GEMS", "purchasing", new[] { "MAT_GEM_SHORT", "FC_GEM_SHORT_UPCOMING", "FC_GEM_STOCKOUT" }),
+            ("ACT_FIX_GEM_SPEC", "productionManager", new[] { "MAT_SPEC_UNMATCHED" }),
+            ("ACT_ADD_GEM_SORTER", "productionManager", new[] { "MAT_GEM_WAITING" })
         };
 
         // priority: เรียงตาม severity ที่แย่ที่สุดของ finding ที่เกี่ยวข้องก่อน (critical > warning) แล้วตามลำดับ
@@ -1295,6 +1392,25 @@ namespace Jewelry.Service.Production.Insight
                     var workersList = workersObj as List<Dictionary<string, object>> ?? new List<Dictionary<string, object>>();
                     return new Dictionary<string, object> { ["workers"] = workersList };
                 }
+                // ACT_ISSUE_READY/ACT_BUY_GEMS/ACT_FIX_GEM_SPEC/ACT_ADD_GEM_SORTER: ค่า fallback ที่นี่ใช้แค่กันพัง —
+                // ค่าจริงถูกเติมทับจากข้อมูลที่คำนวณไว้แล้วตรงๆ ใน ProductionInsightService.EnrichMaterialActionParams เสมอ
+                case "ACT_ISSUE_READY":
+                {
+                    var count = GetParam(findings, "MAT_READY_NOT_ISSUED", "count") ?? 0;
+                    return new Dictionary<string, object> { ["count"] = count };
+                }
+                case "ACT_BUY_GEMS":
+                {
+                    var lines = GetParam(findings, "MAT_GEM_SHORT", "lines") ?? 0;
+                    return new Dictionary<string, object> { ["lines"] = lines };
+                }
+                case "ACT_FIX_GEM_SPEC":
+                {
+                    var lines = GetParam(findings, "MAT_SPEC_UNMATCHED", "lines") ?? 0;
+                    return new Dictionary<string, object> { ["lines"] = lines };
+                }
+                case "ACT_ADD_GEM_SORTER":
+                    return new Dictionary<string, object> { ["deptKey"] = "gemSort" };
                 default:
                     return new Dictionary<string, object>();
             }

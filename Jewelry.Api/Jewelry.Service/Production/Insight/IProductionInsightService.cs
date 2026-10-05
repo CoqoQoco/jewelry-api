@@ -28,6 +28,10 @@ using GoldStagePendingReturn = jewelry.Model.Production.Insight.GoldStagePending
 using Workers = jewelry.Model.Production.Insight.Workers;
 using WorkerMonthly = jewelry.Model.Production.Insight.WorkerMonthly;
 using UnpaidPieceJobs = jewelry.Model.Production.Insight.UnpaidPieceJobs;
+using Materials = jewelry.Model.Production.Insight.Materials;
+using MaterialWaitingPlans = jewelry.Model.Production.Insight.MaterialWaitingPlans;
+using MaterialGemDemand = jewelry.Model.Production.Insight.MaterialGemDemand;
+using MaterialGemLowCover = jewelry.Model.Production.Insight.MaterialGemLowCover;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -68,5 +72,10 @@ namespace Jewelry.Service.Production.Insight
         Task<Workers.Response> Workers(Workers.Request request);
         Task<WorkerMonthly.Response> WorkerMonthly(WorkerMonthly.Request request);
         Task<DataSourceResult> UnpaidPieceJobs(UnpaidPieceJobs.Request request);
+
+        Task<Materials.Response> Materials(Materials.Request request);
+        Task<DataSourceResult> MaterialWaitingPlans(MaterialWaitingPlans.Request request);
+        Task<DataSourceResult> MaterialGemDemand(MaterialGemDemand.Request request);
+        Task<DataSourceResult> MaterialGemLowCover(MaterialGemLowCover.Request request);
     }
 }

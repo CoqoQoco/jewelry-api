@@ -40,6 +40,10 @@ using GoldStagePendingReturn = jewelry.Model.Production.Insight.GoldStagePending
 using Workers = jewelry.Model.Production.Insight.Workers;
 using WorkerMonthly = jewelry.Model.Production.Insight.WorkerMonthly;
 using UnpaidPieceJobs = jewelry.Model.Production.Insight.UnpaidPieceJobs;
+using Materials = jewelry.Model.Production.Insight.Materials;
+using MaterialWaitingPlans = jewelry.Model.Production.Insight.MaterialWaitingPlans;
+using MaterialGemDemand = jewelry.Model.Production.Insight.MaterialGemDemand;
+using MaterialGemLowCover = jewelry.Model.Production.Insight.MaterialGemLowCover;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -54,6 +58,7 @@ namespace Jewelry.Service.Production.Insight
         private readonly IProductionDeliveryTargetService _deliveryTargetService;
         private readonly IProductionGoldLossTargetService _goldLossTargetService;
         private readonly IProductionWorkerLookupService _workerLookupService;
+        private readonly IProductionMaterialGemDataProvider _materialGemDataProvider;
 
         public ProductionInsightService(
             JewelryContext jewelryContext,
@@ -65,7 +70,8 @@ namespace Jewelry.Service.Production.Insight
             IProductionDeliveryDataProvider deliveryDataProvider,
             IProductionDeliveryTargetService deliveryTargetService,
             IProductionGoldLossTargetService goldLossTargetService,
-            IProductionWorkerLookupService workerLookupService)
+            IProductionWorkerLookupService workerLookupService,
+            IProductionMaterialGemDataProvider materialGemDataProvider)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
@@ -77,6 +83,7 @@ namespace Jewelry.Service.Production.Insight
             _deliveryTargetService = deliveryTargetService;
             _goldLossTargetService = goldLossTargetService;
             _workerLookupService = workerLookupService;
+            _materialGemDataProvider = materialGemDataProvider;
         }
 
         public async Task<Wip.Response> Wip(Wip.Request request)
@@ -3296,6 +3303,496 @@ namespace Jewelry.Service.Production.Insight
             if (request.Sort == null || !request.Sort.Any())
             {
                 ordered = items.OrderByDescending(x => x.JobDate);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        // ---- วัตถุดิบที่กระทบการผลิต (Materials — gems only) ----
+        // tbt_stock_gold ใช้ไม่ได้ (ติดลบเพราะไม่มีการบันทึกรับเข้า) — หน้านี้ทำเฉพาะพลอย (tbt_stock_gem) —
+        // การจับคู่เป็นค่าประมาณ (approximate): ไม่รู้เกรด/คุณภาพละเอียด ไม่หัก reservation ของแผนอื่นออกจาก
+        // quantity ที่เห็น (ดู ProductionMaterialGemEvaluator)
+
+        private class MaterialLineResult
+        {
+            public int PlanId { get; set; }
+            public string? Gem { get; set; }
+            public string? Shape { get; set; }
+            public string? Size { get; set; }
+            public string Metal { get; set; } = null!;
+            public decimal RequiredQty { get; set; }
+            public ProductionMaterialGemEvaluator.MatchResult Match { get; set; } = null!;
+        }
+
+        private class MaterialContext
+        {
+            // สถานะ 69/70 (แผนกตัดพลอย), ไม่ stale, ยังไม่มี type-7 issue เลย
+            public List<OpenPlanRow> WaitingPlans { get; set; } = new List<OpenPlanRow>();
+
+            // สถานะ 10,49,50,59,60,69,70 (ยังไม่ผ่านแผนกตัดพลอย), ไม่ stale — ฐานของ Lines ด้านล่าง
+            public List<OpenPlanRow> RelevantPlans { get; set; } = new List<OpenPlanRow>();
+
+            // แผน -> วันที่เข้าแผนกตัดพลอยครั้งแรก (header แรกที่ status 69 หรือ 70) — ทุกแผนใน WaitingPlans ต้องมี key นี้เสมอ
+            public Dictionary<int, DateTime> GemSortEntryDateByPlan { get; set; } = new Dictionary<int, DateTime>();
+
+            // แผน -> วันที่เข้าสถานะ 70 (ทำงานจริง) ครั้งแรก — ALL ประวัติ (ไม่กรองสถานะปัจจุบัน) ใช้กับ KPI entered→issue
+            public Dictionary<int, DateTime> First70DateByPlan { get; set; } = new Dictionary<int, DateTime>();
+
+            // แผน -> วันที่เบิกพลอยจริง (type 7) ครั้งแรก — ALL ประวัติ, join ด้วย wo+wo_number
+            public Dictionary<int, DateTime> FirstIssueDateByPlan { get; set; } = new Dictionary<int, DateTime>();
+
+            // 1 แถวต่อบรรทัดวัตถุดิบพลอย (เฉพาะของ RelevantPlans) พร้อมผลจับคู่ stock แล้ว
+            public List<MaterialLineResult> Lines { get; set; } = new List<MaterialLineResult>();
+        }
+
+        private async Task<MaterialContext> BuildMaterialContextAsync(DateTime now)
+        {
+            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+            var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
+            var stalePlanIds = new HashSet<int>(
+                openPlans.Where(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) < staleCutoff).Select(p => p.Id));
+
+            var notPastGemSortStatuses = new HashSet<int> { 10, 49, 50, 59, 60, 69, 70 };
+            var gemSortStatuses = new HashSet<int> { 69, 70 };
+
+            var relevantPlans = openPlans.Where(p => notPastGemSortStatuses.Contains(p.Status) && !stalePlanIds.Contains(p.Id)).ToList();
+            var relevantPlanIds = relevantPlans.Select(p => p.Id).ToList();
+
+            // MIN(create_date) ต่อแผน ที่ header.status IN (69,70) — "เข้าแผนกตัดพลอย" ระดับแผนก (รอ หรือ ทำงาน)
+            var gemSortEntryRows = await _jewelryContext.TbtProductionPlanStatusHeader
+                .AsNoTracking()
+                .Where(h => h.IsActive == true && (h.Status == 69 || h.Status == 70))
+                .GroupBy(h => h.ProductionPlanId)
+                .Select(g => new { PlanId = g.Key, EnteredDate = g.Min(h => h.CreateDate) })
+                .ToListAsync();
+            var gemSortEntryDateByPlan = gemSortEntryRows.ToDictionary(x => x.PlanId, x => x.EnteredDate);
+
+            // MIN(create_date) ต่อแผน ที่ header.status = 70 เท่านั้น (ทำงานจริง) — ALL ประวัติ ใช้กับ KPI entered→issue
+            var first70Rows = await _jewelryContext.TbtProductionPlanStatusHeader
+                .AsNoTracking()
+                .Where(h => h.IsActive == true && h.Status == 70)
+                .GroupBy(h => h.ProductionPlanId)
+                .Select(g => new { PlanId = g.Key, EnteredDate = g.Min(h => h.CreateDate) })
+                .ToListAsync();
+            var first70DateByPlan = first70Rows.ToDictionary(x => x.PlanId, x => x.EnteredDate);
+
+            // type 7 = เบิกพลอยจริงให้แผน (มี wo/wo_number) — join plan ด้วย (wo, wo_number) ตามรูปแบบเดียวกับ
+            // StockGemService — ALL ประวัติ (ไม่ bound ด้วย start/end เพราะต้องรู้ "ไม่เคยมี issue เลย" จริงๆ)
+            var type7Raw = await (
+                from trans in _jewelryContext.TbtStockGemTransection
+                where trans.Type == 7 && trans.ProductionPlanWo != null
+                join plan in _jewelryContext.TbtProductionPlan
+                    on new { Wo = trans.ProductionPlanWo, WoNumber = trans.ProductionPlanWoNumber ?? 0 }
+                    equals new { Wo = plan.Wo, WoNumber = plan.WoNumber }
+                select new { PlanId = plan.Id, trans.CreateDate })
+                .AsNoTracking()
+                .ToListAsync();
+            var firstIssueDateByPlan = type7Raw.GroupBy(t => t.PlanId).ToDictionary(g => g.Key, g => g.Min(t => t.CreateDate));
+
+            var waitingPlans = relevantPlans.Where(p => gemSortStatuses.Contains(p.Status) && !firstIssueDateByPlan.ContainsKey(p.Id)).ToList();
+
+            var stockList = await _materialGemDataProvider.GetStockGemsAsync();
+            var gemNames = await _materialGemDataProvider.GetGemNamesAsync();
+
+            var materialRows = await _jewelryContext.TbtProductionPlanMaterial
+                .AsNoTracking()
+                .Where(m => m.IsActive == true && m.Gem != null && relevantPlanIds.Contains(m.ProductionPlanId))
+                .Select(m => new { m.ProductionPlanId, m.Gold, m.Gem, m.GemShape, m.GemSize, m.GemQty })
+                .ToListAsync();
+
+            var lines = materialRows.Select(m =>
+            {
+                var metal = ProductionGoldLossEvaluator.ClassifyMetal(m.Gold);
+                var requiredQty = (decimal)(m.GemQty ?? 0);
+                var match = ProductionMaterialGemEvaluator.Match(m.Gem, m.GemShape, m.GemSize, metal, requiredQty, stockList, gemNames);
+                return new MaterialLineResult
+                {
+                    PlanId = m.ProductionPlanId,
+                    Gem = m.Gem,
+                    Shape = m.GemShape,
+                    Size = m.GemSize,
+                    Metal = metal,
+                    RequiredQty = requiredQty,
+                    Match = match
+                };
+            }).ToList();
+
+            return new MaterialContext
+            {
+                WaitingPlans = waitingPlans,
+                RelevantPlans = relevantPlans,
+                GemSortEntryDateByPlan = gemSortEntryDateByPlan,
+                First70DateByPlan = first70DateByPlan,
+                FirstIssueDateByPlan = firstIssueDateByPlan,
+                Lines = lines
+            };
+        }
+
+        // รวมจำนวนเบิก (type 7) ต่อรหัส stock ใน 90 วันล่าสุดจาก now — ใช้กับ MaterialGemDemand.usedPerMonth และ
+        // MaterialGemLowCover ทั้งคู่ (คนละมุมมองของข้อมูลเดียวกัน)
+        private async Task<Dictionary<string, decimal>> GetGemUsage90dByCodeAsync(DateTime now)
+        {
+            var windowStart = now.AddDays(-ProductionInsightThresholds.MatGemUsageWindowDays);
+            var rows = await _jewelryContext.TbtStockGemTransection
+                .AsNoTracking()
+                .Where(t => t.Type == 7 && t.CreateDate >= windowStart && t.CreateDate <= now)
+                .GroupBy(t => t.Code)
+                .Select(g => new { Code = g.Key, Used = g.Sum(x => x.Qty) })
+                .ToListAsync();
+
+            return rows.ToDictionary(x => x.Code, x => x.Used);
+        }
+
+        private async Task<List<(ProductionMaterialGemEvaluator.StockGemRow Stock, decimal Used90d, double CoverDays)>> ComputeGemCoverRowsAsync(DateTime now)
+        {
+            var stockList = await _materialGemDataProvider.GetStockGemsAsync();
+            var usageByCode = await GetGemUsage90dByCodeAsync(now);
+
+            var result = new List<(ProductionMaterialGemEvaluator.StockGemRow, decimal, double)>();
+            foreach (var s in stockList)
+            {
+                if (s.Quantity <= 0) continue;
+                if (!usageByCode.TryGetValue(s.Code, out var used90d) || used90d <= 0) continue;
+
+                var dailyUsage = used90d / ProductionInsightThresholds.MatGemUsageWindowDays;
+                var coverDays = (double)(s.Quantity / dailyUsage);
+                result.Add((s, used90d, coverDays));
+            }
+
+            return result;
+        }
+
+        public async Task<Materials.Response> Materials(Materials.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var start = request.Start.UtcDateTime;
+            var end = request.End.UtcDateTime;
+            var bucket = string.IsNullOrWhiteSpace(request.Bucket) ? "month" : request.Bucket;
+            var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, bucket).Select(b => b.End).ToList();
+
+            var ctx = await BuildMaterialContextAsync(now);
+
+            // entered(70) ในช่วง [start,end] -> delay ถึง issue จริงครั้งแรก (เฉพาะคู่ที่มี issue แล้ว, issue >= entered)
+            var entries = ctx.First70DateByPlan
+                .Where(kv => kv.Value > start && kv.Value <= end)
+                .Select(kv => new
+                {
+                    PlanId = kv.Key,
+                    EnteredDate = kv.Value,
+                    Issue = ctx.FirstIssueDateByPlan.TryGetValue(kv.Key, out var id) && id >= kv.Value ? (DateTime?)id : null
+                })
+                .ToList();
+
+            var allDelayDays = entries.Where(e => e.Issue.HasValue).Select(e => (e.Issue!.Value - e.EnteredDate).TotalDays).ToList();
+            double? issueMedianDays = allDelayDays.Count > 0 ? ProductionStageLeadTimeEvaluator.Median(allDelayDays) : (double?)null;
+            double? issueP90Days = allDelayDays.Count > 0 ? ProductionStageLeadTimeEvaluator.Percentile(allDelayDays, 90) : (double?)null;
+
+            var seriesOut = new List<Materials.SeriesItem>();
+            var prev = start;
+            foreach (var bucketEnd in bucketEnds)
+            {
+                var bucketEntries = entries.Where(e => e.EnteredDate > prev && e.EnteredDate <= bucketEnd).ToList();
+                var bucketDelays = bucketEntries.Where(e => e.Issue.HasValue).Select(e => (e.Issue!.Value - e.EnteredDate).TotalDays).ToList();
+
+                seriesOut.Add(new Materials.SeriesItem
+                {
+                    BucketEnd = bucketEnd,
+                    Entered = bucketEntries.Count,
+                    IssueMedianDays = bucketDelays.Count > 0 ? Math.Round(ProductionStageLeadTimeEvaluator.Median(bucketDelays), 1) : (double?)null,
+                    IssueP90Days = bucketDelays.Count > 0 ? Math.Round(ProductionStageLeadTimeEvaluator.Percentile(bucketDelays, 90), 1) : (double?)null
+                });
+                prev = bucketEnd;
+            }
+
+            // waiting — snapshot ตอนนี้ (ไม่ขึ้นกับ start/end)
+            var waitingDaysList = ctx.WaitingPlans
+                .Select(p => (now - (ctx.GemSortEntryDateByPlan.TryGetValue(p.Id, out var ed) ? ed : p.CreateDate)).TotalDays)
+                .ToList();
+            double? waitingMedianDays = waitingDaysList.Count > 0 ? ProductionStageLeadTimeEvaluator.Median(waitingDaysList) : (double?)null;
+
+            // สถานะบรรทัด/แผน
+            var totalLines = ctx.Lines.Count;
+            var unmatchedLines = ctx.Lines.Count(l => l.Match.Status == ProductionMaterialGemEvaluator.StatusUnmatched);
+            var unmatchedByGem = ctx.Lines.Count(l => l.Match.UnmatchedReason == "gem");
+            var unmatchedBySpec = ctx.Lines.Count(l => l.Match.UnmatchedReason == "spec");
+            var shortLinesCount = ctx.Lines.Count(l => l.Match.Status == ProductionMaterialGemEvaluator.StatusShort);
+            var matchedLines = totalLines - unmatchedLines;
+
+            var statusByPlan = ctx.Lines
+                .GroupBy(l => l.PlanId)
+                .ToDictionary(g => g.Key, g => ProductionMaterialGemEvaluator.WorstStatus(g.Select(x => x.Match.Status)));
+            var readyPlansCount = statusByPlan.Values.Count(s => s == ProductionMaterialGemEvaluator.StatusReady);
+            var shortPlansCount = statusByPlan.Values.Count(s => s == ProductionMaterialGemEvaluator.StatusShort);
+
+            // "ready แต่ยังไม่เบิก" — เฉพาะแผนที่กำลังรออยู่แผนกตัดพลอยจริง (waitingPlans) และทุกบรรทัดพร้อม —
+            // แคบกว่า kpi.readyPlans ตรงๆ (readyPlans รวมแผนที่ยังไม่ถึงแผนกตัดพลอยด้วย ซึ่งยังเบิกไม่ได้อยู่แล้วตามขั้นตอน)
+            var waitingPlanIdSet = ctx.WaitingPlans.Select(p => p.Id).ToHashSet();
+            var readyWaitingCount = statusByPlan.Count(kv => waitingPlanIdSet.Contains(kv.Key) && kv.Value == ProductionMaterialGemEvaluator.StatusReady);
+
+            // แผนที่ยังไม่ถึงแผนกตัดพลอย (10,49,50,59,60) ที่ต้องการ spec ที่ "short" อยู่แล้วตอนนี้ — เตือนล่วงหน้า
+            var upcomingStatuses = new HashSet<int> { 10, 49, 50, 59, 60 };
+            var upcomingPlanIds = new HashSet<int>(ctx.RelevantPlans.Where(p => upcomingStatuses.Contains(p.Status)).Select(p => p.Id));
+            var upcomingShortLines = ctx.Lines.Where(l => upcomingPlanIds.Contains(l.PlanId) && l.Match.Status == ProductionMaterialGemEvaluator.StatusShort).ToList();
+            var upcomingShortPlansCount = upcomingShortLines.Select(l => l.PlanId).Distinct().Count();
+
+            var coverRows = await ComputeGemCoverRowsAsync(now);
+            var lowCoverCount = coverRows.Count(r => r.CoverDays < ProductionInsightThresholds.MatGemLowCoverDefaultDays);
+
+            var problems = new List<Wip.Finding>();
+            var forecasts = new List<Wip.Finding>();
+
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateMatGemWaiting(ctx.WaitingPlans.Count, waitingMedianDays));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateMatReadyNotIssued(readyWaitingCount));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateMatGemShort(shortPlansCount, shortLinesCount));
+            AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateMatSpecUnmatched(unmatchedLines, totalLines));
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcGemShortUpcoming(upcomingShortPlansCount, upcomingShortLines.Count));
+            AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcGemStockout(lowCoverCount, ProductionInsightThresholds.MatGemLowCoverDefaultDays));
+
+            var actions = ProductionInsightRuleEngine.BuildActions(problems, forecasts);
+            EnrichMaterialActionParams(actions, readyWaitingCount, shortLinesCount, unmatchedLines);
+
+            var worstSeverity = ProductionInsightRuleEngine.WorstSeverity(problems.Concat(forecasts));
+            var status = worstSeverity == "critical" || worstSeverity == "warning" ? worstSeverity : "ok";
+
+            return new Materials.Response
+            {
+                AsOf = now,
+                Status = status,
+                Problems = problems,
+                Forecasts = forecasts,
+                Actions = actions,
+                Kpi = new Materials.KpiData
+                {
+                    WaitingPlans = ctx.WaitingPlans.Count,
+                    WaitingMedianDays = waitingMedianDays.HasValue ? Math.Round(waitingMedianDays.Value, 1) : (double?)null,
+                    IssueMedianDays = issueMedianDays.HasValue ? Math.Round(issueMedianDays.Value, 1) : (double?)null,
+                    IssueP90Days = issueP90Days.HasValue ? Math.Round(issueP90Days.Value, 1) : (double?)null,
+                    ReadyPlans = readyPlansCount,
+                    ReadyWaitingPlans = readyWaitingCount,
+                    ShortPlans = shortPlansCount,
+                    ShortLines = shortLinesCount,
+                    UnmatchedLines = unmatchedLines,
+                    UnmatchedByGem = unmatchedByGem,
+                    UnmatchedBySpec = unmatchedBySpec,
+                    MatchedLines = matchedLines,
+                    TotalLines = totalLines,
+                    LowCoverCount = lowCoverCount
+                },
+                Series = seriesOut
+            };
+        }
+
+        private static void EnrichMaterialActionParams(List<Wip.ActionItem> actions, int readyWaitingCount, int shortLines, int unmatchedLines)
+        {
+            foreach (var action in actions)
+            {
+                switch (action.Code)
+                {
+                    case "ACT_ISSUE_READY":
+                        action.Params["count"] = readyWaitingCount;
+                        break;
+                    case "ACT_BUY_GEMS":
+                        action.Params["lines"] = shortLines;
+                        break;
+                    case "ACT_FIX_GEM_SPEC":
+                        action.Params["lines"] = unmatchedLines;
+                        break;
+                    case "ACT_ADD_GEM_SORTER":
+                        action.Params["deptKey"] = "gemSort";
+                        break;
+                }
+            }
+        }
+
+        public async Task<DataSourceResult> MaterialWaitingPlans(MaterialWaitingPlans.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var ctx = await BuildMaterialContextAsync(now);
+            var statusNames = await _wipHelper.GetStatusNamesAsync();
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+            var linesByPlan = ctx.Lines.GroupBy(l => l.PlanId).ToDictionary(g => g.Key, g => g.ToList());
+
+            var items = ctx.WaitingPlans.Select(p =>
+            {
+                var enteredDate = ctx.GemSortEntryDateByPlan.TryGetValue(p.Id, out var ed) ? ed : p.CreateDate;
+                var lines = linesByPlan.TryGetValue(p.Id, out var ls) ? ls : new List<MaterialLineResult>();
+                var gems = lines.Select(l => new MaterialWaitingPlans.GemLineItem
+                {
+                    Gem = l.Gem,
+                    Shape = l.Shape,
+                    Size = l.Size,
+                    Metal = l.Metal,
+                    Qty = (int)l.RequiredQty,
+                    Available = l.Match.AvailableQty,
+                    Status = l.Match.Status,
+                    UnmatchedReason = l.Match.UnmatchedReason
+                }).ToList();
+                var gemStatus = gems.Count > 0 ? ProductionMaterialGemEvaluator.WorstStatus(gems.Select(g => g.Status)) : ProductionMaterialGemEvaluator.StatusUnmatched;
+                var lastMoveDate = ProductionPlanDepartments.LastMoveOf(p, lastMoveDates);
+
+                return new MaterialWaitingPlans.Item
+                {
+                    PlanId = p.Id,
+                    Wo = p.Wo,
+                    WoNumber = p.WoNumber,
+                    WoText = p.WoText,
+                    Mold = p.Mold,
+                    ProductNumber = p.ProductNumber,
+                    ProductName = p.ProductName,
+                    ProductQty = p.ProductQty,
+                    StatusId = p.Status,
+                    StatusName = statusNames.TryGetValue(p.Status, out var sn) ? sn : null,
+                    DepartmentKey = ProductionPlanDepartments.DepartmentKeyOf(p.Status),
+                    CreateDate = p.CreateDate,
+                    LastMoveDate = lastMoveDate,
+                    DaysSinceMove = (int)Math.Round((now - lastMoveDate).TotalDays),
+                    RequestDate = p.RequestDate,
+                    EnteredGemSortDate = enteredDate,
+                    WaitingDays = Math.Round((now - enteredDate).TotalDays, 1),
+                    Gems = gems,
+                    GemStatus = gemStatus
+                };
+            }).ToList();
+
+            if (!string.IsNullOrWhiteSpace(request.GemStatus))
+            {
+                var filterStatus = request.GemStatus.Trim().ToLowerInvariant();
+                items = items.Where(i => i.GemStatus == filterStatus).ToList();
+            }
+
+            IEnumerable<MaterialWaitingPlans.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderByDescending(x => x.WaitingDays);
+            }
+
+            var dataSource = ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+
+            var pageItems = dataSource.Data?.Cast<MaterialWaitingPlans.Item>().ToList() ?? new List<MaterialWaitingPlans.Item>();
+            if (pageItems.Count > 0)
+            {
+                var plansById = ctx.WaitingPlans.ToDictionary(p => p.Id);
+                var pagePlans = pageItems.Select(i => plansById[i.PlanId]).ToList();
+                var lastActionInfo = await _wipHelper.GetLastActionInfoAsync(pagePlans);
+
+                foreach (var item in pageItems)
+                {
+                    if (!lastActionInfo.TryGetValue(item.PlanId, out var info)) continue;
+                    item.LastUpdateBy = info.LastUpdateBy;
+                    item.LastAction = info.LastAction;
+                    item.LastActionRemark = info.LastActionRemark;
+                    item.LastActionDate = info.LastActionDate;
+                    item.Workers = info.Workers;
+                    item.WorkerItems = info.WorkerItems.Select(w => new StalePlans.WorkerItem { Code = w.Code, Name = w.Name, IsQueue = w.IsQueue }).ToList();
+                }
+
+                dataSource.Data = pageItems;
+            }
+
+            return dataSource;
+        }
+
+        public async Task<DataSourceResult> MaterialGemDemand(MaterialGemDemand.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var ctx = await BuildMaterialContextAsync(now);
+            var usageByCode = await GetGemUsage90dByCodeAsync(now);
+            var stockList = await _materialGemDataProvider.GetStockGemsAsync();
+            var gemNames = await _materialGemDataProvider.GetGemNamesAsync();
+
+            var gemSortStatuses = new HashSet<int> { 69, 70 };
+            var upcomingStatuses = new HashSet<int> { 10, 49, 50, 59, 60 };
+            var planStatusById = ctx.RelevantPlans.ToDictionary(p => p.Id, p => p.Status);
+
+            var specGroups = ctx.Lines.GroupBy(l => (
+                Gem: (l.Gem ?? string.Empty).Trim().ToUpperInvariant(),
+                Shape: ProductionMaterialGemEvaluator.Normalize(l.Shape),
+                Size: ProductionMaterialGemEvaluator.Normalize(l.Size),
+                l.Metal));
+
+            var items = new List<MaterialGemDemand.Item>();
+            foreach (var g in specGroups)
+            {
+                var requiredQty = g.Sum(l => l.RequiredQty);
+                var planIds = g.Select(l => l.PlanId).Distinct().ToList();
+                var waitingPlansCount = planIds.Count(id => planStatusById.TryGetValue(id, out var st) && gemSortStatuses.Contains(st));
+                var upcomingPlansCount = planIds.Count(id => planStatusById.TryGetValue(id, out var st) && upcomingStatuses.Contains(st));
+
+                var rep = g.First();
+                var match = ProductionMaterialGemEvaluator.Match(rep.Gem, rep.Shape, rep.Size, rep.Metal, requiredQty, stockList, gemNames);
+
+                decimal? usedPerMonth = null;
+                if (match.MatchedStockCodes.Count > 0)
+                {
+                    var used90d = match.MatchedStockCodes.Sum(c => usageByCode.TryGetValue(c, out var u) ? u : 0m);
+                    if (used90d > 0) usedPerMonth = Math.Round(used90d / ProductionInsightThresholds.MatGemUsageWindowMonths, 2);
+                }
+
+                double? coverDays = null;
+                if (usedPerMonth.HasValue && usedPerMonth.Value > 0 && match.AvailableQty.HasValue)
+                {
+                    coverDays = (double)(match.AvailableQty.Value / (usedPerMonth.Value / 30m));
+                }
+
+                items.Add(new MaterialGemDemand.Item
+                {
+                    Gem = rep.Gem,
+                    Shape = rep.Shape,
+                    Size = rep.Size,
+                    Metal = rep.Metal,
+                    WaitingPlans = waitingPlansCount,
+                    UpcomingPlans = upcomingPlansCount,
+                    RequiredQty = requiredQty,
+                    Available = match.AvailableQty,
+                    UsedPerMonth = usedPerMonth,
+                    CoverDays = coverDays.HasValue ? Math.Round(coverDays.Value, 1) : (double?)null,
+                    Status = match.Status,
+                    UnmatchedReason = match.UnmatchedReason
+                });
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Status))
+            {
+                var filterStatus = request.Status.Trim().ToLowerInvariant();
+                items = items.Where(i => i.Status == filterStatus).ToList();
+            }
+
+            IEnumerable<MaterialGemDemand.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items
+                    .OrderByDescending(x => x.Status == ProductionMaterialGemEvaluator.StatusShort ? 2 : (x.Status == ProductionMaterialGemEvaluator.StatusUnmatched ? 1 : 0))
+                    .ThenByDescending(x => x.RequiredQty);
+            }
+
+            return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
+        }
+
+        public async Task<DataSourceResult> MaterialGemLowCover(MaterialGemLowCover.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var coverRows = await ComputeGemCoverRowsAsync(now);
+            var thresholdDays = request.CoverDays > 0 ? request.CoverDays : ProductionInsightThresholds.MatGemLowCoverDefaultDays;
+
+            var items = coverRows
+                .Where(r => r.CoverDays < thresholdDays)
+                .Select(r => new MaterialGemLowCover.Item
+                {
+                    Code = r.Stock.Code,
+                    GroupName = r.Stock.GroupName,
+                    Shape = r.Stock.Shape,
+                    Size = r.Stock.Size,
+                    Grade = r.Stock.Grade,
+                    Quantity = r.Stock.Quantity,
+                    Used90d = r.Used90d,
+                    CoverDays = Math.Round(r.CoverDays, 1)
+                }).ToList();
+
+            IEnumerable<MaterialGemLowCover.Item> ordered = items;
+            if (request.Sort == null || !request.Sort.Any())
+            {
+                ordered = items.OrderBy(x => x.CoverDays);
             }
 
             return ordered.ToDataSourceResult(request.Take, request.Skip, request.Sort, request.Group);
