@@ -762,6 +762,32 @@ namespace Jewelry.Service.Production.Insight
             };
         }
 
+        // CAP_GROUP_BACKLOG_GROWING: คืนได้หลาย finding (1 ต่อกลุ่ม) — candidates คือกลุ่มที่ผ่านเงื่อนไข "inflowPieces >
+        // outputPieces ทุกเดือนใน N เดือนเต็มล่าสุด" แล้ว — เลือก top N ตาม addedPieces (Σ(inflow−output) ใน N เดือนนั้น)
+        public static List<Wip.Finding> EvaluateCapGroupBacklogGrowing(
+            string by, IReadOnlyList<(string Key, string Name, int AddedPieces, string Unit)> candidates)
+        {
+            return candidates
+                .OrderByDescending(c => c.AddedPieces)
+                .Take(ProductionInsightThresholds.CapGroupBacklogTopCount)
+                .Select(c => new Wip.Finding
+                {
+                    Code = "CAP_GROUP_BACKLOG_GROWING",
+                    Severity = "warning",
+                    ReportRef = "capBreakdown",
+                    Params = new Dictionary<string, object>
+                    {
+                        ["by"] = by,
+                        ["key"] = c.Key,
+                        ["name"] = c.Name,
+                        ["months"] = ProductionInsightThresholds.CapGroupBacklogMonths,
+                        ["addedPieces"] = c.AddedPieces,
+                        ["unit"] = c.Unit
+                    }
+                })
+                .ToList();
+        }
+
         // ---- Gold Loss by Stage (Loss ตามใบงานรายแผนก จ่าย-รับ) ----
 
         // GOLD_STAGE_ABOVE_TARGET: diffPercent (รายแผนก) > targetPercent (STAGE) + tolerance — trigger ได้หลาย

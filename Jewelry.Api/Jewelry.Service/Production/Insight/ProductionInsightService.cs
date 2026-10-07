@@ -1891,6 +1891,25 @@ namespace Jewelry.Service.Production.Insight
             var doneDates = await _deliveryDataProvider.GetDoneDatesAsync();
             var openPlans = await _wipHelper.GetOpenPlansAsync();
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+
+            // ---- ตัวกรองระดับแผน (productTypes/golds/goldSizes) — กรองที่ชุดข้อมูลต้นทางครั้งเดียว (plans, headers,
+            // doneDates, openPlans, worker activity) ทุกตัวเลขข้างล่างจึงถูกกรองเหมือนกันหมดโดยไม่ต้องแก้ทีละสูตร ----
+            var planById = trendData.Plans.ToDictionary(p => p.Id);
+            var unfilteredPlans = trendData.Plans;
+            var unfilteredHeaders = trendData.Headers;
+            var unfilteredDoneDates = doneDates;
+            var unfilteredOpenPlans = openPlans;
+            var allowedPlanIds = ProductionCapacityEvaluator.ResolveAllowedPlanIds(trendData.Plans, request.ProductTypes, request.Golds, request.GoldSizes);
+            if (allowedPlanIds != null)
+            {
+                trendData = (
+                    trendData.Plans.Where(p => allowedPlanIds.Contains(p.Id)).ToList(),
+                    trendData.Headers.Where(h => allowedPlanIds.Contains(h.ProductionPlanId)).ToList(),
+                    trendData.MinReceiveDate);
+                doneDates = doneDates.Where(kv => allowedPlanIds.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+                openPlans = openPlans.Where(p => allowedPlanIds.Contains(p.Id)).ToList();
+            }
+
             var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
             var stalePlanIds = new HashSet<int>(
                 openPlans.Where(p => ProductionPlanDepartments.LastMoveOf(p, lastMoveDates) < staleCutoff).Select(p => p.Id));
@@ -1935,6 +1954,40 @@ namespace Jewelry.Service.Production.Insight
             var wipTimes = ProductionPlanTrendEvaluator.ComputeWipCountsAtTimes(trendData.Plans, trendData.Headers, ProductionPlanDepartments.DepartmentKeyOf, bucketEnds);
             var seriesRaw = ProductionCapacityEvaluator.ComputeSeries(trendData.Plans, first95Dates, doneDates, meltedDates, wipTimes, start, bucketEnds, now);
 
+            // ด้านชิ้น — qty ต่อแผนจากชุดทั้งหมด (ก่อนกรอง) เพื่อให้ plan id ที่ไม่ผ่านกรองไม่หลุดจาก lookup (ถูกกรองออกจาก
+            // first95/done ไปแล้วตั้งแต่ต้น) — นิยามเดียวกับด้านแผน: output=เข้า 95 ครั้งแรก, completed=เข้า 100 ครั้งแรก
+            // trend provider โหลด "ทุกแผนที่ is_active=true ทุกสถานะ" (รวม 100/500 ที่เสร็จ/หลอมแล้ว) — ไม่ใช่เฉพาะแผนเปิด —
+            // แต่ first95/done/visit อาจอ้างแผนที่ไม่อยู่ในชุดนั้น (is_active ว่าง/ไม่ใช่ true) จึงโหลด qty/หน่วย/กลุ่ม
+            // ของ id ที่ขาดแบบ set-based ครั้งเดียว (ข้ามเฉพาะ is_active=false) — กรณีมีตัวกรองจะไม่มี id ขาดเลย
+            var referencedIds = new HashSet<int>(first95Dates.Keys);
+            referencedIds.UnionWith(doneDates.Keys);
+            referencedIds.UnionWith(visits.Where(v => v.End.HasValue).Select(v => v.PlanId));
+            referencedIds.ExceptWith(planById.Keys);
+            var extraPlans = new List<ProductionPlanTrendEvaluator.PlanTrendRow>();
+            if (referencedIds.Count > 0)
+            {
+                var missingIds = referencedIds.ToList();
+                extraPlans = await _jewelryContext.TbtProductionPlan
+                    .AsNoTracking()
+                    .Where(p => p.IsActive != false && missingIds.Contains(p.Id))
+                    .Select(p => new ProductionPlanTrendEvaluator.PlanTrendRow
+                    {
+                        Id = p.Id,
+                        CreateDate = p.CreateDate,
+                        Status = p.Status,
+                        ProductQty = p.ProductQty,
+                        ProductQtyUnit = p.ProductQtyUnit,
+                        ProductType = p.ProductType,
+                        Type = p.Type,
+                        TypeSize = p.TypeSize
+                    })
+                    .ToListAsync();
+            }
+            var attributePlans = trendData.Plans.Concat(extraPlans).ToList();
+            var qtyById = planById.ToDictionary(kv => kv.Key, kv => kv.Value.ProductQty);
+            foreach (var ep in extraPlans) qtyById[ep.Id] = ep.ProductQty;
+            var piecesSeries = ProductionCapacityEvaluator.ComputePiecesSeries(qtyById, first95Dates, doneDates, wipTimes, start, bucketEnds, now);
+
             var totalInflow = seriesRaw.Sum(s => s.Inflow);
             var totalInflowPieces = seriesRaw.Sum(s => s.InflowPieces);
             var totalOutput = seriesRaw.Sum(s => s.Output);
@@ -1947,6 +2000,16 @@ namespace Jewelry.Service.Production.Insight
             // netPerMonth = inflow - output (ไม่ใช่ - completed) ให้สอดคล้องกับ backlogMonths ที่สเปกระบุให้หาร
             // ด้วย outputPerMonth ตรงๆ — มองสายการผลิตจบที่บัตรต้นทุน ส่วนช้า 95→100 แยกติดตามที่ costCardToDone
             var netPerMonth = inflowPerMonth - outputPerMonth;
+
+            var outputPiecesPerMonth = (decimal)piecesSeries.Sum(s => s.OutputPieces) / (decimal)monthsForRates;
+            var completedPiecesPerMonth = (decimal)piecesSeries.Sum(s => s.CompletedPieces) / (decimal)monthsForRates;
+            var netPiecesPerMonth = inflowPiecesPerMonth - outputPiecesPerMonth;
+            var activeWipPlanQty = nonStaleOpenPlans
+                .Where(p => ProductionPlanDepartments.DepartmentKeyOf(p.Status) != null)
+                .Select(p => (PlanId: p.Id, Qty: p.ProductQty))
+                .ToList();
+            var activeWipPieces = activeWipPlanQty.Sum(x => x.Qty);
+            var backlogMonthsPieces = outputPiecesPerMonth > 0 ? (decimal?)Math.Round(activeWipPieces / outputPiecesPerMonth, 1) : null;
 
             // = Σ activeWipByDept (แผนกที่ไม่มี deptKey เช่น CVD 84/85 ไม่ถูกนับ — ตรงกับนิยาม "status ไม่ใช่
             // 100/500/84/85" ที่ใช้ตลอดทั้งหน้านี้) — ไม่ใช้ openPlans.Count ตรงๆ อีกต่อไป (นับ 84/85 ปนเข้ามาทำให้
@@ -1962,7 +2025,7 @@ namespace Jewelry.Service.Production.Insight
                 .Count();
 
             var workerNames = await _workerLookupService.GetWorkerNamesAsync();
-            var activityRowsRaw = await GetWorkerActivityRowsAsync(start, end);
+            var activityRowsRaw = await GetWorkerActivityRowsAsync(start, end, allowedPlanIds);
             // ไม่นับรหัส placeholder ("รอจ่าย...") หรือไม่มีรหัสช่างเลย เป็น "ช่าง" ในการนับ/หา median — รหัสพวกนี้
             // คือคิวรองาน ไม่ใช่คนจริง
             var activityRows = activityRowsRaw
@@ -1988,9 +2051,26 @@ namespace Jewelry.Service.Production.Insight
                 var deptVisitsForExits = visits.Where(v => v.DeptKey == dept.Key).ToList();
                 var exitsSeries = ProductionCapacityEvaluator.ComputeExitsSeries(deptVisitsForExits, start, bucketEnds);
 
+                // ด้านชิ้น — เงื่อนไข exit เดียวกับ BuildCapacity (End ในช่วง [start,end]) แต่ถ่วงด้วย ProductQty
+                var exitsPieces = deptVisitsForExits
+                    .Where(v => v.End.HasValue && v.End.Value >= start && v.End.Value <= end)
+                    .Sum(v => qtyById.TryGetValue(v.PlanId, out var q) ? q : 0);
+                var exitsPiecesPerMonth = (decimal)exitsPieces / (decimal)monthsForRates;
+                decimal? piecesPerWorker = workersInfo.WorkersMedian.HasValue && workersInfo.WorkersMedian.Value > 0
+                    ? Math.Round(exitsPiecesPerMonth / (decimal)workersInfo.WorkersMedian.Value, 1)
+                    : (decimal?)null;
+                var waitingNowPieces = waitStatus.HasValue ? nonStaleOpenPlans.Where(p => p.Status == waitStatus.Value).Sum(p => p.ProductQty) : 0;
+                var workingNowPieces = nonStaleOpenPlans.Where(p => p.Status == workStatus).Sum(p => p.ProductQty);
+                var deptActiveWipPieces = nonStaleOpenPlans.Where(p => ProductionPlanDepartments.DepartmentKeyOf(p.Status) == dept.Key).Sum(p => p.ProductQty);
+
                 departmentsOut.Add(new Capacity.DepartmentItem
                 {
                     Key = dept.Key,
+                    ExitsPiecesPerMonth = Math.Round(exitsPiecesPerMonth, 1),
+                    PiecesPerWorker = piecesPerWorker,
+                    WaitingNowPieces = waitingNowPieces,
+                    WorkingNowPieces = workingNowPieces,
+                    ActiveWipPieces = deptActiveWipPieces,
                     ExitsPerMonth = Math.Round(exitsPerMonth, 1),
                     ExitsSeries = exitsSeries.Select(s => new Capacity.ExitsSeriesPoint { BucketEnd = s.BucketEnd, Exits = s.Exits }).ToList(),
                     WorkersMedian = workersInfo.WorkersMedian,
@@ -2059,6 +2139,104 @@ namespace Jewelry.Service.Production.Insight
             }
             AddIfNotNull(forecasts, ProductionInsightRuleEngine.EvaluateFcPeakRisk(peakMonthLabel, peak?.Inflow ?? 0, outputPerMonth, extraQueueDays));
 
+            // ---- breakdown ตามมิติสินค้า/ทอง (by: productType|gold|goldSize) ----
+            var breakdownBy = request.BreakdownBy == "gold" || request.BreakdownBy == "goldSize" ? request.BreakdownBy : "productType";
+            var productTypeNames = await _jewelryContext.TbmProductType.AsNoTracking().ToDictionaryAsync(t => t.Code, t => t.NameTh);
+
+            var groups = ProductionCapacityEvaluator.ComputeBreakdown(
+                breakdownBy, trendData.Plans, attributePlans, first95Dates, doneDates, activeWipPlanQty, start, bucketEnds);
+            System.Diagnostics.Debug.Assert(
+                ProductionCapacityEvaluator.CheckBreakdownInvariants(groups).Count == 0,
+                "breakdown pieces must be >= plans (minus zero-qty plans)");
+
+            string GroupName(string key) =>
+                key.Length == 0 ? "ไม่ระบุ" : (breakdownBy == "productType" && productTypeNames.TryGetValue(key, out var nm) && !string.IsNullOrWhiteSpace(nm) ? nm : key);
+
+            var breakdownRows = groups.Select(g => new Capacity.BreakdownRow
+            {
+                Key = g.Key,
+                Name = GroupName(g.Key),
+                Unit = g.Unit,
+                InflowPieces = g.InflowPieces,
+                OutputPieces = g.OutputPieces,
+                CompletedPieces = g.CompletedPieces,
+                ActiveWipPieces = g.ActiveWipPieces,
+                InflowPiecesPerMonth = Math.Round((decimal)g.InflowPieces / (decimal)monthsForRates, 1),
+                OutputPiecesPerMonth = Math.Round((decimal)g.OutputPieces / (decimal)monthsForRates, 1),
+                CompletedPiecesPerMonth = Math.Round((decimal)g.CompletedPieces / (decimal)monthsForRates, 1),
+                NetPiecesPerMonth = Math.Round((decimal)(g.InflowPieces - g.OutputPieces) / (decimal)monthsForRates, 1),
+                InflowPlans = g.InflowPlans,
+                OutputPlans = g.OutputPlans,
+                ActiveWipPlans = g.ActiveWipPlans
+            }).ToList();
+
+            var breakdownSeries = new List<Capacity.BreakdownSeriesItem>();
+            foreach (var g in groups)
+            {
+                for (var i = 0; i < bucketEnds.Count; i++)
+                {
+                    breakdownSeries.Add(new Capacity.BreakdownSeriesItem
+                    {
+                        BucketEnd = bucketEnds[i],
+                        Key = g.Key,
+                        InflowPieces = g.InflowPiecesByBucket[i],
+                        OutputPieces = g.OutputPiecesByBucket[i]
+                    });
+                }
+            }
+
+            // CAP_GROUP_BACKLOG_GROWING: inflowPieces > outputPieces ทุกเดือนใน N เดือนเต็มล่าสุด (bucket >= 28 วัน)
+            var fullMonthIdx = Enumerable.Range(0, bucketEnds.Count)
+                .Where(i => bucketDurationDays[i] >= ProductionInsightThresholds.CapGroupFullMonthMinDays)
+                .ToList();
+            if (fullMonthIdx.Count >= ProductionInsightThresholds.CapGroupBacklogMonths)
+            {
+                var lastIdx = fullMonthIdx.Skip(fullMonthIdx.Count - ProductionInsightThresholds.CapGroupBacklogMonths).ToList();
+                var candidates = new List<(string Key, string Name, int AddedPieces, string Unit)>();
+                foreach (var g in groups)
+                {
+                    if (lastIdx.All(i => g.InflowPiecesByBucket[i] > g.OutputPiecesByBucket[i]))
+                    {
+                        var added = lastIdx.Sum(i => g.InflowPiecesByBucket[i] - g.OutputPiecesByBucket[i]);
+                        candidates.Add((g.Key, GroupName(g.Key), added, g.Unit));
+                    }
+                }
+                problems.AddRange(ProductionInsightRuleEngine.EvaluateCapGroupBacklogGrowing(breakdownBy, candidates));
+            }
+
+            // ---- filterOptions: distinct ค่าของแผนที่เกี่ยวข้องกับช่วง (สร้างในช่วง / เข้า 95 หรือ 100 ในช่วง / ยังเปิดอยู่)
+            // จากชุดก่อนกรอง — ไม่สนตัวกรองที่ส่งมา ให้หน้าจอแสดงตัวเลือกครบตั้งแต่แรก ----
+            var relevantIds = new HashSet<int>(unfilteredOpenPlans.Select(p => p.Id));
+            foreach (var p in unfilteredPlans)
+            {
+                if (p.CreateDate > start && p.CreateDate <= end) relevantIds.Add(p.Id);
+            }
+            foreach (var kv in ProductionCapacityEvaluator.ComputeFirst95Dates(unfilteredHeaders))
+            {
+                if (kv.Value > start && kv.Value <= end) relevantIds.Add(kv.Key);
+            }
+            foreach (var kv in unfilteredDoneDates)
+            {
+                if (kv.Value > start && kv.Value <= end) relevantIds.Add(kv.Key);
+            }
+            var optionPlans = unfilteredPlans.Where(p => relevantIds.Contains(p.Id)).ToList();
+
+            List<Capacity.FilterOption> BuildOptions(Func<ProductionPlanTrendEvaluator.PlanTrendRow, string?> selector, Func<string, string> nameOf) =>
+                optionPlans
+                    .Select(p => (selector(p) ?? string.Empty).Trim())
+                    .Distinct()
+                    .Select(k => new Capacity.FilterOption { Key = k, Name = k.Length == 0 ? "ไม่ระบุ" : nameOf(k) })
+                    .OrderBy(o => o.Key.Length == 0 ? 1 : 0)
+                    .ThenBy(o => o.Name, StringComparer.CurrentCulture)
+                    .ToList();
+
+            var filterOptions = new Capacity.FilterOptionsData
+            {
+                ProductTypes = BuildOptions(p => p.ProductType, k => productTypeNames.TryGetValue(k, out var nm) && !string.IsNullOrWhiteSpace(nm) ? nm : k),
+                Golds = BuildOptions(p => p.Type, k => k),
+                GoldSizes = BuildOptions(p => p.TypeSize, k => k)
+            };
+
             var actions = ProductionInsightRuleEngine.BuildActions(problems, forecasts);
             EnrichCapacityActionParams(actions, departmentsOut, cc, staleWip, outputPerMonth);
 
@@ -2076,6 +2254,11 @@ namespace Jewelry.Service.Production.Insight
                 {
                     InflowPerMonth = Math.Round(inflowPerMonth, 1),
                     InflowPiecesPerMonth = Math.Round(inflowPiecesPerMonth, 1),
+                    OutputPiecesPerMonth = Math.Round(outputPiecesPerMonth, 1),
+                    CompletedPiecesPerMonth = Math.Round(completedPiecesPerMonth, 1),
+                    NetPiecesPerMonth = Math.Round(netPiecesPerMonth, 1),
+                    ActiveWipPieces = activeWipPieces,
+                    BacklogMonthsPieces = backlogMonthsPieces,
                     OutputPerMonth = Math.Round(outputPerMonth, 1),
                     CompletedPerMonth = Math.Round(completedPerMonth, 1),
                     NetPerMonth = Math.Round(netPerMonth, 1),
@@ -2086,16 +2269,27 @@ namespace Jewelry.Service.Production.Insight
                     OverloadMonths = overloadMonths,
                     MonthsInRange = monthsInRangeRounded
                 },
-                Series = seriesRaw.Select(s => new Capacity.SeriesItem
+                Series = seriesRaw.Select((s, i) => new Capacity.SeriesItem
                 {
                     BucketEnd = s.BucketEnd,
                     Inflow = s.Inflow,
                     InflowPieces = s.InflowPieces,
                     Output = s.Output,
+                    OutputPieces = piecesSeries[i].OutputPieces,
                     Completed = s.Completed,
+                    CompletedPieces = piecesSeries[i].CompletedPieces,
                     Melted = s.Melted,
-                    ActiveWipEnd = s.ActiveWipEnd
+                    ActiveWipEnd = s.ActiveWipEnd,
+                    ActiveWipEndPieces = piecesSeries[i].ActiveWipEndPieces
                 }).ToList(),
+                FilterOptions = filterOptions,
+                Breakdown = new Capacity.BreakdownData
+                {
+                    By = breakdownBy,
+                    UnitNote = true,
+                    Rows = breakdownRows,
+                    Series = breakdownSeries
+                },
                 Departments = departmentsOut,
                 CostCardToDone = new Capacity.CostCardToDoneData
                 {
@@ -2142,7 +2336,8 @@ namespace Jewelry.Service.Production.Insight
         // ไม่กี่คนแบบนับจาก worker_code) — LEFT JOIN header-detail เป็น query เดียว (set-based) แล้ว group/fallback
         // ในหน่วยความจำ: header ไหนไม่มี worker ระดับ detail เลย (ไม่มี record หรือ worker/worker_sub ว่างหมด)
         // fallback ไปใช้ header.worker_code แทน — header ที่มี detail worker จะได้ 1 แถวต่อช่าง distinct 1 คน
-        private async Task<List<(string DeptKey, DateTime CreateDate, string? WorkerCode)>> GetWorkerActivityRowsAsync(DateTime start, DateTime end)
+        private async Task<List<(string DeptKey, DateTime CreateDate, string? WorkerCode)>> GetWorkerActivityRowsAsync(
+            DateTime start, DateTime end, HashSet<int>? allowedPlanIds = null)
         {
             var raw = await (
                 from h in _jewelryContext.TbtProductionPlanStatusHeader
@@ -2153,6 +2348,7 @@ namespace Jewelry.Service.Production.Insight
                 select new
                 {
                     h.Id,
+                    h.ProductionPlanId,
                     h.Status,
                     h.CreateDate,
                     h.WorkerCode,
@@ -2167,6 +2363,7 @@ namespace Jewelry.Service.Production.Insight
             foreach (var headerGroup in raw.GroupBy(r => r.Id))
             {
                 var first = headerGroup.First();
+                if (allowedPlanIds != null && !allowedPlanIds.Contains(first.ProductionPlanId)) continue;
                 var deptKey = ProductionPlanDepartments.DepartmentKeyOf(first.Status);
                 if (deptKey == null) continue;
 

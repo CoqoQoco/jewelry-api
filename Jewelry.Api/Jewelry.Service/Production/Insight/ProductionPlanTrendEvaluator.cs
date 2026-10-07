@@ -49,11 +49,18 @@ namespace Jewelry.Service.Production.Insight
             public int ProductQty { get; set; }
             public DateTime RequestDate { get; set; }
             public string CustomerNumber { get; set; } = null!;
+
+            // เพิ่มสำหรับ Capacity (ชิ้น + แตกตามสินค้า/ทอง) — ProductQtyUnit ไม่แปลงหน่วย
+            public string ProductQtyUnit { get; set; } = string.Empty;
+            public string ProductType { get; set; } = string.Empty;
+            public string? Type { get; set; }
+            public string? TypeSize { get; set; }
         }
 
         public class WipSnapshot
         {
             public int Total { get; set; }
+            public int TotalPieces { get; set; }
             public Dictionary<string, int> ByDept { get; set; } = new Dictionary<string, int>();
         }
 
@@ -210,6 +217,7 @@ namespace Jewelry.Service.Production.Insight
                     if (!IsWipAt(plan, statusAtT, t)) continue;
 
                     snapshot.Total++;
+                    snapshot.TotalPieces += plan.ProductQty;
                     var deptKey = departmentKeyOf(statusAtT!.Value);
                     if (deptKey != null)
                     {

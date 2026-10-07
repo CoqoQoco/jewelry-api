@@ -146,6 +146,12 @@ namespace Jewelry.Service.Production.Insight
         // WRK_WAGE_PER_PLAN_RISING/FC_WAGES_NEXT_MONTH: bucket เดือนที่สั้นกว่านี้ (วัน) ไม่ถือว่าเป็น "เต็มเดือน"
         public const double WrkFullMonthMinDays = 28;
 
+        // CAP_GROUP_BACKLOG_GROWING: กลุ่ม (breakdown) ที่ inflowPieces > outputPieces ทุกเดือนใน N เดือนเต็มล่าสุด
+        // (bucket เต็มเดือน = >= CapGroupFullMonthMinDays วัน), แสดง top กี่กลุ่ม
+        public const int CapGroupBacklogMonths = 3;
+        public const double CapGroupFullMonthMinDays = 28;
+        public const int CapGroupBacklogTopCount = 3;
+
         // ---- วัตถุดิบที่กระทบการผลิต (Materials — gems only) ----
 
         // MAT_GEM_WAITING: waitingMedianDays > ค่านี้ ถือว่า critical (ไม่ถึง = warning)

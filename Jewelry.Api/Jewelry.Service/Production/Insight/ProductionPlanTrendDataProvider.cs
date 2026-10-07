@@ -48,7 +48,11 @@ namespace Jewelry.Service.Production.Insight
                     ProductName = p.ProductName,
                     ProductQty = p.ProductQty,
                     RequestDate = p.RequestDate,
-                    CustomerNumber = p.CustomerNumber
+                    CustomerNumber = p.CustomerNumber,
+                    ProductQtyUnit = p.ProductQtyUnit,
+                    ProductType = p.ProductType,
+                    Type = p.Type,
+                    TypeSize = p.TypeSize
                 })
                 .ToListAsync();
 
