@@ -46,6 +46,7 @@ namespace Jewelry.Service.Production.Shared
                     ProductName = p.ProductName,
                     ProductQty = p.ProductQty,
                     Status = p.Status,
+                    Type = p.Type,
                     RequestDate = p.RequestDate,
                     CreateDate = p.CreateDate,
                     CreateBy = p.CreateBy,

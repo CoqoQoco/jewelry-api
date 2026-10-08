@@ -14,6 +14,10 @@ namespace jewelry.Model.Report.Executive.StockHealth
         public int Count { get; set; }
         public int NoCostCount { get; set; }
         public decimal CostThb { get; set; }
+
+        // ถ่วงด้วย qty ของ piece (ล็อตเงิน) — Qty = Σ qty, CostThbQty = Σ ProductCost*qty
+        public decimal Qty { get; set; }
+        public decimal CostThbQty { get; set; }
     }
 
     public class ReceiptTypeData
@@ -21,5 +25,6 @@ namespace jewelry.Model.Report.Executive.StockHealth
         public string? ReceiptType { get; set; }
         public int Count { get; set; }
         public int NoCostCount { get; set; }
+        public decimal Qty { get; set; }
     }
 }

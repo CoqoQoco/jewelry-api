@@ -1,6 +1,7 @@
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
+using Jewelry.Service.Helper;
 using Jewelry.Service.Production.Shared;
 using Jewelry.Service.Report.Executive;
 using Kendo.DynamicLinqCore;
@@ -86,8 +87,47 @@ namespace Jewelry.Service.Production.Insight
             _materialGemDataProvider = materialGemDataProvider;
         }
 
+        // ---- ตัวกรองโลหะ (metal: ALL|GOLD|SILVER) — จัดประเภทแผนจาก plan.Type ด้วย MetalClassifier ----
+        // กรองจากชุดข้อมูล cached ในหน่วยความจำ (cache ต้นทางของ provider เก็บชุดเต็มไม่แยกโลหะ — ผลที่กรองแล้วไม่ถูก
+        // cache ซ้ำ จึงไม่ต้องใส่ metal ใน cache key) — ALL คืนชุดเดิมตรงๆ ไม่แตะข้อมูล
+
+        private async Task<List<OpenPlanRow>> GetOpenPlansAsync(string metalFilter)
+        {
+            var plans = await _wipHelper.GetOpenPlansAsync();
+            return metalFilter == MetalClassifier.All ? plans : plans.Where(p => MetalClassifier.Matches(metalFilter, p.Type)).ToList();
+        }
+
+        private async Task<(List<ProductionPlanTrendEvaluator.PlanTrendRow> Plans, List<ProductionPlanFlowCalculator.HeaderRow> Headers, DateTime? MinReceiveDate)> GetTrendDataAsync(string metalFilter)
+        {
+            var data = await _trendDataProvider.GetTrendDataAsync();
+            if (metalFilter == MetalClassifier.All) return data;
+
+            var plans = data.Plans.Where(p => MetalClassifier.Matches(metalFilter, p.Type)).ToList();
+            var ids = new HashSet<int>(plans.Select(p => p.Id));
+            var headers = data.Headers.Where(h => ids.Contains(h.ProductionPlanId)).ToList();
+            return (plans, headers, data.MinReceiveDate);
+        }
+
+        // null = ALL (ไม่กรอง) — ไม่ null = plan id ของแผน active ที่เป็นโลหะนั้น
+        private async Task<HashSet<int>?> GetMetalPlanIdsAsync(string metalFilter)
+        {
+            if (metalFilter == MetalClassifier.All) return null;
+            var data = await _trendDataProvider.GetTrendDataAsync();
+            return new HashSet<int>(data.Plans.Where(p => MetalClassifier.Matches(metalFilter, p.Type)).Select(p => p.Id));
+        }
+
+        private async Task<Dictionary<int, DateTime>> GetDoneDatesAsync(string metalFilter)
+        {
+            var done = await _deliveryDataProvider.GetDoneDatesAsync();
+            if (metalFilter == MetalClassifier.All) return done;
+
+            var ids = await GetMetalPlanIdsAsync(metalFilter);
+            return done.Where(kv => ids!.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+        }
+
         public async Task<Wip.Response> Wip(Wip.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var staleDays = request.StaleDays > 0 ? request.StaleDays : ProductionInsightThresholds.DefaultStaleDays;
             var riskWindowDays = request.RiskWindowDays > 0 ? request.RiskWindowDays : ProductionInsightThresholds.DefaultRiskWindowDays;
@@ -97,9 +137,11 @@ namespace Jewelry.Service.Production.Insight
             var rangeStart = request.Start?.UtcDateTime ?? now.AddDays(-ProductionInsightThresholds.DefaultFlowRangeDays);
             var rangeEnd = request.End?.UtcDateTime ?? now;
 
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
-            var meltedOpenCount = await _wipHelper.GetMeltedOpenCountAsync();
+            var meltedOpenCount = metalFilter == MetalClassifier.All
+                ? await _wipHelper.GetMeltedOpenCountAsync()
+                : (await GetTrendDataAsync(metalFilter)).Plans.Count(p => p.Status == ProductionPlanStatusConst.Melted);
 
             var openCount = openPlans.Count;
             var staleCount = 0;
@@ -168,10 +210,17 @@ namespace Jewelry.Service.Production.Insight
                 .Select(p => new ProductionPlanFlowCalculator.PlanCreationRow { ProductionPlanId = p.Id, CreateDate = p.CreateDate })
                 .ToListAsync();
 
+            var wipMetalPlanIds = await GetMetalPlanIdsAsync(metalFilter);
+            if (wipMetalPlanIds != null)
+            {
+                headerRows = headerRows.Where(h => wipMetalPlanIds.Contains(h.ProductionPlanId)).ToList();
+                planCreationRows = planCreationRows.Where(r => wipMetalPlanIds.Contains(r.ProductionPlanId)).ToList();
+            }
+
             var flowByDept = ProductionPlanFlowCalculator.ComputeFlow(headerRows, planCreationRows, ProductionPlanDepartments.DepartmentKeyOf, rangeStart);
 
             // ---- report.departments — reuse ExecutiveReport/ProductionWip ตรงๆ (fixed 30d/180d เหมือนเดิม) ----
-            var executiveWip = await _executiveReportService.ProductionWip(new ExecutiveProductionWip.Request());
+            var executiveWip = await _executiveReportService.ProductionWip(new ExecutiveProductionWip.Request { Metal = metalFilter });
             var departmentsReport = executiveWip.Departments.Select(d => new Wip.DepartmentReportItem
             {
                 Key = d.Key,
@@ -196,7 +245,7 @@ namespace Jewelry.Service.Production.Insight
             }).ToList();
 
             // ---- WIP_DEPT_GROWING (ใช้ WipTrend evaluator แค่ 2 จุดเวลา start/end ไม่ต้องทำ bucket) ----
-            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var trendData = await GetTrendDataAsync(metalFilter);
             var growthSnapshots = ProductionPlanTrendEvaluator.ComputeWipCountsAtTimes(
                 trendData.Plans, trendData.Headers, ProductionPlanDepartments.DepartmentKeyOf, new[] { rangeStart, rangeEnd });
             var growthStartSnapshot = growthSnapshots[rangeStart];
@@ -278,11 +327,12 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<WipTrend.Response> WipTrend(WipTrend.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
             var bucket = string.Equals(request.Bucket, "month", StringComparison.OrdinalIgnoreCase) ? "month" : "week";
 
-            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var trendData = await GetTrendDataAsync(metalFilter);
 
             return ProductionPlanTrendEvaluator.EvaluateTrend(
                 trendData.Plans,
@@ -302,11 +352,12 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<DataSourceResult> DueRiskPlans(DueRiskPlans.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var mode = string.IsNullOrWhiteSpace(request.Mode) ? "overdue" : request.Mode.Trim().ToLowerInvariant();
             var riskWindowDays = request.RiskWindowDays > 0 ? request.RiskWindowDays : ProductionInsightThresholds.DefaultRiskWindowDays;
 
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
             var statusNames = await _wipHelper.GetStatusNamesAsync();
 
@@ -382,16 +433,17 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<StageLeadTime.Response> StageLeadTime(StageLeadTime.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
             var bucket = string.Equals(request.Bucket, "month", StringComparison.OrdinalIgnoreCase) ? "month" : "week";
 
-            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var trendData = await GetTrendDataAsync(metalFilter);
             var visits = ProductionStageLeadTimeEvaluator.ComputeVisits(trendData.Plans, trendData.Headers, ProductionPlanDepartments.Departments, now);
 
             // stale plan ids (นิยามเดียวกับ WIP_STALE) — ตัดออกจาก AbnormalCount เท่านั้น (มี StalePlans table ของตัวเองแล้ว)
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
             var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
             var stalePlanIds = new HashSet<int>(
@@ -461,16 +513,17 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<DataSourceResult> AbnormalDwellPlans(AbnormalDwellPlans.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var multiplier = request.Multiplier > 0 ? request.Multiplier : ProductionInsightThresholds.DefaultAbnormalDwellMultiplier;
 
-            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var trendData = await GetTrendDataAsync(metalFilter);
             var visits = ProductionStageLeadTimeEvaluator.ComputeVisits(trendData.Plans, trendData.Headers, ProductionPlanDepartments.Departments, now);
             var savedStandards = await _stageStandardService.GetCurrentStandardsAsync();
 
             // visit ที่ยังไม่จบ = แผนที่อยู่ใน open plans อยู่แล้วเสมอ (ยังไม่ 100/500) — ใช้ชุดข้อมูลเดียวกับ
             // endpoint อื่นๆ (StalePlans/DueRiskPlans) เพื่อ enrich รายละเอียด + lastUpdateBy/workers แบบเดียวกัน
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var statusNames = await _wipHelper.GetStatusNamesAsync();
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
             var plansById = openPlans.ToDictionary(p => p.Id);
@@ -627,11 +680,11 @@ namespace Jewelry.Service.Production.Insight
             public Dictionary<int, DateTime> DoneDates = null!;
         }
 
-        private async Task<DeliveryContext> LoadDeliveryContextAsync(DateTime now)
+        private async Task<DeliveryContext> LoadDeliveryContextAsync(DateTime now, string metalFilter)
         {
-            var trendData = await _trendDataProvider.GetTrendDataAsync();
-            var doneDates = await _deliveryDataProvider.GetDoneDatesAsync();
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var trendData = await GetTrendDataAsync(metalFilter);
+            var doneDates = await GetDoneDatesAsync(metalFilter);
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
 
             var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
@@ -703,13 +756,14 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<Delivery.Response> Delivery(Delivery.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
             var bucket = string.Equals(request.Bucket, "month", StringComparison.OrdinalIgnoreCase) ? "month" : "week";
             var riskHorizonDays = request.RiskHorizonDays > 0 ? request.RiskHorizonDays : ProductionInsightThresholds.DefaultRiskWindowDays;
 
-            var ctx = await LoadDeliveryContextAsync(now);
+            var ctx = await LoadDeliveryContextAsync(now, metalFilter);
             var customerNames = await _deliveryDataProvider.GetCustomerNamesAsync();
 
             var savedTarget = await _deliveryTargetService.GetCurrentTargetAsync();
@@ -857,10 +911,11 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<DataSourceResult> DeliveryAtRiskPlans(DeliveryAtRiskPlans.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var riskHorizonDays = request.RiskHorizonDays > 0 ? request.RiskHorizonDays : ProductionInsightThresholds.DefaultRiskWindowDays;
 
-            var ctx = await LoadDeliveryContextAsync(now);
+            var ctx = await LoadDeliveryContextAsync(now, metalFilter);
             var statusNames = await _wipHelper.GetStatusNamesAsync();
 
             var atRiskRows = ComputeAtRiskList(ctx, now, riskHorizonDays, request.DepartmentKeys);
@@ -927,11 +982,12 @@ namespace Jewelry.Service.Production.Insight
         // ไม่เติม LastUpdateBy/LastAction/Workers (enrichment สำหรับแผนเปิด) — ดู comment บน DeliveryLatePlans.Item
         public async Task<DataSourceResult> DeliveryLatePlans(DeliveryLatePlans.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
 
-            var ctx = await LoadDeliveryContextAsync(now);
+            var ctx = await LoadDeliveryContextAsync(now, metalFilter);
             var statusNames = await _wipHelper.GetStatusNamesAsync();
 
             var items = new List<DeliveryLatePlans.Item>();
@@ -980,8 +1036,9 @@ namespace Jewelry.Service.Production.Insight
         // และสถานะปัจจุบันไม่ใช่ 500/84/85 (ดู FACTS ในสเปก) — ไม่เติม LastUpdateBy/LastAction/Workers เช่นกัน
         public async Task<DataSourceResult> StuckAfterCostCardPlans(StuckAfterCostCardPlans.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
-            var ctx = await LoadDeliveryContextAsync(now);
+            var ctx = await LoadDeliveryContextAsync(now, metalFilter);
             var statusNames = await _wipHelper.GetStatusNamesAsync();
 
             var excluded = new HashSet<int> { ProductionPlanStatusConst.Completed, ProductionPlanStatusConst.Melted, ProductionPlanStatusConst.WaitCVD, ProductionPlanStatusConst.CVD };
@@ -1131,6 +1188,7 @@ namespace Jewelry.Service.Production.Insight
             var bucket = string.Equals(request.Bucket, "month", StringComparison.OrdinalIgnoreCase) ? "month" : "week";
             var rangeDays = Math.Max((end - start).TotalDays, 1);
             var metal = IsValidMetal(request.Metal) ? request.Metal : ProductionGoldLossEvaluator.MetalGold;
+            var metalForced = !IsValidMetal(request.Metal);
 
             var includeTang = request.WorkerTypes == null || request.WorkerTypes.Length == 0
                 || request.WorkerTypes.Contains(ProductionGoldLossEvaluator.WorkerTypeTang);
@@ -1293,6 +1351,7 @@ namespace Jewelry.Service.Production.Insight
 
             return new Gold.Response
             {
+                MetalForced = metalForced,
                 AsOf = now,
                 Status = status,
                 Problems = problems,
@@ -1883,13 +1942,14 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<Capacity.Response> Capacity(Capacity.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
 
-            var trendData = await _trendDataProvider.GetTrendDataAsync();
-            var doneDates = await _deliveryDataProvider.GetDoneDatesAsync();
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var trendData = await GetTrendDataAsync(metalFilter);
+            var doneDates = await GetDoneDatesAsync(metalFilter);
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
 
             // ---- ตัวกรองระดับแผน (productTypes/golds/goldSizes) — กรองที่ชุดข้อมูลต้นทางครั้งเดียว (plans, headers,
@@ -2025,7 +2085,11 @@ namespace Jewelry.Service.Production.Insight
                 .Count();
 
             var workerNames = await _workerLookupService.GetWorkerNamesAsync();
-            var activityRowsRaw = await GetWorkerActivityRowsAsync(start, end, allowedPlanIds);
+            // scope = แผนที่ผ่านทั้งตัวกรองโลหะและตัวกรองสินค้า/ทอง (trendData ถูกกรองแล้วทั้งคู่) — null = ไม่มีตัวกรองใดเลย
+            var scopedPlanIds = (metalFilter != MetalClassifier.All || allowedPlanIds != null)
+                ? new HashSet<int>(trendData.Plans.Select(p => p.Id))
+                : null;
+            var activityRowsRaw = await GetWorkerActivityRowsAsync(start, end, scopedPlanIds);
             // ไม่นับรหัส placeholder ("รอจ่าย...") หรือไม่มีรหัสช่างเลย เป็น "ช่าง" ในการนับ/หา median — รหัสพวกนี้
             // คือคิวรองาน ไม่ใช่คนจริง
             var activityRows = activityRowsRaw
@@ -2439,9 +2503,10 @@ namespace Jewelry.Service.Production.Insight
         // StuckAfterCostCardPlans เดิมของ Delivery ที่ใช้ "ล่าสุด" MAX — ดู report)
         public async Task<DataSourceResult> CostCardPendingPlans(CostCardPendingPlans.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
-            var trendData = await _trendDataProvider.GetTrendDataAsync();
-            var doneDates = await _deliveryDataProvider.GetDoneDatesAsync();
+            var trendData = await GetTrendDataAsync(metalFilter);
+            var doneDates = await GetDoneDatesAsync(metalFilter);
             var statusNames = await _wipHelper.GetStatusNamesAsync();
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
 
@@ -2723,6 +2788,7 @@ namespace Jewelry.Service.Production.Insight
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
             var metal = IsValidMetal(request.Metal) ? request.Metal : ProductionGoldLossEvaluator.MetalGold;
+            var metalForced = !IsValidMetal(request.Metal);
 
             var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, "month").Select(b => b.End).ToList();
             var stageDraftByWorkerType = request.DraftTargets?
@@ -2783,7 +2849,7 @@ namespace Jewelry.Service.Production.Insight
                 }));
             }
 
-            return new GoldByStage.Response { Departments = departmentsOut, Series = seriesOut };
+            return new GoldByStage.Response { MetalForced = metalForced, Departments = departmentsOut, Series = seriesOut };
         }
 
         // row diff% > 2×dept median diff% (เฉพาะแถวคืนแล้วในช่วง) AND diffGram >= 0.10g — ไม่รวม trim/gemSort
@@ -3076,6 +3142,7 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<Workers.Response> Workers(Workers.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
@@ -3104,6 +3171,8 @@ namespace Jewelry.Service.Production.Insight
             var employmentTypes = await _workerLookupService.GetWorkerEmploymentTypesAsync();
 
             var allRows = await GetWorkerWageRowsAsync(start, end);
+            var workersMetalPlanIds = await GetMetalPlanIdsAsync(metalFilter);
+            if (workersMetalPlanIds != null) allRows = allRows.Where(r => workersMetalPlanIds.Contains(r.PlanId)).ToList();
             var rows = allRows.Where(r => !ProductionGoldStageEvaluator.IsQueueOrEmptyWorker(r.WorkerCode, workerNames)).ToList();
             if (deptFilter != null) rows = rows.Where(r => deptFilter.Contains(r.DeptKey)).ToList();
             if (empTypeFilter != null)
@@ -3116,8 +3185,9 @@ namespace Jewelry.Service.Production.Insight
             }
 
             // ---- slip-side (SLIP scope) % loss ต่อช่าง — trim จากใบตั้งฉาก(tang)/setting จากใบฝัง GOLD เท่านั้น ----
-            var tangUnitsGold = (await GetTangUnitsAsync(start, end)).Where(u => u.Metal == ProductionGoldLossEvaluator.MetalGold).ToList();
-            var settingUnitsGold = (await GetSettingUnitsAsync(start, end, null)).Where(u => u.Metal == ProductionGoldLossEvaluator.MetalGold).ToList();
+            // ใบ gold loss (slip) ฝั่งนี้เป็น GOLD เท่านั้นตาม spec — metal=SILVER ไม่แสดง % loss/ช่างซ้ำจากใบทอง (ว่างเสมอ)
+            var tangUnitsGold = (await GetTangUnitsAsync(start, end)).Where(u => u.Metal == ProductionGoldLossEvaluator.MetalGold && metalFilter != MetalClassifier.Silver).ToList();
+            var settingUnitsGold = (await GetSettingUnitsAsync(start, end, null)).Where(u => u.Metal == ProductionGoldLossEvaluator.MetalGold && metalFilter != MetalClassifier.Silver).ToList();
             var tangLossPercentByWorker = ComputeSlipLossPercentByWorker(tangUnitsGold);
             var settingLossPercentByWorker = ComputeSlipLossPercentByWorker(settingUnitsGold);
 
@@ -3216,7 +3286,7 @@ namespace Jewelry.Service.Production.Insight
             }
 
             // ---- series รายแผนก + รวม (wagePerPlan ใช้ first95Dates — "ผลิตเสร็จ" เดียวกับ Capacity.kpi.outputPerMonth) ----
-            var trendData = await _trendDataProvider.GetTrendDataAsync();
+            var trendData = await GetTrendDataAsync(metalFilter);
             var first95Dates = ProductionCapacityEvaluator.ComputeFirst95Dates(trendData.Headers);
 
             var seriesOut = new List<Workers.SeriesItem>();
@@ -3250,6 +3320,7 @@ namespace Jewelry.Service.Production.Insight
 
             // ---- unpaid piece jobs (ไม่กรองตาม request.DepartmentKeys/EmploymentTypes — ขอบเขตกว้างกว่าตาราง workers) ----
             var unpaidRows = await GetUnpaidPieceJobRowsAsync(start, end, workerNames, employmentTypes);
+            if (workersMetalPlanIds != null) unpaidRows = unpaidRows.Where(r => workersMetalPlanIds.Contains(r.PlanId)).ToList();
             var unpaidCount = unpaidRows.Count;
 
             // ---- WRK_GOLD_REPEAT: reuse เกณฑ์ GOLD_REPEAT_OFFENDER (tang 50 + setting 80, GOLD) — targetPercent
@@ -3296,7 +3367,7 @@ namespace Jewelry.Service.Production.Insight
             // ---- FC_KEY_PERSON_RISK: แผนกกระจุกตัวที่สุด (top2Share สูงสุด, มีช่างจริงอย่างน้อย 1 คน) — reuse
             // pipeline เดียวกับ Capacity ทุกจุด (visits, standardByDept, activeWipByDept, BuildCapacity) เพื่อให้
             // queueDaysNow ตรงกับที่ผู้ใช้เห็นในแท็บ Capacity เป๊ะ (เทียบกันได้โดยตรง) ไม่ใช้ตัวประมาณจาก jobs/rangeDays
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
             var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
             var stalePlanIdsForWip = new HashSet<int>(
@@ -3430,11 +3501,14 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<WorkerMonthly.Response> WorkerMonthly(WorkerMonthly.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
             var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, "month").Select(b => b.End).ToList();
 
             var allRows = await GetWorkerWageRowsAsync(start, end);
+            var monthlyMetalPlanIds = await GetMetalPlanIdsAsync(metalFilter);
+            if (monthlyMetalPlanIds != null) allRows = allRows.Where(r => monthlyMetalPlanIds.Contains(r.PlanId)).ToList();
             var code = (request.Code ?? string.Empty).Trim();
             var rows = allRows
                 .Where(r => string.Equals(r.DeptKey, request.DeptKey, StringComparison.Ordinal))
@@ -3470,12 +3544,15 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<DataSourceResult> UnpaidPieceJobs(UnpaidPieceJobs.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
 
             var workerNames = await _workerLookupService.GetWorkerNamesAsync();
             var employmentTypes = await _workerLookupService.GetWorkerEmploymentTypesAsync();
             var rows = await GetUnpaidPieceJobRowsAsync(start, end, workerNames, employmentTypes);
+            var unpaidMetalPlanIds = await GetMetalPlanIdsAsync(metalFilter);
+            if (unpaidMetalPlanIds != null) rows = rows.Where(r => unpaidMetalPlanIds.Contains(r.PlanId)).ToList();
 
             if (request.DepartmentKeys != null && request.DepartmentKeys.Length > 0)
             {
@@ -3542,9 +3619,9 @@ namespace Jewelry.Service.Production.Insight
             public List<MaterialLineResult> Lines { get; set; } = new List<MaterialLineResult>();
         }
 
-        private async Task<MaterialContext> BuildMaterialContextAsync(DateTime now)
+        private async Task<MaterialContext> BuildMaterialContextAsync(DateTime now, string metalFilter)
         {
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
             var staleCutoff = now.AddDays(-ProductionInsightThresholds.DefaultStaleDays);
             var stalePlanIds = new HashSet<int>(
@@ -3573,6 +3650,12 @@ namespace Jewelry.Service.Production.Insight
                 .Select(g => new { PlanId = g.Key, EnteredDate = g.Min(h => h.CreateDate) })
                 .ToListAsync();
             var first70DateByPlan = first70Rows.ToDictionary(x => x.PlanId, x => x.EnteredDate);
+            // KPI entered→issue ครอบทุกแผนในประวัติ (ไม่ใช่เฉพาะแผนเปิด) จึงต้องกรองโลหะที่ชุดนี้ด้วย
+            var materialMetalPlanIds = await GetMetalPlanIdsAsync(metalFilter);
+            if (materialMetalPlanIds != null)
+            {
+                first70DateByPlan = first70DateByPlan.Where(kv => materialMetalPlanIds.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+            }
 
             // type 7 = เบิกพลอยจริงให้แผน (มี wo/wo_number) — join plan ด้วย (wo, wo_number) ตามรูปแบบเดียวกับ
             // StockGemService — ALL ประวัติ (ไม่ bound ด้วย start/end เพราะต้องรู้ "ไม่เคยมี issue เลย" จริงๆ)
@@ -3641,7 +3724,7 @@ namespace Jewelry.Service.Production.Insight
             return rows.ToDictionary(x => x.Code, x => x.Used);
         }
 
-        private async Task<List<(ProductionMaterialGemEvaluator.StockGemRow Stock, decimal Used90d, double CoverDays)>> ComputeGemCoverRowsAsync(DateTime now)
+        private async Task<List<(ProductionMaterialGemEvaluator.StockGemRow Stock, decimal Used90d, double CoverDays)>> ComputeGemCoverRowsAsync(DateTime now, string metalFilter)
         {
             var stockList = await _materialGemDataProvider.GetStockGemsAsync();
             var usageByCode = await GetGemUsage90dByCodeAsync(now);
@@ -3650,6 +3733,8 @@ namespace Jewelry.Service.Production.Insight
             foreach (var s in stockList)
             {
                 if (s.Quantity <= 0) continue;
+                // ตัวกรองโลหะของสต็อกพลอย — จัดจาก grade (silver% = เงิน) เหมือนตอนจับคู่ requirement
+                if (metalFilter != MetalClassifier.All && ProductionMaterialGemEvaluator.ClassifyStockMetal(s.Grade) != metalFilter) continue;
                 if (!usageByCode.TryGetValue(s.Code, out var used90d) || used90d <= 0) continue;
 
                 var dailyUsage = used90d / ProductionInsightThresholds.MatGemUsageWindowDays;
@@ -3662,13 +3747,14 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<Materials.Response> Materials(Materials.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
             var start = request.Start.UtcDateTime;
             var end = request.End.UtcDateTime;
             var bucket = string.IsNullOrWhiteSpace(request.Bucket) ? "month" : request.Bucket;
             var bucketEnds = ProductionPlanTrendEvaluator.GenerateBuckets(start, end, bucket).Select(b => b.End).ToList();
 
-            var ctx = await BuildMaterialContextAsync(now);
+            var ctx = await BuildMaterialContextAsync(now, metalFilter);
 
             // entered(70) ในช่วง [start,end] -> delay ถึง issue จริงครั้งแรก (เฉพาะคู่ที่มี issue แล้ว, issue >= entered)
             var entries = ctx.First70DateByPlan
@@ -3733,7 +3819,7 @@ namespace Jewelry.Service.Production.Insight
             var upcomingShortLines = ctx.Lines.Where(l => upcomingPlanIds.Contains(l.PlanId) && l.Match.Status == ProductionMaterialGemEvaluator.StatusShort).ToList();
             var upcomingShortPlansCount = upcomingShortLines.Select(l => l.PlanId).Distinct().Count();
 
-            var coverRows = await ComputeGemCoverRowsAsync(now);
+            var coverRows = await ComputeGemCoverRowsAsync(now, metalFilter);
             var lowCoverCount = coverRows.Count(r => r.CoverDays < ProductionInsightThresholds.MatGemLowCoverDefaultDays);
 
             var problems = new List<Wip.Finding>();
@@ -3804,8 +3890,9 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<DataSourceResult> MaterialWaitingPlans(MaterialWaitingPlans.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
-            var ctx = await BuildMaterialContextAsync(now);
+            var ctx = await BuildMaterialContextAsync(now, metalFilter);
             var statusNames = await _wipHelper.GetStatusNamesAsync();
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
             var linesByPlan = ctx.Lines.GroupBy(l => l.PlanId).ToDictionary(g => g.Key, g => g.ToList());
@@ -3892,8 +3979,9 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<DataSourceResult> MaterialGemDemand(MaterialGemDemand.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
-            var ctx = await BuildMaterialContextAsync(now);
+            var ctx = await BuildMaterialContextAsync(now, metalFilter);
             var usageByCode = await GetGemUsage90dByCodeAsync(now);
             var stockList = await _materialGemDataProvider.GetStockGemsAsync();
             var gemNames = await _materialGemDataProvider.GetGemNamesAsync();
@@ -3968,8 +4056,9 @@ namespace Jewelry.Service.Production.Insight
 
         public async Task<DataSourceResult> MaterialGemLowCover(MaterialGemLowCover.Request request)
         {
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var now = DateTime.UtcNow;
-            var coverRows = await ComputeGemCoverRowsAsync(now);
+            var coverRows = await ComputeGemCoverRowsAsync(now, metalFilter);
             var thresholdDays = request.CoverDays > 0 ? request.CoverDays : ProductionInsightThresholds.MatGemLowCoverDefaultDays;
 
             var items = coverRows

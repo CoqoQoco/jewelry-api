@@ -8,6 +8,9 @@ namespace jewelry.Model.Production.Insight.Gold
     {
         public DateTime AsOf { get; set; }
 
+        // true = request ส่ง metal=ALL (หรือค่าไม่รู้จัก) มา — endpoint นี้คำนวณแยกโลหะเสมอจึงถูกบังคับเป็น GOLD
+        public bool MetalForced { get; set; }
+
         // 'critical' | 'warning' | 'ok'
         public string Status { get; set; } = "ok";
 

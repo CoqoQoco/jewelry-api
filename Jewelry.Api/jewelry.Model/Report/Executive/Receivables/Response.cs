@@ -21,5 +21,9 @@ namespace jewelry.Model.Report.Executive.Receivables
         public int DaysOverdue { get; set; }
         public string? SalePerson { get; set; }
         public string? SaleChannelCode { get; set; }
+
+        // สัดส่วนของบิลที่เป็นโลหะที่ขอ (0-1) — ALL = 1 เสมอ; GOLD/SILVER = สัดส่วนยอดบรรทัด (NetPrice*Qty) ของโลหะนั้นต่อทั้งบิล
+        // ยอดเงินทุกช่อง (grandTotal, grandTotalThb, paidAmount, outstanding) ถูกคูณด้วยค่านี้แล้ว
+        public decimal MetalShare { get; set; } = 1m;
     }
 }

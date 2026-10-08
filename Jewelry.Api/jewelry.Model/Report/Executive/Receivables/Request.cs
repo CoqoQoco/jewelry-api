@@ -4,6 +4,9 @@ namespace jewelry.Model.Report.Executive.Receivables
 {
     public class Request : DataSourceRequest
     {
+        // ตัวกรองโลหะทั้งหน้า: 'ALL' (default = พฤติกรรมเดิม) | 'GOLD' | 'SILVER' — ค่าอื่นถือเป็น ALL
+        public string Metal { get; set; } = "ALL";
+
         // shadow ฐาน DataSourceRequest.Filter (Kendo dynamic filter object) โดยตั้งใจ —
         // endpoint นี้ไม่ใช้ dynamic filter, ใช้ string enum ธรรมดาแทน (ตรวจแล้วว่า
         // Newtonsoft.Json CamelCasePropertyNamesContractResolver bind JSON key "filter"

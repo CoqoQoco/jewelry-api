@@ -1,6 +1,8 @@
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
+using Jewelry.Service.Helper;
+using Jewelry.Service.Production.Insight;
 using Jewelry.Service.Production.Shared;
 using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Http;
@@ -52,29 +54,101 @@ namespace Jewelry.Service.Report.Executive
             public decimal? ProductCost { get; set; }
             public DateTime? ProductionDate { get; set; }
             public string? ReceiptType { get; set; }
+
+            // ล็อตเงินเก็บจำนวน >1 บน piece เดียว (ทอง 1 ชิ้น = 1) — ใช้ถ่วงน้ำหนักควบคู่กับนับแถว
+            public decimal Qty { get; set; }
+            public string? ProductionType { get; set; }
         }
 
-        private async Task<List<InStockRow>> GetInStockRowsAsync()
+        // metal ของสต็อก: tbt_stock_piece → tbt_sku.production_type ผ่าน MetalClassifier (ว่าง = GOLD)
+        private async Task<List<InStockRow>> GetInStockRowsAsync(string metalFilter)
         {
-            return await _jewelryContext.TbtStockPiece
+            var rows = await _jewelryContext.TbtStockPiece
                 .AsNoTracking()
                 .Where(x => x.Status == InStockStatus)
                 .Select(x => new InStockRow
                 {
                     ProductCost = x.ProductCost,
                     ProductionDate = x.ProductionDate,
-                    ReceiptType = x.ReceiptType
+                    ReceiptType = x.ReceiptType,
+                    Qty = x.Qty,
+                    ProductionType = x.SkuCodeNavigation.ProductionType
                 })
                 .ToListAsync();
+
+            return metalFilter == MetalClassifier.All
+                ? rows
+                : rows.Where(x => MetalClassifier.Matches(metalFilter, x.ProductionType)).ToList();
+        }
+
+        // แผนเปิดที่กรองตามโลหะ (plan.Type = tbm_gold.name_en) — ALL คืนชุดเดิม
+        private async Task<List<OpenPlanRow>> GetOpenPlansAsync(string metalFilter)
+        {
+            var plans = await _wipHelper.GetOpenPlansAsync();
+            return metalFilter == MetalClassifier.All ? plans : plans.Where(p => MetalClassifier.Matches(metalFilter, p.Type)).ToList();
+        }
+
+        private class InvoiceMoneyRow
+        {
+            public string Running { get; set; } = null!;
+            public DateTime? DueDate { get; set; }
+            public decimal Deposit { get; set; }
+            public decimal GrandTotal { get; set; }
+            public decimal Rate { get; set; }
+            public decimal Paid { get; set; }
+            public decimal Share { get; set; } = 1m;
+        }
+
+        // เงินระดับ header (GrandTotalRounded, Deposit, paid) ถูกจัดสรรตามสัดส่วนโลหะของบรรทัดขาย — ALL = ไม่คูณ (share=1)
+        // บิลที่ share=0 ในโลหะที่ขอ (ไม่มีบรรทัดโลหะนั้นเลย) ถูกตัดออก — สถานะบิล (unpaid/overdue) ตัดสินจากค่าเต็มก่อนคูณ share
+        private async Task<List<InvoiceMoneyRow>> GetInvoiceMoneyRowsAsync(string metalFilter)
+        {
+            var raw = await InScopeInvoices()
+                .Select(x => new InvoiceMoneyRow
+                {
+                    Running = x.Running,
+                    DueDate = x.DueDate,
+                    Deposit = x.Deposit,
+                    GrandTotal = x.GrandTotalRounded ?? 0,
+                    Rate = x.CurrencyRate > 0 ? x.CurrencyRate : 1,
+                    Paid = _jewelryContext.TbtSaleInvoicePaymentItem
+                        .Where(p => p.InvoiceRunning == x.Running && p.IsDelete == false)
+                        .Sum(p => (decimal?)p.Amount) ?? 0m
+                })
+                .ToListAsync();
+
+            if (metalFilter == MetalClassifier.All) return raw;
+
+            var shares = await new SaleMetalResolver(_jewelryContext).ByInvoiceAsync(raw.Select(x => x.Running).ToList());
+            foreach (var row in raw)
+            {
+                row.Share = shares.TryGetValue(row.Running, out var sh) ? sh.ShareOf(metalFilter) : 0m;
+            }
+
+            return raw.Where(x => x.Share > 0).ToList();
         }
 
         public async Task<Summary.Response> Summary(Summary.Request request)
         {
             var now = DateTime.UtcNow;
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
 
             // ---- Production ----
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
-            var meltedOpenCount = await _wipHelper.GetMeltedOpenCountAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
+            int meltedOpenCount;
+            if (metalFilter == MetalClassifier.All)
+            {
+                meltedOpenCount = await _wipHelper.GetMeltedOpenCountAsync();
+            }
+            else
+            {
+                var meltedTypes = await _jewelryContext.TbtProductionPlan
+                    .AsNoTracking()
+                    .Where(p => p.IsActive == true && p.Status == 500)
+                    .Select(p => p.Type)
+                    .ToListAsync();
+                meltedOpenCount = meltedTypes.Count(t => MetalClassifier.Matches(metalFilter, t));
+            }
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
 
             var moved30dCutoff = now.AddDays(-30);
@@ -89,27 +163,17 @@ namespace Jewelry.Service.Report.Executive
             };
 
             // ---- Receivables ----
-            var invoiceRows = await InScopeInvoices()
-                .Select(x => new
-                {
-                    x.DueDate,
-                    x.Deposit,
-                    GrandTotal = x.GrandTotalRounded ?? 0,
-                    Rate = x.CurrencyRate > 0 ? x.CurrencyRate : 1,
-                    Paid = _jewelryContext.TbtSaleInvoicePaymentItem
-                        .Where(p => p.InvoiceRunning == x.Running && p.IsDelete == false)
-                        .Sum(p => (decimal?)p.Amount) ?? 0m
-                })
-                .ToListAsync();
+            var invoiceRows = await GetInvoiceMoneyRowsAsync(metalFilter);
 
-            var invoiceTotalThb = invoiceRows.Sum(x => x.GrandTotal * x.Rate);
+            // ยอดเงินคูณ Share (ALL = 1) — การนับบิล/สถานะ unpaid ใช้ค่าเต็มของบิล (ไม่คูณ)
+            var invoiceTotalThb = invoiceRows.Sum(x => x.GrandTotal * x.Rate * x.Share);
             // unpaid = มียอดจริง (grand_total>0) และยังไม่มีเงินเข้าเลย ทั้ง payment_item และมัดจำ
             // (grand_total=0 หรือ deposit>0 แต่ยังไม่มี payment_item ไม่ถือว่า unpaid)
             var unpaidRows = invoiceRows.Where(x => x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0).ToList();
-            var paidOrPartialThb = invoiceRows.Where(x => !(x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0)).Sum(x => x.GrandTotal * x.Rate);
-            var unpaidThb = unpaidRows.Sum(x => x.GrandTotal * x.Rate);
+            var paidOrPartialThb = invoiceRows.Where(x => !(x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0)).Sum(x => x.GrandTotal * x.Rate * x.Share);
+            var unpaidThb = unpaidRows.Sum(x => x.GrandTotal * x.Rate * x.Share);
             var overdueRows = unpaidRows.Where(x => x.DueDate.HasValue && x.DueDate.Value < now).ToList();
-            var overdueThb = overdueRows.Sum(x => x.GrandTotal * x.Rate);
+            var overdueThb = overdueRows.Sum(x => x.GrandTotal * x.Rate * x.Share);
 
             var receivables = new Summary.ReceivablesData
             {
@@ -128,7 +192,7 @@ namespace Jewelry.Service.Report.Executive
             var invoicedSoNumbers = new HashSet<string>(
                 await InScopeInvoices().Select(x => x.SoRunning).Distinct().ToListAsync());
 
-            var soRows = await InScopeSalesOrders()
+            var soRowsRaw = await InScopeSalesOrders()
                 .Select(x => new
                 {
                     x.SoNumber,
@@ -138,19 +202,35 @@ namespace Jewelry.Service.Report.Executive
                 })
                 .ToListAsync();
 
+            Dictionary<string, SaleMetalShare>? soShares = metalFilter == MetalClassifier.All
+                ? null
+                : await new SaleMetalResolver(_jewelryContext).BySalesOrderAsync(soRowsRaw.Select(x => x.SoNumber).ToList());
+
+            var soRows = soRowsRaw
+                .Select(x => new
+                {
+                    x.SoNumber,
+                    x.DeliveryDate,
+                    x.GrandTotal,
+                    x.Rate,
+                    Share = soShares == null ? 1m : (soShares.TryGetValue(x.SoNumber, out var sh) ? sh.ShareOf(metalFilter) : 0m)
+                })
+                .Where(x => x.Share > 0)
+                .ToList();
+
             var noInvoiceRows = soRows.Where(x => !invoicedSoNumbers.Contains(x.SoNumber)).ToList();
 
             var salesOrders = new Summary.SalesOrdersData
             {
                 OpenCount = soRows.Count,
                 NoInvoiceCount = noInvoiceRows.Count,
-                NoInvoiceThb = noInvoiceRows.Sum(x => x.GrandTotal * x.Rate),
+                NoInvoiceThb = noInvoiceRows.Sum(x => x.GrandTotal * x.Rate * x.Share),
                 OverdueNoInvoiceCount = noInvoiceRows.Count(x => x.DeliveryDate.HasValue && x.DeliveryDate.Value < now),
                 NoDeliveryDateCount = noInvoiceRows.Count(x => !x.DeliveryDate.HasValue)
             };
 
             // ---- Stock ----
-            var inStockRows = await GetInStockRowsAsync();
+            var inStockRows = await GetInStockRowsAsync(metalFilter);
             var agedCutoff1y = now.AddDays(-365);
 
             var stock = new Summary.StockData
@@ -159,7 +239,9 @@ namespace Jewelry.Service.Report.Executive
                 NoCostCount = inStockRows.Count(x => (x.ProductCost ?? 0) == 0),
                 CostThb = inStockRows.Sum(x => x.ProductCost ?? 0),
                 // production_date ว่างไม่มีจริงใน prod ปัจจุบัน แต่ถ้ามีให้นับเป็นของเก่า (เหมือน StockHealth bucket gt5y)
-                AgedOver1yCount = inStockRows.Count(x => !x.ProductionDate.HasValue || x.ProductionDate.Value < agedCutoff1y)
+                AgedOver1yCount = inStockRows.Count(x => !x.ProductionDate.HasValue || x.ProductionDate.Value < agedCutoff1y),
+                InStockQty = inStockRows.Sum(x => x.Qty),
+                CostThbQty = inStockRows.Sum(x => (x.ProductCost ?? 0) * x.Qty)
             };
 
             // ---- Gold Loss (เดือนปัจจุบัน + ย้อนหลัง 2 เดือน, เวลาไทย) ----
@@ -171,65 +253,103 @@ namespace Jewelry.Service.Report.Executive
             var slipRows = await _jewelryContext.TbtGoldLossTangSlip
                 .AsNoTracking()
                 .Where(x => x.IsActive && x.RequestDateEnd != null && x.RequestDateEnd >= windowStartUtc)
-                .Select(x => new { x.RequestDateEnd, x.IssuedTotal, x.RawLoss, x.AllowedLoss })
+                .Select(x => new { x.Id, x.RequestDateEnd, x.IssuedTotal, x.RawLoss, x.AllowedLoss, x.PricePerGram })
                 .ToListAsync();
+
+            // โลหะของใบ tang จัดจาก "item" ของใบ (item.Gold = "SV" → เงิน) — ใบปนโลหะใช้ฝั่งน้ำหนักมากสุด (เหมือน Gold topic)
+            // ไม่มี item เลย fallback ดู price_per_gram (< 500 = เงิน) ผ่าน ProductionGoldLossEvaluator.ClassifySlipMetal
+            var slipIds = slipRows.Select(x => x.Id).ToList();
+            var slipItems = slipIds.Count == 0
+                ? new List<ProductionGoldLossEvaluator.TangSlipItemMetalRow>().Select(i => (SlipId: 0L, Item: i)).ToList()
+                : (await _jewelryContext.TbtGoldLossTangSlipItem
+                    .AsNoTracking()
+                    .Where(i => i.IsActive && slipIds.Contains(i.SlipId))
+                    .Select(i => new { i.SlipId, i.Gold, i.GoldWeightSend, i.GoldWeightCheck })
+                    .ToListAsync())
+                    .Select(i => (SlipId: i.SlipId, Item: new ProductionGoldLossEvaluator.TangSlipItemMetalRow { Gold = i.Gold, WeightSend = i.GoldWeightSend, WeightCheck = i.GoldWeightCheck }))
+                    .ToList();
+            var itemsBySlip = slipItems.GroupBy(i => i.SlipId).ToDictionary(g => g.Key, g => g.Select(x => x.Item).ToList());
+
+            var slipsWithMetal = slipRows
+                .Select(x => new
+                {
+                    x.RequestDateEnd,
+                    x.IssuedTotal,
+                    x.RawLoss,
+                    x.AllowedLoss,
+                    Metal = ProductionGoldLossEvaluator.ClassifySlipMetal(
+                        itemsBySlip.TryGetValue(x.Id, out var its) ? its : new List<ProductionGoldLossEvaluator.TangSlipItemMetalRow>(),
+                        x.PricePerGram).Metal
+                })
+                .ToList();
 
             // diff_loss ของตาราง = allowed_loss - raw_loss (บวก = ต่ำกว่าเกณฑ์ ไม่ใช่เกินเกณฑ์) — ห้ามใช้ตรง ๆ
             // over = max(raw - allowed, 0) ต่อใบ แล้วค่อย sum ต่อเดือน
-            var slipByMonth = slipRows
-                .GroupBy(x => x.RequestDateEnd!.Value.AddHours(7).ToString("yyyy-MM"))
-                .ToDictionary(g => g.Key, g =>
-                {
-                    var list = g.Select(x => new
-                    {
-                        Issued = x.IssuedTotal ?? 0,
-                        Raw = x.RawLoss ?? 0,
-                        Allowed = x.AllowedLoss ?? 0
-                    }).ToList();
-
-                    return new
-                    {
-                        SlipCount = list.Count,
-                        IssuedGram = list.Sum(x => x.Issued),
-                        RawLossGram = list.Sum(x => x.Raw),
-                        AllowedGram = list.Sum(x => x.Allowed),
-                        OverAllowedGram = list.Sum(x => Math.Max(x.Raw - x.Allowed, 0)),
-                        OverSlipCount = list.Count(x => x.Raw > x.Allowed)
-                    };
-                });
-
-            var goldLoss = new List<Summary.GoldLossMonthData>();
-            for (var i = 2; i >= 0; i--)
+            List<Summary.GoldLossMonthData> BuildGoldLoss(string slipMetal)
             {
-                var monthKey = currentMonthStartThai.AddMonths(-i).ToString("yyyy-MM");
-
-                if (slipByMonth.TryGetValue(monthKey, out var g))
-                {
-                    goldLoss.Add(new Summary.GoldLossMonthData
+                var slipByMonth = slipsWithMetal
+                    .Where(x => x.Metal == slipMetal)
+                    .GroupBy(x => x.RequestDateEnd!.Value.AddHours(7).ToString("yyyy-MM"))
+                    .ToDictionary(g => g.Key, g =>
                     {
-                        Month = monthKey,
-                        SlipCount = g.SlipCount,
-                        IssuedGram = g.IssuedGram,
-                        RawLossGram = g.RawLossGram,
-                        AllowedGram = g.AllowedGram,
-                        OverAllowedGram = g.OverAllowedGram,
-                        OverSlipCount = g.OverSlipCount,
-                        LossPercent = g.IssuedGram > 0
-                            ? Math.Round(g.RawLossGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
-                            : 0,
-                        AllowedPercent = g.IssuedGram > 0
-                            ? Math.Round(g.AllowedGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
-                            : 0,
-                        OverAllowedPercent = g.IssuedGram > 0
-                            ? Math.Round(g.OverAllowedGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
-                            : 0
+                        var list = g.Select(x => new
+                        {
+                            Issued = x.IssuedTotal ?? 0,
+                            Raw = x.RawLoss ?? 0,
+                            Allowed = x.AllowedLoss ?? 0
+                        }).ToList();
+
+                        return new
+                        {
+                            SlipCount = list.Count,
+                            IssuedGram = list.Sum(x => x.Issued),
+                            RawLossGram = list.Sum(x => x.Raw),
+                            AllowedGram = list.Sum(x => x.Allowed),
+                            OverAllowedGram = list.Sum(x => Math.Max(x.Raw - x.Allowed, 0)),
+                            OverSlipCount = list.Count(x => x.Raw > x.Allowed)
+                        };
                     });
-                }
-                else
+
+                var result = new List<Summary.GoldLossMonthData>();
+                for (var i = 2; i >= 0; i--)
                 {
-                    goldLoss.Add(new Summary.GoldLossMonthData { Month = monthKey });
+                    var monthKey = currentMonthStartThai.AddMonths(-i).ToString("yyyy-MM");
+
+                    if (slipByMonth.TryGetValue(monthKey, out var g))
+                    {
+                        result.Add(new Summary.GoldLossMonthData
+                        {
+                            Month = monthKey,
+                            SlipCount = g.SlipCount,
+                            IssuedGram = g.IssuedGram,
+                            RawLossGram = g.RawLossGram,
+                            AllowedGram = g.AllowedGram,
+                            OverAllowedGram = g.OverAllowedGram,
+                            OverSlipCount = g.OverSlipCount,
+                            LossPercent = g.IssuedGram > 0
+                                ? Math.Round(g.RawLossGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
+                                : 0,
+                            AllowedPercent = g.IssuedGram > 0
+                                ? Math.Round(g.AllowedGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
+                                : 0,
+                            OverAllowedPercent = g.IssuedGram > 0
+                                ? Math.Round(g.OverAllowedGram / g.IssuedGram * 100, 2, MidpointRounding.AwayFromZero)
+                                : 0
+                        });
+                    }
+                    else
+                    {
+                        result.Add(new Summary.GoldLossMonthData { Month = monthKey });
+                    }
                 }
+
+                return result;
             }
+
+            // ALL: goldLoss = ใบทอง + silverLoss = ใบเงิน — GOLD/SILVER: goldLoss = ใบของโลหะที่ขอตัวเดียว (goldLossMetal บอกว่าเป็นอะไร)
+            var goldLossMetal = metalFilter == MetalClassifier.Silver ? MetalClassifier.Silver : MetalClassifier.Gold;
+            var goldLoss = BuildGoldLoss(goldLossMetal);
+            var silverLoss = metalFilter == MetalClassifier.All ? BuildGoldLoss(MetalClassifier.Silver) : new List<Summary.GoldLossMonthData>();
 
             return new Summary.Response
             {
@@ -238,15 +358,19 @@ namespace Jewelry.Service.Report.Executive
                 Receivables = receivables,
                 SalesOrders = salesOrders,
                 Stock = stock,
-                GoldLoss = goldLoss
+                Metal = metalFilter,
+                GoldLossMetal = goldLossMetal,
+                GoldLoss = goldLoss,
+                SilverLoss = silverLoss
             };
         }
 
         public async Task<ProductionWip.Response> ProductionWip(ProductionWip.Request request)
         {
             var now = DateTime.UtcNow;
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
 
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
 
             var moved30dCutoff = now.AddDays(-30);
@@ -283,12 +407,17 @@ namespace Jewelry.Service.Report.Executive
             var windowStartThai = currentMonthStartThai.AddMonths(-12);
             var windowStartUtc = DateTime.SpecifyKind(windowStartThai.AddHours(-7), DateTimeKind.Utc);
 
-            var completedDates = await _jewelryContext.TbtProductionPlan
+            var completedRows = await _jewelryContext.TbtProductionPlan
                 .AsNoTracking()
                 .Where(p => p.IsActive == true && p.Status == StatusDone
                     && p.CompletedDate != null && p.CompletedDate.Value >= windowStartUtc)
-                .Select(p => p.CompletedDate!.Value)
+                .Select(p => new { CompletedDate = p.CompletedDate!.Value, p.Type })
                 .ToListAsync();
+
+            var completedDates = completedRows
+                .Where(p => MetalClassifier.Matches(metalFilter, p.Type))
+                .Select(p => p.CompletedDate)
+                .ToList();
 
             var completedByMonth = completedDates
                 .GroupBy(d => d.AddHours(7).ToString("yyyy-MM"))
@@ -315,8 +444,9 @@ namespace Jewelry.Service.Report.Executive
         public async Task<DataSourceResult> StalePlans(StalePlans.Request request)
         {
             var now = DateTime.UtcNow;
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
 
-            var openPlans = await _wipHelper.GetOpenPlansAsync();
+            var openPlans = await GetOpenPlansAsync(metalFilter);
             var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
             var statusNames = await _wipHelper.GetStatusNamesAsync();
 
@@ -386,6 +516,7 @@ namespace Jewelry.Service.Report.Executive
         public async Task<DataSourceResult> Receivables(Receivables.Request request)
         {
             var now = DateTime.UtcNow;
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
             var filter = string.IsNullOrWhiteSpace(request.Filter) ? "unpaid" : request.Filter.Trim().ToLowerInvariant();
 
             // paid/outstanding: สูตรเดียวกับ InvoiceService.List เป๊ะ ๆ
@@ -415,8 +546,14 @@ namespace Jewelry.Service.Report.Executive
 
             // unpaid (strict) = มียอดจริง (grand_total>0) และยังไม่มีเงินเข้าเลย ทั้ง payment_item และมัดจำ — ใช้เกณฑ์เดียวกับ Summary
             // เก็บคู่กับ Item ไว้ใช้กรอง filter 'unpaid'/'overdue' เท่านั้น ไม่ขึ้น contract (paymentState ยังใช้สูตร paid/partial/unpaid เดิม)
+            Dictionary<string, SaleMetalShare>? invoiceShares = metalFilter == MetalClassifier.All
+                ? null
+                : await new SaleMetalResolver(_jewelryContext).ByInvoiceAsync(rows.Select(r => r.Running).ToList());
+
             var mapped = rows.Select(x =>
             {
+                // เงินระดับ header ถูกจัดสรรตามสัดส่วนโลหะของบรรทัดขาย (ALL = 1) — สถานะบิล (unpaid/overdue) ตัดสินจากค่าเต็ม
+                var share = invoiceShares == null ? 1m : (invoiceShares.TryGetValue(x.Running, out var sh) ? sh.ShareOf(metalFilter) : 0m);
                 var outstanding = x.GrandTotal - x.Deposit - x.Paid;
                 var isOverdue = x.DueDate.HasValue && x.DueDate.Value < now;
                 var isUnpaidStrict = x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0;
@@ -431,10 +568,11 @@ namespace Jewelry.Service.Report.Executive
                     CreateDate = x.CreateDate,
                     DueDate = x.DueDate,
                     CurrencyUnit = x.CurrencyUnit,
-                    GrandTotal = x.GrandTotal,
-                    GrandTotalThb = x.GrandTotal * x.Rate,
-                    PaidAmount = x.Paid,
-                    Outstanding = outstanding,
+                    GrandTotal = x.GrandTotal * share,
+                    GrandTotalThb = x.GrandTotal * x.Rate * share,
+                    PaidAmount = x.Paid * share,
+                    Outstanding = outstanding * share,
+                    MetalShare = share,
                     PaymentState = outstanding <= 0 ? "paid" : (x.Paid > 0 || x.Deposit > 0 ? "partial" : "unpaid"),
                     IsOverdue = isOverdue,
                     DaysOverdue = isOverdue ? (int)(now - x.DueDate!.Value).TotalDays : 0,
@@ -444,7 +582,7 @@ namespace Jewelry.Service.Report.Executive
                 };
 
                 return (Item: item, IsUnpaidStrict: isUnpaidStrict);
-            }).ToList();
+            }).Where(x => x.Item.MetalShare > 0).ToList();
 
             List<Receivables.Item> filtered;
             switch (filter)
@@ -479,6 +617,7 @@ namespace Jewelry.Service.Report.Executive
         public async Task<DataSourceResult> SalesOrdersWithoutInvoice(SalesOrdersWithoutInvoice.Request request)
         {
             var now = DateTime.UtcNow;
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
 
             var invoicedSoNumbers = new HashSet<string>(
                 await InScopeInvoices().Select(x => x.SoRunning).Distinct().ToListAsync());
@@ -501,9 +640,19 @@ namespace Jewelry.Service.Report.Executive
                 })
                 .ToListAsync();
 
-            var items = soRows
-                .Where(x => !invoicedSoNumbers.Contains(x.SoNumber))
-                .Select(x => new SalesOrdersWithoutInvoice.Item
+            var noInvoiceSoRows = soRows.Where(x => !invoicedSoNumbers.Contains(x.SoNumber)).ToList();
+            Dictionary<string, SaleMetalShare>? soShares = metalFilter == MetalClassifier.All
+                ? null
+                : await new SaleMetalResolver(_jewelryContext).BySalesOrderAsync(noInvoiceSoRows.Select(r => r.SoNumber).ToList());
+
+            var items = noInvoiceSoRows
+                .Select(r => (Row: r, Share: soShares == null ? 1m : (soShares.TryGetValue(r.SoNumber, out var sh) ? sh.ShareOf(metalFilter) : 0m)))
+                .Where(t => t.Share > 0)
+                .Select(t =>
+                {
+                    var x = t.Row;
+                    var share = t.Share;
+                    return new SalesOrdersWithoutInvoice.Item
                 {
                     Running = x.Running,
                     SoNumber = x.SoNumber,
@@ -512,12 +661,14 @@ namespace Jewelry.Service.Report.Executive
                     SoDate = x.SoDate,
                     DeliveryDate = x.DeliveryDate,
                     CurrencyUnit = x.CurrencyUnit,
-                    GrandTotal = x.GrandTotal,
-                    GrandTotalThb = x.GrandTotal * x.Rate,
+                    GrandTotal = x.GrandTotal * share,
+                    GrandTotalThb = x.GrandTotal * x.Rate * share,
+                    MetalShare = share,
                     IsOverdue = x.DeliveryDate.HasValue && x.DeliveryDate.Value < now,
                     // ลูกค้าไม่มี sale_person ผูกไว้เสมอ — fallback ไปคนสร้างเอกสาร (business rule: เจ้าของลูกค้า derive จาก create_by)
                     SalePerson = !string.IsNullOrEmpty(x.SalePerson) ? x.SalePerson : x.CreateBy,
                     SaleChannelCode = x.SaleChannelCode
+                };
                 })
                 .ToList();
 
@@ -534,7 +685,8 @@ namespace Jewelry.Service.Report.Executive
 
         public async Task<StockHealth.Response> StockHealth(StockHealth.Request request)
         {
-            var rows = await GetInStockRowsAsync();
+            var metalFilter = MetalClassifier.Normalize(request.Metal);
+            var rows = await GetInStockRowsAsync(metalFilter);
 
             var now = DateTime.UtcNow;
             var oneYearAgo = now.AddYears(-1);
@@ -562,7 +714,9 @@ namespace Jewelry.Service.Report.Executive
                     Key = key,
                     Count = list.Count,
                     NoCostCount = list.Count(x => (x.ProductCost ?? 0) == 0),
-                    CostThb = list.Sum(x => x.ProductCost ?? 0)
+                    CostThb = list.Sum(x => x.ProductCost ?? 0),
+                    Qty = list.Sum(x => x.Qty),
+                    CostThbQty = list.Sum(x => (x.ProductCost ?? 0) * x.Qty)
                 };
             }).ToList();
 
@@ -572,7 +726,8 @@ namespace Jewelry.Service.Report.Executive
                 {
                     ReceiptType = g.Key,
                     Count = g.Count(),
-                    NoCostCount = g.Count(x => (x.ProductCost ?? 0) == 0)
+                    NoCostCount = g.Count(x => (x.ProductCost ?? 0) == 0),
+                    Qty = g.Sum(x => x.Qty)
                 })
                 .OrderByDescending(x => x.Count)
                 .ToList();

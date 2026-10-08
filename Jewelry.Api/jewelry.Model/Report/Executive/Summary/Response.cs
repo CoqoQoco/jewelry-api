@@ -10,7 +10,17 @@ namespace jewelry.Model.Report.Executive.Summary
         public ReceivablesData Receivables { get; set; } = new ReceivablesData();
         public SalesOrdersData SalesOrders { get; set; } = new SalesOrdersData();
         public StockData Stock { get; set; } = new StockData();
+
+        // metal ที่ขอ: 'ALL' | 'GOLD' | 'SILVER'
+        public string Metal { get; set; } = "ALL";
+
+        // โลหะของ goldLoss: ALL/GOLD -> 'GOLD', SILVER -> 'SILVER' (ตัวเดียวที่ขอ)
+        public string GoldLossMetal { get; set; } = "GOLD";
+
         public List<GoldLossMonthData> GoldLoss { get; set; } = new List<GoldLossMonthData>();
+
+        // มีค่าเฉพาะ metal=ALL (ใบ tang ที่จัดเป็นเงิน) — GOLD/SILVER = ว่าง
+        public List<GoldLossMonthData> SilverLoss { get; set; } = new List<GoldLossMonthData>();
     }
 
     public class ProductionData
@@ -49,6 +59,10 @@ namespace jewelry.Model.Report.Executive.Summary
         public int NoCostCount { get; set; }
         public decimal CostThb { get; set; }
         public int AgedOver1yCount { get; set; }
+
+        // ถ่วงด้วยจำนวน (ล็อตเงินมี qty>1 บน piece เดียว) — inStockQty = Σ qty, costThbQty = Σ ProductCost*qty
+        public decimal InStockQty { get; set; }
+        public decimal CostThbQty { get; set; }
     }
 
     public class GoldLossMonthData

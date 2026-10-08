@@ -14,6 +14,9 @@ namespace Jewelry.Service.Production.Shared
         public string ProductName { get; set; } = null!;
         public int ProductQty { get; set; }
         public int Status { get; set; }
+
+        // tbt_production_plan.type = tbm_gold.name_en ("Silver", "Yellow Gold", ...) — ใช้จัดประเภทโลหะ (MetalClassifier)
+        public string? Type { get; set; }
         public DateTime RequestDate { get; set; }
         public DateTime CreateDate { get; set; }
         public string CreateBy { get; set; } = null!;

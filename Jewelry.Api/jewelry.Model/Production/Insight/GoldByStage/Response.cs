@@ -5,6 +5,9 @@ namespace jewelry.Model.Production.Insight.GoldByStage
 {
     public class Response
     {
+        // true = request ส่ง metal=ALL (หรือค่าไม่รู้จัก) มา — endpoint นี้คำนวณแยกโลหะเสมอจึงถูกบังคับเป็น GOLD
+        public bool MetalForced { get; set; }
+
         public List<DepartmentItem> Departments { get; set; } = new List<DepartmentItem>();
         public List<SeriesItem> Series { get; set; } = new List<SeriesItem>();
     }
