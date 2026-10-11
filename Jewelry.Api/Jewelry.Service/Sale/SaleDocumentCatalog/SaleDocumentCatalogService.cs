@@ -3,6 +3,7 @@ using jewelry.Model.Sale.SaleDocumentCatalog;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
+using Jewelry.Service.Catalog;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,12 @@ namespace Jewelry.Service.Sale.SaleDocumentCatalog
         public async Task<long> Save(SaveRequest request)
         {
             var statusName = request.Status == 1 ? "Final" : "Draft";
+            var canWritePrice = CatalogPriceHelper.CanWritePrice(_jewelryContext, CurrentUserRoles);
+            var prices = request.Items
+                .Select(i => canWritePrice
+                    ? CatalogPriceHelper.Normalize(i.PriceFull, i.PriceSale, i.PriceCurrency)
+                    : (Full: (decimal?)null, Sale: (decimal?)null, Currency: "THB"))
+                .ToList();
 
             if (request.Id.HasValue)
             {
@@ -54,6 +61,24 @@ namespace Jewelry.Service.Sale.SaleDocumentCatalog
                 catalog.UpdateBy = CurrentUsername ?? "system";
                 catalog.UpdateDate = DateTime.UtcNow;
 
+                var existingByProduct = catalog.TbtSaleDocumentCatalogItem
+                    .OrderBy(i => i.SortOrder)
+                    .Where(i => i.ProductNumber != null)
+                    .GroupBy(i => i.ProductNumber!)
+                    .ToDictionary(g => g.Key, g => new Queue<TbtSaleDocumentCatalogItem>(g));
+                if (!canWritePrice)
+                {
+                    for (var idx = 0; idx < request.Items.Count; idx++)
+                    {
+                        var pn = request.Items[idx].ProductNumber;
+                        if (pn != null && existingByProduct.TryGetValue(pn, out var queue) && queue.Count > 0)
+                        {
+                            var old = queue.Dequeue();
+                            prices[idx] = (old.PriceFull, old.PriceSale, old.PriceCurrency);
+                        }
+                    }
+                }
+
                 var existingImages = catalog.TbtSaleDocumentCatalogItem
                     .SelectMany(i => i.TbtSaleDocumentCatalogItemImage)
                     .ToList();
@@ -65,7 +90,7 @@ namespace Jewelry.Service.Sale.SaleDocumentCatalog
                 _jewelryContext.TbtSaleDocumentCatalog.Update(catalog);
                 await _jewelryContext.SaveChangesAsync();
 
-                var newItems = BuildItems(catalog.Id, request.Items);
+                var newItems = BuildItems(catalog.Id, request.Items, prices);
                 _jewelryContext.TbtSaleDocumentCatalogItem.AddRange(newItems);
                 await _jewelryContext.SaveChangesAsync();
 
@@ -91,7 +116,7 @@ namespace Jewelry.Service.Sale.SaleDocumentCatalog
                 _jewelryContext.TbtSaleDocumentCatalog.Add(catalog);
                 await _jewelryContext.SaveChangesAsync();
 
-                var newItems = BuildItems(catalog.Id, request.Items);
+                var newItems = BuildItems(catalog.Id, request.Items, prices);
                 _jewelryContext.TbtSaleDocumentCatalogItem.AddRange(newItems);
                 await _jewelryContext.SaveChangesAsync();
 
@@ -134,6 +159,9 @@ namespace Jewelry.Service.Sale.SaleDocumentCatalog
                     Dimension2 = i.Dimension2,
                     Dimension3 = i.Dimension3,
                     SortOrder = i.SortOrder,
+                    PriceFull = i.PriceFull,
+                    PriceSale = i.PriceSale,
+                    PriceCurrency = i.PriceCurrency,
                     Images = i.TbtSaleDocumentCatalogItemImage.Select(img => new GetItemImageResponse
                     {
                         Id = img.Id,
@@ -245,11 +273,12 @@ namespace Jewelry.Service.Sale.SaleDocumentCatalog
             return (stream, contentType);
         }
 
-        private static List<TbtSaleDocumentCatalogItem> BuildItems(long catalogId, List<ItemRequest> itemRequests)
+        private static List<TbtSaleDocumentCatalogItem> BuildItems(long catalogId, List<ItemRequest> itemRequests, List<(decimal? Full, decimal? Sale, string Currency)> prices)
         {
             var result = new List<TbtSaleDocumentCatalogItem>();
-            foreach (var itemReq in itemRequests)
+            for (var index = 0; index < itemRequests.Count; index++)
             {
+                var itemReq = itemRequests[index];
                 var item = new TbtSaleDocumentCatalogItem
                 {
                     CatalogId = catalogId,
@@ -260,6 +289,9 @@ namespace Jewelry.Service.Sale.SaleDocumentCatalog
                     Dimension2 = itemReq.Dimension2,
                     Dimension3 = itemReq.Dimension3,
                     SortOrder = itemReq.SortOrder,
+                    PriceFull = prices[index].Full,
+                    PriceSale = prices[index].Sale,
+                    PriceCurrency = prices[index].Currency,
                     TbtSaleDocumentCatalogItemImage = itemReq.ImageBlobPaths
                         .Select((bp, idx) => new TbtSaleDocumentCatalogItemImage
                         {

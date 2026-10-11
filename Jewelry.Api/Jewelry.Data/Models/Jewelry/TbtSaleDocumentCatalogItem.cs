@@ -22,6 +22,12 @@ public partial class TbtSaleDocumentCatalogItem
 
     public int SortOrder { get; set; }
 
+    public decimal? PriceFull { get; set; }
+
+    public decimal? PriceSale { get; set; }
+
+    public string PriceCurrency { get; set; } = "THB";
+
     public virtual TbtSaleDocumentCatalog CatalogNavigation { get; set; } = null!;
 
     public virtual ICollection<TbtSaleDocumentCatalogItemImage> TbtSaleDocumentCatalogItemImage { get; set; } = new List<TbtSaleDocumentCatalogItemImage>();

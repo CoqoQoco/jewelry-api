@@ -19,6 +19,12 @@ public partial class TbtCatalogProduct
 
     public string? Dimension3 { get; set; }
 
+    public decimal? PriceFull { get; set; }
+
+    public decimal? PriceSale { get; set; }
+
+    public string PriceCurrency { get; set; } = "THB";
+
     public bool IsActive { get; set; }
 
     public DateTime CreateDate { get; set; }

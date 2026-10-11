@@ -116,7 +116,10 @@ namespace Jewelry.Service.Catalog
                         SortOrder = p.SortOrder,
                         Dimension1 = p.Dimension1,
                         Dimension2 = p.Dimension2,
-                        Dimension3 = p.Dimension3
+                        Dimension3 = p.Dimension3,
+                        PriceFull = p.PriceFull,
+                        PriceSale = p.PriceSale,
+                        PriceCurrency = p.PriceCurrency
                     })
                     .ToList()
             };
@@ -132,6 +135,9 @@ namespace Jewelry.Service.Catalog
             {
                 throw new HandleException($"มี Catalog รหัส {request.Code.ToUpper()} อยู่แล้ว ไม่สามารถสร้างรายการซ้ำได้");
             }
+
+            var canWritePrice = CanWritePrice();
+            var createPrices = request.Items?.Select(item => ResolvePrice(canWritePrice, item.PriceFull, item.PriceSale, item.PriceCurrency)).ToList();
 
             using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
 
@@ -160,6 +166,9 @@ namespace Jewelry.Service.Catalog
                     Dimension1 = item.Dimension1,
                     Dimension2 = item.Dimension2,
                     Dimension3 = item.Dimension3,
+                    PriceFull = createPrices![index].Full,
+                    PriceSale = createPrices[index].Sale,
+                    PriceCurrency = createPrices[index].Currency,
                     IsActive = true,
                     CreateDate = DateTime.UtcNow,
                     CreateBy = CurrentUsername
@@ -194,6 +203,9 @@ namespace Jewelry.Service.Catalog
                 throw new HandleException($"มี Catalog รหัส {request.Code.ToUpper()} อยู่แล้ว ไม่สามารถใช้รหัสซ้ำได้");
             }
 
+            var canWritePrice = CanWritePrice();
+            var updatePrices = request.Items?.Select(item => ResolvePrice(canWritePrice, item.PriceFull, item.PriceSale, item.PriceCurrency)).ToList();
+
             using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
 
             catalog.Code = request.Code.ToUpper();
@@ -207,6 +219,10 @@ namespace Jewelry.Service.Catalog
             _jewelryContext.TbmProductCatalog.Update(catalog);
 
             var existingItems = catalog.TbtCatalogProduct.Where(p => p.IsActive).ToList();
+            var existingByProduct = existingItems
+                .OrderBy(p => p.SortOrder)
+                .GroupBy(p => p.ProductNumber)
+                .ToDictionary(g => g.Key, g => new Queue<TbtCatalogProduct>(g));
             foreach (var item in existingItems)
             {
                 item.IsActive = false;
@@ -219,17 +235,44 @@ namespace Jewelry.Service.Catalog
 
             if (request.Items != null && request.Items.Any())
             {
-                var newItems = request.Items.Select(item => new TbtCatalogProduct
+                var newItems = request.Items.Select((item, index) =>
                 {
-                    CatalogId = catalog.Id,
-                    ProductNumber = item.ProductNumber,
-                    SortOrder = item.SortOrder,
-                    Dimension1 = item.Dimension1,
-                    Dimension2 = item.Dimension2,
-                    Dimension3 = item.Dimension3,
-                    IsActive = true,
-                    CreateDate = DateTime.UtcNow,
-                    CreateBy = CurrentUsername
+                    decimal? priceFull;
+                    decimal? priceSale;
+                    string priceCurrency;
+                    if (canWritePrice)
+                    {
+                        (priceFull, priceSale, priceCurrency) = updatePrices![index];
+                    }
+                    else if (existingByProduct.TryGetValue(item.ProductNumber, out var queue) && queue.Count > 0)
+                    {
+                        var old = queue.Dequeue();
+                        priceFull = old.PriceFull;
+                        priceSale = old.PriceSale;
+                        priceCurrency = old.PriceCurrency;
+                    }
+                    else
+                    {
+                        priceFull = null;
+                        priceSale = null;
+                        priceCurrency = "THB";
+                    }
+
+                    return new TbtCatalogProduct
+                    {
+                        CatalogId = catalog.Id,
+                        ProductNumber = item.ProductNumber,
+                        SortOrder = item.SortOrder,
+                        Dimension1 = item.Dimension1,
+                        Dimension2 = item.Dimension2,
+                        Dimension3 = item.Dimension3,
+                        PriceFull = priceFull,
+                        PriceSale = priceSale,
+                        PriceCurrency = priceCurrency,
+                        IsActive = true,
+                        CreateDate = DateTime.UtcNow,
+                        CreateBy = CurrentUsername
+                    };
                 }).ToList();
 
                 _jewelryContext.TbtCatalogProduct.AddRange(newItems);
@@ -278,6 +321,9 @@ namespace Jewelry.Service.Catalog
                 throw new HandleException("กรุณาระบุสินค้าที่ต้องการเพิ่ม");
             }
 
+            var canWritePrice = CanWritePrice();
+            var addPrices = request.Items.Select(item => ResolvePrice(canWritePrice, item.PriceFull, item.PriceSale, item.PriceCurrency)).ToList();
+
             var maxSortOrder = catalog.TbtCatalogProduct
                 .Where(p => p.IsActive)
                 .Select(p => (int?)p.SortOrder)
@@ -291,6 +337,9 @@ namespace Jewelry.Service.Catalog
                 Dimension1 = item.Dimension1,
                 Dimension2 = item.Dimension2,
                 Dimension3 = item.Dimension3,
+                PriceFull = addPrices[index].Full,
+                PriceSale = addPrices[index].Sale,
+                PriceCurrency = addPrices[index].Currency,
                 IsActive = true,
                 CreateDate = DateTime.UtcNow,
                 CreateBy = CurrentUsername
@@ -301,6 +350,14 @@ namespace Jewelry.Service.Catalog
 
             return "success";
         }
+
+        private bool CanWritePrice() =>
+            CatalogPriceHelper.CanWritePrice(_jewelryContext, CurrentUserRoles);
+
+        private static (decimal? Full, decimal? Sale, string Currency) ResolvePrice(bool canWrite, decimal? full, decimal? sale, string? currency) =>
+            canWrite
+                ? CatalogPriceHelper.Normalize(full, sale, currency)
+                : (null, null, "THB");
 
         public async Task<string> RemoveProduct(jewelry.Model.Catalog.RemoveProduct.Request request)
         {

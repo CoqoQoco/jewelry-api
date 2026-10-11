@@ -14,5 +14,8 @@ namespace jewelry.Model.Catalog.AddProducts
         public string? Dimension1 { get; set; }
         public string? Dimension2 { get; set; }
         public string? Dimension3 { get; set; }
+        public decimal? PriceFull { get; set; }
+        public decimal? PriceSale { get; set; }
+        public string? PriceCurrency { get; set; }
     }
 }

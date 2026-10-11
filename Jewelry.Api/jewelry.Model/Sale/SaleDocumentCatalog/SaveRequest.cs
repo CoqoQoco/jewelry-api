@@ -24,6 +24,9 @@ namespace jewelry.Model.Sale.SaleDocumentCatalog
         public string? Dimension2 { get; set; }
         public string? Dimension3 { get; set; }
         public int SortOrder { get; set; }
+        public decimal? PriceFull { get; set; }
+        public decimal? PriceSale { get; set; }
+        public string? PriceCurrency { get; set; }
         public List<string> ImageBlobPaths { get; set; } = new List<string>();
     }
 }

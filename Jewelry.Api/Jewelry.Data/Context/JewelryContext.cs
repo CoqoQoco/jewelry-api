@@ -4728,6 +4728,16 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Dimension3)
                 .HasColumnType("character varying")
                 .HasColumnName("dimension_3");
+            entity.Property(e => e.PriceFull)
+                .HasPrecision(18, 2)
+                .HasColumnName("price_full");
+            entity.Property(e => e.PriceSale)
+                .HasPrecision(18, 2)
+                .HasColumnName("price_sale");
+            entity.Property(e => e.PriceCurrency)
+                .HasMaxLength(3)
+                .HasDefaultValue("THB")
+                .HasColumnName("price_currency");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.CreateBy)
@@ -4815,6 +4825,16 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("dimension3");
             entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.PriceFull)
+                .HasPrecision(18, 2)
+                .HasColumnName("price_full");
+            entity.Property(e => e.PriceSale)
+                .HasPrecision(18, 2)
+                .HasColumnName("price_sale");
+            entity.Property(e => e.PriceCurrency)
+                .HasMaxLength(3)
+                .HasDefaultValue("THB")
+                .HasColumnName("price_currency");
 
             entity.HasMany(e => e.TbtSaleDocumentCatalogItemImage)
                 .WithOne(e => e.ItemNavigation)
