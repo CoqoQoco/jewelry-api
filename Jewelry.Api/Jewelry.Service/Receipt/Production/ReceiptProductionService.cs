@@ -507,6 +507,30 @@ namespace Jewelry.Service.Receipt.Production
             var silverLotRunningByKey = new Dictionary<string, string>();
             var stockNumbersWithMaterialsPersisted = new HashSet<string>();
 
+            // แผนเงิน: ConfirmStock.Qty = จำนวนชิ้นของแถวนั้น — ตรวจให้เป็นจำนวนเต็ม > 0 และรวมแล้วไม่เกินที่เหลือของแผน
+            var silverTotalPieces = 0;
+            if (isSilverPlan)
+            {
+                foreach (var s in request.Stocks)
+                {
+                    if (s.Qty <= 0)
+                    {
+                        throw new HandleException($"จำนวนต้องมากกว่า 0 --> {s.StockReceiptNumber}");
+                    }
+                    if (s.Qty != decimal.Truncate(s.Qty))
+                    {
+                        throw new HandleException($"แผนเงินต้องระบุจำนวนเป็นจำนวนเต็ม --> {s.StockReceiptNumber} (Qty = {s.Qty})");
+                    }
+                    silverTotalPieces = checked(silverTotalPieces + (int)s.Qty);
+                }
+
+                var remainingPieces = updateReceipt.Qty - updateReceipt.QtyRunning;
+                if (silverTotalPieces > remainingPieces)
+                {
+                    throw new HandleException($"จำนวนที่รับ ({silverTotalPieces}) เกินจำนวนคงเหลือของแผน ({remainingPieces} จากทั้งหมด {updateReceipt.Qty}, รับแล้ว {updateReceipt.QtyRunning})");
+                }
+            }
+
             decimal? productCostPerUnit = null;
             if (query.plan.TbtProductionPlanPrice != null && query.plan.TbtProductionPlanPrice.Any() && query.plan.ProductQty > 0)
             {
@@ -633,7 +657,7 @@ namespace Jewelry.Service.Receipt.Production
             updateReceipt.UpdateBy = CurrentUsername;
             updateReceipt.UpdateDate = DateTime.UtcNow;
             updateReceipt.IsRunning = true;
-            updateReceipt.QtyRunning += request.Stocks.Count;
+            updateReceipt.QtyRunning += isSilverPlan ? silverTotalPieces : request.Stocks.Count;
             if (updateReceipt.QtyRunning >= updateReceipt.Qty)
             {
                 updateReceipt.IsComplete = true;
@@ -673,7 +697,7 @@ namespace Jewelry.Service.Receipt.Production
             foreach (var stockGroup in newStocks.GroupBy(x => x.StockNumber))
             {
                 var stock = stockGroup.First();
-                var lotQty = stockGroup.Count();
+                var lotQty = isSilverPlan ? (int)stockGroup.Sum(x => x.Qty) : stockGroup.Count();
 
                 var skuCode = stock.DeriveSkuCode();
 
