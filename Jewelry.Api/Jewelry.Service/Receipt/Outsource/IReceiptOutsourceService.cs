@@ -7,5 +7,7 @@ namespace Jewelry.Service.Receipt.Outsource
     {
         Task<jewelry.Model.Receipt.Outsource.Confirm.Response> Confirm(jewelry.Model.Receipt.Outsource.Confirm.Request request);
         IQueryable<jewelry.Model.Receipt.Outsource.History.List.Response> ListHistory(jewelry.Model.Receipt.Outsource.History.List.Search request);
+        void FillHistoryMaterials(System.Collections.Generic.IEnumerable<jewelry.Model.Receipt.Outsource.History.List.Response> rows);
+        jewelry.Model.Receipt.ReceiptHistorySummary GetHistorySummary(jewelry.Model.Receipt.Outsource.History.List.Search request);
     }
 }

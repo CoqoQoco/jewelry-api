@@ -845,7 +845,7 @@ namespace Jewelry.Service.Receipt.Production
         public IQueryable<jewelry.Model.Receipt.Production.History.List.Response> ListHistory(jewelry.Model.Receipt.Production.History.List.Search request)
         {
             var receipt = (from item in _jewelryContext.TbtStockProductReceiptItem
-                           where item.IsReceipt == true
+                           where item.IsReceipt == true && item.Type == "production"
                            //&& item.ReceiptDate >= request.ReceiptDateStart.StartOfDayUtc()
                            //&& item.ReceiptDate <= request.ReceiptDateEnd.EndOfDayUtc()
                            select item);
@@ -961,6 +961,17 @@ namespace Jewelry.Service.Receipt.Production
 
             return query;
 
+        }
+
+        public void FillHistoryMaterials(IEnumerable<jewelry.Model.Receipt.Production.History.List.Response> rows)
+        {
+            ReceiptHistoryMaterialHelper.Enrich(_jewelryContext, rows, x => x.StockNumber);
+        }
+
+        public jewelry.Model.Receipt.ReceiptHistorySummary GetHistorySummary(jewelry.Model.Receipt.Production.History.List.Search request)
+        {
+            var query = ListHistory(request);
+            return ReceiptHistoryMaterialHelper.Summarize(_jewelryContext, query.Select(x => x.StockNumber), query.Select(x => x.ProductPrice));
         }
 
     }

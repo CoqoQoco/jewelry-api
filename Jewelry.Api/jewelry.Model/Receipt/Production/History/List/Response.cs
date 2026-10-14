@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace jewelry.Model.Receipt.Production.History.List
 {
-    public class Response
+    public class Response : jewelry.Model.Receipt.ReceiptHistoryMaterial
     {
         public string StockNumber { get; set; }
         public string ReceiptNumber { get; set; }

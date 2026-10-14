@@ -103,7 +103,16 @@ namespace Jewelry.Api.Controllers.Receipt
             try
             {
                 var response = _receiptProduction.ListHistory(request.Search);
-                return response.ToDataSource(request);
+                var result = response.ToDataSource(request);
+                if (result.Data != null)
+                {
+                    _receiptProduction.FillHistoryMaterials(result.Data.Cast<jewelry.Model.Receipt.Production.History.List.Response>());
+                }
+                if (result.Aggregates == null)
+                {
+                    result.Aggregates = _receiptProduction.GetHistorySummary(request.Search);
+                }
+                return result;
             }
             catch (HandleException ex)
             {

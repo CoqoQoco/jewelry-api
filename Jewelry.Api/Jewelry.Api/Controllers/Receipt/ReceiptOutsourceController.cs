@@ -55,7 +55,16 @@ namespace Jewelry.Api.Controllers.Receipt
             try
             {
                 var response = _receiptOutsource.ListHistory(request.Search);
-                return response.ToDataSource(request);
+                var result = response.ToDataSource(request);
+                if (result.Data != null)
+                {
+                    _receiptOutsource.FillHistoryMaterials(result.Data.Cast<jewelry.Model.Receipt.Outsource.History.List.Response>());
+                }
+                if (result.Aggregates == null)
+                {
+                    result.Aggregates = _receiptOutsource.GetHistorySummary(request.Search);
+                }
+                return result;
             }
             catch (HandleException ex)
             {

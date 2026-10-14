@@ -2,7 +2,7 @@ using System;
 
 namespace jewelry.Model.Receipt.Outsource.History.List
 {
-    public class Response
+    public class Response : jewelry.Model.Receipt.ReceiptHistoryMaterial
     {
         public string StockNumber { get; set; }
         public string ReceiptNumber { get; set; }
