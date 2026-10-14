@@ -25,7 +25,7 @@ namespace jewelry.Model.Stock.Product.List
         public string? ProductNameEn { get; set; }
         public string? ProductNameTh { get; set; }
 
-        //public string? WoText { get; set; }
+        public string? WoText { get; set; }
         public string[]? ProductType { get; set; }
         public string[]? Gold { get; set; }
         public string[]? GoldSize { get; set; }

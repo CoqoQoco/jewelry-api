@@ -78,6 +78,14 @@ namespace Jewelry.Service.Stock.Product
             {
                 pieces = pieces.Where(x => x.SkuCodeNavigation.MoldDesign != null && x.SkuCodeNavigation.MoldDesign.Contains(request.Mold));
             }
+            if (!string.IsNullOrWhiteSpace(request.WoText))
+            {
+                var woKeyword = new string(request.WoText.Where(c => c != '-' && !char.IsWhiteSpace(c)).ToArray()).ToLower();
+                if (woKeyword != "")
+                {
+                    pieces = pieces.Where(x => ((x.Wo ?? "") + (x.WoNumber != null ? x.WoNumber.Value.ToString() : "")).ToLower().Contains(woKeyword));
+                }
+            }
             if (request.ProductType != null && request.ProductType.Any())
             {
                 var productTypeArray = request.ProductType.ToArray();
