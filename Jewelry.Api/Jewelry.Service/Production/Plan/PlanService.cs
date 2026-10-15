@@ -386,6 +386,188 @@ namespace Jewelry.Service.Production.Plan
         }
         #endregion
 
+        #region --- Backdate Close ---
+        private static string? GetBackdateCloseReason(int status)
+        {
+            if (status == ProductionPlanStatus.Completed) return jewelry.Model.Production.Plan.BackdateClose.ReasonCode.AlreadyCompleted;
+            if (status == ProductionPlanStatus.Melted) return jewelry.Model.Production.Plan.BackdateClose.ReasonCode.Melted;
+            if (status == ProductionPlanStatus.WaitCVD || status == ProductionPlanStatus.CVD) return jewelry.Model.Production.Plan.BackdateClose.ReasonCode.Cvd;
+            return null;
+        }
+
+        public async Task<jewelry.Model.Production.Plan.BackdateClose.PreviewResponse> BackdateClosePreview(jewelry.Model.Production.Plan.BackdateClose.PreviewRequest request)
+        {
+            var response = new jewelry.Model.Production.Plan.BackdateClose.PreviewResponse();
+            var parsed = new List<(string Input, string? Wo, int WoNumber, bool Valid)>();
+
+            foreach (var raw in (request.Jobs ?? new List<string>()))
+            {
+                var input = (raw ?? string.Empty).Trim();
+                if (input.Length == 0) continue;
+
+                var idx = input.LastIndexOf('-');
+                if (idx > 0 && int.TryParse(input.Substring(idx + 1).Trim(), out var no))
+                {
+                    var wo = input.Substring(0, idx).Trim();
+                    parsed.Add((input, wo, no, wo.Length > 0));
+                }
+                else
+                {
+                    parsed.Add((input, null, 0, false));
+                }
+            }
+
+            var woList = parsed.Where(x => x.Valid).Select(x => x.Wo!).Distinct().ToList();
+            var plans = await _jewelryContext.TbtProductionPlan
+                .Include(x => x.StatusNavigation)
+                .Include(x => x.TbtProductionPlanStatusHeader)
+                .Where(x => woList.Contains(x.Wo) && x.IsActive == true)
+                .ToListAsync();
+
+            var seen = new HashSet<string>();
+            foreach (var p in parsed)
+            {
+                var item = new jewelry.Model.Production.Plan.BackdateClose.PreviewItem { Input = p.Input };
+
+                if (!p.Valid)
+                {
+                    item.ReasonCode = jewelry.Model.Production.Plan.BackdateClose.ReasonCode.InvalidFormat;
+                    response.Items.Add(item);
+                    continue;
+                }
+
+                var plan = plans.FirstOrDefault(x => x.Wo == p.Wo && x.WoNumber == p.WoNumber);
+                if (plan == null)
+                {
+                    item.ReasonCode = jewelry.Model.Production.Plan.BackdateClose.ReasonCode.NotFound;
+                    response.Items.Add(item);
+                    continue;
+                }
+
+                item.Found = true;
+                item.Id = plan.Id;
+                item.Wo = plan.Wo;
+                item.WoNumber = plan.WoNumber;
+                item.Mold = plan.Mold;
+                item.ProductNumber = plan.ProductNumber;
+                item.Status = plan.Status;
+                item.StatusName = plan.StatusNavigation?.NameTh;
+                item.LastMoveDate = plan.TbtProductionPlanStatusHeader
+                    .Where(h => h.IsActive)
+                    .Select(h => (DateTime?)(h.ReceiveDate ?? h.CreateDate))
+                    .Concat(new DateTime?[] { plan.UpdateDate })
+                    .Max();
+
+                if (!seen.Add($"{plan.Wo}-{plan.WoNumber}"))
+                {
+                    item.ReasonCode = jewelry.Model.Production.Plan.BackdateClose.ReasonCode.Duplicate;
+                }
+                else
+                {
+                    item.ReasonCode = GetBackdateCloseReason(plan.Status);
+                    item.CanClose = item.ReasonCode == null;
+                }
+
+                response.Items.Add(item);
+            }
+
+            return response;
+        }
+
+        public async Task<jewelry.Model.Production.Plan.BackdateClose.CloseResponse> BackdateClose(jewelry.Model.Production.Plan.BackdateClose.CloseRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Remark) || request.PlanIds == null || !request.PlanIds.Any())
+            {
+                throw new HandleException(ErrorMessage.InvalidRequest);
+            }
+
+            var response = new jewelry.Model.Production.Plan.BackdateClose.CloseResponse();
+            var dateNow = DateTime.UtcNow;
+            var closeDate = request.CloseDate.HasValue ? request.CloseDate.Value.UtcDateTime : dateNow;
+            var remark = $"{BackdateCloseMarker.RemarkPrefix} {request.Remark.Trim()}";
+
+            var ids = request.PlanIds.Distinct().ToList();
+            var plans = await _jewelryContext.TbtProductionPlan
+                .Where(x => ids.Contains(x.Id) && x.IsActive == true)
+                .ToListAsync();
+
+            var validPlans = new List<TbtProductionPlan>();
+            foreach (var id in ids)
+            {
+                var plan = plans.FirstOrDefault(x => x.Id == id);
+                if (plan == null)
+                {
+                    response.Errors.Add(new jewelry.Model.Production.Plan.BackdateClose.ErrorItem { Id = id, ReasonCode = jewelry.Model.Production.Plan.BackdateClose.ReasonCode.NotFound });
+                    continue;
+                }
+
+                var reason = GetBackdateCloseReason(plan.Status);
+                if (reason != null)
+                {
+                    response.Errors.Add(new jewelry.Model.Production.Plan.BackdateClose.ErrorItem { Id = id, ReasonCode = reason });
+                    continue;
+                }
+
+                validPlans.Add(plan);
+            }
+
+            if (!validPlans.Any()) return response;
+
+            var transferRunning = await _runningNumberService.GenerateRunningNumberForGold("PLT");
+            var formerStatuses = validPlans.ToDictionary(x => x.Id, x => x.Status);
+
+            using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
+
+            var headers = validPlans.Select(plan => new TbtProductionPlanStatusHeader
+            {
+                CreateDate = dateNow,
+                CreateBy = CurrentUsername,
+                UpdateDate = dateNow,
+                UpdateBy = CurrentUsername,
+                IsActive = true,
+                ProductionPlanId = plan.Id,
+                Status = ProductionPlanStatus.Completed,
+                ReceiveDate = closeDate,
+                Remark1 = remark
+            }).ToList();
+
+            await _jewelryContext.TbtProductionPlanStatusHeader.AddRangeAsync(headers);
+            await _jewelryContext.SaveChangesAsync();
+
+            var transfers = validPlans.Select(plan => new TbtProductionPlanTransferStatus
+            {
+                Running = transferRunning,
+                Wo = plan.Wo,
+                WoNumber = plan.WoNumber,
+                ProductionPlanId = plan.Id,
+                CreateDate = dateNow,
+                CreateBy = CurrentUsername,
+                FormerStatus = formerStatuses[plan.Id],
+                TargetStatus = ProductionPlanStatus.Completed,
+                TargetStatusId = headers.First(h => h.ProductionPlanId == plan.Id).Id
+            }).ToList();
+
+            await _jewelryContext.TbtProductionPlanTransferStatus.AddRangeAsync(transfers);
+            await _jewelryContext.SaveChangesAsync();
+
+            foreach (var plan in validPlans)
+            {
+                plan.Status = ProductionPlanStatus.Completed;
+                plan.CompletedDate = closeDate;
+                plan.UpdateDate = dateNow;
+                plan.UpdateBy = CurrentUsername;
+                response.Closed.Add(new jewelry.Model.Production.Plan.BackdateClose.ClosedItem { Id = plan.Id, Wo = plan.Wo, WoNumber = plan.WoNumber });
+            }
+
+            _jewelryContext.TbtProductionPlan.UpdateRange(validPlans);
+            await _jewelryContext.SaveChangesAsync();
+
+            scope.Complete();
+            response.TransferNumber = transferRunning;
+            return response;
+        }
+        #endregion
+
         #region --- Transfer Plan ---
         public async Task<jewelry.Model.Production.Plan.Transfer.Response> Transfer(jewelry.Model.Production.Plan.Transfer.Request request)
         {

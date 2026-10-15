@@ -26,13 +26,17 @@ namespace Jewelry.Service.Production.Insight
 
         // สถานะปลอมสำหรับแทน "ออกจาก WIP แล้วแต่ไม่มี header ยืนยัน" (ไม่ตรงกับ status code จริงใดๆ ทั้งสิ้น
         // เพื่อไม่ให้ปนกับ 100/500 จริงตอน debug) — DepartmentKeyOf คืน null เสมอสำหรับค่านี้ (ไม่อยู่แผนกไหน)
-        private const int StatusExitedNoHeader = -1;
+        internal const int StatusExitedNoHeader = -1;
 
         public class PlanTrendRow
         {
             public int Id { get; set; }
             public DateTime CreateDate { get; set; }
             public DateTime? CompletedDate { get; set; }
+
+            // true = แผนที่ถูก "ปิดใบงานย้อนหลัง" — header 100 ปลอมถูกตัดออกจาก headers และ CompletedDate ถูกแทนด้วย
+            // เวลาที่ย้ายครั้งสุดท้ายจริง (effective exit) เพื่อให้ออกจาก WIP ย้อนหลังถูกจุด แต่ไม่นับเป็น exit/outflow
+            public bool BackdateClosed { get; set; }
 
             // สถานะปัจจุบัน (snapshot ณ เวลาที่โหลดข้อมูล) — ใช้เฉพาะ ProductionStageLeadTimeEvaluator สำหรับ
             // เช็ค visit ที่ยังไม่จบว่า "ยังรออยู่" หรือ "เริ่มทำงานแล้วแต่ไม่มี ReceiveDate" (ข้อมูลเก่า)
@@ -326,6 +330,8 @@ namespace Jewelry.Service.Production.Insight
                         totalInflow++;
                     }
                 }
+
+                if (plan.BackdateClosed) continue;
 
                 var exitEntry = timelines[plan.Id]
                     .Where(e => e.Status == StatusCompleted || e.Status == StatusMelted || e.Status == StatusExitedNoHeader)

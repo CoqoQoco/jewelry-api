@@ -210,6 +210,13 @@ namespace Jewelry.Service.Production.Insight
                 .Select(p => new ProductionPlanFlowCalculator.PlanCreationRow { ProductionPlanId = p.Id, CreateDate = p.CreateDate })
                 .ToListAsync();
 
+            // header 100 ของแผนปิดย้อนหลังเป็นของปลอม — ตัดออก ไม่ให้นับเป็น outflow ของแผนกสุดท้าย
+            var backdateClosedForFlow = await BackdateClosedPlans.LoadAsync(_jewelryContext);
+            if (backdateClosedForFlow.Count > 0)
+            {
+                headerRows = headerRows.Where(h => !(h.Status == BackdateClosedPlans.StatusCompleted && backdateClosedForFlow.ContainsKey(h.ProductionPlanId))).ToList();
+            }
+
             var wipMetalPlanIds = await GetMetalPlanIdsAsync(metalFilter);
             if (wipMetalPlanIds != null)
             {

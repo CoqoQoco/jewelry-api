@@ -407,14 +407,17 @@ namespace Jewelry.Service.Report.Executive
             var windowStartThai = currentMonthStartThai.AddMonths(-12);
             var windowStartUtc = DateTime.SpecifyKind(windowStartThai.AddHours(-7), DateTimeKind.Utc);
 
+            var backdateClosedIds = await BackdateClosedPlans.LoadAsync(_jewelryContext);
+
             var completedRows = await _jewelryContext.TbtProductionPlan
                 .AsNoTracking()
                 .Where(p => p.IsActive == true && p.Status == StatusDone
                     && p.CompletedDate != null && p.CompletedDate.Value >= windowStartUtc)
-                .Select(p => new { CompletedDate = p.CompletedDate!.Value, p.Type })
+                .Select(p => new { p.Id, CompletedDate = p.CompletedDate!.Value, p.Type })
                 .ToListAsync();
 
             var completedDates = completedRows
+                .Where(p => !backdateClosedIds.ContainsKey(p.Id))
                 .Where(p => MetalClassifier.Matches(metalFilter, p.Type))
                 .Select(p => p.CompletedDate)
                 .ToList();

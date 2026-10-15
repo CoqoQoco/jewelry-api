@@ -92,6 +92,13 @@ namespace Jewelry.Service.Production.Insight
                         k++;
                     }
 
+                    // แผนปิดย้อนหลัง: visit สุดท้ายที่จบด้วย synthetic exit คือเวลาปิดปลอม ไม่ใช่การออกจากแผนกจริง — ไม่นับ visit นี้
+                    if (plan.BackdateClosed && k < timeline.Count && timeline[k].Status == ProductionPlanTrendEvaluator.StatusExitedNoHeader)
+                    {
+                        i = k;
+                        continue;
+                    }
+
                     DateTime? visitEnd = k < timeline.Count ? timeline[k].Time : (DateTime?)null;
                     var totalDays = visitEnd.HasValue
                         ? (visitEnd.Value - visitStart).TotalDays

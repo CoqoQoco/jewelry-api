@@ -107,6 +107,42 @@ namespace Jewelry.Api.Controllers.Production
             }
         }
 
+        [Route("BackdateClosePreview")]
+        [HttpPost]
+        [RequirePermission("production:backdate-close")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.BackdateClose.PreviewResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        public async Task<IActionResult> BackdateClosePreview([FromBody] jewelry.Model.Production.Plan.BackdateClose.PreviewRequest request)
+        {
+            try
+            {
+                var response = await _planService.BackdateClosePreview(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("BackdateClose")]
+        [HttpPost]
+        [RequirePermission("production:backdate-close")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Production.Plan.BackdateClose.CloseResponse))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        public async Task<IActionResult> BackdateClose([FromBody] jewelry.Model.Production.Plan.BackdateClose.CloseRequest request)
+        {
+            try
+            {
+                var response = await _planService.BackdateClose(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("DailyPlan")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Production.Plan.DailyPlan.Response>))]

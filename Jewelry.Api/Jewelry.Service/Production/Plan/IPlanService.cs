@@ -11,6 +11,8 @@ namespace Jewelry.Service.Production.Plan
         IQueryable<jewelry.Model.Production.Plan.StatusDetailList.Response> StatusDetailList(jewelry.Model.Production.Plan.StatusDetailList.RequestSearch request);
         IQueryable<jewelry.Model.Production.Plan.TransferList.Response> TransferList(jewelry.Model.Production.Plan.TransferList.RequestSearch request);
         Task<jewelry.Model.Production.Plan.Transfer.Response> Transfer(jewelry.Model.Production.Plan.Transfer.Request request);
+        Task<jewelry.Model.Production.Plan.BackdateClose.PreviewResponse> BackdateClosePreview(jewelry.Model.Production.Plan.BackdateClose.PreviewRequest request);
+        Task<jewelry.Model.Production.Plan.BackdateClose.CloseResponse> BackdateClose(jewelry.Model.Production.Plan.BackdateClose.CloseRequest request);
 
         Task<jewelry.Model.Production.Plan.DailyPlan.Response> GetDailyReport(jewelry.Model.Production.Plan.DailyPlan.Criteria request);
         Task<jewelry.Model.Production.Plan.MonthlyReport.Response> GetPlanSuccessMonthlyReport(jewelry.Model.Production.Plan.MonthlyReport.Criteria request);

@@ -1,4 +1,5 @@
 using Jewelry.Data.Context;
+using Jewelry.Service.Production.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System;
@@ -53,12 +54,17 @@ namespace Jewelry.Service.Production.Insight
                 .Select(g => new { PlanId = g.Key, DoneDate = g.Min(x => x.CreateDate) })
                 .ToListAsync();
 
-            var result = firstDoneTransfers.ToDictionary(x => x.PlanId, x => x.DoneDate);
+            // แผนปิดย้อนหลังไม่ใช่การส่งงานจริง — ไม่มี done date (ไม่เข้า on-time/late/lead time/completed)
+            var backdateClosed = await BackdateClosedPlans.LoadAsync(_jewelryContext);
+
+            var result = firstDoneTransfers
+                .Where(x => !backdateClosed.ContainsKey(x.PlanId))
+                .ToDictionary(x => x.PlanId, x => x.DoneDate);
 
             // fallback completed_date สำหรับแผนที่ไม่มี row transfer เลย (ข้อมูลเก่าก่อนมีตารางนี้)
             foreach (var plan in trendData.Plans)
             {
-                if (!result.ContainsKey(plan.Id) && plan.CompletedDate.HasValue)
+                if (!result.ContainsKey(plan.Id) && !plan.BackdateClosed && !backdateClosed.ContainsKey(plan.Id) && plan.CompletedDate.HasValue)
                 {
                     result[plan.Id] = plan.CompletedDate.Value;
                 }

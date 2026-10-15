@@ -1,4 +1,5 @@
 using Jewelry.Data.Context;
+using Jewelry.Service.Production.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System;
@@ -67,6 +68,27 @@ namespace Jewelry.Service.Production.Insight
                     ReceiveDate = h.ReceiveDate
                 })
                 .ToListAsync();
+
+            var backdateClosed = await BackdateClosedPlans.LoadAsync(_jewelryContext);
+            if (backdateClosed.Count > 0)
+            {
+                // effective exit = header ล่าสุด (create/receive) ก่อน header ปิดย้อนหลัง; ไม่มี -> plan.CreateDate
+                var lastRealMove = headers
+                    .Where(h => backdateClosed.TryGetValue(h.ProductionPlanId, out var markerDate)
+                        && !(h.Status == BackdateClosedPlans.StatusCompleted) && h.CreateDate < markerDate)
+                    .GroupBy(h => h.ProductionPlanId)
+                    .ToDictionary(g => g.Key, g => g.Max(x => x.ReceiveDate.HasValue && x.ReceiveDate.Value > x.CreateDate ? x.ReceiveDate.Value : x.CreateDate));
+
+                foreach (var plan in plans)
+                {
+                    if (!backdateClosed.TryGetValue(plan.Id, out var markerDate)) continue;
+                    var exit = lastRealMove.TryGetValue(plan.Id, out var last) ? last : plan.CreateDate;
+                    plan.BackdateClosed = true;
+                    plan.CompletedDate = exit < markerDate ? exit : markerDate;
+                }
+
+                headers = headers.Where(h => !(h.Status == BackdateClosedPlans.StatusCompleted && backdateClosed.ContainsKey(h.ProductionPlanId))).ToList();
+            }
 
             // MinReceiveDate: คำนวณจาก headers ที่โหลดมาแล้วในหน่วยความจำเลย ไม่ query DB เพิ่ม (ฟรี — ข้อมูลมีอยู่แล้ว)
             var receiveDates = headers.Where(h => h.ReceiveDate.HasValue).Select(h => h.ReceiveDate!.Value).ToList();
