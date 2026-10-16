@@ -166,6 +166,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionWorkerLookupService, ProductionWorkerLookupService>();
             services.AddScoped<IProductionMaterialGemDataProvider, ProductionMaterialGemDataProvider>();
             services.AddScoped<IExecutiveReportService, ExecutiveReportService>();
+            services.AddScoped<IExecutiveFlowService, ExecutiveFlowService>();
             services.AddScoped<IProductionInsightService, ProductionInsightService>();
 
             services.AddScoped<ICatalogService, CatalogService>();
