@@ -64,6 +64,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtProductGallery> TbtProductGallery { get; set; }
 
+    public virtual DbSet<TbtStockPieceRfid> TbtStockPieceRfid { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
 
     public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
@@ -1119,6 +1121,48 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.ContentType)
                 .HasColumnType("character varying")
                 .HasColumnName("content_type");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+        });
+
+        modelBuilder.Entity<TbtStockPieceRfid>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_piece_rfid_pk");
+            entity.ToTable("tbt_stock_piece_rfid");
+
+            entity.HasIndex(e => e.Epc)
+                .IsUnique()
+                .HasFilter("is_active")
+                .HasDatabaseName("idx_tbt_stock_piece_rfid_epc_active");
+            entity.HasIndex(e => new { e.StockNumber, e.ProductCode })
+                .IsUnique()
+                .HasFilter("is_active")
+                .HasDatabaseName("idx_tbt_stock_piece_rfid_piece_active");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.Epc)
+                .HasColumnType("character varying")
+                .HasColumnName("epc");
+            entity.Property(e => e.Tid)
+                .HasColumnType("character varying")
+                .HasColumnName("tid");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
             entity.Property(e => e.IsActive)
                 .HasDefaultValue(true)
                 .HasColumnName("is_active");
