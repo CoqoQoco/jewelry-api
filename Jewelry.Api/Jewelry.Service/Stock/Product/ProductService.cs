@@ -529,9 +529,13 @@ namespace Jewelry.Service.Stock.Product
             }
 
             var sku = piece.SkuCodeNavigation;
+            var skuPieceCount = await _jewelryContext.TbtStockPiece
+                .AsNoTracking()
+                .CountAsync(x => x.SkuCode == piece.SkuCode);
 
             var response = new jewelry.Model.Stock.Product.Get.Response()
             {
+                SkuPieceCount = skuPieceCount,
                 StockNumber = piece.StockNumber,
                 StockNumberOrigin = piece.StockNumberOrigin,
 
@@ -750,23 +754,6 @@ namespace Jewelry.Service.Stock.Product
         {
             CheckPermissionLevel("update_stock");
 
-            var piece = await _jewelryContext.TbtStockPiece
-                .Include(x => x.TbtStockPieceMaterial)
-                .FirstOrDefaultAsync(x => x.StockNumber == request.StockNumber);
-
-            if (piece == null)
-            {
-                throw new HandleException(ErrorMessage.NotFound);
-            }
-
-            var sku = await _jewelryContext.TbtSku
-                .FirstOrDefaultAsync(x => x.SkuCode == piece.SkuCode);
-
-            if (sku == null)
-            {
-                throw new HandleException(ErrorMessage.NotFound);
-            }
-
             var now = DateTime.UtcNow;
 
             TbmProductType? productTypeMaster = null;
@@ -776,30 +763,187 @@ namespace Jewelry.Service.Stock.Product
                     .FirstOrDefaultAsync(x => x.Code == request.ProductType && x.IsActive == true);
             }
 
-            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            var ownsTransaction = _jewelryContext.Database.CurrentTransaction == null;
+            var transaction = ownsTransaction
+                ? await _jewelryContext.Database.BeginTransactionAsync()
+                : null;
+
+            try
             {
-                piece.LocationCode = request.Location ?? piece.LocationCode;
+                // ลำดับ lock เดียวกับ path อื่น: stock piece -> stock balance
+                await _jewelryContext.LockStockPiecesAsync(new[] { request.StockNumber });
+
+                var pieceQuery = _jewelryContext.TbtStockPiece
+                    .Include(x => x.TbtStockPieceMaterial)
+                    .Where(x => x.StockNumber == request.StockNumber);
+
+                if (!string.IsNullOrEmpty(request.ProductCode))
+                {
+                    pieceQuery = pieceQuery.Where(x => x.ProductCode == request.ProductCode);
+                }
+
+                var matchedPieces = await pieceQuery.ToListAsync();
+
+                if (matchedPieces.Count == 0)
+                {
+                    throw new HandleException(ErrorMessage.NotFound);
+                }
+
+                if (matchedPieces.Count > 1)
+                {
+                    throw new HandleException($"พบสินค้าเลข {request.StockNumber} มากกว่า 1 รายการ กรุณาระบุรหัสสินค้า (ProductCode)");
+                }
+
+                var piece = matchedPieces[0];
+                var oldSkuCode = piece.SkuCode;
+                var oldLocation = piece.LocationCode;
+
+                await _jewelryContext.LockStockBalancesAsync(new[] { oldSkuCode });
+
+                var sku = await _jewelryContext.TbtSku
+                    .FirstOrDefaultAsync(x => x.SkuCode == oldSkuCode);
+
+                if (sku == null)
+                {
+                    throw new HandleException(ErrorMessage.NotFound);
+                }
+
+                var finalLocation = request.Location ?? oldLocation;
+                var locationChanged = finalLocation != oldLocation;
+                var forked = false;
+
+                if (IsSkuLevelChanged(sku, request))
+                {
+                    var skuToEdit = sku;
+                    var piecesOnSku = await _jewelryContext.TbtStockPiece
+                        .CountAsync(x => x.SkuCode == oldSkuCode);
+
+                    if (piecesOnSku > 1)
+                    {
+                        if (piece.QtyReserved > 0)
+                        {
+                            throw new HandleException($"สินค้า {piece.StockNumber} มีการจองค้างอยู่ {piece.QtyReserved} ชิ้น ไม่สามารถแก้ข้อมูลที่ใช้ร่วมกับสินค้าอื่น (ราคา/ชื่อ/แบบ/รูป/ประเภท) ได้ กรุณายกเลิกการจองก่อน");
+                        }
+
+                        // sku ถูกแชร์กับชิ้นอื่น: แยก SKU ใหม่เฉพาะชิ้นนี้ ห้ามแก้ SKU เดิม
+                        var forkedSkuCode = $"{oldSkuCode}~{piece.StockNumber}";
+                        if (await _jewelryContext.TbtSku.AnyAsync(x => x.SkuCode == forkedSkuCode))
+                        {
+                            throw new HandleException($"รหัส SKU {forkedSkuCode} มีอยู่แล้ว ไม่สามารถแยกสินค้าได้");
+                        }
+
+                        var forkedSku = CloneSku(sku, forkedSkuCode);
+                        _jewelryContext.TbtSku.Add(forkedSku);
+                        skuToEdit = forkedSku;
+
+                        // ชิ้นที่ไม่มีของคงเหลือ (qty 0) ไม่มี balance ให้ย้าย/สร้าง
+                        if (piece.Qty > 0)
+                        {
+                            var oldBalance = await _jewelryContext.TbtStockBalance
+                                .FirstOrDefaultAsync(x => x.SkuCode == oldSkuCode && x.LocationCode == oldLocation);
+                            if (oldBalance != null)
+                            {
+                                oldBalance.QtyOnHand -= piece.Qty;
+                                oldBalance.LastMovementAt = now;
+                                oldBalance.UpdateDate = now;
+                                oldBalance.UpdateBy = CurrentUsername;
+                                _jewelryContext.TbtStockBalance.Update(oldBalance);
+                            }
+
+                            _jewelryContext.TbtStockBalance.Add(new TbtStockBalance
+                            {
+                                SkuCode = forkedSkuCode,
+                                LocationCode = finalLocation,
+                                QtyOnHand = piece.Qty,
+                                QtyReserved = 0,
+                                LastMovementAt = now,
+                                CreateBy = CurrentUsername,
+                                CreateDate = now
+                            });
+
+                            if (locationChanged)
+                            {
+                                _jewelryContext.TbtStockMovement.Add(BuildEditLocationMovement(piece, forkedSkuCode, oldLocation, finalLocation, now));
+                            }
+                        }
+
+                        piece.SkuCode = forkedSkuCode;
+                        forked = true;
+                    }
+
+                    skuToEdit.ProductNameEn = request.ProductNameEn;
+                    skuToEdit.ProductNameTh = request.ProductNameTh;
+                    skuToEdit.ProductNumber = request.ProductNumber;
+                    skuToEdit.MoldDesign = request.Mold;
+                    skuToEdit.DefaultPrice = request.ProductPrice;
+                    skuToEdit.ImageName = request.ImageName;
+                    skuToEdit.ImagePath = request.ImagePath;
+                    skuToEdit.EarringStemSize = request.EarringStemSize;
+                    if (!string.IsNullOrEmpty(request.ProductType))
+                    {
+                        skuToEdit.ProductType = request.ProductType;
+                        skuToEdit.ProductTypeName = productTypeMaster?.NameTh;
+                    }
+                    skuToEdit.UpdateDate = now;
+                    skuToEdit.UpdateBy = CurrentUsername;
+
+                    if (ReferenceEquals(skuToEdit, sku))
+                    {
+                        _jewelryContext.TbtSku.Update(sku);
+                    }
+                }
+
+                if (locationChanged && !forked && piece.Qty > 0)
+                {
+                    if (piece.QtyReserved > 0)
+                    {
+                        throw new HandleException($"ไม่สามารถย้ายคลังสินค้า {piece.StockNumber} ได้ เนื่องจากมีการจองค้างอยู่ {piece.QtyReserved} ชิ้น");
+                    }
+
+                    var srcBalance = await _jewelryContext.TbtStockBalance
+                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == oldLocation);
+                    if (srcBalance != null)
+                    {
+                        srcBalance.QtyOnHand -= piece.Qty;
+                        srcBalance.LastMovementAt = now;
+                        srcBalance.UpdateDate = now;
+                        srcBalance.UpdateBy = CurrentUsername;
+                        _jewelryContext.TbtStockBalance.Update(srcBalance);
+                    }
+
+                    var dstBalance = await _jewelryContext.TbtStockBalance
+                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == finalLocation);
+                    if (dstBalance == null)
+                    {
+                        _jewelryContext.TbtStockBalance.Add(new TbtStockBalance
+                        {
+                            SkuCode = piece.SkuCode,
+                            LocationCode = finalLocation,
+                            QtyOnHand = piece.Qty,
+                            QtyReserved = 0,
+                            LastMovementAt = now,
+                            CreateDate = now,
+                            CreateBy = CurrentUsername
+                        });
+                    }
+                    else
+                    {
+                        dstBalance.QtyOnHand += piece.Qty;
+                        dstBalance.LastMovementAt = now;
+                        dstBalance.UpdateDate = now;
+                        dstBalance.UpdateBy = CurrentUsername;
+                        _jewelryContext.TbtStockBalance.Update(dstBalance);
+                    }
+
+                    _jewelryContext.TbtStockMovement.Add(BuildEditLocationMovement(piece, piece.SkuCode, oldLocation, finalLocation, now));
+                }
+
+                piece.LocationCode = finalLocation;
                 piece.SizeActual = request.Size;
                 piece.Remark = request.Remark;
                 piece.ProductCost = request.ProductCost ?? piece.ProductCost;
                 piece.UpdateDate = now;
                 piece.UpdateBy = CurrentUsername;
-
-                sku.ProductNameEn = request.ProductNameEn;
-                sku.ProductNameTh = request.ProductNameTh;
-                sku.ProductNumber = request.ProductNumber;
-                sku.MoldDesign = request.Mold;
-                sku.DefaultPrice = request.ProductPrice;
-                sku.ImageName = request.ImageName;
-                sku.ImagePath = request.ImagePath;
-                sku.EarringStemSize = request.EarringStemSize;
-                if (!string.IsNullOrEmpty(request.ProductType))
-                {
-                    sku.ProductType = request.ProductType;
-                    sku.ProductTypeName = productTypeMaster?.NameTh;
-                }
-                sku.UpdateDate = now;
-                sku.UpdateBy = CurrentUsername;
 
                 if (piece.TbtStockPieceMaterial.Any())
                 {
@@ -838,17 +982,99 @@ namespace Jewelry.Service.Stock.Product
                 }
 
                 _jewelryContext.TbtStockPiece.Update(piece);
-                _jewelryContext.TbtSku.Update(sku);
                 if (newMats.Any())
                 {
                     _jewelryContext.TbtStockPieceMaterial.AddRange(newMats);
                 }
 
                 await _jewelryContext.SaveChangesAsync();
-                scope.Complete();
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
             }
 
             return "success";
+        }
+
+        private TbtStockMovement BuildEditLocationMovement(TbtStockPiece piece, string skuCode, string? fromLocation, string toLocation, DateTime now)
+        {
+            return new TbtStockMovement
+            {
+                MovementDate = now,
+                MovementType = "Transfer",
+                SkuCode = skuCode,
+                StockNumber = piece.StockNumber,
+                ProductCode = piece.ProductCode,
+                FromLocation = fromLocation,
+                ToLocation = toLocation,
+                Qty = piece.Qty,
+                RefDocType = "EditProduct",
+                Remark = null,
+                CreateDate = now,
+                CreateBy = CurrentUsername
+            };
+        }
+
+        private static string? NormalizeText(string? value) => string.IsNullOrEmpty(value) ? null : value;
+
+        private static bool IsSkuLevelChanged(TbtSku sku, jewelry.Model.Stock.Product.Update.Request request)
+        {
+            if (NormalizeText(sku.ProductNameEn) != NormalizeText(request.ProductNameEn)) return true;
+            if (NormalizeText(sku.ProductNameTh) != NormalizeText(request.ProductNameTh)) return true;
+            if (NormalizeText(sku.ProductNumber) != NormalizeText(request.ProductNumber)) return true;
+            if (NormalizeText(sku.MoldDesign) != NormalizeText(request.Mold)) return true;
+            if (sku.DefaultPrice != request.ProductPrice) return true;
+            if (NormalizeText(sku.ImageName) != NormalizeText(request.ImageName)) return true;
+            if (NormalizeText(sku.ImagePath) != NormalizeText(request.ImagePath)) return true;
+            if (NormalizeText(sku.EarringStemSize) != NormalizeText(request.EarringStemSize)) return true;
+            if (!string.IsNullOrEmpty(request.ProductType) && sku.ProductType != request.ProductType) return true;
+            return false;
+        }
+
+        private TbtSku CloneSku(TbtSku source, string skuCode)
+        {
+            return new TbtSku
+            {
+                SkuCode = skuCode,
+                ProductNumber = source.ProductNumber,
+                ProductNameTh = source.ProductNameTh,
+                ProductNameEn = source.ProductNameEn,
+                ProductType = source.ProductType,
+                ProductTypeName = source.ProductTypeName,
+                Mold = source.Mold,
+                MoldDesign = source.MoldDesign,
+                StudEarring = source.StudEarring,
+                EarringStemSize = source.EarringStemSize,
+                Size = source.Size,
+                ProductionType = source.ProductionType,
+                ProductionTypeSize = source.ProductionTypeSize,
+                ImageName = source.ImageName,
+                ImagePath = source.ImagePath,
+                DefaultPrice = source.DefaultPrice,
+                TagPriceMultiplier = source.TagPriceMultiplier,
+                IsActive = source.IsActive,
+                IsSerialized = source.IsSerialized,
+                Remark = source.Remark,
+                CreateDate = DateTime.UtcNow,
+                CreateBy = CurrentUsername
+            };
         }
 
         public async Task<jewelry.Model.Stock.Product.UpdatePriceBulk.Response> UpdatePriceBulk(jewelry.Model.Stock.Product.UpdatePriceBulk.Request request)
