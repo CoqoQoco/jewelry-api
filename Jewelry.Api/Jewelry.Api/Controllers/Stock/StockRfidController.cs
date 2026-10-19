@@ -25,6 +25,7 @@ namespace Jewelry.Api.Controllers.Stock
 
         [Route("Bind")]
         [HttpPost]
+        [RequirePermission("stock-rfid:bind")]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.Bind.Response))]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -43,6 +44,7 @@ namespace Jewelry.Api.Controllers.Stock
 
         [Route("Unbind")]
         [HttpPost]
+        [RequirePermission("stock-rfid:bind")]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.Unbind.Response))]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -61,6 +63,7 @@ namespace Jewelry.Api.Controllers.Stock
 
         [Route("GetByEpc")]
         [HttpPost]
+        [RequirePermission("stock-rfid:view")]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.GetByEpc.Response))]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -79,6 +82,7 @@ namespace Jewelry.Api.Controllers.Stock
 
         [Route("GetByEpcs")]
         [HttpPost]
+        [RequirePermission("stock-rfid:view")]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.GetByEpcs.Response))]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -97,6 +101,7 @@ namespace Jewelry.Api.Controllers.Stock
 
         [Route("GetByStock")]
         [HttpPost]
+        [RequirePermission("stock-rfid:view")]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.GetByStock.Response))]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -105,6 +110,82 @@ namespace Jewelry.Api.Controllers.Stock
             try
             {
                 var response = await _service.GetByStock(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListReceipts")]
+        [HttpPost]
+        [RequirePermission("stock-rfid:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.ListReceipts.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ListReceipts([FromBody] jewelry.Model.Stock.Rfid.ListReceipts.Request request)
+        {
+            try
+            {
+                var response = await _service.ListReceipts(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListByReceipt")]
+        [HttpPost]
+        [RequirePermission("stock-rfid:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.ListByReceipt.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ListByReceipt([FromBody] jewelry.Model.Stock.Rfid.ListByReceipt.Request request)
+        {
+            try
+            {
+                var response = await _service.ListByReceipt(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListUnbound")]
+        [HttpPost]
+        [RequirePermission("stock-rfid:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.ListUnbound.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ListUnbound([FromBody] jewelry.Model.Stock.Rfid.ListUnbound.Request request)
+        {
+            try
+            {
+                var response = await _service.ListUnbound(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListRecent")]
+        [HttpPost]
+        [RequirePermission("stock-rfid:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.ListRecent.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ListRecent([FromBody] jewelry.Model.Stock.Rfid.ListRecent.Request request)
+        {
+            try
+            {
+                var response = await _service.ListRecent(request);
                 return Ok(response);
             }
             catch (HandleException ex)
