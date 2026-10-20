@@ -50,6 +50,7 @@ using Jewelry.Service.Stock.Balance;
 using Jewelry.Service.Stock.Location;
 using Jewelry.Service.Stock.Movement;
 using Jewelry.Service.Stock.Piece;
+using Jewelry.Service.Stock.PriceSanity;
 using Jewelry.Service.Catalog;
 using Jewelry.Service.GoldPrice;
 using Jewelry.Service.Stock.Reconciliation;
@@ -159,6 +160,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IStockProductGalleryService, StockProductGalleryService>();
             services.AddScoped<IStockRfidService, StockRfidService>();
             services.AddScoped<IStockReportService, StockReportService>();
+            services.AddScoped<IPriceSanityService, PriceSanityService>();
             services.AddScoped<IProductionPlanWipHelper, ProductionPlanWipHelper>();
             services.AddScoped<IProductionPlanTrendDataProvider, ProductionPlanTrendDataProvider>();
             services.AddScoped<IProductionStageStandardService, ProductionStageStandardService>();

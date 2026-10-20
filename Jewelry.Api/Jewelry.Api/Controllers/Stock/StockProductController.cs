@@ -6,6 +6,7 @@ using Jewelry.Api.Extension;
 using Jewelry.Service.PublicProduct;
 using Jewelry.Service.Stock;
 using Jewelry.Service.Stock.PlanReceipt;
+using Jewelry.Service.Stock.PriceSanity;
 using Jewelry.Service.Stock.Product;
 using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Authorization;
@@ -24,11 +25,13 @@ namespace Jewelry.Api.Controllers.Stock
         private readonly IProductService _service;
         private readonly IPlanReceiptService _planReceiptservice;
         private readonly IPublicProductService _publicProductService;
+        private readonly IPriceSanityService _priceSanityService;
 
         public StockProductController(ILogger<MoldController> logger,
            IProductService service,
            IPlanReceiptService planReceiptservice,
            IPublicProductService publicProductService,
+           IPriceSanityService priceSanityService,
            IOptions<ApiBehaviorOptions> apiBehaviorOptions)
            : base(apiBehaviorOptions)
         {
@@ -36,6 +39,7 @@ namespace Jewelry.Api.Controllers.Stock
             _service = service;
             _planReceiptservice = planReceiptservice;
             _publicProductService = publicProductService;
+            _priceSanityService = priceSanityService;
         }
 
         [Route("List")]
@@ -418,6 +422,23 @@ namespace Jewelry.Api.Controllers.Stock
             try
             {
                 var response = await _service.GetAvailability(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("PriceCheck")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.PriceCheck.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PriceCheck([FromBody] jewelry.Model.Stock.Product.PriceCheck.Request request)
+        {
+            try
+            {
+                var response = await _priceSanityService.Check(request);
                 return Ok(response);
             }
             catch (HandleException ex)
