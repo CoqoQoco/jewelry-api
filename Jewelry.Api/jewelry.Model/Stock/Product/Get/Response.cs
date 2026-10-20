@@ -62,6 +62,16 @@ namespace jewelry.Model.Stock.Product.Get
 
         public ConvertedFromInfo? ConvertedFrom { get; set; }
         public ConvertedToInfo? ConvertedTo { get; set; }
+
+        public decimal? QuickPrice { get; set; }
+        public DateTime? QuickPriceDate { get; set; }
+        public decimal? QuickPriceGoldPrice { get; set; }
+        public decimal? QuickPriceMarkup { get; set; }
+        public decimal? QuickPricePercent { get; set; }
+        public int? QuickPriceRounding { get; set; }
+        public string? QuickPriceRemark { get; set; }
+        public string? QuickPriceBy { get; set; }
+        public bool HasNormalAppraisal { get; set; }
     }
 
     public class ConvertedFromInfo

@@ -61,6 +61,16 @@ namespace jewelry.Model.Stock.Product.List
         public string? LastMoveFromLocationName { get; set; }
         public DateTime? LastMoveDate { get; set; }
         public string? LastMoveBy { get; set; }
+
+        public decimal? QuickPrice { get; set; }
+        public DateTime? QuickPriceDate { get; set; }
+        public decimal? QuickPriceGoldPrice { get; set; }
+        public decimal? QuickPriceMarkup { get; set; }
+        public decimal? QuickPricePercent { get; set; }
+        public int? QuickPriceRounding { get; set; }
+        public string? QuickPriceRemark { get; set; }
+        public string? QuickPriceBy { get; set; }
+        public bool HasNormalAppraisal { get; set; }
     }
 
     public class Material

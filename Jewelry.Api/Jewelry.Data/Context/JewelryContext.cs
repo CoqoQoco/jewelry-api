@@ -66,6 +66,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockPieceRfid> TbtStockPieceRfid { get; set; }
 
+    public virtual DbSet<TbtStockPieceQuickPrice> TbtStockPieceQuickPrice { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
 
     public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
@@ -1174,6 +1176,45 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
+        });
+
+        modelBuilder.Entity<TbtStockPieceQuickPrice>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_piece_quick_price_pk");
+            entity.ToTable("tbt_stock_piece_quick_price");
+
+            entity.HasIndex(e => new { e.StockNumber, e.CreateDate }).HasDatabaseName("idx_tbt_stock_piece_quick_price_stock");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.SalePrice).HasColumnName("sale_price");
+            entity.Property(e => e.Markup).HasColumnName("markup");
+            entity.Property(e => e.GoldWeight).HasColumnName("gold_weight");
+            entity.Property(e => e.GoldPrice).HasColumnName("gold_price");
+            entity.Property(e => e.Cost).HasColumnName("cost");
+            entity.Property(e => e.CostExGold).HasColumnName("cost_ex_gold");
+            entity.Property(e => e.Percent).HasColumnName("percent");
+            entity.Property(e => e.Rounding).HasColumnName("rounding");
+            entity.Property(e => e.QuickPrice).HasColumnName("quick_price");
+            entity.Property(e => e.Remark)
+                .HasMaxLength(500)
+                .HasColumnType("character varying")
+                .HasColumnName("remark");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
         });
 
         modelBuilder.Entity<TbtProductMold>(entity =>

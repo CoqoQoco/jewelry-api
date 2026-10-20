@@ -43,12 +43,17 @@ namespace Jewelry.Api.Controllers.Stock
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.List.Response>))]
         [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
-        public DataSourceResult List([FromBody] jewelry.Model.Stock.Product.List.Request request)
+        public async Task<DataSourceResult> List([FromBody] jewelry.Model.Stock.Product.List.Request request)
         {
             try
             {
                 var response = _service.List(request.Search);
-                return response.ToDataSource(request);
+                var result = response.ToDataSource(request);
+                if (result.Data != null)
+                {
+                    await _service.AttachQuickPrice(result.Data.OfType<jewelry.Model.Stock.Product.List.Response>());
+                }
+                return result;
 
             }
             catch (HandleException ex)
@@ -70,6 +75,40 @@ namespace Jewelry.Api.Controllers.Stock
                 var response = await _service.Get(request);
                 return Ok(response);
 
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("QuickPriceCreate")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.QuickPrice.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> QuickPriceCreate([FromBody] jewelry.Model.Stock.Product.QuickPrice.CreateRequest request)
+        {
+            try
+            {
+                var response = await _service.QuickPriceCreate(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("QuickPriceList")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Stock.Product.QuickPrice.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> QuickPriceList([FromBody] jewelry.Model.Stock.Product.QuickPrice.ListRequest request)
+        {
+            try
+            {
+                var response = await _service.QuickPriceList(request);
+                return Ok(response);
             }
             catch (HandleException ex)
             {

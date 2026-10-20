@@ -50,5 +50,8 @@ namespace jewelry.Model.Stock.Product.List
         public bool? MaterialMatchAll { get; set; }
         public decimal? PriceMin { get; set; }
         public decimal? PriceMax { get; set; }
+
+        // null/"" = ทั้งหมด, NO_NORMAL = ยังไม่เคยตีราคาปกติ, HAS_QUICK = มีราคาตีด่วน
+        public string? PriceStatus { get; set; }
     }
 }

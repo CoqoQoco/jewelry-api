@@ -160,6 +160,15 @@ namespace Jewelry.Service.Stock.Product
                 pieces = pieces.Where(x => x.Status == request.PieceStatus);
             }
 
+            if (request.PriceStatus == "NO_NORMAL")
+            {
+                pieces = pieces.Where(x => !((x.ProductCostDetail != null && x.ProductCostDetail != "") || x.TbtStockPieceCostVersion.Any()));
+            }
+            else if (request.PriceStatus == "HAS_QUICK")
+            {
+                pieces = pieces.Where(x => _jewelryContext.TbtStockPieceQuickPrice.Any(q => q.StockNumber == x.StockNumber && q.IsActive));
+            }
+
             if (request.LastMoveFromLocations != null && request.LastMoveFromLocations.Any())
             {
                 var lastMoveFromLocationArray = request.LastMoveFromLocations.ToArray();
@@ -330,6 +339,7 @@ namespace Jewelry.Service.Stock.Product
                                    UpdateBy = item.UpdateBy,
 
                                    TagPriceMultiplier = item.SkuCodeNavigation.TagPriceMultiplier ?? 1,
+                                   HasNormalAppraisal = (item.ProductCostDetail != null && item.ProductCostDetail != "") || item.TbtStockPieceCostVersion.Any(),
 
                                    Materials = item.TbtStockPieceMaterial.Any()
                                        ? (from material in item.TbtStockPieceMaterial
@@ -419,6 +429,7 @@ namespace Jewelry.Service.Stock.Product
                                UpdateBy = item.UpdateBy,
 
                                TagPriceMultiplier = item.SkuCodeNavigation.TagPriceMultiplier ?? 1,
+                               HasNormalAppraisal = (item.ProductCostDetail != null && item.ProductCostDetail != "") || item.TbtStockPieceCostVersion.Any(),
 
                                Materials = item.TbtStockPieceMaterial.Any()
                                    ? (from material in item.TbtStockPieceMaterial
@@ -589,6 +600,26 @@ namespace Jewelry.Service.Stock.Product
                              }).ToList(),
             };
 
+            response.HasNormalAppraisal = !string.IsNullOrEmpty(piece.ProductCostDetail)
+                || await _jewelryContext.TbtStockPieceCostVersion.AnyAsync(x => x.StockNumber == piece.StockNumber && x.ProductCode == piece.ProductCode);
+
+            var latestQuickPrice = await _jewelryContext.TbtStockPieceQuickPrice
+                .AsNoTracking()
+                .Where(q => q.StockNumber == piece.StockNumber && q.IsActive)
+                .OrderByDescending(q => q.CreateDate)
+                .FirstOrDefaultAsync();
+            if (latestQuickPrice != null)
+            {
+                response.QuickPrice = latestQuickPrice.QuickPrice;
+                response.QuickPriceDate = latestQuickPrice.CreateDate;
+                response.QuickPriceGoldPrice = latestQuickPrice.GoldPrice;
+                response.QuickPriceMarkup = latestQuickPrice.Markup;
+                response.QuickPricePercent = latestQuickPrice.Percent;
+                response.QuickPriceRounding = latestQuickPrice.Rounding;
+                response.QuickPriceRemark = latestQuickPrice.Remark;
+                response.QuickPriceBy = latestQuickPrice.CreateBy;
+            }
+
             response.Reservations = await _jewelryContext.TbtSaleOrderProduct
                 .AsNoTracking()
                 // placeholder (รายการรอของ) ไม่เคยจองชิ้นนี้จริง — กันเลขที่พนักงานพิมพ์เองพ้องกับเลขสต็อกจริงโดยบังเอิญ
@@ -750,6 +781,169 @@ namespace Jewelry.Service.Stock.Product
 
             return response;
         }
+        public async Task AttachQuickPrice(IEnumerable<jewelry.Model.Stock.Product.List.Response> items)
+        {
+            var rows = items.ToList();
+            if (rows.Count == 0) return;
+
+            var stockNumbers = rows.Select(x => x.StockNumber).Distinct().ToList();
+            var quickPrices = await _jewelryContext.TbtStockPieceQuickPrice
+                .AsNoTracking()
+                .Where(q => stockNumbers.Contains(q.StockNumber) && q.IsActive)
+                .OrderByDescending(q => q.CreateDate)
+                .ToListAsync();
+
+            var latestByStock = new Dictionary<string, TbtStockPieceQuickPrice>();
+            foreach (var q in quickPrices)
+            {
+                latestByStock.TryAdd(q.StockNumber, q);
+            }
+
+            foreach (var row in rows)
+            {
+                if (!latestByStock.TryGetValue(row.StockNumber, out var q)) continue;
+                row.QuickPrice = q.QuickPrice;
+                row.QuickPriceDate = q.CreateDate;
+                row.QuickPriceGoldPrice = q.GoldPrice;
+                row.QuickPriceMarkup = q.Markup;
+                row.QuickPricePercent = q.Percent;
+                row.QuickPriceRounding = q.Rounding;
+                row.QuickPriceRemark = q.Remark;
+                row.QuickPriceBy = q.CreateBy;
+            }
+        }
+
+        public async Task<jewelry.Model.Stock.Product.QuickPrice.Response> QuickPriceCreate(jewelry.Model.Stock.Product.QuickPrice.CreateRequest request)
+        {
+            CheckPermissionLevel("update_stock");
+
+            if (string.IsNullOrWhiteSpace(request.StockNumber))
+            {
+                throw new HandleException("กรุณาระบุเลขสต็อก");
+            }
+            if (request.Markup <= 0) throw new HandleException("Markup ต้องมากกว่า 0");
+            if (request.GoldWeight < 0) throw new HandleException("น้ำหนักทองต้องไม่ติดลบ");
+            if (request.GoldPrice < 0) throw new HandleException("ราคาทองต้องไม่ติดลบ");
+            if (request.Percent < 0) throw new HandleException("เปอร์เซ็นต์ต้องไม่ติดลบ");
+            if (request.Rounding != 0 && request.Rounding != 10 && request.Rounding != 100 && request.Rounding != 1000)
+            {
+                throw new HandleException("การปัดเศษต้องเป็น 0, 10, 100 หรือ 1000");
+            }
+            if (request.Remark != null && request.Remark.Length > 500)
+            {
+                throw new HandleException("หมายเหตุต้องไม่เกิน 500 ตัวอักษร");
+            }
+
+            var piece = await _jewelryContext.TbtStockPiece
+                .AsNoTracking()
+                .Include(x => x.SkuCodeNavigation)
+                .FirstOrDefaultAsync(x => x.StockNumber == request.StockNumber);
+
+            if (piece == null)
+            {
+                var normalized = StockNumberSearch.Normalize(request.StockNumber);
+                piece = await _jewelryContext.TbtStockPiece
+                    .AsNoTracking()
+                    .Include(x => x.SkuCodeNavigation)
+                    .FirstOrDefaultAsync(x => x.StockNumber.Replace("-", "") == normalized);
+            }
+
+            if (piece == null)
+            {
+                throw new HandleException(ErrorMessage.NotFound);
+            }
+
+            var salePrice = piece.SkuCodeNavigation?.DefaultPrice ?? 0;
+            if (salePrice <= 0)
+            {
+                throw new HandleException("สินค้านี้ไม่มีราคาขาย ไม่สามารถตีราคาด่วนได้");
+            }
+
+            var cost = salePrice / request.Markup;
+            var costExGold = cost - request.GoldWeight * request.GoldPrice;
+            if (costExGold <= 0)
+            {
+                throw new HandleException("ทุนไม่รวมทองติดลบหรือเป็นศูนย์ ตรวจ Markup หรือน้ำหนักทอง");
+            }
+
+            var raw = costExGold * (1 + request.Percent / 100m);
+            var quickPrice = request.Rounding == 0
+                ? Math.Round(raw, 2, MidpointRounding.AwayFromZero)
+                : Math.Ceiling(raw / request.Rounding) * request.Rounding;
+
+            var entity = new TbtStockPieceQuickPrice
+            {
+                StockNumber = piece.StockNumber,
+                SalePrice = salePrice,
+                Markup = request.Markup,
+                GoldWeight = request.GoldWeight,
+                GoldPrice = request.GoldPrice,
+                Cost = cost,
+                CostExGold = costExGold,
+                Percent = request.Percent,
+                Rounding = request.Rounding,
+                QuickPrice = quickPrice,
+                Remark = string.IsNullOrWhiteSpace(request.Remark) ? null : request.Remark.Trim(),
+                IsActive = true,
+                CreateBy = CurrentUsername,
+                CreateDate = DateTime.UtcNow
+            };
+
+            _jewelryContext.TbtStockPieceQuickPrice.Add(entity);
+            await _jewelryContext.SaveChangesAsync();
+
+            return MapQuickPrice(entity);
+        }
+
+        public async Task<List<jewelry.Model.Stock.Product.QuickPrice.Response>> QuickPriceList(jewelry.Model.Stock.Product.QuickPrice.ListRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.StockNumber))
+            {
+                throw new HandleException("กรุณาระบุเลขสต็อก");
+            }
+
+            var stockNumber = request.StockNumber;
+            if (!await _jewelryContext.TbtStockPiece.AnyAsync(x => x.StockNumber == stockNumber))
+            {
+                var normalized = StockNumberSearch.Normalize(stockNumber);
+                var resolved = await _jewelryContext.TbtStockPiece
+                    .AsNoTracking()
+                    .Where(x => x.StockNumber.Replace("-", "") == normalized)
+                    .Select(x => x.StockNumber)
+                    .FirstOrDefaultAsync();
+                if (resolved != null) stockNumber = resolved;
+            }
+
+            var rows = await _jewelryContext.TbtStockPieceQuickPrice
+                .AsNoTracking()
+                .Where(q => q.StockNumber == stockNumber && q.IsActive)
+                .OrderByDescending(q => q.CreateDate)
+                .ToListAsync();
+
+            return rows.Select(MapQuickPrice).ToList();
+        }
+
+        private static jewelry.Model.Stock.Product.QuickPrice.Response MapQuickPrice(TbtStockPieceQuickPrice q)
+        {
+            return new jewelry.Model.Stock.Product.QuickPrice.Response
+            {
+                Id = q.Id,
+                StockNumber = q.StockNumber,
+                SalePrice = q.SalePrice,
+                Markup = q.Markup,
+                GoldWeight = q.GoldWeight,
+                GoldPrice = q.GoldPrice,
+                Cost = q.Cost,
+                CostExGold = q.CostExGold,
+                Percent = q.Percent,
+                Rounding = q.Rounding,
+                QuickPrice = q.QuickPrice,
+                Remark = q.Remark,
+                CreateBy = q.CreateBy,
+                CreateDate = q.CreateDate
+            };
+        }
+
         public async Task<string> Update(jewelry.Model.Stock.Product.Update.Request request)
         {
             CheckPermissionLevel("update_stock");
