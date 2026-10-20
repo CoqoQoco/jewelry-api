@@ -68,6 +68,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockPieceQuickPrice> TbtStockPieceQuickPrice { get; set; }
 
+    public virtual DbSet<TbtStockPriceReviewAck> TbtStockPriceReviewAck { get; set; }
+
     public virtual DbSet<TbtProductMold> TbtProductMold { get; set; }
 
     public virtual DbSet<TbtProductMoldPlan> TbtProductMoldPlan { get; set; }
@@ -1204,6 +1206,37 @@ public partial class JewelryContext : DbContext
                 .HasMaxLength(500)
                 .HasColumnType("character varying")
                 .HasColumnName("remark");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtStockPriceReviewAck>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_price_review_ack_pk");
+            entity.ToTable("tbt_stock_price_review_ack");
+
+            entity.HasIndex(e => new { e.StockNumber, e.IsActive }).HasDatabaseName("idx_tbt_stock_price_review_ack_stock");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.PriceAcked).HasColumnName("price_acked");
+            entity.Property(e => e.Note)
+                .HasMaxLength(500)
+                .HasColumnType("character varying")
+                .HasColumnName("note");
             entity.Property(e => e.IsActive)
                 .HasDefaultValue(true)
                 .HasColumnName("is_active");

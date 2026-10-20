@@ -430,6 +430,50 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("PriceOutlierList")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PriceOutlierList([FromBody] jewelry.Model.Stock.Product.PriceOutlierList.Request request)
+        {
+            var response = await _priceSanityService.OutlierList(request);
+            return Ok(response);
+        }
+
+        [Route("PriceReviewAck")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.PriceReviewAck.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PriceReviewAck([FromBody] jewelry.Model.Stock.Product.PriceReviewAck.AckRequest request)
+        {
+            try
+            {
+                var response = await _priceSanityService.Ack(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("PriceReviewUnack")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.PriceReviewAck.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> PriceReviewUnack([FromBody] jewelry.Model.Stock.Product.PriceReviewAck.UnackRequest request)
+        {
+            try
+            {
+                var response = await _priceSanityService.Unack(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("PriceCheck")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Product.PriceCheck.Response))]

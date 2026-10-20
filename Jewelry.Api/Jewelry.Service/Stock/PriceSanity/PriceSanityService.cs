@@ -1,5 +1,8 @@
 using jewelry.Model.Exceptions;
 using jewelry.Model.Stock.Product.PriceCheck;
+using Kendo.DynamicLinqCore;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using Jewelry.Data.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -8,10 +11,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Base;
+using Jewelry.Service.Stock.Product;
+using Microsoft.AspNetCore.Http;
 
 namespace Jewelry.Service.Stock.PriceSanity
 {
-    public class PriceSanityService : IPriceSanityService
+    public class PriceSanityService : BaseService, IPriceSanityService
     {
         private const int MaxItems = 500;
         private const string CacheKey = "PriceSanity:Snapshot";
@@ -20,11 +27,207 @@ namespace Jewelry.Service.Stock.PriceSanity
 
         private readonly JewelryContext _jewelryContext;
         private readonly IMemoryCache _cache;
+        private readonly ILogger<PriceSanityService> _logger;
 
-        public PriceSanityService(JewelryContext jewelryContext, IMemoryCache cache)
+        private readonly IProductService _productService;
+
+        public PriceSanityService(JewelryContext jewelryContext, IMemoryCache cache, ILogger<PriceSanityService> logger,
+            IHttpContextAccessor httpContextAccessor, IProductService productService)
+            : base(jewelryContext, httpContextAccessor)
         {
+            _productService = productService;
             _jewelryContext = jewelryContext;
             _cache = cache;
+            _logger = logger;
+        }
+
+        public async Task<DataSourceResult> OutlierList(jewelry.Model.Stock.Product.PriceOutlierList.Request request)
+        {
+            var sw = Stopwatch.StartNew();
+            SnapshotBuild build;
+            await BuildLock.WaitAsync();
+            try
+            {
+                build = await BuildSnapshot();
+                _cache.Set(CacheKey, build.Snap, CacheDuration);
+            }
+            finally
+            {
+                BuildLock.Release();
+            }
+
+            var activeAcks = await _jewelryContext.TbtStockPriceReviewAck.AsNoTracking()
+                .Where(a => a.IsActive)
+                .ToListAsync();
+            var ackByStock = activeAcks
+                .GroupBy(a => a.StockNumber, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.CreateDate).ThenByDescending(a => a.Id).First(), StringComparer.OrdinalIgnoreCase);
+
+            var all = new List<jewelry.Model.Stock.Product.PriceOutlierList.OutlierItem>();
+            foreach (var p in build.Pieces)
+            {
+                if (!build.SkuByCode.TryGetValue(p.SkuCode, out var sku)) continue;
+                var price = sku.DefaultPrice ?? 0m;
+                if (price <= 0) continue;
+
+                var hasMat = build.MatByKey.TryGetValue(p.StockNumber + "|" + p.ProductCode, out var mat);
+                var ctx = new PriceSanityContext
+                {
+                    StockNumber = p.StockNumber,
+                    SkuCode = p.SkuCode,
+                    Wo = p.Wo,
+                    WoNumber = p.WoNumber,
+                    MoldDesign = sku.MoldDesign,
+                    ProductTypeName = sku.ProductTypeName,
+                    ProductionType = sku.ProductionType,
+                    GoldWeight = hasMat ? mat.Gold : 0m,
+                    GemPrice = hasMat ? mat.Gem : 0m,
+                    OldPrice = price
+                };
+                var reasons = PriceSanityEvaluator.Evaluate(build.Snap, ctx, price);
+                if (reasons.Count == 0) continue;
+
+                ackByStock.TryGetValue(p.StockNumber, out var ack);
+                all.Add(new jewelry.Model.Stock.Product.PriceOutlierList.OutlierItem
+                {
+                    StockNumber = p.StockNumber,
+                    StockNumberOrigin = p.StockNumberOrigin,
+                    SkuCode = p.SkuCode,
+                    ProductNumber = sku.ProductNumber,
+                    ProductNameTh = sku.ProductNameTh,
+                    ProductTypeName = sku.ProductTypeName,
+                    ProductionType = sku.ProductionType,
+                    Wo = p.Wo,
+                    WoNumber = p.WoNumber,
+                    Price = price,
+                    ImagePath = sku.ImagePath,
+                    Score = PriceSanityEvaluator.Score(reasons),
+                    Reasons = reasons,
+                    SuggestedPrice = PriceSanityEvaluator.Suggest(build.Snap, ctx, price),
+                    AckPrice = ack?.PriceAcked,
+                    AckBy = ack?.CreateBy,
+                    AckDate = ack == null ? null : new DateTimeOffset(DateTime.SpecifyKind(ack.CreateDate, DateTimeKind.Utc)),
+                    AckNote = ack?.Note,
+                    IsAcked = ack != null && ack.PriceAcked == price,
+                    PriceChangedSinceAck = ack != null && ack.PriceAcked != price
+                });
+            }
+
+            var filter = request?.Search?.Filter;
+            if (filter != null && HasAnyFilter(filter))
+            {
+                var allowed = (await _productService.List(filter)
+                    .Select(x => x.StockNumber)
+                    .Distinct()
+                    .ToListAsync())
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                all = all.Where(x => allowed.Contains(x.StockNumber)).ToList();
+            }
+
+            var result = PriceOutlierQuery.FilterSortPage(all, request);
+            sw.Stop();
+            _logger.LogInformation("PriceOutlierList: pieces={Pieces} flagged={Flagged} elapsedMs={Elapsed}",
+                build.Pieces.Count, all.Count, sw.ElapsedMilliseconds);
+            return result;
+        }
+
+        public async Task<jewelry.Model.Stock.Product.PriceReviewAck.Response> Ack(jewelry.Model.Stock.Product.PriceReviewAck.AckRequest request)
+        {
+            CheckPermissionLevel("update_stock");
+
+            var stockNumbers = NormalizeStockNumbers(request?.StockNumbers);
+            if (request?.Note != null && request.Note.Length > 500)
+                throw new HandleException("หมายเหตุต้องไม่เกิน 500 ตัวอักษร");
+
+            var prices = await _jewelryContext.TbtStockPiece.AsNoTracking()
+                .Where(p => stockNumbers.Contains(p.StockNumber))
+                .Select(p => new { p.StockNumber, Price = p.SkuCodeNavigation.DefaultPrice })
+                .ToListAsync();
+            var priceByStock = prices.ToDictionary(x => x.StockNumber, x => x.Price ?? 0m);
+            var missing = stockNumbers.Where(s => !priceByStock.ContainsKey(s)).ToList();
+            if (missing.Count > 0)
+                throw new HandleException($"ไม่พบสินค้า: {string.Join(", ", missing.Take(5))}");
+
+            var now = DateTime.UtcNow;
+            var previous = await _jewelryContext.TbtStockPriceReviewAck
+                .Where(a => a.IsActive && stockNumbers.Contains(a.StockNumber))
+                .ToListAsync();
+            foreach (var a in previous)
+            {
+                a.IsActive = false;
+                a.UpdateBy = CurrentUsername;
+                a.UpdateDate = now;
+            }
+            if (previous.Count > 0) _jewelryContext.TbtStockPriceReviewAck.UpdateRange(previous);
+
+            var note = string.IsNullOrWhiteSpace(request?.Note) ? null : request!.Note!.Trim();
+            _jewelryContext.TbtStockPriceReviewAck.AddRange(stockNumbers.Select(s => new TbtStockPriceReviewAck
+            {
+                StockNumber = s,
+                PriceAcked = priceByStock[s],
+                Note = note,
+                IsActive = true,
+                CreateBy = CurrentUsername,
+                CreateDate = now
+            }));
+            await _jewelryContext.SaveChangesAsync();
+
+            return new jewelry.Model.Stock.Product.PriceReviewAck.Response { Count = stockNumbers.Count };
+        }
+
+        public async Task<jewelry.Model.Stock.Product.PriceReviewAck.Response> Unack(jewelry.Model.Stock.Product.PriceReviewAck.UnackRequest request)
+        {
+            CheckPermissionLevel("update_stock");
+
+            var stockNumbers = NormalizeStockNumbers(request?.StockNumbers);
+            var now = DateTime.UtcNow;
+            var rows = await _jewelryContext.TbtStockPriceReviewAck
+                .Where(a => a.IsActive && stockNumbers.Contains(a.StockNumber))
+                .ToListAsync();
+            foreach (var a in rows)
+            {
+                a.IsActive = false;
+                a.UpdateBy = CurrentUsername;
+                a.UpdateDate = now;
+            }
+            if (rows.Count > 0)
+            {
+                _jewelryContext.TbtStockPriceReviewAck.UpdateRange(rows);
+                await _jewelryContext.SaveChangesAsync();
+            }
+            return new jewelry.Model.Stock.Product.PriceReviewAck.Response { Count = rows.Select(r => r.StockNumber).Distinct().Count() };
+        }
+
+        private static List<string> NormalizeStockNumbers(List<string>? input)
+        {
+            var list = (input ?? new List<string>())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s.Trim())
+                .Distinct()
+                .ToList();
+            if (list.Count == 0) throw new HandleException("กรุณาระบุเลขสต็อก");
+            if (list.Count > MaxItems) throw new HandleException($"Maximum {MaxItems} items per request");
+            return list;
+        }
+
+        private static bool HasAnyFilter(jewelry.Model.Stock.Product.List.Search f)
+        {
+            foreach (var prop in typeof(jewelry.Model.Stock.Product.List.Search).GetProperties())
+            {
+                if (prop.Name == nameof(jewelry.Model.Stock.Product.List.Search.IncludeLastMovement)
+                    || prop.Name == nameof(jewelry.Model.Stock.Product.List.Search.MaterialMatchAll)) continue;
+                var v = prop.GetValue(f);
+                if (v == null) continue;
+                if (v is string str) { if (!string.IsNullOrWhiteSpace(str)) return true; continue; }
+                if (v is System.Collections.IEnumerable en)
+                {
+                    foreach (var item in en)
+                        if (item != null && !(item is string s2 && string.IsNullOrWhiteSpace(s2))) return true;
+                    continue;
+                }
+                return true;
+            }
+            return false;
         }
 
         public async Task<Response> Check(Request request)
@@ -155,7 +358,7 @@ namespace Jewelry.Service.Stock.PriceSanity
                 if (_cache.TryGetValue(CacheKey, out cached) && cached != null)
                     return cached;
 
-                var snap = await BuildSnapshot();
+                var snap = (await BuildSnapshot()).Snap;
                 _cache.Set(CacheKey, snap, CacheDuration);
                 return snap;
             }
@@ -165,11 +368,11 @@ namespace Jewelry.Service.Stock.PriceSanity
             }
         }
 
-        private async Task<PriceSanitySnapshot> BuildSnapshot()
+        private async Task<SnapshotBuild> BuildSnapshot()
         {
             var pieces = await _jewelryContext.TbtStockPiece.AsNoTracking()
                 .Where(p => p.Status == "IN_STOCK")
-                .Select(p => new PieceRow { StockNumber = p.StockNumber, ProductCode = p.ProductCode, SkuCode = p.SkuCode, Wo = p.Wo, WoNumber = p.WoNumber })
+                .Select(p => new PieceRow { StockNumber = p.StockNumber, ProductCode = p.ProductCode, SkuCode = p.SkuCode, Wo = p.Wo, WoNumber = p.WoNumber, StockNumberOrigin = p.StockNumberOrigin })
                 .ToListAsync();
 
             var skus = await _jewelryContext.TbtSku.AsNoTracking()
@@ -180,7 +383,10 @@ namespace Jewelry.Service.Stock.PriceSanity
                     DefaultPrice = s.DefaultPrice,
                     MoldDesign = s.MoldDesign,
                     ProductTypeName = s.ProductTypeName,
-                    ProductionType = s.ProductionType
+                    ProductionType = s.ProductionType,
+                    ProductNumber = s.ProductNumber,
+                    ProductNameTh = s.ProductNameTh,
+                    ImagePath = s.ImagePath
                 })
                 .ToListAsync();
             var skuByCode = skus.ToDictionary(s => s.SkuCode, StringComparer.OrdinalIgnoreCase);
@@ -264,7 +470,15 @@ namespace Jewelry.Service.Stock.PriceSanity
                 dl.Add(new DesignSku { Sku = s.SkuCode, Price = s.DefaultPrice ?? 0m });
             }
 
-            return snap;
+            return new SnapshotBuild { Snap = snap, Pieces = pieces, SkuByCode = skuByCode, MatByKey = matByKey };
+        }
+
+        private class SnapshotBuild
+        {
+            public PriceSanitySnapshot Snap { get; set; } = null!;
+            public List<PieceRow> Pieces { get; set; } = new();
+            public Dictionary<string, SkuRow> SkuByCode { get; set; } = new();
+            public Dictionary<string, (decimal Gold, decimal Gem)> MatByKey { get; set; } = new();
         }
 
         private class PieceRow
@@ -274,6 +488,7 @@ namespace Jewelry.Service.Stock.PriceSanity
             public string SkuCode { get; set; } = null!;
             public string? Wo { get; set; }
             public int? WoNumber { get; set; }
+            public string? StockNumberOrigin { get; set; }
         }
 
         private class MaterialRow
@@ -291,6 +506,9 @@ namespace Jewelry.Service.Stock.PriceSanity
             public string? MoldDesign { get; set; }
             public string? ProductTypeName { get; set; }
             public string? ProductionType { get; set; }
+            public string? ProductNumber { get; set; }
+            public string? ProductNameTh { get; set; }
+            public string? ImagePath { get; set; }
         }
     }
 }

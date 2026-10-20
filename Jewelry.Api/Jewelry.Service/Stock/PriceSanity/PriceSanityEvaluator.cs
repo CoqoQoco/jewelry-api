@@ -182,6 +182,18 @@ namespace Jewelry.Service.Stock.PriceSanity
             return null;
         }
 
+        public static double Score(IEnumerable<Reason> reasons)
+        {
+            var max = 0d;
+            foreach (var r in reasons)
+            {
+                if (r.Value <= 0 || r.Reference <= 0) continue;
+                var s = Math.Abs(Math.Log((double)r.Value / (double)r.Reference));
+                if (s > max) max = s;
+            }
+            return Math.Round(max, 3);
+        }
+
         private static bool IsFar(decimal price, decimal reference, decimal factor)
             => price >= reference * factor || price <= reference / factor;
 
