@@ -17,6 +17,8 @@ public partial class JewelryContext
             .Property(e => e.ProductCostDetail)
             .HasColumnType("text");
 
+        ConfigureMaterialStock(modelBuilder);
+
         modelBuilder.Entity<TbtPosCheckout>(entity =>
         {
             entity.HasKey(e => e.IdempotencyKey).HasName("tbt_pos_checkout_pk");
