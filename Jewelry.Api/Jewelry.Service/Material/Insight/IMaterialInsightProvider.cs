@@ -47,6 +47,9 @@ namespace Jewelry.Service.Material.Insight
 
         // true เมื่อ Items[].OnProcessAgeDays มีความหมาย (เปิดใช้กฎ MAT_ON_PROCESS_STALE)
         public bool OnProcessAgeSupported { get; set; }
+
+        // true เมื่อมี movement รับเข้า/ยอดยกมาที่ยังมีผลอย่างน้อย 1 แถว
+        public bool InboundRecorded { get; set; }
     }
 
     // ตัวโหลดข้อมูลเฉพาะประเภทวัตถุดิบ (GOLD ตอนนี้, GEM ภายหลัง) — engine ที่เหลือไม่รู้จักตารางต้นทาง

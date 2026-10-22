@@ -21,6 +21,27 @@ namespace Jewelry.Service.Material.Insight
 
         // ---- problems ----
 
+        // ยอดติดลบ (warning เสมอ) — ledger ไม่เคยมียอดตั้งต้น ไม่ใช่ของหมดจริง; เรียงตาม |ยอด| มากสุดก่อน
+        public static Wip.Finding? EvaluateNegativeBalance(IReadOnlyList<Item> items, bool inboundRecorded)
+        {
+            var list = items.Where(i => i.Status == MaterialInsightCalculator.StatusNegative).ToList();
+            if (list.Count == 0) return null;
+
+            return new Wip.Finding
+            {
+                Code = "MAT_NEGATIVE_BALANCE",
+                Severity = Warning,
+                ReportRef = "matItems",
+                Params = new Dictionary<string, object>
+                {
+                    ["count"] = list.Count,
+                    ["totalWeight"] = list.Sum(i => Math.Abs(i.OnHand)),
+                    ["topItems"] = Top(list.OrderByDescending(i => Math.Abs(i.OnHand)).ThenBy(i => i.Label, StringComparer.Ordinal)),
+                    ["ledgerHasInbound"] = inboundRecorded
+                }
+            };
+        }
+
         // หมดสต็อก (critical) — เรียงตามอัตราใช้สูงสุดก่อน
         public static Wip.Finding? EvaluateZeroStock(IReadOnlyList<Item> items)
         {
@@ -163,6 +184,7 @@ namespace Jewelry.Service.Material.Insight
 
         private static readonly (string Code, string OwnerRole, string[] RelatedCodes)[] ActionDefinitions =
         {
+            ("ACT_RECORD_OPENING_BALANCE", "deptHead", new[] { "MAT_NEGATIVE_BALANCE" }),
             ("ACT_REORDER_MATERIAL", "planner", new[] { "MAT_ZERO_STOCK", "MAT_BELOW_MIN", "FC_MAT_STOCKOUT" }),
             ("ACT_CLEAR_DEAD_STOCK", "productionManager", new[] { "MAT_DEAD_STOCK" }),
             ("ACT_RETURN_ON_PROCESS", "deptHead", new[] { "MAT_ON_PROCESS_STALE" }),
@@ -208,6 +230,12 @@ namespace Jewelry.Service.Material.Insight
         {
             switch (actionCode)
             {
+                case "ACT_RECORD_OPENING_BALANCE":
+                    return new Dictionary<string, object>
+                    {
+                        ["count"] = Param(findings, "MAT_NEGATIVE_BALANCE", "count") ?? 0,
+                        ["totalWeight"] = Param(findings, "MAT_NEGATIVE_BALANCE", "totalWeight") ?? 0m
+                    };
                 case "ACT_REORDER_MATERIAL":
                     return new Dictionary<string, object>
                     {

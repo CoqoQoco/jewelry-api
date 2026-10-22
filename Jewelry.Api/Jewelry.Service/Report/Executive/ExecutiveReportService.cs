@@ -1,5 +1,6 @@
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
+using Jewelry.Service.Common;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Production.Insight;
@@ -24,15 +25,18 @@ namespace Jewelry.Service.Report.Executive
     {
         private readonly JewelryContext _jewelryContext;
         private readonly IProductionPlanWipHelper _wipHelper;
+        private readonly InsightCache _insightCache;
 
+        private const string SummaryCacheEndpoint = "ExecutiveReport:Summary";
         private const int StatusDone = 100;
         private const string InStockStatus = "IN_STOCK";
 
-        public ExecutiveReportService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor, IProductionPlanWipHelper wipHelper)
+        public ExecutiveReportService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor, IProductionPlanWipHelper wipHelper, InsightCache insightCache)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _wipHelper = wipHelper;
+            _insightCache = insightCache;
         }
 
         private IQueryable<TbtSaleInvoiceHeader> InScopeInvoices()
@@ -92,7 +96,13 @@ namespace Jewelry.Service.Report.Executive
         private Task<List<InvoiceMoneyRow>> GetInvoiceMoneyRowsAsync(string metalFilter)
             => ExecutiveSalesLoader.GetInvoiceMoneyRowsAsync(_jewelryContext, metalFilter);
 
-        public async Task<Summary.Response> Summary(Summary.Request request)
+        public Task<Summary.Response> Summary(Summary.Request request)
+        {
+            var key = InsightCache.Key(SummaryCacheEndpoint, MetalClassifier.Normalize(request.Metal));
+            return _insightCache.GetOrCreateAsync(key, InsightCache.SummaryTtl, () => SummaryCore(request));
+        }
+
+        private async Task<Summary.Response> SummaryCore(Summary.Request request)
         {
             var now = DateTime.UtcNow;
             var metalFilter = MetalClassifier.Normalize(request.Metal);

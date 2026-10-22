@@ -52,6 +52,8 @@ namespace Jewelry.Service.Material.Insight
             return new MaterialDataset
             {
                 OnProcessAgeSupported = false,
+                InboundRecorded = tx.Any(x => (x.Type == GoldStockTransactionType.Inbound || x.Type == GoldStockTransactionType.OpeningBalance)
+                    && !string.Equals(x.Status, GoldStockTransactionStatus.Reversed, StringComparison.OrdinalIgnoreCase)),
                 Items = stock
                     .OrderBy(x => x.GoldCode, StringComparer.Ordinal)
                     .ThenBy(x => x.GoldSizeCode, StringComparer.Ordinal)

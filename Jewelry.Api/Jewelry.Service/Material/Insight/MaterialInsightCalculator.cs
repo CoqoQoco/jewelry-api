@@ -12,6 +12,7 @@ namespace Jewelry.Service.Material.Insight
     // Pure — ไม่แตะ DB (unit-testable)
     public static class MaterialInsightCalculator
     {
+        public const string StatusNegative = "negative";
         public const string StatusZero = "zero";
         public const string StatusBelow = "below";
         public const string StatusNear = "near";
@@ -84,10 +85,12 @@ namespace Jewelry.Service.Material.Insight
         public static bool IsDead(decimal onHand, int? daysSinceMove, int deadStockDays)
             => onHand > 0 && daysSinceMove.HasValue && daysSinceMove.Value > deadStockDays;
 
+        // negative: ยอดติดลบ (ตรวจก่อนทุกสถานะ — ledger ไม่มียอดตั้งต้น ไม่ใช่ของหมด)
         // zero: หมด (available <= 0) และ "ควรมี" ของ (มีขั้นต่ำ หรือมีการใช้ในหน้าต่าง) — หมดแต่ไม่เคยใช้/ไม่มีขั้นต่ำ = ok
         // below: available < min | near: available < min x nearPercent/100 | dead: ไม่ได้ใช้นานเกินเกณฑ์ (เมื่อไม่ติดสถานะก่อนหน้า)
         public static string Classify(decimal available, decimal effectiveMin, decimal avgDailyUsage, decimal nearPercent, bool isDead)
         {
+            if (available < 0) return StatusNegative;
             if (available <= 0) return effectiveMin > 0 || avgDailyUsage > 0 ? StatusZero : StatusOk;
             if (available < effectiveMin) return StatusBelow;
             if (effectiveMin > 0 && available < effectiveMin * nearPercent / 100m) return StatusNear;
@@ -139,9 +142,10 @@ namespace Jewelry.Service.Material.Insight
                 var (effMin, minSource) = EffectiveMin(autoMin, policy.FloorQty, ov?.MinQty);
 
                 var available = input.OnHand;
-                var dead = IsDead(input.OnHand, daysSince, policy.DeadStockDays);
+                var negative = available < 0;
+                var dead = !negative && IsDead(input.OnHand, daysSince, policy.DeadStockDays);
                 var status = Classify(available, effMin, avgDaily, policy.NearPercent, dead);
-                var cover = CoverDays(available, avgDaily);
+                var cover = negative ? null : CoverDays(available, avgDaily);
 
                 result.Add(new Item
                 {
@@ -168,7 +172,7 @@ namespace Jewelry.Service.Material.Insight
                     MinSource = minSource,
                     Status = status,
                     IsDead = dead,
-                    StockoutRisk = cover.HasValue && cover.Value < leadTime,
+                    StockoutRisk = !negative && cover.HasValue && cover.Value < leadTime,
                     LastMovementDate = lastConsumed,
                     DaysSinceMove = daysSince,
                     NeverConsumed = lastConsumed == null,
@@ -211,8 +215,10 @@ namespace Jewelry.Service.Material.Insight
             return points;
         }
 
-        public static Kpi BuildKpi(IReadOnlyList<Item> items, bool onProcessAgeSupported, PolicyValues policy)
+        public static Kpi BuildKpi(IReadOnlyList<Item> items, bool onProcessAgeSupported, PolicyValues policy, bool inboundRecorded = false)
         {
+            var nonNegative = items.Where(i => i.Status != StatusNegative).ToList();
+            var negatives = items.Where(i => i.Status == StatusNegative).ToList();
             var stale = onProcessAgeSupported
                 ? items.Where(i => i.OnProcess > 0 && i.OnProcessAgeDays.HasValue && i.OnProcessAgeDays.Value > policy.OnProcessStaleDays).ToList()
                 : new List<Item>();
@@ -221,9 +227,9 @@ namespace Jewelry.Service.Material.Insight
             return new Kpi
             {
                 ItemCount = items.Count,
-                TotalOnHand = items.Sum(i => i.OnHand),
+                TotalOnHand = nonNegative.Sum(i => i.OnHand),
                 TotalOnProcess = items.Sum(i => i.OnProcess),
-                TotalAvailable = items.Sum(i => i.Available),
+                TotalAvailable = nonNegative.Sum(i => i.Available),
                 ZeroCount = items.Count(i => i.Status == StatusZero),
                 BelowMinCount = items.Count(i => i.Status == StatusBelow),
                 NearMinCount = items.Count(i => i.Status == StatusNear),
@@ -235,7 +241,9 @@ namespace Jewelry.Service.Material.Insight
                 StockoutRiskCount = items.Count(i => i.StockoutRisk && i.Available > 0),
                 OverrideCount = items.Count(i => i.MinSource == MinSourceOverride),
                 WithUsageCount = items.Count(i => i.AvgDailyUsage > 0),
-                NegativeCount = items.Count(i => i.OnHand < 0 || i.OnProcess < 0)
+                NegativeCount = negatives.Count,
+                NegativeWeight = negatives.Sum(i => i.OnHand),
+                InboundRecorded = inboundRecorded
             };
         }
 
@@ -249,7 +257,8 @@ namespace Jewelry.Service.Material.Insight
                     Name = g.Select(i => i.Name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)),
                     ItemCount = g.Count(),
                     OnHand = g.Sum(i => i.OnHand),
-                    OnProcess = g.Sum(i => i.OnProcess)
+                    OnProcess = g.Sum(i => i.OnProcess),
+                    NegativeCount = g.Count(i => i.Status == StatusNegative)
                 })
                 .OrderByDescending(g => g.OnHand)
                 .ThenBy(g => g.Code, StringComparer.Ordinal)

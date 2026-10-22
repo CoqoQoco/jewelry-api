@@ -1,4 +1,5 @@
 using Jewelry.Data.Context;
+using Jewelry.Service.Common;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
@@ -14,15 +15,17 @@ namespace Jewelry.Service.Stock.Insight
     public class StockInsightService : BaseService, IStockInsightService
     {
         private readonly JewelryContext _jewelryContext;
+        private readonly InsightCache _insightCache;
 
         private const string InStockStatus = "IN_STOCK";
 
         private static readonly string[] QtyMovementTypes = { "RECEIPT", "RETURN", "SALE", "TRANSFORM_IN", "TRANSFORM_OUT" };
 
-        public StockInsightService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor)
+        public StockInsightService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor, InsightCache insightCache)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
+            _insightCache = insightCache;
         }
 
         private class PieceRow
@@ -37,7 +40,15 @@ namespace Jewelry.Service.Stock.Insight
             public string? ProductTypeName { get; set; }
         }
 
-        public async Task<Overview.Response> Overview(Overview.Request request)
+        public const string CacheEndpoint = "StockInsight:Overview";
+
+        public Task<Overview.Response> Overview(Overview.Request request)
+        {
+            var key = InsightCache.Key(CacheEndpoint, MetalClassifier.Normalize(request.Metal), StockInsightThresholds.ClampMonths(request.Months));
+            return _insightCache.GetOrCreateAsync(key, InsightCache.OverviewTtl, request.Thresholds, () => OverviewCore(request));
+        }
+
+        private async Task<Overview.Response> OverviewCore(Overview.Request request)
         {
             var metal = MetalClassifier.Normalize(request.Metal);
             var months = StockInsightThresholds.ClampMonths(request.Months);

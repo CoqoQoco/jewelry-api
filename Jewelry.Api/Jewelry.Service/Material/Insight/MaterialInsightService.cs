@@ -1,6 +1,7 @@
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
+using Jewelry.Service.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -20,16 +21,29 @@ namespace Jewelry.Service.Material.Insight
 
         private readonly JewelryContext _jewelryContext;
         private readonly IEnumerable<IMaterialInsightProvider> _providers;
+        private readonly InsightCache _insightCache;
 
         public MaterialInsightService(JewelryContext jewelryContext, IHttpContextAccessor httpContextAccessor,
-            IEnumerable<IMaterialInsightProvider> providers)
+            IEnumerable<IMaterialInsightProvider> providers, InsightCache insightCache)
             : base(jewelryContext, httpContextAccessor)
         {
             _jewelryContext = jewelryContext;
             _providers = providers;
+            _insightCache = insightCache;
         }
 
-        public async Task<Overview.Response> Overview(Overview.Request request)
+        public const string CacheEndpoint = "MaterialInsight:Overview";
+
+        public static string CachePrefix(string kind) => CacheEndpoint + ":" + kind + ":";
+
+        public Task<Overview.Response> Overview(Overview.Request request)
+        {
+            var kind = GetProvider(request.Kind).Kind;
+            var key = CachePrefix(kind) + MaterialInsightThresholds.ClampMonths(request.Months);
+            return _insightCache.GetOrCreateAsync(key, InsightCache.OverviewTtl, request.Thresholds, () => OverviewCore(request));
+        }
+
+        private async Task<Overview.Response> OverviewCore(Overview.Request request)
         {
             var provider = GetProvider(request.Kind);
             var kind = provider.Kind;
@@ -59,10 +73,11 @@ namespace Jewelry.Service.Material.Insight
             var startMonth = firstConsumed.HasValue ? MaterialInsightCalculator.ThaiMonthStart(firstConsumed.Value) : (DateTime?)null;
             var historyMonths = MaterialInsightCalculator.FullMonthsSince(startMonth, MaterialInsightCalculator.ThaiMonthStart(now));
 
-            var kpi = MaterialInsightCalculator.BuildKpi(items, dataset.OnProcessAgeSupported, policy);
+            var kpi = MaterialInsightCalculator.BuildKpi(items, dataset.OnProcessAgeSupported, policy, dataset.InboundRecorded);
 
             var problems = new List<jewelry.Model.Production.Insight.Wip.Finding?>
             {
+                MaterialInsightRuleEngine.EvaluateNegativeBalance(items, dataset.InboundRecorded),
                 MaterialInsightRuleEngine.EvaluateZeroStock(items),
                 MaterialInsightRuleEngine.EvaluateBelowMin(items),
                 MaterialInsightRuleEngine.EvaluateNearMin(items),
@@ -155,6 +170,7 @@ namespace Jewelry.Service.Material.Insight
             }
 
             await _jewelryContext.SaveChangesAsync();
+            _insightCache.Invalidate(CachePrefix(kind));
 
             resolved.Source = MaterialInsightThresholds.SourceDb;
             return new Policy.Response { Kind = kind, Policy = resolved };
@@ -202,6 +218,7 @@ namespace Jewelry.Service.Material.Insight
             }
 
             await _jewelryContext.SaveChangesAsync();
+            _insightCache.Invalidate(CachePrefix(kind));
             return ToMinResponse(entity);
         }
 
@@ -221,6 +238,7 @@ namespace Jewelry.Service.Material.Insight
             _jewelryContext.TbmMaterialStockMin.Update(entity);
 
             await _jewelryContext.SaveChangesAsync();
+            _insightCache.Invalidate(CachePrefix(kind));
             return ToMinResponse(entity);
         }
 

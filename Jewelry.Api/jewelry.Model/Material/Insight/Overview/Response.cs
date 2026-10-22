@@ -41,8 +41,10 @@ namespace jewelry.Model.Material.Insight.Overview
     public class Kpi
     {
         public int ItemCount { get; set; }
+        // ผลรวมเฉพาะ item ที่ยอด >= 0 (ไม่รวม negative — ดู NegativeWeight)
         public decimal TotalOnHand { get; set; }
         public decimal TotalOnProcess { get; set; }
+        // เหมือน TotalOnHand (ไม่รวม item ติดลบ)
         public decimal TotalAvailable { get; set; }
 
         // status แยกกัน (zero/below/near ไม่ซ้อนกัน)
@@ -64,8 +66,14 @@ namespace jewelry.Model.Material.Insight.Overview
         public int OverrideCount { get; set; }
         public int WithUsageCount { get; set; }
 
-        // data quality: item ที่ยอดคงเหลือติดลบ
+        // item ที่ status = negative (ยอดในคลังติดลบ = ledger ไม่เคยตั้งยอดยกมา/รับเข้า) — ไม่นับรวมใน zero/below/near/dead
         public int NegativeCount { get; set; }
+
+        // ผลรวมยอดติดลบแบบมีเครื่องหมาย (<= 0); totalOnHand/totalAvailable "ไม่รวม" item ติดลบ
+        public decimal NegativeWeight { get; set; }
+
+        // มี movement รับเข้า/ยอดยกมา (type 1/2) ที่ยังมีผลอยู่ใน ledger หรือไม่ (false = คลังไม่เคยมียอดตั้งต้น)
+        public bool InboundRecorded { get; set; }
     }
 
     public class Item
@@ -99,7 +107,7 @@ namespace jewelry.Model.Material.Insight.Overview
         // 'auto' | 'override' | 'floor'
         public string MinSource { get; set; } = "auto";
 
-        // 'zero' | 'below' | 'near' | 'ok' | 'dead'
+        // 'negative' | 'zero' | 'below' | 'near' | 'ok' | 'dead'
         public string Status { get; set; } = "ok";
         public bool IsDead { get; set; }
         public bool StockoutRisk { get; set; }
@@ -119,8 +127,10 @@ namespace jewelry.Model.Material.Insight.Overview
         public string Code { get; set; } = null!;
         public string? Name { get; set; }
         public int ItemCount { get; set; }
+        // OnHand = ผลรวมมีเครื่องหมาย (รวมยอดติดลบ)
         public decimal OnHand { get; set; }
         public decimal OnProcess { get; set; }
+        public int NegativeCount { get; set; }
     }
 
     public class SeriesPoint
