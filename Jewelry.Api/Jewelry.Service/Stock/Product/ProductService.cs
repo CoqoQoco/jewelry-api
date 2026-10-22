@@ -611,6 +611,7 @@ namespace Jewelry.Service.Stock.Product
             if (latestQuickPrice != null)
             {
                 response.QuickPrice = latestQuickPrice.QuickPrice;
+                response.QuickPriceTotal = latestQuickPrice.TotalPrice;
                 response.QuickPriceDate = latestQuickPrice.CreateDate;
                 response.QuickPriceGoldPrice = latestQuickPrice.GoldPrice;
                 response.QuickPriceMarkup = latestQuickPrice.Markup;
@@ -803,6 +804,7 @@ namespace Jewelry.Service.Stock.Product
             {
                 if (!latestByStock.TryGetValue(row.StockNumber, out var q)) continue;
                 row.QuickPrice = q.QuickPrice;
+                row.QuickPriceTotal = q.TotalPrice;
                 row.QuickPriceDate = q.CreateDate;
                 row.QuickPriceGoldPrice = q.GoldPrice;
                 row.QuickPriceMarkup = q.Markup;
@@ -824,6 +826,9 @@ namespace Jewelry.Service.Stock.Product
             if (request.Markup <= 0) throw new HandleException("Markup ต้องมากกว่า 0");
             if (request.GoldWeight < 0) throw new HandleException("น้ำหนักทองต้องไม่ติดลบ");
             if (request.GoldPrice < 0) throw new HandleException("ราคาทองต้องไม่ติดลบ");
+            if (request.AlloyFactor < 0) throw new HandleException("ตัวคูณ Alloy ต้องไม่ติดลบ");
+            if (request.AlloyWeight < 0) throw new HandleException("น้ำหนัก Alloy ต้องไม่ติดลบ");
+            if (request.AlloyPrice < 0) throw new HandleException("ราคา Alloy ต้องไม่ติดลบ");
             if (request.Percent < 0) throw new HandleException("เปอร์เซ็นต์ต้องไม่ติดลบ");
             if (request.Rounding != 0 && request.Rounding != 10 && request.Rounding != 100 && request.Rounding != 1000)
             {
@@ -860,16 +865,19 @@ namespace Jewelry.Service.Stock.Product
             }
 
             var cost = salePrice / request.Markup;
-            var costExGold = cost - request.GoldWeight * request.GoldPrice;
+            var goldCost = request.GoldWeight * request.GoldPrice;
+            var alloyCost = request.AlloyWeight * request.AlloyPrice;
+            var goldCostTotal = goldCost + alloyCost;
+            var costExGold = cost - goldCostTotal;
             if (costExGold <= 0)
             {
-                throw new HandleException("ทุนไม่รวมทองติดลบหรือเป็นศูนย์ ตรวจ Markup หรือน้ำหนักทอง");
+                throw new HandleException("ทุนเพชรพลอย+ค่าแรงติดลบหรือเป็นศูนย์ ตรวจ Markup หรือน้ำหนักทอง/Alloy");
             }
 
             var raw = costExGold * (1 + request.Percent / 100m);
-            var quickPrice = request.Rounding == 0
-                ? Math.Round(raw, 2, MidpointRounding.AwayFromZero)
-                : Math.Ceiling(raw / request.Rounding) * request.Rounding;
+            var quickPrice = ApplyQuickPriceRounding(raw, request.Rounding);
+            var totalPrice = ApplyQuickPriceRounding(raw + goldCostTotal, request.Rounding);
+            var karat = string.IsNullOrWhiteSpace(request.Karat) ? null : request.Karat.Trim();
 
             var entity = new TbtStockPieceQuickPrice
             {
@@ -883,6 +891,12 @@ namespace Jewelry.Service.Stock.Product
                 Percent = request.Percent,
                 Rounding = request.Rounding,
                 QuickPrice = quickPrice,
+                Karat = karat,
+                AlloyFactor = request.AlloyFactor,
+                AlloyWeight = request.AlloyWeight,
+                AlloyPrice = request.AlloyPrice,
+                GoldCostTotal = goldCostTotal,
+                TotalPrice = totalPrice,
                 Remark = string.IsNullOrWhiteSpace(request.Remark) ? null : request.Remark.Trim(),
                 IsActive = true,
                 CreateBy = CurrentUsername,
@@ -938,10 +952,23 @@ namespace Jewelry.Service.Stock.Product
                 Percent = q.Percent,
                 Rounding = q.Rounding,
                 QuickPrice = q.QuickPrice,
+                Karat = q.Karat,
+                AlloyFactor = q.AlloyFactor,
+                AlloyWeight = q.AlloyWeight,
+                AlloyPrice = q.AlloyPrice,
+                GoldCostTotal = q.GoldCostTotal,
+                TotalPrice = q.TotalPrice,
                 Remark = q.Remark,
                 CreateBy = q.CreateBy,
                 CreateDate = q.CreateDate
             };
+        }
+
+        private static decimal ApplyQuickPriceRounding(decimal value, int rounding)
+        {
+            return rounding == 0
+                ? Math.Round(value, 2, MidpointRounding.AwayFromZero)
+                : Math.Ceiling(value / rounding) * rounding;
         }
 
         public async Task<string> Update(jewelry.Model.Stock.Product.Update.Request request)

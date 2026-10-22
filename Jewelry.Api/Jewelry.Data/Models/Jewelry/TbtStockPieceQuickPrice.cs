@@ -26,6 +26,18 @@ public partial class TbtStockPieceQuickPrice
 
     public decimal QuickPrice { get; set; }
 
+    public string? Karat { get; set; }
+
+    public decimal? AlloyFactor { get; set; }
+
+    public decimal? AlloyWeight { get; set; }
+
+    public decimal? AlloyPrice { get; set; }
+
+    public decimal? GoldCostTotal { get; set; }
+
+    public decimal? TotalPrice { get; set; }
+
     public string? Remark { get; set; }
 
     public bool IsActive { get; set; }

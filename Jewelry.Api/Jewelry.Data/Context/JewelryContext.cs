@@ -1202,6 +1202,14 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Percent).HasColumnName("percent");
             entity.Property(e => e.Rounding).HasColumnName("rounding");
             entity.Property(e => e.QuickPrice).HasColumnName("quick_price");
+            entity.Property(e => e.Karat)
+                .HasColumnType("character varying")
+                .HasColumnName("karat");
+            entity.Property(e => e.AlloyFactor).HasColumnName("alloy_factor");
+            entity.Property(e => e.AlloyWeight).HasColumnName("alloy_weight");
+            entity.Property(e => e.AlloyPrice).HasColumnName("alloy_price");
+            entity.Property(e => e.GoldCostTotal).HasColumnName("gold_cost_total");
+            entity.Property(e => e.TotalPrice).HasColumnName("total_price");
             entity.Property(e => e.Remark)
                 .HasMaxLength(500)
                 .HasColumnType("character varying")

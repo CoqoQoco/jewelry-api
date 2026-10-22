@@ -63,6 +63,7 @@ namespace jewelry.Model.Stock.Product.List
         public string? LastMoveBy { get; set; }
 
         public decimal? QuickPrice { get; set; }
+        public decimal? QuickPriceTotal { get; set; }
         public DateTime? QuickPriceDate { get; set; }
         public decimal? QuickPriceGoldPrice { get; set; }
         public decimal? QuickPriceMarkup { get; set; }

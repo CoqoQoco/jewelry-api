@@ -13,6 +13,12 @@ namespace jewelry.Model.Stock.Product.QuickPrice
         public decimal Percent { get; set; }
         public int Rounding { get; set; }
         public decimal QuickPrice { get; set; }
+        public string? Karat { get; set; }
+        public decimal? AlloyFactor { get; set; }
+        public decimal? AlloyWeight { get; set; }
+        public decimal? AlloyPrice { get; set; }
+        public decimal? GoldCostTotal { get; set; }
+        public decimal? TotalPrice { get; set; }
         public string? Remark { get; set; }
         public string CreateBy { get; set; } = null!;
         public DateTime CreateDate { get; set; }
