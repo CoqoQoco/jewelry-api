@@ -15,14 +15,35 @@ namespace Jewelry.Api.Controllers.Report
     {
         private readonly IExecutiveReportService _service;
         private readonly IExecutiveFlowService _flowService;
+        private readonly IExecutiveDigestService _digestService;
 
         public ExecutiveReportController(IExecutiveReportService service,
             IExecutiveFlowService flowService,
+            IExecutiveDigestService digestService,
             IOptions<ApiBehaviorOptions> apiBehaviorOptions)
             : base(apiBehaviorOptions)
         {
             _service = service;
             _flowService = flowService;
+            _digestService = digestService;
+        }
+
+        [Route("Digest")]
+        [HttpPost]
+        [RequirePermission("executive:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Report.Executive.Digest.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> Digest([FromBody] jewelry.Model.Report.Executive.Digest.Request request)
+        {
+            try
+            {
+                var response = await _digestService.Digest(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
 
         [Route("Summary")]
