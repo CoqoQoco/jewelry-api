@@ -88,45 +88,9 @@ namespace Jewelry.Service.Report.Executive
             return metalFilter == MetalClassifier.All ? plans : plans.Where(p => MetalClassifier.Matches(metalFilter, p.Type)).ToList();
         }
 
-        private class InvoiceMoneyRow
-        {
-            public string Running { get; set; } = null!;
-            public DateTime? DueDate { get; set; }
-            public decimal Deposit { get; set; }
-            public decimal GrandTotal { get; set; }
-            public decimal Rate { get; set; }
-            public decimal Paid { get; set; }
-            public decimal Share { get; set; } = 1m;
-        }
-
-        // เงินระดับ header (GrandTotalRounded, Deposit, paid) ถูกจัดสรรตามสัดส่วนโลหะของบรรทัดขาย — ALL = ไม่คูณ (share=1)
-        // บิลที่ share=0 ในโลหะที่ขอ (ไม่มีบรรทัดโลหะนั้นเลย) ถูกตัดออก — สถานะบิล (unpaid/overdue) ตัดสินจากค่าเต็มก่อนคูณ share
-        private async Task<List<InvoiceMoneyRow>> GetInvoiceMoneyRowsAsync(string metalFilter)
-        {
-            var raw = await InScopeInvoices()
-                .Select(x => new InvoiceMoneyRow
-                {
-                    Running = x.Running,
-                    DueDate = x.DueDate,
-                    Deposit = x.Deposit,
-                    GrandTotal = x.GrandTotalRounded ?? 0,
-                    Rate = x.CurrencyRate > 0 ? x.CurrencyRate : 1,
-                    Paid = _jewelryContext.TbtSaleInvoicePaymentItem
-                        .Where(p => p.InvoiceRunning == x.Running && p.IsDelete == false)
-                        .Sum(p => (decimal?)p.Amount) ?? 0m
-                })
-                .ToListAsync();
-
-            if (metalFilter == MetalClassifier.All) return raw;
-
-            var shares = await new SaleMetalResolver(_jewelryContext).ByInvoiceAsync(raw.Select(x => x.Running).ToList());
-            foreach (var row in raw)
-            {
-                row.Share = shares.TryGetValue(row.Running, out var sh) ? sh.ShareOf(metalFilter) : 0m;
-            }
-
-            return raw.Where(x => x.Share > 0).ToList();
-        }
+        // สูตรเงินใบแจ้งหนี้/ใบสั่งขายอยู่ที่ ExecutiveSalesMoney.cs (ใช้ร่วมกับ SalesInsightService)
+        private Task<List<InvoiceMoneyRow>> GetInvoiceMoneyRowsAsync(string metalFilter)
+            => ExecutiveSalesLoader.GetInvoiceMoneyRowsAsync(_jewelryContext, metalFilter);
 
         public async Task<Summary.Response> Summary(Summary.Request request)
         {
@@ -165,68 +129,34 @@ namespace Jewelry.Service.Report.Executive
             // ---- Receivables ----
             var invoiceRows = await GetInvoiceMoneyRowsAsync(metalFilter);
 
-            // ยอดเงินคูณ Share (ALL = 1) — การนับบิล/สถานะ unpaid ใช้ค่าเต็มของบิล (ไม่คูณ)
-            var invoiceTotalThb = invoiceRows.Sum(x => x.GrandTotal * x.Rate * x.Share);
             // unpaid = มียอดจริง (grand_total>0) และยังไม่มีเงินเข้าเลย ทั้ง payment_item และมัดจำ
-            // (grand_total=0 หรือ deposit>0 แต่ยังไม่มี payment_item ไม่ถือว่า unpaid)
-            var unpaidRows = invoiceRows.Where(x => x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0).ToList();
-            var paidOrPartialThb = invoiceRows.Where(x => !(x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0)).Sum(x => x.GrandTotal * x.Rate * x.Share);
-            var unpaidThb = unpaidRows.Sum(x => x.GrandTotal * x.Rate * x.Share);
-            var overdueRows = unpaidRows.Where(x => x.DueDate.HasValue && x.DueDate.Value < now).ToList();
-            var overdueThb = overdueRows.Sum(x => x.GrandTotal * x.Rate * x.Share);
+            // (grand_total=0 หรือ deposit>0 แต่ยังไม่มี payment_item ไม่ถือว่า unpaid) — สูตรอยู่ที่ ExecutiveSalesMath
+            var rt = ExecutiveSalesMath.SummarizeReceivables(invoiceRows, now);
 
             var receivables = new Summary.ReceivablesData
             {
-                InvoiceCount = invoiceRows.Count,
-                InvoiceTotalThb = invoiceTotalThb,
-                PaidOrPartialThb = paidOrPartialThb,
-                UnpaidCount = unpaidRows.Count,
-                UnpaidThb = unpaidThb,
-                OverdueCount = overdueRows.Count,
-                OverdueThb = overdueThb,
-                UnpaidNotOverdueThb = unpaidThb - overdueThb,
-                NoDueDateCount = invoiceRows.Count(x => !x.DueDate.HasValue)
+                InvoiceCount = rt.InvoiceCount,
+                InvoiceTotalThb = rt.InvoiceTotalThb,
+                PaidOrPartialThb = rt.PaidOrPartialThb,
+                UnpaidCount = rt.UnpaidCount,
+                UnpaidThb = rt.UnpaidThb,
+                OverdueCount = rt.OverdueCount,
+                OverdueThb = rt.OverdueThb,
+                UnpaidNotOverdueThb = rt.UnpaidNotOverdueThb,
+                NoDueDateCount = rt.NoDueDateCount
             };
 
             // ---- Sales Orders (without invoice) ----
-            var invoicedSoNumbers = new HashSet<string>(
-                await InScopeInvoices().Select(x => x.SoRunning).Distinct().ToListAsync());
-
-            var soRowsRaw = await InScopeSalesOrders()
-                .Select(x => new
-                {
-                    x.SoNumber,
-                    x.DeliveryDate,
-                    GrandTotal = x.GrandTotalRounded ?? 0,
-                    Rate = x.CurrencyRate > 0 ? x.CurrencyRate : 1
-                })
-                .ToListAsync();
-
-            Dictionary<string, SaleMetalShare>? soShares = metalFilter == MetalClassifier.All
-                ? null
-                : await new SaleMetalResolver(_jewelryContext).BySalesOrderAsync(soRowsRaw.Select(x => x.SoNumber).ToList());
-
-            var soRows = soRowsRaw
-                .Select(x => new
-                {
-                    x.SoNumber,
-                    x.DeliveryDate,
-                    x.GrandTotal,
-                    x.Rate,
-                    Share = soShares == null ? 1m : (soShares.TryGetValue(x.SoNumber, out var sh) ? sh.ShareOf(metalFilter) : 0m)
-                })
-                .Where(x => x.Share > 0)
-                .ToList();
-
-            var noInvoiceRows = soRows.Where(x => !invoicedSoNumbers.Contains(x.SoNumber)).ToList();
+            var soRows = await ExecutiveSalesLoader.GetSalesOrderMoneyRowsAsync(_jewelryContext, metalFilter);
+            var st = ExecutiveSalesMath.SummarizeSalesOrders(soRows, now);
 
             var salesOrders = new Summary.SalesOrdersData
             {
-                OpenCount = soRows.Count,
-                NoInvoiceCount = noInvoiceRows.Count,
-                NoInvoiceThb = noInvoiceRows.Sum(x => x.GrandTotal * x.Rate * x.Share),
-                OverdueNoInvoiceCount = noInvoiceRows.Count(x => x.DeliveryDate.HasValue && x.DeliveryDate.Value < now),
-                NoDeliveryDateCount = noInvoiceRows.Count(x => !x.DeliveryDate.HasValue)
+                OpenCount = st.OpenCount,
+                NoInvoiceCount = st.NoInvoiceCount,
+                NoInvoiceThb = st.NoInvoiceThb,
+                OverdueNoInvoiceCount = st.OverdueNoInvoiceCount,
+                NoDeliveryDateCount = st.NoDeliveryDateCount
             };
 
             // ---- Stock ----
@@ -559,7 +489,7 @@ namespace Jewelry.Service.Report.Executive
                 var share = invoiceShares == null ? 1m : (invoiceShares.TryGetValue(x.Running, out var sh) ? sh.ShareOf(metalFilter) : 0m);
                 var outstanding = x.GrandTotal - x.Deposit - x.Paid;
                 var isOverdue = x.DueDate.HasValue && x.DueDate.Value < now;
-                var isUnpaidStrict = x.GrandTotal > 0 && x.Paid == 0 && x.Deposit <= 0;
+                var isUnpaidStrict = ExecutiveSalesMath.IsUnpaidStrict(x.GrandTotal, x.Paid, x.Deposit);
 
                 var item = new Receivables.Item
                 {
