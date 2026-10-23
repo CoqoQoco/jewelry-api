@@ -8,6 +8,8 @@ namespace jewelry.Model.Stock.Product.QuickPrice
         public decimal Markup { get; set; }
         public decimal GoldWeight { get; set; }
         public decimal GoldPrice { get; set; }
+        public decimal SaleGoldPrice { get; set; }
+        public decimal? SaleGoldCostTotal { get; set; }
         public decimal Cost { get; set; }
         public decimal CostExGold { get; set; }
         public decimal Percent { get; set; }

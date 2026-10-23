@@ -70,6 +70,7 @@ namespace jewelry.Model.Stock.Product.Get
         public decimal? QuickPriceGoldLossTotal { get; set; }
         public DateTime? QuickPriceDate { get; set; }
         public decimal? QuickPriceGoldPrice { get; set; }
+        public decimal? QuickPriceSaleGoldPrice { get; set; }
         public decimal? QuickPriceMarkup { get; set; }
         public decimal? QuickPricePercent { get; set; }
         public int? QuickPriceRounding { get; set; }

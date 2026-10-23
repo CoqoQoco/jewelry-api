@@ -618,6 +618,7 @@ namespace Jewelry.Service.Stock.Product
                 response.QuickPriceGoldLossTotal = latestQuickPrice.GoldLossTotalPrice;
                 response.QuickPriceDate = latestQuickPrice.CreateDate;
                 response.QuickPriceGoldPrice = latestQuickPrice.GoldPrice;
+                response.QuickPriceSaleGoldPrice = latestQuickPrice.SaleGoldPrice ?? latestQuickPrice.GoldPrice;
                 response.QuickPriceMarkup = latestQuickPrice.Markup;
                 response.QuickPricePercent = latestQuickPrice.Percent;
                 response.QuickPriceRounding = latestQuickPrice.Rounding;
@@ -814,6 +815,7 @@ namespace Jewelry.Service.Stock.Product
                 row.QuickPriceGoldLossTotal = q.GoldLossTotalPrice;
                 row.QuickPriceDate = q.CreateDate;
                 row.QuickPriceGoldPrice = q.GoldPrice;
+                row.QuickPriceSaleGoldPrice = q.SaleGoldPrice ?? q.GoldPrice;
                 row.QuickPriceMarkup = q.Markup;
                 row.QuickPricePercent = q.Percent;
                 row.QuickPriceRounding = q.Rounding;
@@ -833,6 +835,7 @@ namespace Jewelry.Service.Stock.Product
             if (request.Markup <= 0) throw new HandleException("Markup ต้องมากกว่า 0");
             if (request.GoldWeight < 0) throw new HandleException("น้ำหนักทองต้องไม่ติดลบ");
             if (request.GoldPrice < 0) throw new HandleException("ราคาทองต้องไม่ติดลบ");
+            if (request.SaleGoldPrice < 0) throw new HandleException("ราคาทองวันขายต้องไม่ติดลบ");
             if (request.AlloyFactor < 0) throw new HandleException("ตัวคูณ Alloy ต้องไม่ติดลบ");
             if (request.AlloyWeight < 0) throw new HandleException("น้ำหนัก Alloy ต้องไม่ติดลบ");
             if (request.AlloyPrice < 0) throw new HandleException("ราคา Alloy ต้องไม่ติดลบ");
@@ -877,6 +880,8 @@ namespace Jewelry.Service.Stock.Product
             var alloyCost = request.AlloyWeight * request.AlloyPrice;
             var goldCostTotal = goldCost + alloyCost;
             var costExGold = cost - goldCostTotal;
+            var saleGoldPrice = request.SaleGoldPrice ?? request.GoldPrice;
+            var saleGoldCostTotal = request.GoldWeight * saleGoldPrice + alloyCost;
             if (costExGold <= 0)
             {
                 throw new HandleException("ทุนเพชรพลอย+ค่าแรงติดลบหรือเป็นศูนย์ ตรวจ Markup หรือน้ำหนักทอง/Alloy");
@@ -884,12 +889,12 @@ namespace Jewelry.Service.Stock.Product
 
             var raw = costExGold * (1 + request.Percent / 100m);
             var quickPrice = ApplyQuickPriceRounding(raw, request.Rounding);
-            var totalPrice = ApplyQuickPriceRounding(raw + goldCostTotal, request.Rounding);
+            var totalPrice = ApplyQuickPriceRounding(raw + saleGoldCostTotal, request.Rounding);
             decimal? goldLossCostTotal = null;
             decimal? goldLossTotalPrice = null;
             if (request.GoldLossPercent.HasValue)
             {
-                goldLossCostTotal = request.GoldWeight * (1 + request.GoldLossPercent.Value / 100m) * request.GoldPrice + alloyCost;
+                goldLossCostTotal = request.GoldWeight * (1 + request.GoldLossPercent.Value / 100m) * saleGoldPrice + alloyCost;
                 goldLossTotalPrice = ApplyQuickPriceRounding(raw + goldLossCostTotal.Value, request.Rounding);
             }
             var karat = string.IsNullOrWhiteSpace(request.Karat) ? null : request.Karat.Trim();
@@ -915,6 +920,8 @@ namespace Jewelry.Service.Stock.Product
                 GoldLossPercent = request.GoldLossPercent,
                 GoldLossCostTotal = goldLossCostTotal,
                 GoldLossTotalPrice = goldLossTotalPrice,
+                SaleGoldPrice = saleGoldPrice,
+                SaleGoldCostTotal = saleGoldCostTotal,
                 Remark = string.IsNullOrWhiteSpace(request.Remark) ? null : request.Remark.Trim(),
                 IsActive = true,
                 CreateBy = CurrentUsername,
@@ -965,6 +972,8 @@ namespace Jewelry.Service.Stock.Product
                 Markup = q.Markup,
                 GoldWeight = q.GoldWeight,
                 GoldPrice = q.GoldPrice,
+                SaleGoldPrice = q.SaleGoldPrice ?? q.GoldPrice,
+                SaleGoldCostTotal = q.SaleGoldCostTotal ?? q.GoldCostTotal,
                 Cost = q.Cost,
                 CostExGold = q.CostExGold,
                 Percent = q.Percent,

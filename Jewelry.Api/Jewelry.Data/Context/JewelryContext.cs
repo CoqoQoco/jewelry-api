@@ -1213,6 +1213,8 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GoldLossPercent).HasColumnName("gold_loss_percent");
             entity.Property(e => e.GoldLossCostTotal).HasColumnName("gold_loss_cost_total");
             entity.Property(e => e.GoldLossTotalPrice).HasColumnName("gold_loss_total_price");
+            entity.Property(e => e.SaleGoldPrice).HasColumnName("sale_gold_price");
+            entity.Property(e => e.SaleGoldCostTotal).HasColumnName("sale_gold_cost_total");
             entity.Property(e => e.Remark)
                 .HasMaxLength(500)
                 .HasColumnType("character varying")
