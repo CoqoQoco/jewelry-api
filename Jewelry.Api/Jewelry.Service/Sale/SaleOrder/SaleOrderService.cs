@@ -760,6 +760,7 @@ namespace Jewelry.Service.Sale.SaleOrder
             //}
 
             var confirmedDate = DateTime.UtcNow;
+            await ResolveRealStockNumbersAsync(request.StockItems);
             // placeholder ไม่มีของจริงให้จอง ไม่ต้องล็อก piece/balance — ล็อกเฉพาะเลขสต็อกของรายการจริงเท่านั้น
             var requestStockNumbers = request.StockItems
                 .Where(s => !string.IsNullOrEmpty(s.StockNumber) && !s.IsPlaceholder)
@@ -834,6 +835,23 @@ namespace Jewelry.Service.Sale.SaleOrder
             await ValidateStockItemConfirmations(saleOrder.SoNumber, stockItems);
 
             return await ConfirmStockItemsCore(saleOrder, stockItems, confirmedDate);
+        }
+
+        // เลขที่สแกน/พิมพ์อาจมีขีดหรือไม่มีขีด — แปลงรายการจริง (ไม่ใช่ placeholder) เป็นเลขจริงใน DB ก่อน lock/validate/บันทึก
+        // เลขที่หาไม่เจอคงเดิม เพื่อให้ validation แจ้ง "ไม่พบเลขสินค้า" ด้วยเลขที่ user ส่งมา
+        private async Task ResolveRealStockNumbersAsync(List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems)
+        {
+            var realItems = stockItems.Where(s => !string.IsNullOrEmpty(s.StockNumber) && !s.IsPlaceholder).ToList();
+            if (realItems.Count == 0) return;
+
+            var resolved = await _jewelryContext.ResolveAsync(realItems.Select(s => s.StockNumber));
+            foreach (var item in realItems)
+            {
+                if (resolved.TryGetValue(item.StockNumber, out var actual))
+                {
+                    item.StockNumber = actual;
+                }
+            }
         }
 
         // ล็อกแถว tbt_stock_balance ของ SKU ที่ผูกกับ stock number เหล่านี้ — ต้องเรียกหลังล็อก piece เสมอ (ลำดับ global: piece -> balance)
@@ -1331,6 +1349,12 @@ namespace Jewelry.Service.Sale.SaleOrder
 
             var soNumberUpper = request.SoNumber.ToUpper();
             var replacedDate = DateTime.UtcNow;
+
+            var resolvedNewStockNumber = await _jewelryContext.ResolveAsync(request.NewStockNumber);
+            if (resolvedNewStockNumber != null)
+            {
+                request.NewStockNumber = resolvedNewStockNumber;
+            }
 
             using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
             try

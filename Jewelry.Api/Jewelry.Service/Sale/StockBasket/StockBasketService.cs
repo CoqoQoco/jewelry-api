@@ -218,11 +218,19 @@ public class StockBasketService : BaseService, IStockBasketService
 
         if (request.StockNumbers != null && request.StockNumbers.Any())
         {
-            foreach (var stockNumber in request.StockNumbers)
+            var resolvedNumbers = await _jewelryContext.ResolveAsync(request.StockNumbers);
+
+            foreach (var requestedNumber in request.StockNumbers)
             {
+                if (requestedNumber == null || !resolvedNumbers.TryGetValue(requestedNumber, out var stockNumber))
+                {
+                    response.SkippedStockNumbers.Add(requestedNumber ?? string.Empty);
+                    continue;
+                }
+
                 if (activeBasketStockNumbers.Contains(stockNumber))
                 {
-                    response.SkippedStockNumbers.Add(stockNumber);
+                    response.SkippedStockNumbers.Add(requestedNumber);
                     continue;
                 }
 
@@ -231,7 +239,7 @@ public class StockBasketService : BaseService, IStockBasketService
 
                 if (piece == null || piece.Status != "IN_STOCK")
                 {
-                    response.SkippedStockNumbers.Add(stockNumber);
+                    response.SkippedStockNumbers.Add(requestedNumber);
                     continue;
                 }
 

@@ -227,7 +227,8 @@ public class ExportShipmentService : BaseService, IExportShipmentService
 
         if (request.StockNumbers != null && request.StockNumbers.Any())
         {
-            var stockNumbersSet = request.StockNumbers.Distinct().ToList();
+            var resolvedNumbers = await _jewelryContext.ResolveAsync(request.StockNumbers);
+            var stockNumbersSet = resolvedNumbers.Values.Distinct().ToList();
 
             candidatePieces = await _jewelryContext.TbtStockPiece
                 .Include(p => p.SkuCodeNavigation)
@@ -414,6 +415,16 @@ public class ExportShipmentService : BaseService, IExportShipmentService
         var survivingStockNumbers = new HashSet<string>(
             existingItems.Where(x => payloadIds.Contains(x.Id)).Select(x => x.StockNumber),
             StringComparer.OrdinalIgnoreCase);
+
+        var resolvedInsertNumbers = await _jewelryContext.ResolveAsync(
+            requestItems.Where(x => !x.Id.HasValue).Select(x => x.StockNumber));
+        foreach (var itemReq in requestItems.Where(x => !x.Id.HasValue))
+        {
+            if (!string.IsNullOrEmpty(itemReq.StockNumber) && resolvedInsertNumbers.TryGetValue(itemReq.StockNumber, out var actualNumber))
+            {
+                itemReq.StockNumber = actualNumber;
+            }
+        }
 
         var toInsertRequests = requestItems
             .Where(x => !x.Id.HasValue && !string.IsNullOrEmpty(x.StockNumber) && !survivingStockNumbers.Contains(x.StockNumber))

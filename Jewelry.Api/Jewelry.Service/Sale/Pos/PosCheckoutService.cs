@@ -62,6 +62,16 @@ namespace Jewelry.Service.Sale.Pos
             var customerName = string.IsNullOrWhiteSpace(request.CustomerName) ? request.CustomerCode : request.CustomerName;
             var now = DateTime.UtcNow;
 
+            // เลขที่สแกน/พิมพ์อาจมีขีดหรือไม่มีขีด — แปลงเป็นเลขจริงใน DB ก่อน แล้วใช้เลขจริงตลอดทั้งบิล (เลขที่หาไม่เจอคงเดิม ให้ Guard แจ้งไม่พบ)
+            var resolvedNumbers = await _jewelryContext.ResolveAsync(request.Items.Select(i => i.StockNumber));
+            foreach (var item in request.Items)
+            {
+                if (item.StockNumber != null && resolvedNumbers.TryGetValue(item.StockNumber, out var actualNumber))
+                {
+                    item.StockNumber = actualNumber;
+                }
+            }
+
             using var transaction = await _jewelryContext.Database.BeginTransactionAsync();
             try
             {

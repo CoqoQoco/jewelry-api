@@ -1,4 +1,5 @@
 using Jewelry.Data.Context;
+using Jewelry.Service.Helper;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 
@@ -22,6 +23,9 @@ namespace Jewelry.Service.Stock.Balance
         {
             if (stockNumbers == null || !stockNumbers.Any())
                 return new List<jewelry.Model.Stock.Balance.ByStockNumbers.Response>();
+
+            var resolvedNumbers = await _jewelryContext.ResolveAsync(stockNumbers);
+            stockNumbers = resolvedNumbers.Values.Distinct().ToList();
 
             var result = await (from p in _jewelryContext.TbtStockPiece.AsNoTracking()
                                 where stockNumbers.Contains(p.StockNumber)

@@ -455,6 +455,7 @@ namespace Jewelry.Service.Stock.Product
         }
         public IQueryable<jewelry.Model.Stock.Product.List.PriceTransection> GetStockCostDetail(string stockNumber)
         {
+            stockNumber = _jewelryContext.Resolve(stockNumber) ?? stockNumber;
 
             var piece = (from item in _jewelryContext.TbtStockPiece
                          where item.StockNumber == stockNumber
@@ -997,6 +998,8 @@ namespace Jewelry.Service.Stock.Product
 
             var now = DateTime.UtcNow;
 
+            request.StockNumber = await _jewelryContext.ResolveAsync(request.StockNumber) ?? request.StockNumber;
+
             TbmProductType? productTypeMaster = null;
             if (!string.IsNullOrEmpty(request.ProductType))
             {
@@ -1386,6 +1389,8 @@ namespace Jewelry.Service.Stock.Product
 
         public async Task<string> CreateProductCostDeatialPlan(jewelry.Model.Stock.Product.PlanPeoductCost.Request request)
         {
+            request.StockNumber = await _jewelryContext.ResolveAsync(request.StockNumber) ?? request.StockNumber;
+
             var _running = await _runningNumberService.GenerateRunningNumber("CP");
 
             var piece = (from item in _jewelryContext.TbtStockPiece
@@ -1441,6 +1446,8 @@ namespace Jewelry.Service.Stock.Product
         }
         public async Task<string> AddProductCostDeatialVersion(jewelry.Model.Stock.Product.AddProductCost.Request request)
         {
+            request.StockNumber = await _jewelryContext.ResolveAsync(request.StockNumber) ?? request.StockNumber;
+
             var piece = (from item in _jewelryContext.TbtStockPiece
                          where item.StockNumber == request.StockNumber
                          select item).FirstOrDefault();
@@ -1535,6 +1542,8 @@ namespace Jewelry.Service.Stock.Product
             {
                 PropertyNameCaseInsensitive = true
             };
+
+            stockNumber = _jewelryContext.Resolve(stockNumber) ?? stockNumber;
 
             var response = (from item in _jewelryContext.TbtStockPieceCostVersion
                             where item.StockNumber == stockNumber
@@ -2224,6 +2233,9 @@ namespace Jewelry.Service.Stock.Product
             {
                 throw new HandleException("Stock Numbers must not exceed 500 items.");
             }
+
+            var resolvedNumbers = await _jewelryContext.ResolveAsync(stockNumbers);
+            stockNumbers = resolvedNumbers.Values.Distinct().ToList();
 
             var pieces = await _jewelryContext.TbtStockPiece
                 .AsNoTracking()

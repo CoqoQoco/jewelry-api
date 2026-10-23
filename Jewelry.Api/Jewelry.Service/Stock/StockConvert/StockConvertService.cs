@@ -25,16 +25,26 @@ public class StockConvertService : BaseService, IStockConvertService
 
     public async Task<jewelry.Model.Stock.StockConvert.Create.Response> Create(jewelry.Model.Stock.StockConvert.Create.Request request)
     {
-        var sourceStockNumbers = (request.SourceStockNumbers ?? new List<string>())
+        var requestedStockNumbers = (request.SourceStockNumbers ?? new List<string>())
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
             .Distinct()
             .ToList();
 
-        if (!sourceStockNumbers.Any())
+        if (!requestedStockNumbers.Any())
         {
             throw new HandleException("ต้องระบุสินค้าต้นทางอย่างน้อย 1 ชิ้น");
         }
+
+        // เลขที่สแกน/พิมพ์อาจมีขีดหรือไม่มีขีด — แปลงเป็นเลขจริงใน DB ก่อน แล้วใช้เลขจริงต่อจากนี้
+        var resolvedSourceNumbers = await _jewelryContext.ResolveAsync(requestedStockNumbers);
+        var unresolvedSourceNumbers = requestedStockNumbers.Where(x => !resolvedSourceNumbers.ContainsKey(x)).ToList();
+        if (unresolvedSourceNumbers.Any())
+        {
+            throw new HandleException($"ไม่พบสินค้าต้นทาง: {string.Join(", ", unresolvedSourceNumbers)}");
+        }
+
+        var sourceStockNumbers = resolvedSourceNumbers.Values.Distinct().ToList();
 
         var running = await _runningNumberService.GenerateRunningNumberForGold("CV");
         var now = DateTime.UtcNow;

@@ -47,6 +47,8 @@ public class StockRfidService : BaseService, IStockRfidService
             throw new HandleException("กรุณาระบุเลขสต็อกและรหัสสินค้า");
         }
 
+        stockNumber = await _jewelryContext.ResolveAsync(stockNumber) ?? stockNumber;
+
         var pieceExists = await _jewelryContext.TbtStockPiece
             .AsNoTracking()
             .AnyAsync(p => p.StockNumber == stockNumber && p.ProductCode == productCode);
@@ -126,6 +128,8 @@ public class StockRfidService : BaseService, IStockRfidService
         }
         else if (!string.IsNullOrEmpty(stockNumber) && !string.IsNullOrEmpty(productCode))
         {
+            stockNumber = await _jewelryContext.ResolveAsync(stockNumber) ?? stockNumber;
+
             targets = await _jewelryContext.TbtStockPieceRfid
                 .Where(r => r.IsActive && r.StockNumber == stockNumber && r.ProductCode == productCode)
                 .ToListAsync();
@@ -221,6 +225,8 @@ public class StockRfidService : BaseService, IStockRfidService
         {
             throw new HandleException("กรุณาระบุเลขสต็อกและรหัสสินค้า");
         }
+
+        stockNumber = await _jewelryContext.ResolveAsync(stockNumber) ?? stockNumber;
 
         var tag = await _jewelryContext.TbtStockPieceRfid
             .AsNoTracking()

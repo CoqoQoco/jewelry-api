@@ -107,6 +107,10 @@ namespace Jewelry.Service.Stock.Movement
                 throw new HandleException($"ไม่พบ Location {req.TargetLocationCode} ในระบบ");
             }
 
+            // เลขที่สแกน/พิมพ์อาจมีขีดหรือไม่มีขีด — แปลงเป็นเลขจริงใน DB ก่อน lock/lookup
+            var resolvedNumbers = await _jewelryContext.ResolveAsync(req.StockNumbers);
+            var realStockNumbers = resolvedNumbers.Values.Distinct().ToList();
+
             // เคารพ transaction เดิมถ้าถูกเรียกจากภายในอีก transaction ที่เปิดอยู่แล้ว เหมือน InvoiceService.Create
             var ownsTransaction = _jewelryContext.Database.CurrentTransaction == null;
             var transaction = ownsTransaction
@@ -117,10 +121,10 @@ namespace Jewelry.Service.Stock.Movement
             {
 
             // ล็อก piece ก่อน แล้วค่อยล็อก balance ของ SKU ที่เกี่ยวข้อง ตามลำดับ global: piece -> balance
-            await _jewelryContext.LockStockPiecesAsync(req.StockNumbers);
+            await _jewelryContext.LockStockPiecesAsync(realStockNumbers);
 
             var pieces = _jewelryContext.TbtStockPiece
-                .Where(p => req.StockNumbers.Contains(p.StockNumber))
+                .Where(p => realStockNumbers.Contains(p.StockNumber))
                 .ToList();
 
             await _jewelryContext.LockStockBalancesAsync(pieces.Select(p => p.SkuCode));

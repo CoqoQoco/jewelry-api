@@ -108,8 +108,10 @@ namespace Jewelry.Service.Stock.ProductImage
 
         public async Task<jewelry.Model.Stock.Product.Image.Replace.Response> Replace(jewelry.Model.Stock.Product.Image.Replace.Request request)
         {
+            var resolvedStockNumber = await _jewelryContext.ResolveAsync(request.StockNumber) ?? request.StockNumber;
+
             var piece = await _jewelryContext.TbtStockPiece
-                .FirstOrDefaultAsync(x => x.StockNumber == request.StockNumber);
+                .FirstOrDefaultAsync(x => x.StockNumber == resolvedStockNumber);
 
             if (piece == null)
             {
