@@ -13,5 +13,6 @@ namespace jewelry.Model.Worker.GoldLossSlip
         public decimal TotalWeightLossActual { get; set; }
         public decimal TotalMoneyDiff { get; set; }
         public decimal TotalGoldReturnAmount { get; set; }
+        public decimal TotalReturnWeight { get; set; }
     }
 }

@@ -254,6 +254,7 @@ namespace Jewelry.Service.Worker
         {
             var query = _jewelryContext.TbtWorkerGoldLossSlip
                 .Include(x => x.TbtWorkerGoldLossSlipItem.Where(i => i.IsActive))
+                .Include(x => x.TbtWorkerGoldLossSlipReturn)
                 .Where(x => x.IsActive);
 
             if (request.RequestDateStart.HasValue)
@@ -323,6 +324,7 @@ namespace Jewelry.Service.Worker
                 TotalWeightLossActual = items.Sum(i => i.WeightLossActual ?? 0),
                 TotalMoneyDiff = items.Sum(i => i.MoneyDiff ?? 0),
                 TotalGoldReturnAmount = slips.Sum(s => s.TotalGoldReturnAmount ?? 0),
+                TotalReturnWeight = slips.SelectMany(s => s.TbtWorkerGoldLossSlipReturn).Where(r => r.CountInCalc).Sum(r => r.Weight),
             };
         }
 
