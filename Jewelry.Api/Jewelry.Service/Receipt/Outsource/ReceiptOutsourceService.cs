@@ -66,8 +66,21 @@ namespace Jewelry.Service.Receipt.Outsource
             var newStocks = new List<StockProductDto>();
             var newStockPieceMaterials = new List<TbtStockPieceMaterial>();
 
+            var goldRows = await _jewelryContext.TbmGold.AsNoTracking().ToListAsync();
+            var goldNameByCode = goldRows
+                .GroupBy(x => x.Code.Trim().ToUpper())
+                .ToDictionary(g => g.Key, g => g.First().NameEn);
+            var goldSizeRows = await _jewelryContext.TbmGoldSize.AsNoTracking().ToListAsync();
+            var goldSizeNameByCode = goldSizeRows
+                .GroupBy(x => x.Code.Trim().ToUpper())
+                .ToDictionary(g => g.Key, g => g.First().NameEn);
+
             foreach (var stock in request.Stocks)
             {
+                // UI ส่ง master code (WG/7) มา แต่ทุก path รับสินค้าอื่นเก็บเป็นชื่อ (White Gold/18K) จึงแปลงให้ตรงกันก่อนใช้งาน
+                stock.ProductionType = NormalizeToName(stock.ProductionType, goldNameByCode);
+                stock.ProductionTypeSize = NormalizeToName(stock.ProductionTypeSize, goldSizeNameByCode);
+
                 var productType = await _jewelryContext.TbmProductType
                     .FirstOrDefaultAsync(x => x.Code == stock.ProductType);
 
@@ -269,6 +282,16 @@ namespace Jewelry.Service.Receipt.Outsource
                     await transaction!.DisposeAsync();
                 }
             }
+        }
+
+        private static string? NormalizeToName(string? value, Dictionary<string, string> nameByCode)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            return nameByCode.TryGetValue(value.Trim().ToUpper(), out var name) ? name : value;
         }
 
         public IQueryable<jewelry.Model.Receipt.Outsource.History.List.Response> ListHistory(jewelry.Model.Receipt.Outsource.History.List.Search request)

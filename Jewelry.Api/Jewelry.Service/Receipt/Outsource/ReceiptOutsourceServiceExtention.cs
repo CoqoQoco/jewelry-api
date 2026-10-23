@@ -25,7 +25,7 @@ namespace Jewelry.Service.Receipt.Outsource
                 ReceiptDate = DateTime.UtcNow,
                 ReceiptType = "outsource",
 
-                Mold = null,
+                Mold = stock.MoldDesign,
                 MoldDesign = stock.MoldDesign,
 
                 Qty = stock.Qty,
