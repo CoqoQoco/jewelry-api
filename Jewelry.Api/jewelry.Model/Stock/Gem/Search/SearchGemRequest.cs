@@ -25,5 +25,9 @@ namespace jewelry.Model.Stock.Gem.Search
         public string[]? TypeCheck { get; set; }
 
         public string? Text { get; set; }
+
+        public string? StockStatus { get; set; }
+        public bool? NoPrice { get; set; }
+        public int? IdleDays { get; set; }
     }
 }

@@ -172,6 +172,44 @@ namespace Jewelry.Service.Stock
                 }
             }
 
+            var text = search.Text?.Trim();
+            if (!string.IsNullOrEmpty(text))
+            {
+                var pattern = "%" + text.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+                query = query.Where(item =>
+                    EF.Functions.ILike(item.Code, pattern, "\\") ||
+                    EF.Functions.ILike(item.GroupName, pattern, "\\") ||
+                    EF.Functions.ILike(item.Shape, pattern, "\\") ||
+                    EF.Functions.ILike(item.Size, pattern, "\\") ||
+                    EF.Functions.ILike(item.Grade, pattern, "\\"));
+            }
+
+            var stockStatus = search.StockStatus?.Trim().ToLowerInvariant();
+            if (stockStatus == "in-stock")
+            {
+                query = query.Where(item => item.Quantity > 0 || item.QuantityWeight > 0);
+            }
+            else if (stockStatus == "out-of-stock")
+            {
+                query = query.Where(item => item.Quantity <= 0 && item.QuantityWeight <= 0);
+            }
+            else if (stockStatus == "on-process")
+            {
+                query = query.Where(item => item.QuantityOnProcess > 0 || item.QuantityWeightOnProcess > 0);
+            }
+
+            if (search.NoPrice == true)
+            {
+                query = query.Where(item => item.Price == 0 && item.PriceQty == 0);
+            }
+
+            if (search.IdleDays.HasValue && search.IdleDays.Value > 0)
+            {
+                var idleCutoff = DateTime.UtcNow.AddDays(-search.IdleDays.Value);
+                query = query.Where(item => !_jewelryContext.TbtStockGemTransection
+                    .Any(t => t.Code == item.Code && t.RequestDate >= idleCutoff));
+            }
+
             var response = (from item in query
                             select new SearchGemResponse()
                             {
