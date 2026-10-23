@@ -19,6 +19,9 @@ namespace jewelry.Model.Stock.Product.QuickPrice
         public decimal? AlloyPrice { get; set; }
         public decimal? GoldCostTotal { get; set; }
         public decimal? TotalPrice { get; set; }
+        public decimal? GoldLossPercent { get; set; }
+        public decimal? GoldLossCostTotal { get; set; }
+        public decimal? GoldLossTotalPrice { get; set; }
         public string? Remark { get; set; }
         public string CreateBy { get; set; } = null!;
         public DateTime CreateDate { get; set; }

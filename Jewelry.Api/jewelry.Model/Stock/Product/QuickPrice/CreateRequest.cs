@@ -11,6 +11,7 @@ namespace jewelry.Model.Stock.Product.QuickPrice
         public decimal AlloyWeight { get; set; }
         public decimal AlloyPrice { get; set; }
         public decimal Percent { get; set; }
+        public decimal? GoldLossPercent { get; set; }
         public int Rounding { get; set; }
         public string? Remark { get; set; }
     }

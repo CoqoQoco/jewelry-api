@@ -38,6 +38,12 @@ public partial class TbtStockPieceQuickPrice
 
     public decimal? TotalPrice { get; set; }
 
+    public decimal? GoldLossPercent { get; set; }
+
+    public decimal? GoldLossCostTotal { get; set; }
+
+    public decimal? GoldLossTotalPrice { get; set; }
+
     public string? Remark { get; set; }
 
     public bool IsActive { get; set; }
