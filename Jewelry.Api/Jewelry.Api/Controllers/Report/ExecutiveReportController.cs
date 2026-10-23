@@ -16,16 +16,37 @@ namespace Jewelry.Api.Controllers.Report
         private readonly IExecutiveReportService _service;
         private readonly IExecutiveFlowService _flowService;
         private readonly IExecutiveDigestService _digestService;
+        private readonly IExecutiveDataQualityService _dataQualityService;
 
         public ExecutiveReportController(IExecutiveReportService service,
             IExecutiveFlowService flowService,
             IExecutiveDigestService digestService,
+            IExecutiveDataQualityService dataQualityService,
             IOptions<ApiBehaviorOptions> apiBehaviorOptions)
             : base(apiBehaviorOptions)
         {
             _service = service;
             _flowService = flowService;
             _digestService = digestService;
+            _dataQualityService = dataQualityService;
+        }
+
+        [Route("DataQuality")]
+        [HttpPost]
+        [RequirePermission("executive:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Report.Executive.DataQuality.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> DataQuality([FromBody] jewelry.Model.Report.Executive.DataQuality.Request request)
+        {
+            try
+            {
+                var response = await _dataQualityService.DataQuality(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
 
         [Route("Digest")]

@@ -173,6 +173,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IExecutiveReportService, ExecutiveReportService>();
             services.AddScoped<IExecutiveFlowService, ExecutiveFlowService>();
             services.AddScoped<IExecutiveDigestService, ExecutiveDigestService>();
+            services.AddScoped<IExecutiveDataQualityService, ExecutiveDataQualityService>();
             services.AddScoped<IProductionInsightService, ProductionInsightService>();
             services.AddScoped<Jewelry.Service.Stock.Insight.IStockInsightService, Jewelry.Service.Stock.Insight.StockInsightService>();
             services.AddScoped<Jewelry.Service.Material.Insight.IMaterialInsightProvider, Jewelry.Service.Material.Insight.GoldMaterialInsightProvider>();
