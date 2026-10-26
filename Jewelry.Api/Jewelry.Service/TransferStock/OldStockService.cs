@@ -5,6 +5,7 @@ using Jewelry.Data.Models.Jewelry;
 using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Receipt.Production;
+using Jewelry.Service.Stock;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -27,6 +28,7 @@ namespace Jewelry.Service.TransferStock
         Task<string> TransferStock14K(jewelry.Model.Stock.OldStock._9K.Request request);
         Task<string> TransferStock18K(jewelry.Model.Stock.OldStock._9K.Request request);
         Task<string> TransferStockSilver(jewelry.Model.Stock.OldStock._9K.Request request);
+        Task<jewelry.Model.Stock.OldStock._9K.TopUpSilverResponse> TopUpStockSilver(jewelry.Model.Stock.OldStock._9K.TopUpSilverRequest request);
     }
     public class OldStockService : BaseService, IOldStockService
     {
@@ -633,6 +635,188 @@ namespace Jewelry.Service.TransferStock
                 request.Take,
                 request.Location,
                 x => x.Qty);
+
+        // เติมจำนวนเข้า lot เงินที่มีอยู่แล้ว (1 รหัสเก่า = 1 piece, qty อยู่บน piece) — all-or-nothing
+        public async Task<jewelry.Model.Stock.OldStock._9K.TopUpSilverResponse> TopUpStockSilver(jewelry.Model.Stock.OldStock._9K.TopUpSilverRequest request)
+        {
+            const string refDocType = "TRANSFER_SILVER_TOPUP";
+            var errors = new List<string>();
+            var batchRef = request?.BatchRef?.Trim();
+
+            if (string.IsNullOrWhiteSpace(batchRef)) errors.Add("BatchRef is required.");
+            if (request?.Items == null || request.Items.Count == 0) errors.Add("Items is empty.");
+
+            var items = new List<(string Code, int Qty)>();
+            var seen = new HashSet<string>();
+            foreach (var it in request?.Items ?? new())
+            {
+                var code = (it.NoProduct ?? "").Trim().ToUpper();
+                if (code == "") { errors.Add("NoProduct is blank."); continue; }
+                if (!seen.Add(code)) { errors.Add($"{code}: duplicate in request."); continue; }
+                if (it.Qty <= 0) { errors.Add($"{code}: Qty must be > 0."); continue; }
+                items.Add((code, it.Qty));
+            }
+
+            // EF บน Postgres เทียบ case-sensitive — โหลด piece transfer ของรหัสที่ normalize แล้ว แล้วเทียบ upper/trim ใน memory
+            var piecesByCode = new Dictionary<string, List<TbtStockPiece>>();
+            var codes = items.Select(x => x.Code).ToList();
+            foreach (var codeBatch in codes.Chunk(500))
+            {
+                var batch = await _jewelryContext.TbtStockPiece
+                    .Where(x => x.ReceiptType == "transfer"
+                             && x.StockNumberOrigin != null
+                             && codeBatch.Contains(x.StockNumberOrigin.Trim().ToUpper()))
+                    .ToListAsync();
+                foreach (var p in batch)
+                {
+                    var key = p.StockNumberOrigin!.Trim().ToUpper();
+                    if (!piecesByCode.TryGetValue(key, out var list)) piecesByCode[key] = list = new List<TbtStockPiece>();
+                    list.Add(p);
+                }
+            }
+
+            var targets = new List<(string Code, int Qty, TbtStockPiece Piece)>();
+            foreach (var (code, qty) in items)
+            {
+                if (!piecesByCode.TryGetValue(code, out var list) || list.Count == 0)
+                {
+                    errors.Add($"{code}: no existing transfer piece.");
+                    continue;
+                }
+                if (list.Count > 1)
+                {
+                    errors.Add($"{code}: found {list.Count} transfer pieces (expected 1).");
+                    continue;
+                }
+                targets.Add((code, qty, list[0]));
+            }
+
+            // idempotency: เคย top-up ด้วย BatchRef นี้แล้วหรือยัง
+            if (!string.IsNullOrWhiteSpace(batchRef) && targets.Count > 0)
+            {
+                var stockNumbers = targets.Select(x => x.Piece.StockNumber).Distinct().ToList();
+                var done = new HashSet<string>();
+                foreach (var snBatch in stockNumbers.Chunk(500))
+                {
+                    var rows = await _jewelryContext.TbtStockMovement
+                        .Where(x => x.RefDocType == refDocType
+                                 && x.RefDocNo == batchRef
+                                 && x.StockNumber != null
+                                 && snBatch.Contains(x.StockNumber))
+                        .Select(x => x.StockNumber!)
+                        .ToListAsync();
+                    foreach (var r in rows) done.Add(r);
+                }
+                foreach (var t in targets.Where(x => done.Contains(x.Piece.StockNumber)))
+                    errors.Add($"{t.Code}: already topped up with batch '{batchRef}'.");
+            }
+
+            if (errors.Count > 0)
+            {
+                var shown = string.Join(" | ", errors.Take(50));
+                var more = errors.Count > 50 ? $" ... (+{errors.Count - 50} more)" : "";
+                throw new HandleException($"TopUp validation failed ({errors.Count} errors): {shown}{more}");
+            }
+
+            var response = new jewelry.Model.Stock.OldStock._9K.TopUpSilverResponse
+            {
+                DryRun = request!.DryRun,
+                ItemCount = targets.Count,
+                TotalQtyAdded = targets.Sum(x => x.Qty)
+            };
+            foreach (var t in targets)
+            {
+                var after = t.Piece.Qty + t.Qty;
+                var statusAfter = t.Piece.Status;
+                var probe = new TbtStockPiece { Qty = after, QtyReserved = t.Piece.QtyReserved };
+                StockPieceQtyHelper.RecalcStatus(probe);
+                statusAfter = probe.Status;
+                response.Items.Add(new jewelry.Model.Stock.OldStock._9K.TopUpSilverResultItem
+                {
+                    NoProduct = t.Code,
+                    StockNumber = t.Piece.StockNumber,
+                    Location = t.Piece.LocationCode,
+                    QtyBefore = t.Piece.Qty,
+                    QtyAfter = after,
+                    StatusBefore = t.Piece.Status,
+                    StatusAfter = statusAfter
+                });
+            }
+
+            if (request.DryRun) return response;
+
+            var ownsTransaction = _jewelryContext.Database.CurrentTransaction == null;
+            var transaction = ownsTransaction
+                ? await _jewelryContext.Database.BeginTransactionAsync()
+                : null;
+
+            try
+            {
+                // ล็อก balance ของ SKU ก่อนอ่านค่าเดิม แล้ว reload piece หลังล็อกเพื่อใช้ qty ล่าสุด
+                await _jewelryContext.LockStockBalancesAsync(targets.Select(x => x.Piece.SkuCode));
+
+                var now = DateTime.UtcNow;
+                var user = CurrentUsername ?? "system";
+                var balanceCache = new Dictionary<string, TbtStockBalance>();
+                var newBalances = new List<TbtStockBalance>();
+                var newMovements = new List<TbtStockMovement>();
+
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    var (code, qty, piece) = targets[i];
+                    await _jewelryContext.Entry(piece).ReloadAsync();
+
+                    piece.Qty += qty;
+                    StockPieceQtyHelper.RecalcStatus(piece);
+                    piece.UpdateBy = user;
+                    piece.UpdateDate = now;
+                    response.Items[i].QtyAfter = piece.Qty;
+                    response.Items[i].StatusAfter = piece.Status;
+
+                    var balanceKey = $"{piece.SkuCode}|{piece.LocationCode}";
+                    if (!balanceCache.TryGetValue(balanceKey, out var balance))
+                    {
+                        balance = await _jewelryContext.TbtStockBalance
+                            .FirstOrDefaultAsync(x => x.SkuCode == piece.SkuCode && x.LocationCode == piece.LocationCode);
+                        if (balance == null)
+                        {
+                            balance = new TbtStockBalance
+                            {
+                                SkuCode = piece.SkuCode,
+                                LocationCode = piece.LocationCode,
+                                QtyOnHand = 0,
+                                QtyReserved = 0,
+                                CreateBy = user,
+                                CreateDate = now
+                            };
+                            newBalances.Add(balance);
+                        }
+                        balanceCache[balanceKey] = balance;
+                    }
+                    balance.QtyOnHand += qty;
+                    balance.LastMovementAt = now;
+
+                    newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(
+                        piece.SkuCode, piece.StockNumber, piece.ProductCode, piece.LocationCode, batchRef!, user, refDocType, qty: qty));
+                }
+
+                _jewelryContext.TbtStockPiece.UpdateRange(targets.Select(x => x.Piece));
+                if (newBalances.Any()) _jewelryContext.TbtStockBalance.AddRange(newBalances);
+                var updateBalances = balanceCache.Values.Where(x => x.Id != 0).ToList();
+                if (updateBalances.Any()) _jewelryContext.TbtStockBalance.UpdateRange(updateBalances);
+                _jewelryContext.TbtStockMovement.AddRange(newMovements);
+
+                await _jewelryContext.SaveChangesAsync();
+
+                if (ownsTransaction) await transaction!.CommitAsync();
+                return response;
+            }
+            catch
+            {
+                if (ownsTransaction) await transaction!.RollbackAsync();
+                throw;
+            }
+        }
 
         #endregion
 

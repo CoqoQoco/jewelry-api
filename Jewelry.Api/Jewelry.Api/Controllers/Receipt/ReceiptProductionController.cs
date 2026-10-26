@@ -241,5 +241,23 @@ namespace Jewelry.Api.Controllers.Receipt
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("Transfer/SILVER-TOPUP")]
+        [HttpPost]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(jewelry.Model.Stock.OldStock._9K.TopUpSilverResponse))]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.OK)]
+        [ProducesResponseType((int)System.Net.HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> TransferSilverTopUp(jewelry.Model.Stock.OldStock._9K.TopUpSilverRequest request)
+        {
+            try
+            {
+                var response = await _oldStockService.TopUpStockSilver(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }
