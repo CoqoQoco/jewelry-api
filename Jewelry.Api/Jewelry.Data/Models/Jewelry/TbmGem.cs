@@ -21,6 +21,10 @@ public partial class TbmGem
 
     public string? Color { get; set; }
 
+    public string? LabelCode { get; set; }
+
+    public int? LabelSort { get; set; }
+
     public virtual ICollection<TbtProductMoldPlanGem> TbtProductMoldPlanGem { get; set; } = new List<TbtProductMoldPlanGem>();
 
     public virtual ICollection<TbtProductionPlanMaterial> TbtProductionPlanMaterial { get; set; } = new List<TbtProductionPlanMaterial>();

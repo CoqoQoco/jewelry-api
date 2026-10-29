@@ -732,6 +732,10 @@ public partial class JewelryContext : DbContext
                 .ValueGeneratedOnAdd()
                 .HasColumnName("id");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.LabelCode)
+                .HasColumnType("character varying")
+                .HasColumnName("label_code");
+            entity.Property(e => e.LabelSort).HasColumnName("label_sort");
             entity.Property(e => e.NameEn)
                 .HasColumnType("character varying")
                 .HasColumnName("name_en");

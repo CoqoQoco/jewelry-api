@@ -16,6 +16,9 @@ namespace jewelry.Model.Master
 
         public string? Color { get; set;  }
 
+        public string? LabelCode { get; set; }
+        public int? LabelSort { get; set; }
+
 
         public string? Prefix { get; set; }
         public string? Prefix2 { get; set; }

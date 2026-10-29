@@ -86,6 +86,8 @@ namespace Jewelry.Service.Master
                                 NameTh = item.NameTh,
                                 Code = item.Code,
                                 Color = item.Color,
+                                LabelCode = item.LabelCode,
+                                LabelSort = item.LabelSort,
                                 Description = $"{item.Code}: {item.NameTh}"
                             });
 
@@ -173,6 +175,8 @@ namespace Jewelry.Service.Master
                                     NameTh = item.NameTh,
                                     Code = item.Code,
                                     Color = item.Color,
+                                    LabelCode = item.LabelCode,
+                                    LabelSort = item.LabelSort,
                                     Description = $"{item.Code}: {item.NameTh}"
                                 });
 
@@ -394,6 +398,16 @@ namespace Jewelry.Service.Master
                 gem.NameTh = request.NameTh;
 
                 gem.Color = request.Color;
+                // LabelCode: null = keep existing, blank = clear, otherwise trim+upper.
+                // LabelSort: null = keep existing, 0 or negative = clear, otherwise set.
+                if (request.LabelCode != null)
+                {
+                    gem.LabelCode = string.IsNullOrWhiteSpace(request.LabelCode) ? null : request.LabelCode.Trim().ToUpper();
+                }
+                if (request.LabelSort.HasValue)
+                {
+                    gem.LabelSort = request.LabelSort.Value <= 0 ? null : request.LabelSort.Value;
+                }
 
                 _jewelryContext.TbmGem.Update(gem);
                 await _jewelryContext.SaveChangesAsync();
@@ -614,6 +628,8 @@ namespace Jewelry.Service.Master
                     NameEn = request.NameEn,
                     NameTh = request.NameTh,
                     Color = request.Color,
+                    LabelCode = string.IsNullOrWhiteSpace(request.LabelCode) ? null : request.LabelCode.Trim().ToUpper(),
+                    LabelSort = request.LabelSort,
                     CreateDate = DateTime.UtcNow,
                     CreateBy = CurrentUsername,
                     IsActive = true,
