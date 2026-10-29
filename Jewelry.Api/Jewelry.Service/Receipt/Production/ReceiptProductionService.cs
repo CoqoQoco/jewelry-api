@@ -531,6 +531,32 @@ namespace Jewelry.Service.Receipt.Production
                 }
             }
 
+            // แผนทอง: 1 แถว = 1 ชิ้นเสมอ (การเพิ่มจำนวนทำผ่านการเติมล็อตเดิม ครั้งละ 1)
+            var locationCache = new Dictionary<string, string>();
+            var topUpRows = new List<TopUpRow>();
+            foreach (var s in request.Stocks)
+            {
+                if (!isSilverPlan && s.Qty != 1)
+                {
+                    throw new HandleException($"ทอง 1 รหัส = 1 ชิ้น กรุณาเพิ่มรายการใหม่ --> {s.ProductNumber}");
+                }
+
+                var rowTopUp = ReceiptTopUpHelper.CleanStockNumber(s.TopUpStockNumber);
+                if (rowTopUp != null)
+                {
+                    topUpRows.Add(new TopUpRow
+                    {
+                        StockNumber = rowTopUp,
+                        IsSilver = isSilverPlan,
+                        Location = s.Location,
+                        Qty = s.Qty,
+                        ReceiptNumber = s.StockReceiptNumber
+                    });
+                }
+            }
+
+            await ReceiptTopUpHelper.LoadAndValidateAsync(_jewelryContext, topUpRows, locationCache, CurrentUsername, track: false);
+
             decimal? productCostPerUnit = null;
             if (query.plan.TbtProductionPlanPrice != null && query.plan.TbtProductionPlanPrice.Any() && query.plan.ProductQty > 0)
             {
@@ -549,6 +575,35 @@ namespace Jewelry.Service.Receipt.Production
                 if (match.IsReceipt)
                 {
                     throw new HandleException($"{ErrorMessage.StockAlreadyReceipt} --> {stock.StockReceiptNumber}");
+                }
+
+                var topUpNumber = ReceiptTopUpHelper.CleanStockNumber(stock.TopUpStockNumber);
+                if (topUpNumber != null)
+                {
+                    var topUpProduct = match.MapNewStockProduction(query.receipt, query.plan, stock, topUpNumber, CurrentUsername);
+                    var topUpResponse = topUpProduct.MapResponseNewStockProduction();
+                    topUpResponse.IsTopUp = true;
+                    response.Stocks.Add(topUpResponse);
+
+                    match.IsReceipt = true;
+                    match.UpdateBy = CurrentUsername;
+                    match.UpdateDate = DateTime.UtcNow;
+                    match.ReceiptDate = DateTime.UtcNow;
+                    match.StockNumber = topUpNumber;
+
+                    match.Mold = query.plan.Mold;
+                    match.MoldDesign = stock.MoldDesign;
+
+                    updateReceiptItem.Add(match);
+
+                    foreach (var draft in drafts.Where(d => d.StockReceiptNumber == match.StockReceiptNumber))
+                    {
+                        draft.StockNumber = topUpNumber;
+                        draft.Qty = stock.Qty;
+                        draft.IsReceipt = true;
+                    }
+
+                    continue;
                 }
 
                 var prefix = isSilverPlan ? productType.SilverCode : productType.ProductCode;
@@ -676,7 +731,6 @@ namespace Jewelry.Service.Receipt.Production
             var newMovements = new List<TbtStockMovement>();
 
             var skuCache = new Dictionary<string, bool>();
-            var locationCache = new Dictionary<string, string>();
             var balanceCache = new Dictionary<string, TbtStockBalance>();
 
             // เคารพ transaction เดิมถ้าถูกเรียกจากภายในอีก transaction ที่เปิดอยู่แล้ว เหมือน InvoiceService.Create / StockMovementService.MoveLocation
@@ -688,9 +742,14 @@ namespace Jewelry.Service.Receipt.Production
             try
             {
 
-            // การรับสินค้าสร้าง stock piece ใหม่เสมอ ไม่มีแถวเดิมให้ล็อก (ล็อก piece row ที่ยังไม่มีอยู่คือ no-op)
-            // สิ่งที่ชนกับ path อื่นได้จริงคือแถว balance ของ SKU ที่กำลังจะถูกบวกเพิ่ม จึงล็อกก่อนอ่านค่า balance เดิมด้านล่าง
-            var skuCodesToLock = newStocks.Select(x => x.DeriveSkuCode()).Distinct().ToList();
+            // ลำดับล็อก: piece ของล็อตที่เติม -> balance (ล็อตใหม่ไม่มีแถว piece ให้ล็อก แต่ balance ของ SKU ชนกับ path อื่นได้)
+            await _jewelryContext.LockStockPiecesAsync(topUpRows.Select(x => x.StockNumber));
+            var topUpPieces = await ReceiptTopUpHelper.LoadAndValidateAsync(_jewelryContext, topUpRows, locationCache, CurrentUsername, track: true);
+
+            var skuCodesToLock = newStocks.Select(x => x.DeriveSkuCode())
+                .Concat(topUpPieces.Values.Select(x => x.SkuCode))
+                .Distinct()
+                .ToList();
             await _jewelryContext.LockStockBalancesAsync(skuCodesToLock);
 
             // group ตาม StockNumber: แผนทองแต่ละแถวมีเลขวิ่งไม่ซ้ำอยู่แล้ว (กลุ่มละ 1) แผนเงินที่ auto-group แล้วจะมีหลายแถวใน 1 เลข (lotQty)
@@ -750,8 +809,15 @@ namespace Jewelry.Service.Receipt.Production
                     }
                 }
 
-                newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername, qty: lotQty));
+                // 1 movement ต่อ 1 receipt item (ไม่รวมทั้งกลุ่ม) เพื่อให้ประวัติรับสินค้ารวมจำนวนต่อรายการได้
+                foreach (var groupItem in stockGroup)
+                {
+                    var itemQty = isSilverPlan ? groupItem.Qty : 1;
+                    newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, groupItem.StockNumber, pieceProductCode, locationCode, groupItem.ReceiptNumber, CurrentUsername, qty: itemQty));
+                }
             }
+
+            await ReceiptTopUpHelper.ApplyAsync(_jewelryContext, topUpRows, topUpPieces, balanceCache, upsertBalances, newMovements, CurrentUsername);
 
             var updateBalances = balanceCache.Values
                 .Where(x => x.Id != 0)
@@ -773,6 +839,10 @@ namespace Jewelry.Service.Receipt.Production
             if (newStockPieces.Any())
             {
                 _jewelryContext.TbtStockPiece.AddRange(newStockPieces);
+            }
+            if (topUpPieces.Any())
+            {
+                _jewelryContext.TbtStockPiece.UpdateRange(topUpPieces.Values);
             }
             if (newStockPieceMaterials.Any())
             {
@@ -899,19 +969,23 @@ namespace Jewelry.Service.Receipt.Production
                          join sku in _jewelryContext.TbtSku
                          on piece.SkuCode equals sku.SkuCode
 
+                         let receivedQty = _jewelryContext.TbtStockMovement
+                             .Where(m => m.RefDocType == "RECEIPT" && m.RefDocNo == item.StockReceiptNumber && m.StockNumber == item.StockNumber)
+                             .Sum(m => (decimal?)m.Qty)
+
                          select new jewelry.Model.Receipt.Production.History.List.Response()
                          {
                              StockNumber = piece.StockNumber,
                              Status = piece.Status,
 
                              ReceiptNumber = item.StockReceiptNumber,
-                             ReceiptDate = piece.ReceiptDate.GetValueOrDefault(),
+                             ReceiptDate = item.ReceiptDate.GetValueOrDefault(),
                              ReceiptType = item.Type,
 
                              Mold = item.MoldDesign ?? item.Mold,
                              MoldDesign = item.MoldDesign,
 
-                             Qty = 1,
+                             Qty = receivedQty ?? 1,
                              ProductPrice = sku.DefaultPrice ?? 0,
 
                              ProductNumber = sku.ProductNumber,
@@ -971,7 +1045,7 @@ namespace Jewelry.Service.Receipt.Production
         public jewelry.Model.Receipt.ReceiptHistorySummary GetHistorySummary(jewelry.Model.Receipt.Production.History.List.Search request)
         {
             var query = ListHistory(request);
-            return ReceiptHistoryMaterialHelper.Summarize(_jewelryContext, query.Select(x => x.StockNumber), query.Select(x => x.ProductPrice));
+            return ReceiptHistoryMaterialHelper.Summarize(_jewelryContext, query.Select(x => x.StockNumber), query.Select(x => x.Qty), query.Select(x => x.ProductPrice * x.Qty));
         }
 
     }

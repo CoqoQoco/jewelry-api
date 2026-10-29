@@ -131,6 +131,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IPlanReceiptService, PlanReceiptService>();
             services.AddScoped<IReceiptProductionService, ReceiptProductionService>();
             services.AddScoped<IReceiptOutsourceService, ReceiptOutsourceService>();
+            services.AddScoped<Jewelry.Service.Receipt.Lot.IReceiptLotService, Jewelry.Service.Receipt.Lot.ReceiptLotService>();
 
             services.AddScoped<ILoginService, LoginService>();
             services.AddScoped<IPermissionService, Jewelry.Service.Permission.PermissionService>();

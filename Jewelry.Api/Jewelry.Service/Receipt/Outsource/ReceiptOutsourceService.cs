@@ -43,6 +43,63 @@ namespace Jewelry.Service.Receipt.Outsource
                 Stocks = new List<jewelry.Model.Receipt.Outsource.Confirm.Stock>()
             };
 
+            var goldRows = await _jewelryContext.TbmGold.AsNoTracking().ToListAsync();
+            var goldNameByCode = goldRows
+                .GroupBy(x => x.Code.Trim().ToUpper())
+                .ToDictionary(g => g.Key, g => g.First().NameEn);
+            var goldSizeRows = await _jewelryContext.TbmGoldSize.AsNoTracking().ToListAsync();
+            var goldSizeNameByCode = goldSizeRows
+                .GroupBy(x => x.Code.Trim().ToUpper())
+                .ToDictionary(g => g.Key, g => g.First().NameEn);
+
+            var locationCache = new Dictionary<string, string>();
+            var topUpRows = new List<TopUpRow>();
+
+            // ตรวจ qty + เตรียมแถวเติมล็อตก่อนออกเลขวิ่ง (กันเลขวิ่งเปลืองเมื่อข้อมูลไม่ผ่าน)
+            for (var i = 0; i < request.Stocks.Count; i++)
+            {
+                var row = request.Stocks[i];
+
+                // UI ส่ง master code (WG/7) มา แต่ทุก path รับสินค้าอื่นเก็บเป็นชื่อ (White Gold/18K) จึงแปลงให้ตรงกันก่อนใช้งาน
+                row.ProductionType = NormalizeToName(row.ProductionType, goldNameByCode);
+                row.ProductionTypeSize = NormalizeToName(row.ProductionTypeSize, goldSizeNameByCode);
+
+                var rowIsSilver = row.ProductionType == "Silver";
+                if (rowIsSilver)
+                {
+                    if (row.Qty <= 0)
+                    {
+                        throw new HandleException($"จำนวนต้องมากกว่า 0 --> {row.ProductNumber}");
+                    }
+                    if (row.Qty != decimal.Truncate(row.Qty))
+                    {
+                        throw new HandleException($"เงินต้องระบุจำนวนเป็นจำนวนเต็ม --> {row.ProductNumber} (Qty = {row.Qty})");
+                    }
+                }
+                else if (row.Qty != 1)
+                {
+                    throw new HandleException($"ทอง 1 รหัส = 1 ชิ้น กรุณาเพิ่มรายการใหม่ --> {row.ProductNumber}");
+                }
+
+                var topUpNumber = ReceiptTopUpHelper.CleanStockNumber(row.TopUpStockNumber);
+                if (topUpNumber != null)
+                {
+                    topUpRows.Add(new TopUpRow
+                    {
+                        StockNumber = topUpNumber,
+                        IsSilver = rowIsSilver,
+                        Location = row.Location,
+                        Qty = row.Qty,
+                        ReceiptNumber = string.Empty
+                    });
+                }
+            }
+
+            await ReceiptTopUpHelper.LoadAndValidateAsync(_jewelryContext, topUpRows, locationCache, CurrentUsername, track: false);
+            topUpRows.Clear();
+
+            var totalPieces = (int)request.Stocks.Sum(x => x.Qty);
+
             var headerRunning = await _runningNumberService.GenerateRunningNumber("OUT");
 
             var header = new TbtStockProductReceiptPlan
@@ -51,8 +108,8 @@ namespace Jewelry.Service.Receipt.Outsource
                 Type = "outsource",
                 Vendor = request.Vendor,
                 PoNumber = request.PoNumber,
-                Qty = request.Stocks.Count,
-                QtyRunning = request.Stocks.Count,
+                Qty = totalPieces,
+                QtyRunning = totalPieces,
                 IsComplete = true,
                 IsRunning = true,
                 Wo = null,
@@ -66,20 +123,10 @@ namespace Jewelry.Service.Receipt.Outsource
             var newStocks = new List<StockProductDto>();
             var newStockPieceMaterials = new List<TbtStockPieceMaterial>();
 
-            var goldRows = await _jewelryContext.TbmGold.AsNoTracking().ToListAsync();
-            var goldNameByCode = goldRows
-                .GroupBy(x => x.Code.Trim().ToUpper())
-                .ToDictionary(g => g.Key, g => g.First().NameEn);
-            var goldSizeRows = await _jewelryContext.TbmGoldSize.AsNoTracking().ToListAsync();
-            var goldSizeNameByCode = goldSizeRows
-                .GroupBy(x => x.Code.Trim().ToUpper())
-                .ToDictionary(g => g.Key, g => g.First().NameEn);
-
-            foreach (var stock in request.Stocks)
+            for (var rowIndex = 0; rowIndex < request.Stocks.Count; rowIndex++)
             {
-                // UI ส่ง master code (WG/7) มา แต่ทุก path รับสินค้าอื่นเก็บเป็นชื่อ (White Gold/18K) จึงแปลงให้ตรงกันก่อนใช้งาน
-                stock.ProductionType = NormalizeToName(stock.ProductionType, goldNameByCode);
-                stock.ProductionTypeSize = NormalizeToName(stock.ProductionTypeSize, goldSizeNameByCode);
+                var stock = request.Stocks[rowIndex];
+                var topUpNumber = ReceiptTopUpHelper.CleanStockNumber(stock.TopUpStockNumber);
 
                 var productType = await _jewelryContext.TbmProductType
                     .FirstOrDefaultAsync(x => x.Code == stock.ProductType);
@@ -89,16 +136,44 @@ namespace Jewelry.Service.Receipt.Outsource
                     throw new KeyNotFoundException($"ไม่พบประเภทสินค้า: {stock.ProductType}");
                 }
 
-                var prefix = stock.ProductionType == "Silver" ? productType.SilverCode : productType.ProductCode;
-                var stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
+                string stockRunning;
+                string receiptNumber;
+                if (topUpNumber != null)
+                {
+                    stockRunning = topUpNumber;
+                    receiptNumber = $"{headerRunning}-{rowIndex + 1}";
+                }
+                else
+                {
+                    var prefix = stock.ProductionType == "Silver" ? productType.SilverCode : productType.ProductCode;
+                    stockRunning = await _runningNumberService.GenerateRunningNumberForStockProductHash(prefix);
+                    receiptNumber = stockRunning;
+                }
 
                 var newProduct = stock.MapNewStockOutsource(request.Vendor, request.PoNumber, productType.NameTh, stockRunning, CurrentUsername);
+                newProduct.ReceiptNumber = receiptNumber;
                 var newProductResponse = newProduct.MapResponseNewStockOutsource();
-                newStocks.Add(newProduct);
+
+                if (topUpNumber != null)
+                {
+                    newProductResponse.IsTopUp = true;
+                    topUpRows.Add(new TopUpRow
+                    {
+                        StockNumber = topUpNumber,
+                        IsSilver = stock.ProductionType == "Silver",
+                        Location = stock.Location,
+                        Qty = stock.Qty,
+                        ReceiptNumber = receiptNumber
+                    });
+                }
+                else
+                {
+                    newStocks.Add(newProduct);
+                }
 
                 var receiptItem = new TbtStockProductReceiptItem
                 {
-                    StockReceiptNumber = stockRunning,
+                    StockReceiptNumber = receiptNumber,
                     Running = headerRunning,
                     Type = "outsource",
                     IsReceipt = true,
@@ -119,7 +194,7 @@ namespace Jewelry.Service.Receipt.Outsource
                 };
                 newReceiptItems.Add(receiptItem);
 
-                if (stock.Materials != null && stock.Materials.Any())
+                if (topUpNumber == null && stock.Materials != null && stock.Materials.Any())
                 {
                     var pieceProductCode = stock.ProductNumber.ToUpper();
                     var materials = stock.MapNewOutsourcePieceMaterial(stockRunning, pieceProductCode, CurrentUsername);
@@ -150,7 +225,6 @@ namespace Jewelry.Service.Receipt.Outsource
             var newMovements = new List<TbtStockMovement>();
 
             var skuCache = new Dictionary<string, bool>();
-            var locationCache = new Dictionary<string, string>();
             var balanceCache = new Dictionary<string, TbtStockBalance>();
 
             // เคารพ transaction เดิมถ้าถูกเรียกจากภายในอีก transaction ที่เปิดอยู่แล้ว เหมือน InvoiceService.Create / StockMovementService.MoveLocation
@@ -162,9 +236,14 @@ namespace Jewelry.Service.Receipt.Outsource
             try
             {
 
-            // การรับสินค้าสร้าง stock piece ใหม่เสมอ ไม่มีแถวเดิมให้ล็อก (ล็อก piece row ที่ยังไม่มีอยู่คือ no-op)
-            // สิ่งที่ชนกับ path อื่นได้จริงคือแถว balance ของ SKU ที่กำลังจะถูกบวกเพิ่ม จึงล็อกก่อนอ่านค่า balance เดิมด้านล่าง
-            var skuCodesToLock = newStocks.Select(x => x.DeriveSkuCode()).Distinct().ToList();
+            // ลำดับล็อก: piece ของล็อตที่เติม -> balance (ล็อตใหม่ไม่มีแถว piece ให้ล็อก แต่ balance ของ SKU ชนกับ path อื่นได้)
+            await _jewelryContext.LockStockPiecesAsync(topUpRows.Select(x => x.StockNumber));
+            var topUpPieces = await ReceiptTopUpHelper.LoadAndValidateAsync(_jewelryContext, topUpRows, locationCache, CurrentUsername, track: true);
+
+            var skuCodesToLock = newStocks.Select(x => x.DeriveSkuCode())
+                .Concat(topUpPieces.Values.Select(x => x.SkuCode))
+                .Distinct()
+                .ToList();
             await _jewelryContext.LockStockBalancesAsync(skuCodesToLock);
 
             foreach (var stock in newStocks)
@@ -184,12 +263,13 @@ namespace Jewelry.Service.Receipt.Outsource
                 var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(_jewelryContext, stock.Location, CurrentUsername, locationCache);
                 var pieceProductCode = stock.ProductNumber ?? stock.StockNumber;
 
-                newStockPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername));
+                var lotQty = stock.Qty;
+                newStockPieces.Add(stock.MapNewStockPiece(skuCode, locationCode, CurrentUsername, qty: lotQty));
 
                 var balanceKey = $"{skuCode}|{locationCode}";
                 if (balanceCache.ContainsKey(balanceKey))
                 {
-                    balanceCache[balanceKey].QtyOnHand += 1;
+                    balanceCache[balanceKey].QtyOnHand += lotQty;
                     balanceCache[balanceKey].LastMovementAt = DateTime.UtcNow;
                 }
                 else
@@ -199,7 +279,7 @@ namespace Jewelry.Service.Receipt.Outsource
 
                     if (existingBalance != null)
                     {
-                        existingBalance.QtyOnHand += 1;
+                        existingBalance.QtyOnHand += lotQty;
                         existingBalance.LastMovementAt = DateTime.UtcNow;
                         balanceCache[balanceKey] = existingBalance;
                     }
@@ -209,7 +289,7 @@ namespace Jewelry.Service.Receipt.Outsource
                         {
                             SkuCode = skuCode,
                             LocationCode = locationCode,
-                            QtyOnHand = 1,
+                            QtyOnHand = lotQty,
                             QtyReserved = 0,
                             LastMovementAt = DateTime.UtcNow,
                             CreateBy = CurrentUsername,
@@ -220,8 +300,10 @@ namespace Jewelry.Service.Receipt.Outsource
                     }
                 }
 
-                newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername));
+                newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(skuCode, stock.StockNumber, pieceProductCode, locationCode, stock.ReceiptNumber, CurrentUsername, qty: lotQty));
             }
+
+            await ReceiptTopUpHelper.ApplyAsync(_jewelryContext, topUpRows, topUpPieces, balanceCache, upsertBalances, newMovements, CurrentUsername);
 
             var updateBalances = balanceCache.Values
                 .Where(x => x.Id != 0)
@@ -240,6 +322,10 @@ namespace Jewelry.Service.Receipt.Outsource
             if (newStockPieces.Any())
             {
                 _jewelryContext.TbtStockPiece.AddRange(newStockPieces);
+            }
+            if (topUpPieces.Any())
+            {
+                _jewelryContext.TbtStockPiece.UpdateRange(topUpPieces.Values);
             }
             if (newStockPieceMaterials.Any())
             {
@@ -348,19 +434,24 @@ namespace Jewelry.Service.Receipt.Outsource
                          join sku in _jewelryContext.TbtSku
                          on piece.SkuCode equals sku.SkuCode
 
+                         let receivedQty = _jewelryContext.TbtStockMovement
+                             .Where(m => m.RefDocType == "RECEIPT" && m.RefDocNo == item.StockReceiptNumber && m.StockNumber == item.StockNumber)
+                             .Sum(m => (decimal?)m.Qty)
+
                          select new jewelry.Model.Receipt.Outsource.History.List.Response
                          {
                              StockNumber = piece.StockNumber,
                              Status = piece.Status,
 
                              ReceiptNumber = item.StockReceiptNumber,
-                             ReceiptDate = piece.ReceiptDate.GetValueOrDefault(),
+                             ReceiptDate = item.ReceiptDate.GetValueOrDefault(),
                              ReceiptType = item.Type,
 
                              Mold = item.MoldDesign,
                              MoldDesign = item.MoldDesign,
 
-                             Qty = 1,
+                             Qty = receivedQty ?? 1,
+                             IsTopUp = piece.ReceiptNumber != item.StockReceiptNumber,
                              ProductPrice = sku.DefaultPrice ?? 0,
 
                              ProductNumber = sku.ProductNumber,
@@ -418,7 +509,7 @@ namespace Jewelry.Service.Receipt.Outsource
         public jewelry.Model.Receipt.ReceiptHistorySummary GetHistorySummary(jewelry.Model.Receipt.Outsource.History.List.Search request)
         {
             var query = ListHistory(request);
-            return ReceiptHistoryMaterialHelper.Summarize(_jewelryContext, query.Select(x => x.StockNumber), query.Select(x => x.ProductPrice));
+            return ReceiptHistoryMaterialHelper.Summarize(_jewelryContext, query.Select(x => x.StockNumber), query.Select(x => x.Qty), query.Select(x => x.ProductPrice * x.Qty));
         }
     }
 }

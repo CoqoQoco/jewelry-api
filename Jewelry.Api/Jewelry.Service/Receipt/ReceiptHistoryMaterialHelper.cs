@@ -74,14 +74,14 @@ namespace Jewelry.Service.Receipt
             }
         }
 
-        public static ReceiptHistorySummary Summarize(JewelryContext context, IQueryable<string> stockNumbers, IQueryable<decimal> prices)
+        public static ReceiptHistorySummary Summarize(JewelryContext context, IQueryable<string> stockNumbers, IQueryable<decimal> qtys, IQueryable<decimal> sales)
         {
             var summary = new ReceiptHistorySummary
             {
-                TotalQty = stockNumbers.Count(),
-                TotalSales = prices.Sum()
+                TotalQty = (int)qtys.Sum(),
+                TotalSales = sales.Sum()
             };
-            if (summary.TotalQty == 0) return summary;
+            if (stockNumbers.Count() == 0) return summary;
 
             var groups = context.TbtStockPieceMaterial
                 .AsNoTracking()

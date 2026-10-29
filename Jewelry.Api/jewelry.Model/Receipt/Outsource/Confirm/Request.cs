@@ -34,6 +34,8 @@ namespace jewelry.Model.Receipt.Outsource.Confirm
 
         public string? Remark { get; set; }
 
+        public string? TopUpStockNumber { get; set; }
+
         public List<OutsourceMaterial> Materials { get; set; } = new List<OutsourceMaterial>();
     }
 

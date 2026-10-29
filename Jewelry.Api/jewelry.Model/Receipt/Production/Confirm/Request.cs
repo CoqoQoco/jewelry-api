@@ -40,6 +40,8 @@ namespace jewelry.Model.Receipt.Production.Confirm
 
         public string? Remark { get; set; }
 
+        public string? TopUpStockNumber { get; set; }
+
         public List<ConfirmMaterial> Materials { get; set; } = new List<ConfirmMaterial>();
     }
 

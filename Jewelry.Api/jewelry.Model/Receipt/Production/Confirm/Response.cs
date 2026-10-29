@@ -52,6 +52,8 @@ namespace jewelry.Model.Receipt.Production.Confirm
 
         public string? Remark { get; set; }
 
+        public bool IsTopUp { get; set; }
+
         public DateTime CreateDate { get; set; }
         public string CreateBy { get; set; } 
         public DateTime? UpdateDate { get; set; }
