@@ -767,6 +767,13 @@ namespace Jewelry.Service.TransferStock
                     await _jewelryContext.Entry(piece).ReloadAsync();
 
                     piece.Qty += qty;
+                    await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo
+                    {
+                        By = user,
+                        Now = now,
+                        ReceiptNumber = batchRef,
+                        ReceiptDate = now
+                    });
                     StockPieceQtyHelper.RecalcStatus(piece);
                     piece.UpdateBy = user;
                     piece.UpdateDate = now;
@@ -1151,7 +1158,11 @@ namespace Jewelry.Service.TransferStock
                 updateBalances = balanceCache.Values.Where(x => x.Id != 0).ToList();
 
                 if (newSkus.Any()) _jewelryContext.TbtSku.AddRange(newSkus);
-                if (newPieces.Any()) _jewelryContext.TbtStockPiece.AddRange(newPieces);
+                if (newPieces.Any())
+                {
+                    _jewelryContext.TbtStockPiece.AddRange(newPieces);
+                    StockUnitSync.AddUnitsForNewPieces(_jewelryContext, newPieces, CurrentUsername ?? "system");
+                }
                 if (newPieceMaterials.Any()) _jewelryContext.TbtStockPieceMaterial.AddRange(newPieceMaterials);
                 if (newBalances.Any()) _jewelryContext.TbtStockBalance.AddRange(newBalances);
                 if (updateBalances.Any()) _jewelryContext.TbtStockBalance.UpdateRange(updateBalances);

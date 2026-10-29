@@ -120,6 +120,13 @@ namespace Jewelry.Service.Receipt
                 }
 
                 piece.Qty += n;
+                await StockUnitSync.ReconcileAsync(context, piece, new StockUnitSyncInfo
+                {
+                    By = operatorBy,
+                    Now = now,
+                    ReceiptNumber = row.ReceiptNumber,
+                    ReceiptDate = now
+                });
                 StockPieceQtyHelper.RecalcStatus(piece);
                 piece.UpdateBy = operatorBy;
                 piece.UpdateDate = now;

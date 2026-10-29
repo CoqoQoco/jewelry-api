@@ -21,4 +21,18 @@ public class PieceInfo
     public string? LocationCode { get; set; }
 
     public string? ImagePath { get; set; }
+
+    public long? UnitId { get; set; }
+
+    public int? UnitNo { get; set; }
+
+    public string? UnitStatus { get; set; }
+
+    public string? UnitLocationCode { get; set; }
+
+    public string? UnitLocationName { get; set; }
+
+    public decimal LotQty { get; set; }
+
+    public bool SoldMismatch { get; set; }
 }

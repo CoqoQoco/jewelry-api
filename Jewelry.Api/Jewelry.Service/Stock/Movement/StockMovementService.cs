@@ -220,6 +220,7 @@ namespace Jewelry.Service.Stock.Movement
 
                 // อัปเดต piece
                 piece.LocationCode = target;
+                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = username, Now = now });
                 piece.UpdateDate = now;
                 piece.UpdateBy = username;
                 piecesToUpdate.Add(piece);

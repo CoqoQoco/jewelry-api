@@ -16,6 +16,10 @@ public partial class TbtStockPieceRfid
 
     public bool IsActive { get; set; }
 
+    public long? UnitId { get; set; }
+
+    public string? UnbindReason { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;

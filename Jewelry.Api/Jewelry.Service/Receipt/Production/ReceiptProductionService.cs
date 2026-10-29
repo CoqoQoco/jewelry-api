@@ -839,6 +839,7 @@ namespace Jewelry.Service.Receipt.Production
             if (newStockPieces.Any())
             {
                 _jewelryContext.TbtStockPiece.AddRange(newStockPieces);
+                StockUnitSync.AddUnitsForNewPieces(_jewelryContext, newStockPieces, CurrentUsername);
             }
             if (topUpPieces.Any())
             {

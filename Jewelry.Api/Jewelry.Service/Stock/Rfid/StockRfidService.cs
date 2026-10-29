@@ -6,6 +6,7 @@ using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Jewelry.Service.Stock.Rfid;
 
@@ -49,67 +50,129 @@ public class StockRfidService : BaseService, IStockRfidService
 
         stockNumber = await _jewelryContext.ResolveAsync(stockNumber) ?? stockNumber;
 
-        var pieceExists = await _jewelryContext.TbtStockPiece
-            .AsNoTracking()
-            .AnyAsync(p => p.StockNumber == stockNumber && p.ProductCode == productCode);
-
-        if (!pieceExists)
-        {
-            throw new HandleException("ไม่พบสินค้า");
-        }
-
-        var epcBound = await _jewelryContext.TbtStockPieceRfid
-            .AsNoTracking()
-            .Where(r => r.IsActive && r.Epc == epc)
-            .Select(r => new { r.StockNumber, r.ProductCode })
-            .FirstOrDefaultAsync();
-
-        if (epcBound != null)
-        {
-            throw new HandleException($"แท็กนี้ถูกผูกกับสินค้า {epcBound.StockNumber} แล้ว");
-        }
-
-        var pieceTag = await _jewelryContext.TbtStockPieceRfid
-            .AsNoTracking()
-            .Where(r => r.IsActive && r.StockNumber == stockNumber && r.ProductCode == productCode)
-            .Select(r => r.Epc)
-            .FirstOrDefaultAsync();
-
-        if (pieceTag != null)
-        {
-            throw new HandleException($"สินค้านี้มีแท็กผูกอยู่แล้ว (EPC {pieceTag}) กรุณายกเลิกการผูกก่อน");
-        }
-
-        var entity = new TbtStockPieceRfid
-        {
-            Epc = epc,
-            Tid = tid,
-            StockNumber = stockNumber,
-            ProductCode = productCode,
-            IsActive = true,
-            CreateDate = DateTime.UtcNow,
-            CreateBy = CurrentUsername ?? "system"
-        };
-
-        _jewelryContext.TbtStockPieceRfid.Add(entity);
-
+        var transaction = await BeginLotLockAsync(new[] { stockNumber });
         try
         {
-            await _jewelryContext.SaveChangesAsync();
-        }
-        catch (DbUpdateException)
-        {
-            throw new HandleException("ไม่สามารถผูกแท็กได้ แท็กหรือสินค้านี้อาจถูกผูกไปพร้อมกัน กรุณาลองใหม่");
-        }
+            var piece = await _jewelryContext.TbtStockPiece
+                .FirstOrDefaultAsync(p => p.StockNumber == stockNumber && p.ProductCode == productCode);
 
-        return new jewelry.Model.Stock.Rfid.Bind.Response
+            if (piece == null)
+            {
+                throw new HandleException("ไม่พบสินค้า");
+            }
+
+            var epcBound = await _jewelryContext.TbtStockPieceRfid
+                .AsNoTracking()
+                .Where(r => r.IsActive && r.Epc == epc)
+                .Select(r => new { r.StockNumber, r.ProductCode })
+                .FirstOrDefaultAsync();
+
+            if (epcBound != null)
+            {
+                throw new HandleException($"แท็กนี้ถูกผูกกับสินค้า {epcBound.StockNumber} แล้ว");
+            }
+
+            var units = await EnsureUnitsAsync(piece);
+
+            var lotTags = await _jewelryContext.TbtStockPieceRfid
+                .AsNoTracking()
+                .Where(r => r.IsActive && r.StockNumber == stockNumber && r.ProductCode == productCode)
+                .Select(r => new { r.Epc, r.UnitId })
+                .ToListAsync();
+
+            var taggedUnitIds = lotTags.Where(t => t.UnitId.HasValue).Select(t => t.UnitId!.Value).ToHashSet();
+
+            TbtStockUnit? unit;
+            if (request.UnitId.HasValue)
+            {
+                unit = units.FirstOrDefault(u => u.Id == request.UnitId.Value);
+                if (unit == null)
+                {
+                    throw new HandleException("ไม่พบชิ้นที่ระบุในสินค้านี้");
+                }
+
+                if (unit.Status == StockUnitSync.Sold)
+                {
+                    throw new HandleException("ชิ้นนี้ขายแล้ว ไม่สามารถผูกแท็กได้");
+                }
+
+                var unitTag = lotTags.FirstOrDefault(t => t.UnitId == unit.Id);
+                if (unitTag != null)
+                {
+                    throw new HandleException($"ชิ้นนี้มีแท็กผูกอยู่แล้ว (EPC {unitTag.Epc}) กรุณายกเลิกการผูกก่อน");
+                }
+            }
+            else
+            {
+                unit = units
+                    .Where(u => u.Status != StockUnitSync.Sold && !taggedUnitIds.Contains(u.Id))
+                    .OrderBy(u => u.UnitNo)
+                    .FirstOrDefault();
+
+                if (unit == null)
+                {
+                    if (lotTags.Count == 0)
+                    {
+                        throw new HandleException("สินค้านี้ไม่มีชิ้นคงเหลือที่ผูกแท็กได้");
+                    }
+
+                    var epcs = string.Join(", ", lotTags.Select(t => t.Epc).Take(3));
+                    throw new HandleException($"สินค้านี้มีแท็กผูกครบทุกชิ้นแล้ว (EPC {epcs}) กรุณายกเลิกการผูกก่อน");
+                }
+            }
+
+            var entity = new TbtStockPieceRfid
+            {
+                Epc = epc,
+                Tid = tid,
+                StockNumber = stockNumber,
+                ProductCode = productCode,
+                UnitId = unit.Id,
+                IsActive = true,
+                CreateDate = DateTime.UtcNow,
+                CreateBy = CurrentUsername ?? "system"
+            };
+
+            _jewelryContext.TbtStockPieceRfid.Add(entity);
+
+            try
+            {
+                await _jewelryContext.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                throw new HandleException("ไม่สามารถผูกแท็กได้ แท็กหรือสินค้านี้อาจถูกผูกไปพร้อมกัน กรุณาลองใหม่");
+            }
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+
+            var locationNames = await LoadLocationNamesAsync(new[] { unit.LocationCode });
+
+            return new jewelry.Model.Stock.Rfid.Bind.Response
+            {
+                Id = entity.Id,
+                Epc = entity.Epc,
+                Tid = entity.Tid,
+                StockNumber = entity.StockNumber,
+                ProductCode = entity.ProductCode,
+                UnitId = unit.Id,
+                UnitNo = unit.UnitNo,
+                UnitStatus = unit.Status,
+                UnitLocationCode = unit.LocationCode,
+                UnitLocationName = locationNames.GetValueOrDefault(unit.LocationCode),
+                LotQty = piece.Qty
+            };
+        }
+        finally
         {
-            Id = entity.Id,
-            Epc = entity.Epc,
-            Tid = entity.Tid,
-            StockNumber = entity.StockNumber,
-            ProductCode = entity.ProductCode
-        };
+            if (transaction != null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 
     public async Task<jewelry.Model.Stock.Rfid.Unbind.Response> Unbind(jewelry.Model.Stock.Rfid.Unbind.Request request)
@@ -126,6 +189,12 @@ public class StockRfidService : BaseService, IStockRfidService
                 .Where(r => r.IsActive && r.Epc == epc)
                 .ToListAsync();
         }
+        else if (request.UnitId.HasValue)
+        {
+            targets = await _jewelryContext.TbtStockPieceRfid
+                .Where(r => r.IsActive && r.UnitId == request.UnitId.Value)
+                .ToListAsync();
+        }
         else if (!string.IsNullOrEmpty(stockNumber) && !string.IsNullOrEmpty(productCode))
         {
             stockNumber = await _jewelryContext.ResolveAsync(stockNumber) ?? stockNumber;
@@ -133,6 +202,11 @@ public class StockRfidService : BaseService, IStockRfidService
             targets = await _jewelryContext.TbtStockPieceRfid
                 .Where(r => r.IsActive && r.StockNumber == stockNumber && r.ProductCode == productCode)
                 .ToListAsync();
+
+            if (targets.Count > 1)
+            {
+                throw new HandleException("สินค้านี้มีแท็กผูกหลายชิ้น กรุณาระบุ EPC หรือชิ้นที่ต้องการยกเลิกการผูก");
+            }
         }
         else
         {
@@ -150,6 +224,7 @@ public class StockRfidService : BaseService, IStockRfidService
         foreach (var target in targets)
         {
             target.IsActive = false;
+            target.UnbindReason = StockUnitSync.UnbindManual;
             target.UpdateDate = now;
             target.UpdateBy = username;
         }
@@ -168,7 +243,7 @@ public class StockRfidService : BaseService, IStockRfidService
             throw new HandleException("กรุณาระบุ EPC ของแท็ก");
         }
 
-        var rows = await QueryPieceInfo(new List<string> { epc });
+        var rows = await ResolveEpcsAsync(new List<string> { epc });
         var info = rows.FirstOrDefault();
 
         if (info == null)
@@ -187,7 +262,14 @@ public class StockRfidService : BaseService, IStockRfidService
             ProductNumber = info.ProductNumber,
             Status = info.Status,
             LocationCode = info.LocationCode,
-            ImagePath = info.ImagePath
+            ImagePath = info.ImagePath,
+            UnitId = info.UnitId,
+            UnitNo = info.UnitNo,
+            UnitStatus = info.UnitStatus,
+            UnitLocationCode = info.UnitLocationCode,
+            UnitLocationName = info.UnitLocationName,
+            LotQty = info.LotQty,
+            SoldMismatch = info.SoldMismatch
         };
     }
 
@@ -207,7 +289,7 @@ public class StockRfidService : BaseService, IStockRfidService
             return response;
         }
 
-        var rows = await QueryPieceInfo(epcs);
+        var rows = await ResolveEpcsAsync(epcs);
         response.Items = rows;
 
         var foundSet = rows.Select(r => r.Epc!).ToHashSet();
@@ -228,23 +310,71 @@ public class StockRfidService : BaseService, IStockRfidService
 
         stockNumber = await _jewelryContext.ResolveAsync(stockNumber) ?? stockNumber;
 
-        var tag = await _jewelryContext.TbtStockPieceRfid
+        var lotQty = await _jewelryContext.TbtStockPiece
             .AsNoTracking()
-            .Where(r => r.IsActive && r.StockNumber == stockNumber && r.ProductCode == productCode)
-            .Select(r => new { r.Epc, r.Tid, r.CreateDate })
-            .FirstOrDefaultAsync();
+            .Where(p => p.StockNumber == stockNumber && p.ProductCode == productCode)
+            .Select(p => (decimal?)p.Qty)
+            .FirstOrDefaultAsync() ?? 0;
 
-        if (tag == null)
+        var activeTags = _jewelryContext.TbtStockPieceRfid.AsNoTracking().Where(r => r.IsActive);
+
+        var rows = await (
+            from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+            join r in activeTags on (long?)u.Id equals r.UnitId into rj
+            from r in rj.DefaultIfEmpty()
+            where u.StockNumber == stockNumber && u.ProductCode == productCode
+            orderby u.UnitNo
+            select new
+            {
+                u.Id,
+                u.UnitNo,
+                u.Status,
+                u.LocationCode,
+                u.ReceiptNumber,
+                u.ReceiptDate,
+                u.SoldRef,
+                u.SoldDate,
+                Epc = r != null ? r.Epc : null,
+                Tid = r != null ? r.Tid : null,
+                BoundDate = r != null ? (DateTime?)r.CreateDate : null,
+                BoundBy = r != null ? r.CreateBy : null
+            }
+        ).ToListAsync();
+
+        var locationNames = await LoadLocationNamesAsync(rows.Select(x => x.LocationCode));
+
+        var units = rows.Select(x => new jewelry.Model.Stock.Rfid.GetByStock.Unit
         {
-            return new jewelry.Model.Stock.Rfid.GetByStock.Response { Found = false };
+            UnitId = x.Id,
+            UnitNo = x.UnitNo,
+            Status = x.Status,
+            LocationCode = x.LocationCode,
+            LocationName = locationNames.GetValueOrDefault(x.LocationCode),
+            ReceiptNumber = x.ReceiptNumber,
+            ReceiptDate = x.ReceiptDate,
+            SoldRef = x.SoldRef,
+            SoldDate = x.SoldDate,
+            Epc = x.Epc,
+            Tid = x.Tid,
+            BoundDate = x.BoundDate,
+            BoundBy = x.BoundBy
+        }).ToList();
+
+        var firstTagged = units.FirstOrDefault(u => u.Epc != null);
+
+        if (firstTagged == null)
+        {
+            return new jewelry.Model.Stock.Rfid.GetByStock.Response { Found = false, LotQty = lotQty, Units = units };
         }
 
         return new jewelry.Model.Stock.Rfid.GetByStock.Response
         {
             Found = true,
-            Epc = tag.Epc,
-            Tid = tag.Tid,
-            BoundDate = tag.CreateDate
+            Epc = firstTagged.Epc,
+            Tid = firstTagged.Tid,
+            BoundDate = firstTagged.BoundDate,
+            LotQty = lotQty,
+            Units = units
         };
     }
 
@@ -253,31 +383,30 @@ public class StockRfidService : BaseService, IStockRfidService
         var (skip, take) = NormalizePaging(request.Skip, request.Take, 20, 100);
         var search = request.Search?.Trim();
 
-        var pieces = _jewelryContext.TbtStockPiece.AsNoTracking()
-            .Where(p => p.ReceiptNumber != null && p.ReceiptNumber != "");
+        var units = _jewelryContext.TbtStockUnit.AsNoTracking()
+            .Where(u => u.ReceiptNumber != null && u.ReceiptNumber != "");
 
         if (!string.IsNullOrEmpty(search))
         {
             var lowered = search.ToLowerInvariant();
-            pieces = pieces.Where(p => p.ReceiptNumber!.ToLower().Contains(lowered));
+            units = units.Where(u => u.ReceiptNumber!.ToLower().Contains(lowered));
         }
         else
         {
             var since = DateTime.UtcNow.AddDays(-365);
-            pieces = pieces.Where(p => p.ReceiptDate >= since);
+            units = units.Where(u => u.ReceiptDate >= since);
         }
 
         var activeTags = _jewelryContext.TbtStockPieceRfid.AsNoTracking().Where(r => r.IsActive);
 
         var flagged =
-            from p in pieces
-            join r in activeTags
-                on new { p.StockNumber, p.ProductCode } equals new { r.StockNumber, r.ProductCode } into rj
+            from u in units
+            join r in activeTags on (long?)u.Id equals r.UnitId into rj
             from r in rj.DefaultIfEmpty()
             select new
             {
-                p.ReceiptNumber,
-                p.ReceiptDate,
+                u.ReceiptNumber,
+                u.ReceiptDate,
                 Bound = r != null ? 1 : 0
             };
 
@@ -332,21 +461,24 @@ public class StockRfidService : BaseService, IStockRfidService
         var activeTags = _jewelryContext.TbtStockPieceRfid.AsNoTracking().Where(r => r.IsActive);
 
         var rows = await (
-            from p in _jewelryContext.TbtStockPiece.AsNoTracking()
+            from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+            join p in _jewelryContext.TbtStockPiece.AsNoTracking()
+                on new { u.StockNumber, u.ProductCode } equals new { p.StockNumber, p.ProductCode }
             join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode
-            join r in activeTags
-                on new { p.StockNumber, p.ProductCode } equals new { r.StockNumber, r.ProductCode } into rj
+            join r in activeTags on (long?)u.Id equals r.UnitId into rj
             from r in rj.DefaultIfEmpty()
-            where p.ReceiptNumber == receiptNumber
-            orderby p.StockNumber, p.ProductCode
+            where u.ReceiptNumber == receiptNumber
+            orderby u.StockNumber, u.ProductCode, u.UnitNo
             select new
             {
-                p.StockNumber,
-                p.ProductCode,
+                u.Id,
+                u.UnitNo,
+                u.StockNumber,
+                u.ProductCode,
                 s.ProductNameTh,
                 s.ProductNumber,
-                p.Status,
-                p.LocationCode,
+                u.Status,
+                u.LocationCode,
                 s.ImagePath,
                 s.ImageName,
                 Epc = r != null ? r.Epc : null,
@@ -358,6 +490,9 @@ public class StockRfidService : BaseService, IStockRfidService
 
         response.Items = rows.Select(x => new jewelry.Model.Stock.Rfid.ListByReceipt.Item
         {
+            UnitId = x.Id,
+            UnitNo = x.UnitNo,
+            UnitStatus = x.Status,
             StockNumber = x.StockNumber,
             ProductCode = x.ProductCode,
             ProductName = x.ProductNameTh,
@@ -384,16 +519,17 @@ public class StockRfidService : BaseService, IStockRfidService
         var locationCode = request.LocationCode?.Trim();
 
         var query =
-            from p in _jewelryContext.TbtStockPiece.AsNoTracking()
+            from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+            join p in _jewelryContext.TbtStockPiece.AsNoTracking()
+                on new { u.StockNumber, u.ProductCode } equals new { p.StockNumber, p.ProductCode }
             join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode
-            where (p.Status == "IN_STOCK" || p.Status == "RESERVED")
-                && !_jewelryContext.TbtStockPieceRfid.Any(r =>
-                    r.IsActive && r.StockNumber == p.StockNumber && r.ProductCode == p.ProductCode)
-            select new { p, s };
+            where (u.Status == StockUnitSync.InStock || u.Status == StockUnitSync.Reserved)
+                && !_jewelryContext.TbtStockPieceRfid.Any(r => r.IsActive && r.UnitId == u.Id)
+            select new { u, p, s };
 
         if (!string.IsNullOrEmpty(locationCode))
         {
-            query = query.Where(x => x.p.LocationCode == locationCode);
+            query = query.Where(x => x.u.LocationCode == locationCode);
         }
 
         if (!string.IsNullOrEmpty(search))
@@ -401,7 +537,7 @@ public class StockRfidService : BaseService, IStockRfidService
             var normalized = StockNumberSearch.Normalize(search);
             var lowered = search.ToLowerInvariant();
             query = query.Where(x =>
-                (normalized != "" && x.p.StockNumber.Replace("-", "").ToUpper().Contains(normalized))
+                (normalized != "" && x.u.StockNumber.Replace("-", "").ToUpper().Contains(normalized))
                 || x.s.ProductNameTh.ToLower().Contains(lowered)
                 || (x.s.ProductNumber != null && x.s.ProductNumber.ToLower().Contains(lowered)));
         }
@@ -409,21 +545,24 @@ public class StockRfidService : BaseService, IStockRfidService
         var total = await query.CountAsync();
 
         var rows = await query
-            .OrderBy(x => x.p.StockNumber)
-            .ThenBy(x => x.p.ProductCode)
+            .OrderBy(x => x.u.StockNumber)
+            .ThenBy(x => x.u.ProductCode)
+            .ThenBy(x => x.u.UnitNo)
             .Skip(skip)
             .Take(take)
             .Select(x => new
             {
-                x.p.StockNumber,
-                x.p.ProductCode,
+                UnitId = x.u.Id,
+                x.u.UnitNo,
+                x.u.StockNumber,
+                x.u.ProductCode,
                 x.s.ProductNameTh,
                 x.s.ProductNumber,
-                x.p.Status,
-                x.p.LocationCode,
+                x.u.Status,
+                x.u.LocationCode,
                 x.s.ImagePath,
                 x.s.ImageName,
-                x.p.ReceiptNumber
+                ReceiptNumber = x.u.ReceiptNumber ?? x.p.ReceiptNumber
             })
             .ToListAsync();
 
@@ -432,6 +571,8 @@ public class StockRfidService : BaseService, IStockRfidService
             Total = total,
             Items = rows.Select(x => new jewelry.Model.Stock.Rfid.ListUnbound.Item
             {
+                UnitId = x.UnitId,
+                UnitNo = x.UnitNo,
                 StockNumber = x.StockNumber,
                 ProductCode = x.ProductCode,
                 ProductName = x.ProductNameTh,
@@ -460,6 +601,8 @@ public class StockRfidService : BaseService, IStockRfidService
             from p in pj.DefaultIfEmpty()
             join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode into sj
             from s in sj.DefaultIfEmpty()
+            join un in _jewelryContext.TbtStockUnit.AsNoTracking() on r.UnitId equals (long?)un.Id into uj
+            from un in uj.DefaultIfEmpty()
             select new
             {
                 r.Id,
@@ -467,8 +610,11 @@ public class StockRfidService : BaseService, IStockRfidService
                 r.StockNumber,
                 r.ProductCode,
                 ProductName = s != null ? s.ProductNameTh : null,
-                ReceiptNumber = p != null ? p.ReceiptNumber : null,
+                ReceiptNumber = un != null ? (un.ReceiptNumber ?? (p != null ? p.ReceiptNumber : null)) : (p != null ? p.ReceiptNumber : null),
                 r.IsActive,
+                r.UnitId,
+                UnitNo = un != null ? (int?)un.UnitNo : null,
+                r.UnbindReason,
                 r.CreateBy,
                 r.CreateDate,
                 r.UpdateDate
@@ -488,6 +634,9 @@ public class StockRfidService : BaseService, IStockRfidService
             ProductName = x.ProductName,
             ReceiptNumber = x.ReceiptNumber,
             IsActive = x.IsActive,
+            UnitId = x.UnitId,
+            UnitNo = x.UnitNo,
+            UnbindReason = x.UnbindReason,
             BoundBy = x.CreateBy,
             BoundDate = x.CreateDate,
             UpdatedDate = x.UpdateDate
@@ -507,14 +656,235 @@ public class StockRfidService : BaseService, IStockRfidService
         return (safeSkip, safeTake);
     }
 
-    private async Task<List<PieceInfo>> QueryPieceInfo(List<string> epcs)
+    // ล็อก piece ของล็อตก่อนแตะ unit (ลำดับ lock เดียวกับ path ขาย: piece ก่อน) — provider ที่ไม่รองรับ transaction (in-memory test) ข้ามไป
+    private async Task<IDbContextTransaction?> BeginLotLockAsync(IEnumerable<string> stockNumbers)
+    {
+        if (!_jewelryContext.Database.IsRelational())
+        {
+            return null;
+        }
+
+        if (_jewelryContext.Database.CurrentTransaction != null)
+        {
+            await _jewelryContext.LockStockPiecesAsync(stockNumbers);
+            return null;
+        }
+
+        var transaction = await _jewelryContext.Database.BeginTransactionAsync();
+        try
+        {
+            await _jewelryContext.LockStockPiecesAsync(stockNumbers);
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
+
+        return transaction;
+    }
+
+    // ล็อตที่ยังไม่เคยมี unit เลย (เช่นก่อน backfill) แต่ยังมีของ → สร้าง unit ตาม qty ให้ก่อนผูกแท็ก
+    private async Task<List<TbtStockUnit>> EnsureUnitsAsync(TbtStockPiece piece)
+    {
+        var units = await _jewelryContext.TbtStockUnit
+            .Where(u => u.StockNumber == piece.StockNumber && u.ProductCode == piece.ProductCode)
+            .ToListAsync();
+
+        if (units.Count > 0 || piece.Status == StockUnitSync.Sold || piece.Qty <= 0)
+        {
+            return units;
+        }
+
+        await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername ?? "system" });
+        await _jewelryContext.SaveChangesAsync();
+
+        return await _jewelryContext.TbtStockUnit
+            .Where(u => u.StockNumber == piece.StockNumber && u.ProductCode == piece.ProductCode)
+            .ToListAsync();
+    }
+
+    private async Task<Dictionary<string, string>> LoadLocationNamesAsync(IEnumerable<string?> codes)
+    {
+        var distinct = codes.Where(c => !string.IsNullOrEmpty(c)).Select(c => c!).Distinct().ToList();
+        if (distinct.Count == 0)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        return await _jewelryContext.TbmStockLocation
+            .AsNoTracking()
+            .Where(l => distinct.Contains(l.Code))
+            .ToDictionaryAsync(l => l.Code, l => l.NameTh);
+    }
+
+    private async Task<List<PieceInfo>> ResolveEpcsAsync(List<string> epcs)
+    {
+        var tags = _jewelryContext.TbtStockPieceRfid.AsNoTracking().Where(r => r.IsActive && epcs.Contains(r.Epc));
+        var rows = await QueryPieceInfo(tags, soldMismatch: false);
+
+        var foundSet = rows.Select(r => r.Epc!).ToHashSet();
+        var missing = epcs.Where(e => !foundSet.Contains(e)).ToList();
+
+        if (missing.Count == 0)
+        {
+            return rows;
+        }
+
+        var (healedEpcs, mismatchBindingIds) = await HealSoldBindingsAsync(missing);
+
+        if (healedEpcs.Count > 0)
+        {
+            var healedTags = _jewelryContext.TbtStockPieceRfid.AsNoTracking().Where(r => r.IsActive && healedEpcs.Contains(r.Epc));
+            rows.AddRange(await QueryPieceInfo(healedTags, soldMismatch: false));
+        }
+
+        if (mismatchBindingIds.Count > 0)
+        {
+            var mismatchTags = _jewelryContext.TbtStockPieceRfid.AsNoTracking().Where(r => mismatchBindingIds.Contains(r.Id));
+            rows.AddRange(await QueryPieceInfo(mismatchTags, soldMismatch: true));
+        }
+
+        return rows;
+    }
+
+    // แท็กที่ถูกปลดเพราะ unit ถูกขาย (SOLD) แต่ยิงเจอ — ถ้าล็อตยังมี unit ที่ยังไม่ขายและไม่มีแท็ก แปลว่าระบบตัดผิดชิ้น
+    // → สลับ: unit ของแท็กนี้กลับมามีสถานะเดิม (ผูกแท็กใหม่) แล้ว unit ที่ไม่มีแท็กกลายเป็น SOLD แทน
+    // ถ้าไม่มีชิ้นให้สลับ (กำกวม) ไม่แตะข้อมูล คืน mismatch ให้ผู้เรียกแสดงเตือน
+    private async Task<(List<string> Healed, List<long> Mismatch)> HealSoldBindingsAsync(List<string> epcs)
+    {
+        var healed = new List<string>();
+        var mismatch = new List<long>();
+
+        var inactive = await _jewelryContext.TbtStockPieceRfid
+            .AsNoTracking()
+            .Where(r => !r.IsActive && epcs.Contains(r.Epc))
+            .Select(r => new { r.Id, r.Epc, r.UnitId, r.UnbindReason, r.StockNumber, r.ProductCode })
+            .ToListAsync();
+
+        var latest = inactive
+            .GroupBy(r => r.Epc)
+            .Select(g => g.OrderByDescending(r => r.Id).First())
+            .Where(r => r.UnbindReason == StockUnitSync.UnbindSold && r.UnitId.HasValue)
+            .OrderBy(r => r.Id)
+            .ToList();
+
+        if (latest.Count == 0)
+        {
+            return (healed, mismatch);
+        }
+
+        var transaction = await BeginLotLockAsync(latest.Select(r => r.StockNumber));
+        try
+        {
+            var now = DateTime.UtcNow;
+            var username = CurrentUsername ?? "system";
+
+            foreach (var item in latest)
+            {
+                var binding = await _jewelryContext.TbtStockPieceRfid.FirstAsync(r => r.Id == item.Id);
+                if (binding.IsActive)
+                {
+                    continue;
+                }
+
+                var epcTaken = await _jewelryContext.TbtStockPieceRfid.AnyAsync(r => r.IsActive && r.Epc == binding.Epc);
+                if (epcTaken)
+                {
+                    continue;
+                }
+
+                var units = await _jewelryContext.TbtStockUnit
+                    .Where(u => u.StockNumber == binding.StockNumber && u.ProductCode == binding.ProductCode)
+                    .ToListAsync();
+
+                var scanned = units.FirstOrDefault(u => u.Id == binding.UnitId);
+                if (scanned == null)
+                {
+                    mismatch.Add(binding.Id);
+                    continue;
+                }
+
+                var taggedUnitIds = (await _jewelryContext.TbtStockPieceRfid
+                    .Where(r => r.IsActive && r.StockNumber == binding.StockNumber && r.ProductCode == binding.ProductCode && r.UnitId != null)
+                    .Select(r => r.UnitId!.Value)
+                    .ToListAsync()).ToHashSet();
+
+                if (scanned.Status != StockUnitSync.Sold)
+                {
+                    if (taggedUnitIds.Contains(scanned.Id))
+                    {
+                        mismatch.Add(binding.Id);
+                        continue;
+                    }
+                }
+                else
+                {
+                    var replacement = units
+                        .Where(u => u.Status != StockUnitSync.Sold && !taggedUnitIds.Contains(u.Id))
+                        .OrderByDescending(u => u.UnitNo)
+                        .FirstOrDefault();
+
+                    if (replacement == null)
+                    {
+                        mismatch.Add(binding.Id);
+                        continue;
+                    }
+
+                    var soldRef = scanned.SoldRef;
+                    var soldDate = scanned.SoldDate;
+
+                    scanned.Status = replacement.Status;
+                    scanned.LocationCode = replacement.LocationCode;
+                    scanned.SoldRef = null;
+                    scanned.SoldDate = null;
+                    scanned.UpdateDate = now;
+                    scanned.UpdateBy = username;
+
+                    replacement.Status = StockUnitSync.Sold;
+                    replacement.SoldRef = soldRef;
+                    replacement.SoldDate = soldDate;
+                    replacement.UpdateDate = now;
+                    replacement.UpdateBy = username;
+
+                    _jewelryContext.TbtStockUnit.UpdateRange(scanned, replacement);
+                }
+
+                binding.IsActive = true;
+                binding.UnbindReason = null;
+                binding.UpdateDate = now;
+                binding.UpdateBy = username;
+                _jewelryContext.TbtStockPieceRfid.Update(binding);
+
+                await _jewelryContext.SaveChangesAsync();
+                healed.Add(binding.Epc);
+            }
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+        }
+        finally
+        {
+            if (transaction != null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
+
+        return (healed, mismatch);
+    }
+
+    private async Task<List<PieceInfo>> QueryPieceInfo(IQueryable<TbtStockPieceRfid> tags, bool soldMismatch)
     {
         var rows = await (
-            from r in _jewelryContext.TbtStockPieceRfid.AsNoTracking()
+            from r in tags
             join p in _jewelryContext.TbtStockPiece.AsNoTracking()
                 on new { r.StockNumber, r.ProductCode } equals new { p.StockNumber, p.ProductCode }
             join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode
-            where r.IsActive && epcs.Contains(r.Epc)
+            join u in _jewelryContext.TbtStockUnit.AsNoTracking() on r.UnitId equals (long?)u.Id into uj
+            from u in uj.DefaultIfEmpty()
             select new
             {
                 r.Epc,
@@ -523,25 +893,43 @@ public class StockRfidService : BaseService, IStockRfidService
                 p.ProductCode,
                 s.ProductNameTh,
                 s.ProductNumber,
-                p.Status,
-                p.LocationCode,
+                PieceStatus = p.Status,
+                PieceLocation = p.LocationCode,
+                LotQty = p.Qty,
                 s.ImagePath,
-                s.ImageName
+                s.ImageName,
+                UnitId = u != null ? (long?)u.Id : null,
+                UnitNo = u != null ? (int?)u.UnitNo : null,
+                UnitStatus = u != null ? u.Status : null,
+                UnitLocation = u != null ? u.LocationCode : null
             }
         ).ToListAsync();
 
-        return rows.Select(x => new PieceInfo
+        var locationNames = await LoadLocationNamesAsync(rows.Select(x => x.UnitLocation ?? x.PieceLocation));
+
+        return rows.Select(x =>
         {
-            Found = true,
-            Epc = x.Epc,
-            Tid = x.Tid,
-            StockNumber = x.StockNumber,
-            ProductCode = x.ProductCode,
-            ProductName = x.ProductNameTh,
-            ProductNumber = x.ProductNumber,
-            Status = x.Status,
-            LocationCode = x.LocationCode,
-            ImagePath = StockImagePath.Build(x.ImagePath, x.ImageName)
+            var location = x.UnitLocation ?? x.PieceLocation;
+            return new PieceInfo
+            {
+                Found = true,
+                Epc = x.Epc,
+                Tid = x.Tid,
+                StockNumber = x.StockNumber,
+                ProductCode = x.ProductCode,
+                ProductName = x.ProductNameTh,
+                ProductNumber = x.ProductNumber,
+                Status = x.UnitStatus ?? x.PieceStatus,
+                LocationCode = location,
+                ImagePath = StockImagePath.Build(x.ImagePath, x.ImageName),
+                UnitId = x.UnitId,
+                UnitNo = x.UnitNo,
+                UnitStatus = x.UnitStatus,
+                UnitLocationCode = x.UnitLocation,
+                UnitLocationName = location != null ? locationNames.GetValueOrDefault(location) : null,
+                LotQty = x.LotQty,
+                SoldMismatch = soldMismatch
+            };
         }).ToList();
     }
 }

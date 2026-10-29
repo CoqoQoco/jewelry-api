@@ -390,6 +390,7 @@ namespace Jewelry.Service.Sale.Invoice
 
                 piece.Qty -= soProduct.Qty;
                 piece.QtyReserved -= soProduct.Qty;
+                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, SoldRef = invoiceNumber, SoldDate = DateTime.UtcNow });
                 StockPieceQtyHelper.RecalcStatus(piece);
                 piece.UpdateBy = CurrentUsername;
                 piece.UpdateDate = DateTime.UtcNow;
@@ -1397,6 +1398,7 @@ namespace Jewelry.Service.Sale.Invoice
                     {
                         piece.Qty += product.Qty;
                         piece.QtyReserved += product.Qty;
+                        await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, ReviveSoldRef = invoiceNumber });
                         StockPieceQtyHelper.RecalcStatus(piece);
                         piece.UpdateBy = CurrentUsername;
                         piece.UpdateDate = DateTime.UtcNow;

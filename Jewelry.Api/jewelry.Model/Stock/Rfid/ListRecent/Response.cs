@@ -23,6 +23,12 @@ public class Item
 
     public bool IsActive { get; set; }
 
+    public long? UnitId { get; set; }
+
+    public int? UnitNo { get; set; }
+
+    public string? UnbindReason { get; set; }
+
     public string? BoundBy { get; set; }
 
     public DateTime BoundDate { get; set; }

@@ -29,6 +29,20 @@ public class StockRfidListTests
             Piece("DK-006", "P1", "SKU1", null, null),
             Piece("DK-007", "P1", "SKU1", "", null),
             Piece("DK-008", "P1", "SKU1", "RC2", now.AddDays(-1), status: "SOLD", location: "L2"));
+        foreach (var p in context.TbtStockPiece.Local.ToList())
+        {
+            context.TbtStockUnit.Add(new TbtStockUnit
+            {
+                StockNumber = p.StockNumber,
+                ProductCode = p.ProductCode,
+                UnitNo = 1,
+                LocationCode = p.LocationCode,
+                Status = p.Status!,
+                ReceiptNumber = p.ReceiptNumber,
+                ReceiptDate = p.ReceiptDate,
+                CreateBy = "t"
+            });
+        }
         context.SaveChanges();
 
         return context;
@@ -45,6 +59,7 @@ public class StockRfidListTests
             Status = status,
             ReceiptNumber = receipt,
             ReceiptDate = receiptDate,
+            Qty = status == "SOLD" ? 0 : 1,
             CreateBy = "t"
         };
 

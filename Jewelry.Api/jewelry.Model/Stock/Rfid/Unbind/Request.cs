@@ -7,4 +7,6 @@ public class Request
     public string? StockNumber { get; set; }
 
     public string? ProductCode { get; set; }
+
+    public long? UnitId { get; set; }
 }

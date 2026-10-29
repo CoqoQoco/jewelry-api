@@ -1192,6 +1192,10 @@ namespace Jewelry.Service.Stock.Product
                 }
 
                 piece.LocationCode = finalLocation;
+                if (locationChanged)
+                {
+                    await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now });
+                }
                 piece.SizeActual = request.Size;
                 piece.Remark = request.Remark;
                 piece.ProductCost = request.ProductCost ?? piece.ProductCost;

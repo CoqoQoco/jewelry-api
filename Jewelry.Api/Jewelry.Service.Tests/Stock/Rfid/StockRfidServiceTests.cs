@@ -18,8 +18,11 @@ public class StockRfidServiceTests
         var context = new JewelryContext(options);
 
         context.TbtStockPiece.AddRange(
-            new TbtStockPiece { StockNumber = "DK001", ProductCode = "P1", SkuCode = "SKU1", LocationCode = "L1", Status = "IN_STOCK", CreateBy = "t" },
-            new TbtStockPiece { StockNumber = "DK002", ProductCode = "P1", SkuCode = "SKU1", LocationCode = "L1", Status = "IN_STOCK", CreateBy = "t" });
+            new TbtStockPiece { StockNumber = "DK001", ProductCode = "P1", SkuCode = "SKU1", LocationCode = "L1", Status = "IN_STOCK", Qty = 1, CreateBy = "t" },
+            new TbtStockPiece { StockNumber = "DK002", ProductCode = "P1", SkuCode = "SKU1", LocationCode = "L1", Status = "IN_STOCK", Qty = 1, CreateBy = "t" });
+        context.TbtStockUnit.AddRange(
+            new TbtStockUnit { StockNumber = "DK001", ProductCode = "P1", UnitNo = 1, LocationCode = "L1", Status = "IN_STOCK", CreateBy = "t" },
+            new TbtStockUnit { StockNumber = "DK002", ProductCode = "P1", UnitNo = 1, LocationCode = "L1", Status = "IN_STOCK", CreateBy = "t" });
         context.SaveChanges();
 
         return context;

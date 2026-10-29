@@ -1050,6 +1050,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                     }
 
                     piece.QtyReserved += stockItem.Qty;
+                    await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = confirmedDate });
                     StockPieceQtyHelper.RecalcStatus(piece);
                     piece.UpdateDate = confirmedDate;
                     piece.UpdateBy = CurrentUsername;
@@ -1150,6 +1151,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                         }
 
                         piece.QtyReserved = Math.Max(0, piece.QtyReserved - product.Qty);
+                        await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now });
                         StockPieceQtyHelper.RecalcStatus(piece);
                         piece.UpdateDate = now;
                         piece.UpdateBy = CurrentUsername;
@@ -1305,6 +1307,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                         }
 
                         piece.QtyReserved = Math.Max(0, piece.QtyReserved - confirmedProduct.Qty);
+                        await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = unconfirmedDate });
                         StockPieceQtyHelper.RecalcStatus(piece);
                         piece.UpdateDate = unconfirmedDate;
                         piece.UpdateBy = CurrentUsername;
@@ -1429,6 +1432,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                 }
 
                 piece.QtyReserved += qty;
+                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = replacedDate });
                 StockPieceQtyHelper.RecalcStatus(piece);
                 piece.UpdateDate = replacedDate;
                 piece.UpdateBy = CurrentUsername;

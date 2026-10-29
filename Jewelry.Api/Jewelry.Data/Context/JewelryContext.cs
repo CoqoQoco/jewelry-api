@@ -66,6 +66,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockPieceRfid> TbtStockPieceRfid { get; set; }
 
+    public virtual DbSet<TbtStockUnit> TbtStockUnit { get; set; }
+
     public virtual DbSet<TbtStockPieceQuickPrice> TbtStockPieceQuickPrice { get; set; }
 
     public virtual DbSet<TbtStockPriceReviewAck> TbtStockPriceReviewAck { get; set; }
@@ -1147,10 +1149,12 @@ public partial class JewelryContext : DbContext
                 .IsUnique()
                 .HasFilter("is_active")
                 .HasDatabaseName("idx_tbt_stock_piece_rfid_epc_active");
-            entity.HasIndex(e => new { e.StockNumber, e.ProductCode })
+            entity.HasIndex(e => e.UnitId)
                 .IsUnique()
                 .HasFilter("is_active")
-                .HasDatabaseName("idx_tbt_stock_piece_rfid_piece_active");
+                .HasDatabaseName("idx_tbt_stock_piece_rfid_unit_active");
+            entity.HasIndex(e => new { e.StockNumber, e.ProductCode })
+                .HasDatabaseName("idx_tbt_stock_piece_rfid_lot");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedOnAdd()
@@ -1170,6 +1174,10 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.IsActive)
                 .HasDefaultValue(true)
                 .HasColumnName("is_active");
+            entity.Property(e => e.UnitId).HasColumnName("unit_id");
+            entity.Property(e => e.UnbindReason)
+                .HasColumnType("character varying")
+                .HasColumnName("unbind_reason");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")
@@ -1178,6 +1186,70 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
+
+            entity.HasOne<TbtStockUnit>()
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .HasConstraintName("tbt_stock_piece_rfid_unit_fk");
+        });
+
+        modelBuilder.Entity<TbtStockUnit>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_unit_pk");
+            entity.ToTable("tbt_stock_unit");
+
+            entity.HasIndex(e => new { e.StockNumber, e.ProductCode, e.UnitNo })
+                .IsUnique()
+                .HasDatabaseName("tbt_stock_unit_lot_no_uq");
+            entity.HasIndex(e => new { e.StockNumber, e.ProductCode, e.Status })
+                .HasDatabaseName("idx_tbt_stock_unit_lot_status");
+            entity.HasIndex(e => e.ReceiptNumber).HasDatabaseName("idx_tbt_stock_unit_receipt");
+            entity.HasIndex(e => new { e.LocationCode, e.Status }).HasDatabaseName("idx_tbt_stock_unit_location_status");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.StockNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("stock_number");
+            entity.Property(e => e.ProductCode)
+                .HasColumnType("character varying")
+                .HasColumnName("product_code");
+            entity.Property(e => e.UnitNo).HasColumnName("unit_no");
+            entity.Property(e => e.LocationCode)
+                .HasColumnType("character varying")
+                .HasColumnName("location_code");
+            entity.Property(e => e.Status)
+                .HasColumnType("character varying")
+                .HasDefaultValue("IN_STOCK")
+                .HasColumnName("status");
+            entity.Property(e => e.ReceiptNumber)
+                .HasColumnType("character varying")
+                .HasColumnName("receipt_number");
+            entity.Property(e => e.ReceiptDate).HasColumnName("receipt_date");
+            entity.Property(e => e.SoldRef)
+                .HasColumnType("character varying")
+                .HasColumnName("sold_ref");
+            entity.Property(e => e.SoldDate).HasColumnName("sold_date");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+            entity.Property(e => e.UpdateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("update_by");
+
+            entity.HasOne<TbtStockPiece>()
+                .WithMany()
+                .HasForeignKey(e => new { e.StockNumber, e.ProductCode })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_unit_piece_fk");
+            entity.HasOne<TbmStockLocation>()
+                .WithMany()
+                .HasForeignKey(e => e.LocationCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_unit_location_fk");
         });
 
         modelBuilder.Entity<TbtStockPieceQuickPrice>(entity =>

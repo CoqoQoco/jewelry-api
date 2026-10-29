@@ -94,6 +94,7 @@ public class StockConvertService : BaseService, IStockConvertService
             foreach (var piece in pieces)
             {
                 piece.QtyReserved += 1;
+                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now });
                 StockPieceQtyHelper.RecalcStatus(piece);
                 piece.UpdateDate = now;
                 piece.UpdateBy = CurrentUsername;
@@ -221,6 +222,7 @@ public class StockConvertService : BaseService, IStockConvertService
             {
                 piece.Qty -= 1;
                 piece.QtyReserved -= 1;
+                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now, SoldRef = header.Running, SoldDate = now });
                 StockPieceQtyHelper.RecalcStatus(piece);
                 piece.UpdateDate = now;
                 piece.UpdateBy = CurrentUsername;
@@ -307,6 +309,7 @@ public class StockConvertService : BaseService, IStockConvertService
             };
             StockPieceQtyHelper.RecalcStatus(resultPiece);
             _jewelryContext.TbtStockPiece.Add(resultPiece);
+            StockUnitSync.AddUnitsForNewPieces(_jewelryContext, new[] { resultPiece }, CurrentUsername);
 
             var materials = (request.Result.Materials ?? new List<jewelry.Model.Stock.StockConvert.Complete.MaterialRequest>())
                 .Select(m => new TbtStockPieceMaterial
@@ -456,6 +459,7 @@ public class StockConvertService : BaseService, IStockConvertService
             foreach (var piece in pieces)
             {
                 piece.QtyReserved = Math.Max(0, piece.QtyReserved - 1);
+                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now });
                 StockPieceQtyHelper.RecalcStatus(piece);
                 piece.UpdateDate = now;
                 piece.UpdateBy = CurrentUsername;

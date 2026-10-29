@@ -9,4 +9,6 @@ public class Request
     public string StockNumber { get; set; } = null!;
 
     public string ProductCode { get; set; } = null!;
+
+    public long? UnitId { get; set; }
 }
