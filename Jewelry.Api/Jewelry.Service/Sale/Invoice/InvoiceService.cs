@@ -1370,7 +1370,8 @@ namespace Jewelry.Service.Sale.Invoice
                 var piece = await _jewelryContext.TbtStockPiece
                     .FirstOrDefaultAsync(p => p.StockNumber == product.StockNumber);
 
-                if (piece != null)
+                // คืนเฉพาะชิ้นที่ใบนี้ขายจริงและยังไม่เคยคืน — กัน RETURN ซ้ำ / กันคืนชิ้นที่ขายไปกับใบอื่น
+                if (piece != null && await InvoiceReturnGuard.CanReturnAsync(_jewelryContext, invoiceNumber, piece))
                 {
                     // คืนชิ้นที่ขายด้วย invoice นี้กลับเป็น RESERVED ที่คลัง/บรรทัดเดิม
                     var returnedAt = DateTime.UtcNow;
