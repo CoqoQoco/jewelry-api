@@ -55,12 +55,19 @@ namespace jewelry.Model.Report.Executive.Summary
 
     public class StockData
     {
+        // TK202610290001: นับเป็นชิ้น (tbt_stock_unit) ไม่ใช่ล็อต — InStockCount = ชิ้น IN_STOCK (พร้อมขาย ไม่รวมจอง)
         public int InStockCount { get; set; }
+        // จำนวนล็อตที่มีชิ้น IN_STOCK / ล็อตที่ไม่มีต้นทุน (ใช้เป็นจำนวนรายการที่ต้องแก้ใน DataQuality)
+        public int InStockLotCount { get; set; }
+        public int NoCostLotCount { get; set; }
+        // ชิ้นที่จองแล้ว (RESERVED)
+        public int ReservedCount { get; set; }
         public int NoCostCount { get; set; }
+        // มูลค่า = Σ ต้นทุนต่อชิ้น x จำนวนชิ้น
         public decimal CostThb { get; set; }
         public int AgedOver1yCount { get; set; }
 
-        // ถ่วงด้วยจำนวน (ล็อตเงินมี qty>1 บน piece เดียว) — inStockQty = Σ qty, costThbQty = Σ ProductCost*qty
+        // เท่ากับ InStockCount / CostThb (คงไว้เพื่อ compat)
         public decimal InStockQty { get; set; }
         public decimal CostThbQty { get; set; }
     }

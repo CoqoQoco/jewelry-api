@@ -111,22 +111,48 @@ namespace Jewelry.Service.Stock.Reconciliation
             }
 
             // จำนวน unit ต้องตรงกับ qty / qty_reserved ของ piece (ถ้าไม่ตรง ยอดรายคลังข้างบนเชื่อถือไม่ได้)
-            var unitMismatches = await _jewelryContext.TbtStockPiece
+            // set-based: ล็อต + unit รวมกลุ่ม แล้วเทียบใน memory (ไม่ใช้ correlated subquery ต่อล็อต)
+            var lots = await _jewelryContext.TbtStockPiece
                 .AsNoTracking()
-                .Select(p => new UnitCountMismatch
+                .Select(p => new { p.StockNumber, p.ProductCode, p.Qty, p.QtyReserved })
+                .ToListAsync(ct);
+
+            var unitCounts = await _jewelryContext.TbtStockUnit
+                .AsNoTracking()
+                .Where(u => u.Status != "SOLD")
+                .GroupBy(u => new { u.StockNumber, u.ProductCode, u.Status })
+                .Select(g => new { g.Key.StockNumber, g.Key.ProductCode, g.Key.Status, Count = g.Count() })
+                .ToListAsync(ct);
+
+            var unitQtyByLot = new Dictionary<(string, string), int>();
+            var unitReservedByLot = new Dictionary<(string, string), int>();
+            foreach (var u in unitCounts)
+            {
+                var key = (u.StockNumber, u.ProductCode);
+                unitQtyByLot[key] = unitQtyByLot.GetValueOrDefault(key) + u.Count;
+                if (u.Status == "RESERVED")
                 {
-                    StockNumber = p.StockNumber,
-                    ProductCode = p.ProductCode,
-                    PieceQty = p.Qty,
-                    UnitQty = _jewelryContext.TbtStockUnit
-                        .Count(u => u.StockNumber == p.StockNumber && u.ProductCode == p.ProductCode && u.Status != "SOLD"),
-                    PieceReserved = p.QtyReserved,
-                    UnitReserved = _jewelryContext.TbtStockUnit
-                        .Count(u => u.StockNumber == p.StockNumber && u.ProductCode == p.ProductCode && u.Status == "RESERVED")
+                    unitReservedByLot[key] = unitReservedByLot.GetValueOrDefault(key) + u.Count;
+                }
+            }
+
+            var unitMismatches = lots
+                .Select(p =>
+                {
+                    var key = (p.StockNumber, p.ProductCode);
+                    return new UnitCountMismatch
+                    {
+                        StockNumber = p.StockNumber,
+                        ProductCode = p.ProductCode,
+                        PieceQty = p.Qty,
+                        UnitQty = unitQtyByLot.GetValueOrDefault(key),
+                        PieceReserved = p.QtyReserved,
+                        UnitReserved = unitReservedByLot.GetValueOrDefault(key)
+                    };
                 })
                 .Where(x => Math.Floor(x.PieceQty) != x.UnitQty
                     || Math.Floor(x.PieceReserved <= x.PieceQty ? x.PieceReserved : x.PieceQty) != x.UnitReserved)
-                .ToListAsync(ct);
+                .ToList();
 
             report.UnitCountMismatchCount = unitMismatches.Count;
             report.UnitCountMismatches = unitMismatches.Take(100).ToList();
@@ -139,53 +165,78 @@ namespace Jewelry.Service.Stock.Reconciliation
             return report;
         }
 
+        private static readonly string[] LedgerMovementTypes = { "RECEIPT", "RETURN", "TRANSFORM_IN", "SALE", "TRANSFORM_OUT" };
+
+        // ledger = Σ ± qty ของ movement ต่อล็อต (กติกา StockLedger.QtySign: รวม TRANSFORM_IN/OUT ของการแปลงสินค้า)
+        // ยอดจองที่ควรเป็น = บรรทัด SO ที่ยังไม่ออกบิล (ไม่นับ placeholder — รายการรอของไม่เคยจองของจริง) + ต้นทางของใบแปลงที่ยังไม่เสร็จ (จองด้วย ref CONVERT)
+        // set-based: 4 query แบน (ล็อต, movement รวมกลุ่ม, SO, ใบแปลง) แล้วเทียบใน memory — ไม่ใช้ correlated subquery ต่อล็อต
         public async Task<PieceLedgerReport> CheckPieceLedgerAsync(CancellationToken ct)
         {
-            // เงื่อนไขความผิดปกติทั้งหมดเช็คในนี้ (correlated subquery ต่อ piece) ให้ postgres กรองให้ ไม่โหลด piece ทั้งหมด (~30k แถว) มาวนใน memory
-            var mismatchQuery = _jewelryContext.TbtStockPiece
+            var lots = await _jewelryContext.TbtStockPiece
                 .AsNoTracking()
-                .Where(p =>
-                    p.Qty != _jewelryContext.TbtStockMovement
-                        .Where(m => m.StockNumber == p.StockNumber && m.ProductCode == p.ProductCode)
-                        .Sum(m => m.MovementType == "RECEIPT" || m.MovementType == "RETURN"
-                            ? m.Qty
-                            : (m.MovementType == "SALE" ? -m.Qty : 0m))
-                    // placeholder (รายการรอของ) ไม่เคยจองของจริง — กันเลขที่พนักงานพิมพ์เองพ้องกับเลขสต็อกจริงโดยบังเอิญ
-                    // แล้วถูกนับรวมเป็นยอดจองของ piece นั้นทั้งที่ไม่เคยกระทบ qty_reserved จริง
-                    || p.QtyReserved != _jewelryContext.TbtSaleOrderProduct
-                        .Where(sop => sop.StockNumber == p.StockNumber && sop.Invoice == null && !sop.IsPlaceholder)
-                        .Sum(sop => sop.Qty)
-                    || p.QtyReserved > p.Qty
-                    || p.Qty < 0);
-
-            var mismatches = await mismatchQuery
                 .Select(p => new PieceLedgerRow
                 {
                     StockNumber = p.StockNumber,
                     ProductCode = p.ProductCode,
                     Status = p.Status,
                     Qty = p.Qty,
-                    QtyReserved = p.QtyReserved,
-                    LedgerQty = _jewelryContext.TbtStockMovement
-                        .Where(m => m.StockNumber == p.StockNumber && m.ProductCode == p.ProductCode)
-                        .Sum(m => m.MovementType == "RECEIPT" || m.MovementType == "RETURN"
-                            ? m.Qty
-                            : (m.MovementType == "SALE" ? -m.Qty : 0m)),
-                    ConfirmedUninvoicedQty = _jewelryContext.TbtSaleOrderProduct
-                        .Where(sop => sop.StockNumber == p.StockNumber && sop.Invoice == null && !sop.IsPlaceholder)
-                        .Sum(sop => sop.Qty)
+                    QtyReserved = p.QtyReserved
                 })
                 .ToListAsync(ct);
 
-            var items = mismatches.Select(x =>
+            var movementSums = await _jewelryContext.TbtStockMovement
+                .AsNoTracking()
+                .Where(m => m.StockNumber != null && m.ProductCode != null && LedgerMovementTypes.Contains(m.MovementType))
+                .GroupBy(m => new { m.StockNumber, m.ProductCode, m.MovementType })
+                .Select(g => new { g.Key.StockNumber, g.Key.ProductCode, g.Key.MovementType, Qty = g.Sum(x => x.Qty) })
+                .ToListAsync(ct);
+
+            var ledgerByLot = new Dictionary<(string, string), decimal>();
+            foreach (var m in movementSums)
             {
+                var key = (m.StockNumber!, m.ProductCode!);
+                ledgerByLot[key] = ledgerByLot.GetValueOrDefault(key) + StockLedger.QtySign(m.MovementType) * m.Qty;
+            }
+
+            var openSoLines = await _jewelryContext.TbtSaleOrderProduct
+                .AsNoTracking()
+                .Where(sop => sop.Invoice == null && !sop.IsPlaceholder)
+                .GroupBy(sop => sop.StockNumber)
+                .Select(g => new { StockNumber = g.Key, Qty = g.Sum(x => x.Qty) })
+                .ToListAsync(ct);
+
+            var reservedByStock = new Dictionary<string, decimal>();
+            foreach (var l in openSoLines)
+            {
+                reservedByStock[l.StockNumber] = reservedByStock.GetValueOrDefault(l.StockNumber) + l.Qty;
+            }
+
+            var openConvertSources = await (
+                from i in _jewelryContext.TbtStockConvertItem.AsNoTracking()
+                join h in _jewelryContext.TbtStockConvertHeader.AsNoTracking() on i.HeaderRunning equals h.Running
+                where i.Role == "SOURCE" && h.Status == 0
+                select new { i.StockNumber, i.Qty })
+                .ToListAsync(ct);
+
+            foreach (var c in openConvertSources)
+            {
+                reservedByStock[c.StockNumber] = reservedByStock.GetValueOrDefault(c.StockNumber) + c.Qty;
+            }
+
+            var items = new List<PieceLedgerIssue>();
+            foreach (var x in lots)
+            {
+                x.LedgerQty = ledgerByLot.GetValueOrDefault((x.StockNumber, x.ProductCode));
+                x.ConfirmedUninvoicedQty = reservedByStock.GetValueOrDefault(x.StockNumber);
+
                 var issues = new List<string>();
                 if (x.Qty != x.LedgerQty) issues.Add("LEDGER_MISMATCH");
                 if (x.QtyReserved != x.ConfirmedUninvoicedQty) issues.Add("RESERVED_MISMATCH");
                 if (x.QtyReserved > x.Qty) issues.Add("RESERVED_OVER_QTY");
                 if (x.Qty < 0) issues.Add("NEGATIVE_QTY");
+                if (issues.Count == 0) continue;
 
-                return new PieceLedgerIssue
+                items.Add(new PieceLedgerIssue
                 {
                     StockNumber = x.StockNumber,
                     ProductCode = x.ProductCode,
@@ -195,8 +246,8 @@ namespace Jewelry.Service.Stock.Reconciliation
                     LedgerQty = x.LedgerQty,
                     ConfirmedUninvoicedQty = x.ConfirmedUninvoicedQty,
                     Issues = issues
-                };
-            }).ToList();
+                });
+            }
 
             return new PieceLedgerReport
             {

@@ -28,18 +28,6 @@ namespace Jewelry.Service.Stock.Insight
             _insightCache = insightCache;
         }
 
-        private class PieceRow
-        {
-            public string? Status { get; set; }
-            public decimal Qty { get; set; }
-            public decimal? ProductCost { get; set; }
-            public DateTime? ProductionDate { get; set; }
-            public string? ReceiptType { get; set; }
-            public string? ProductionType { get; set; }
-            public string? ProductType { get; set; }
-            public string? ProductTypeName { get; set; }
-        }
-
         public const string CacheEndpoint = "StockInsight:Overview";
 
         public Task<Overview.Response> Overview(Overview.Request request)
@@ -57,7 +45,8 @@ namespace Jewelry.Service.Stock.Insight
 
             var pieces = await GetOnHandPiecesAsync(metal);
             var inStock = pieces.Where(x => x.Status == InStockStatus).ToList();
-            var onHandQty = pieces.Sum(x => x.Qty);
+            var reservedPcs = pieces.Where(x => x.Status != InStockStatus).Sum(x => x.Pcs);
+            var onHandQty = (decimal)pieces.Sum(x => x.Pcs);
 
             // คำนวณ series ยาวพอสำหรับหน้าต่างเฉลี่ย/no-outflow แม้ผู้ใช้ขอ months สั้น แล้วค่อยตัดส่งเฉพาะ months ล่าสุด
             var calcMonths = Math.Max(months, Math.Max(thresholds.CoverWindowMonths + 1, thresholds.NoOutflowMonths));
@@ -69,7 +58,7 @@ namespace Jewelry.Service.Stock.Insight
             var salesStart = await GetSalesStartMonthAsync(metal);
             var historyMonths = StockInsightCalculator.FullMonthsSince(salesStart, monthStarts[monthStarts.Count - 1]);
 
-            var kpi = BuildKpi(inStock, onHandQty, now);
+            var kpi = BuildKpi(inStock, onHandQty, reservedPcs, now);
             var ageBuckets = BuildAgeBuckets(inStock, now);
             var (avgOutflow, windowUsed) = StockInsightCalculator.AverageMonthlyOutflow(fullSeries, thresholds.CoverWindowMonths, historyMonths);
 
@@ -110,28 +99,14 @@ namespace Jewelry.Service.Stock.Insight
             };
         }
 
-        // piece ที่ qty > 0 (IN_STOCK + RESERVED) — flat projection แล้ว aggregate ใน memory (~30k แถว)
-        private async Task<List<PieceRow>> GetOnHandPiecesAsync(string metal)
+        // ชิ้นที่ยังมีของ (IN_STOCK + RESERVED) จาก StockUnitSnapshot — หน่วยนับคือชิ้น (unit) ไม่ใช่แถวล็อต
+        private async Task<List<StockUnitBucket>> GetOnHandPiecesAsync(string metal)
         {
-            var rows = await _jewelryContext.TbtStockPiece
-                .AsNoTracking()
-                .Where(x => x.Qty > 0)
-                .Select(x => new PieceRow
-                {
-                    Status = x.Status,
-                    Qty = x.Qty,
-                    ProductCost = x.ProductCost,
-                    ProductionDate = x.ProductionDate,
-                    ReceiptType = x.ReceiptType,
-                    ProductionType = x.SkuCodeNavigation.ProductionType,
-                    ProductType = x.SkuCodeNavigation.ProductType,
-                    ProductTypeName = x.SkuCodeNavigation.ProductTypeName
-                })
-                .ToListAsync();
+            var rows = await StockUnitSnapshot.LoadAsync(_jewelryContext);
 
             return metal == MetalClassifier.All
                 ? rows
-                : rows.Where(x => MetalClassifier.Matches(metal, x.ProductionType)).ToList();
+                : rows.Where(x => MetalClassifier.Matches(metal, x.Lot.ProductionType)).ToList();
         }
 
         private async Task<List<StockMovementInput>> GetMovementsAsync(string metal, DateTime fromUtc)
@@ -172,101 +147,126 @@ namespace Jewelry.Service.Stock.Insight
             return dates.Count == 0 ? null : StockInsightCalculator.ThaiMonthStart(dates.Min());
         }
 
-        private static bool IsNoCost(PieceRow x) => (x.ProductCost ?? 0) == 0;
+        private static bool IsNoCost(StockUnitBucket x) => (x.Lot.ProductCost ?? 0) == 0;
 
-        private static Overview.Kpi BuildKpi(List<PieceRow> inStock, decimal onHandQty, DateTime now)
+        // ต้นทุนต่อชิ้น x จำนวนชิ้น (product_cost เป็นราคาต่อชิ้น)
+        private static decimal CostOf(StockUnitBucket x) => (x.Lot.ProductCost ?? 0) * x.Pcs;
+
+        private static int LotCount(IEnumerable<StockUnitBucket> rows)
+            => rows.Select(x => (x.Lot.StockNumber, x.Lot.ProductCode)).Distinct().Count();
+
+        private static Overview.Kpi BuildKpi(List<StockUnitBucket> inStock, decimal onHandQty, int reservedPcs, DateTime now)
         {
-            var count = inStock.Count;
-            var noCost = inStock.Count(IsNoCost);
-            var over1y = inStock.Count(x => StockInsightCalculator.AgeBucketKey(x.ProductionDate, now) != "lt1y");
-            var over5y = inStock.Count(x => StockInsightCalculator.AgeBucketKey(x.ProductionDate, now) == "gt5y");
+            var count = inStock.Sum(x => x.Pcs);
+            var noCostRows = inStock.Where(IsNoCost).ToList();
+            var noCost = noCostRows.Sum(x => x.Pcs);
+            var over1y = inStock.Where(x => StockInsightCalculator.AgeBucketKey(x.AgeDate, now) != "lt1y").Sum(x => x.Pcs);
+            var over5y = inStock.Where(x => StockInsightCalculator.AgeBucketKey(x.AgeDate, now) == "gt5y").Sum(x => x.Pcs);
+            var cost = inStock.Sum(CostOf);
 
             return new Overview.Kpi
             {
                 InStockCount = count,
-                InStockQty = inStock.Sum(x => x.Qty),
+                InStockQty = count,
+                InStockLotCount = LotCount(inStock),
+                ReservedCount = reservedPcs,
                 OnHandQty = onHandQty,
                 NoCostCount = noCost,
+                NoCostLotCount = LotCount(noCostRows),
                 NoCostPercent = StockInsightCalculator.Percent(noCost, count),
-                CostThb = inStock.Sum(x => x.ProductCost ?? 0),
-                CostThbQty = inStock.Sum(x => (x.ProductCost ?? 0) * x.Qty),
+                CostThb = cost,
+                CostThbQty = cost,
                 AgedOver1yCount = over1y,
                 AgedOver1yPercent = StockInsightCalculator.Percent(over1y, count),
                 AgedOver5yCount = over5y,
                 AgedOver5yPercent = StockInsightCalculator.Percent(over5y, count),
-                NoProductionDateCount = inStock.Count(x => !x.ProductionDate.HasValue)
+                NoProductionDateCount = inStock.Where(x => !x.AgeDate.HasValue).Sum(x => x.Pcs)
             };
         }
 
-        private static List<Overview.AgeBucket> BuildAgeBuckets(List<PieceRow> inStock, DateTime now)
+        private static List<Overview.AgeBucket> BuildAgeBuckets(List<StockUnitBucket> inStock, DateTime now)
         {
-            var keyed = inStock.ToLookup(x => StockInsightCalculator.AgeBucketKey(x.ProductionDate, now));
+            var keyed = inStock.ToLookup(x => StockInsightCalculator.AgeBucketKey(x.AgeDate, now));
             return new[] { "lt1y", "y1to2", "y2to5", "gt5y" }.Select(key =>
             {
                 var list = keyed[key].ToList();
+                var cost = list.Sum(CostOf);
+                var pcs = list.Sum(x => x.Pcs);
                 return new Overview.AgeBucket
                 {
                     Key = key,
-                    Count = list.Count,
-                    NoCostCount = list.Count(IsNoCost),
-                    CostThb = list.Sum(x => x.ProductCost ?? 0),
-                    Qty = list.Sum(x => x.Qty),
-                    CostThbQty = list.Sum(x => (x.ProductCost ?? 0) * x.Qty)
+                    Count = pcs,
+                    NoCostCount = list.Where(IsNoCost).Sum(x => x.Pcs),
+                    CostThb = cost,
+                    Qty = pcs,
+                    CostThbQty = cost
                 };
             }).ToList();
         }
 
-        private static List<Overview.ReceiptTypeRow> BuildReceiptTypes(List<PieceRow> inStock)
+        private static List<Overview.ReceiptTypeRow> BuildReceiptTypes(List<StockUnitBucket> inStock)
         {
             return inStock
-                .GroupBy(x => x.ReceiptType)
-                .Select(g => new Overview.ReceiptTypeRow
+                .GroupBy(x => x.Lot.ReceiptType)
+                .Select(g =>
                 {
-                    ReceiptType = g.Key,
-                    Count = g.Count(),
-                    NoCostCount = g.Count(IsNoCost),
-                    Qty = g.Sum(x => x.Qty),
-                    CostThb = g.Sum(x => x.ProductCost ?? 0)
+                    var pcs = g.Sum(x => x.Pcs);
+                    var cost = g.Sum(CostOf);
+                    return new Overview.ReceiptTypeRow
+                    {
+                        ReceiptType = g.Key,
+                        Count = pcs,
+                        NoCostCount = g.Where(IsNoCost).Sum(x => x.Pcs),
+                        Qty = pcs,
+                        CostThb = cost,
+                        CostThbQty = cost
+                    };
                 })
                 .OrderByDescending(x => x.Count)
                 .ToList();
         }
 
         // หมวดสินค้า = tbt_sku.product_type (รหัส) แสดงชื่อด้วย product_type_name
-        private static List<Overview.CategoryRow> BuildCategories(List<PieceRow> inStock, DateTime now)
+        private static List<Overview.CategoryRow> BuildCategories(List<StockUnitBucket> inStock, DateTime now)
         {
             return inStock
-                .GroupBy(x => x.ProductType ?? string.Empty)
-                .Select(g => new Overview.CategoryRow
+                .GroupBy(x => x.Lot.ProductType ?? string.Empty)
+                .Select(g =>
                 {
-                    Category = g.Key,
-                    CategoryName = g.Select(x => x.ProductTypeName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? g.Key,
-                    Count = g.Count(),
-                    Qty = g.Sum(x => x.Qty),
-                    CostThb = g.Sum(x => x.ProductCost ?? 0),
-                    NoCostCount = g.Count(IsNoCost),
-                    AgedOver1yCount = g.Count(x => StockInsightCalculator.AgeBucketKey(x.ProductionDate, now) != "lt1y")
+                    var pcs = g.Sum(x => x.Pcs);
+                    var cost = g.Sum(CostOf);
+                    return new Overview.CategoryRow
+                    {
+                        Category = g.Key,
+                        CategoryName = g.Select(x => x.Lot.ProductTypeName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? g.Key,
+                        Count = pcs,
+                        Qty = pcs,
+                        CostThb = cost,
+                        CostThbQty = cost,
+                        NoCostCount = g.Where(IsNoCost).Sum(x => x.Pcs),
+                        AgedOver1yCount = g.Where(x => StockInsightCalculator.AgeBucketKey(x.AgeDate, now) != "lt1y").Sum(x => x.Pcs)
+                    };
                 })
                 .OrderByDescending(x => x.Count)
                 .ToList();
         }
 
-        // ฐานคาดการณ์ = สต็อก IN_STOCK ถ่วง qty; อายุเกิน 1 ปี = ไม่ใช่ lt1y (production_date ว่าง = เก่า)
+        // ฐานคาดการณ์ = สต็อก IN_STOCK ถ่วงจำนวนชิ้น; อายุเกิน 1 ปี = ไม่ใช่ lt1y (ไม่มีวันเริ่มนับอายุ = เก่า)
         private static jewelry.Model.Production.Insight.Wip.Finding? BuildAgingForecast(
-            List<PieceRow> inStock, DateTime now, decimal avgOutflow, int historyMonths, int windowMonths, jewelry.Model.Stock.Insight.Overview.ThresholdValues t)
+            List<StockUnitBucket> inStock, DateTime now, decimal avgOutflow, int historyMonths, int windowMonths, jewelry.Model.Stock.Insight.Overview.ThresholdValues t)
         {
             var horizon = t.AgingProjectionMonths;
-            var total = inStock.Sum(x => x.Qty);
+            var total = (decimal)inStock.Sum(x => x.Pcs);
             if (total <= 0) return null;
 
             var aged = 0m;
             var turning = new decimal[horizon];
             foreach (var x in inStock)
             {
-                if (StockInsightCalculator.AgeBucketKey(x.ProductionDate, now) != "lt1y") { aged += x.Qty; continue; }
+                if (StockInsightCalculator.AgeBucketKey(x.AgeDate, now) != "lt1y") { aged += x.Pcs; continue; }
 
-                var k = StockInsightCalculator.TurningMonthIndex(x.ProductionDate!.Value, now, horizon);
-                if (k.HasValue) turning[k.Value - 1] += x.Qty;
+                var k = StockInsightCalculator.TurningMonthIndex(x.AgeDate!.Value, now, horizon);
+                if (k.HasValue) turning[k.Value - 1] += x.Pcs;
             }
 
             var from = aged * 100m / total;

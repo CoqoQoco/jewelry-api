@@ -43,11 +43,13 @@ public class StockProductGalleryService : BaseService, IStockProductGalleryServi
         var moldPieceCount = 0;
         if (moldKey != null)
         {
-            moldPieceCount = await _jewelryContext.TbtStockPiece
-                .Where(p => p.Status == "IN_STOCK"
+            // จำนวนชิ้นของแบบ = ของในมือรวมที่จอง (ล็อตไม่ SOLD, Σ qty) ไม่ใช่จำนวนล็อต
+            var moldQty = await _jewelryContext.TbtStockPiece
+                .Where(p => p.Status != "SOLD" && p.Qty > 0
                     && p.SkuCodeNavigation.Mold != null
                     && p.SkuCodeNavigation.Mold.Trim().ToUpper() == moldKey)
-                .CountAsync();
+                .SumAsync(p => (decimal?)p.Qty) ?? 0m;
+            moldPieceCount = (int)Math.Round(moldQty, MidpointRounding.AwayFromZero);
         }
 
         return new jewelry.Model.Stock.StockProductGallery.Get.Response
@@ -245,13 +247,14 @@ public class StockProductGalleryService : BaseService, IStockProductGalleryServi
 
     public async Task<jewelry.Model.Stock.StockProductGallery.MissingList.Response> MissingList(jewelry.Model.Stock.StockProductGallery.MissingList.Request request)
     {
-        // one round-trip: flat IN_STOCK piece x sku rows (no GroupBy+First on IQueryable — EF8 gotcha)
+        // one round-trip: flat on-hand lot x sku rows (ไม่ SOLD, qty > 0 — no GroupBy+First on IQueryable, EF8 gotcha) · นับเป็นชิ้นด้วย Qty ของล็อต
         var pieceRows = await (
             from p in _jewelryContext.TbtStockPiece.AsNoTracking()
             join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode
-            where p.Status == "IN_STOCK" && s.Mold != null && s.Mold != ""
+            where p.Status != "SOLD" && p.Qty > 0 && s.Mold != null && s.Mold != ""
             select new
             {
+                p.Qty,
                 p.StockNumber,
                 p.StockNumberOrigin,
                 p.SkuCode,
@@ -299,8 +302,10 @@ public class StockProductGalleryService : BaseService, IStockProductGalleryServi
                 return new jewelry.Model.Stock.StockProductGallery.MissingList.Item
                 {
                     Mold = x.MoldKey,
-                    MissingPieceCount = x.Missing.Count,
-                    InStockPieceCount = x.All.Count,
+                    MissingPieceCount = PieceCount(x.Missing.Sum(p => p.Qty)),
+                    InStockPieceCount = PieceCount(x.All.Sum(p => p.Qty)),
+                    MissingLotCount = x.Missing.Count,
+                    InStockLotCount = x.All.Count,
                     SampleStockNumber = sample.StockNumber,
                     SampleStockNumberOrigin = sample.StockNumberOrigin,
                     ProductNameTh = sample.ProductNameTh,
@@ -315,7 +320,8 @@ public class StockProductGalleryService : BaseService, IStockProductGalleryServi
         var summary = new jewelry.Model.Stock.StockProductGallery.MissingList.Summary
         {
             MoldCount = allBacklog.Count,
-            MissingPieceCount = allBacklog.Sum(x => x.MissingPieceCount)
+            MissingPieceCount = allBacklog.Sum(x => x.MissingPieceCount),
+            MissingLotCount = allBacklog.Sum(x => x.MissingLotCount)
         };
 
         IEnumerable<jewelry.Model.Stock.StockProductGallery.MissingList.Item> filtered = allBacklog;
@@ -352,6 +358,8 @@ public class StockProductGalleryService : BaseService, IStockProductGalleryServi
             Summary = summary
         };
     }
+
+    private static int PieceCount(decimal qty) => (int)Math.Round(qty, MidpointRounding.AwayFromZero);
 
     private async Task<(TbtStockPiece Piece, string ScopeKey)> ResolvePieceAndScopeKeyAsync(string stockNumber, string scopeType)
     {

@@ -265,10 +265,14 @@ namespace jewelry.Model.Report.Executive.Flow
         public bool LensesReconcile { get; set; }
     }
 
+    // TK202610290001: ทุกตัวเลขโซนสต็อกเป็นชิ้น (tbt_stock_unit) ไม่ใช่ล็อต
     public class FlowStockTotals
     {
+        // ชิ้นพร้อมขาย (IN_STOCK) · InStock + Reserved = ของในมือทั้งหมด
         public int InStock { get; set; }
+        // ชิ้นที่จองแล้ว (RESERVED)
         public int Reserved { get; set; }
+        // ขายแล้ว = Σ SALE - Σ RETURN ของ movement (ชิ้น)
         public int Sold { get; set; }
         public int CostRecordedPcs { get; set; }
         public int CostMissingPcs { get; set; }

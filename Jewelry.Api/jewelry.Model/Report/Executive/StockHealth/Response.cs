@@ -26,5 +26,6 @@ namespace jewelry.Model.Report.Executive.StockHealth
         public int Count { get; set; }
         public int NoCostCount { get; set; }
         public decimal Qty { get; set; }
+        public decimal CostThbQty { get; set; }
     }
 }

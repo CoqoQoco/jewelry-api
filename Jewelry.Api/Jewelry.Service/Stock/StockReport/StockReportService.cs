@@ -33,7 +33,7 @@ namespace Jewelry.Service.Stock.StockReport
         }
 
         // ฐานสต็อกร่วมของทุก endpoint: IN_STOCK/RESERVED เท่านั้น (ห้ามใช้ "Available" ไม่มีจริงใน DB)
-        // ProductionDate ใช้เป็นวันที่อ้างอิงอายุสต็อกเสมอ (ไม่ใช่ CreateDate/ReceiptDate)
+        // อายุสต็อกใช้ AgeDate ต่อชิ้น (production_date ของล็อต ยกเว้นชิ้นที่เติมล็อตทีหลังใช้วันรับรอบเติม) ไม่ใช่ CreateDate/ReceiptDate ของล็อต
         private class ResolvedStockLine
         {
             public string StockNumber { get; set; } = null!;
@@ -54,6 +54,8 @@ namespace Jewelry.Service.Stock.StockReport
             public decimal Qty { get; set; }
             public decimal QtyReserved { get; set; }
             public DateTime? ProductionDate { get; set; }
+            // วันเริ่มนับอายุของชิ้นในแถวนี้ (ชิ้นที่เติมล็อตทีหลัง = วันรับรอบเติม · นอกนั้น = ProductionDate) — ใช้คิดอายุทุก endpoint
+            public DateTime? AgeDate { get; set; }
             public int AgeDays { get; set; }
         }
 
@@ -130,79 +132,12 @@ namespace Jewelry.Service.Stock.StockReport
             return AllowedAgingThresholdYears.Contains(requested) ? requested : DefaultAgingThresholdYears;
         }
 
-        private class StockPieceRow
-        {
-            public string StockNumber { get; set; } = null!;
-            public string? StockNumberOrigin { get; set; }
-            public string SkuCode { get; set; } = null!;
-            public string ProductCode { get; set; } = null!;
-            public string LocationCode { get; set; } = null!;
-            public string? Status { get; set; }
-            public decimal Qty { get; set; }
-            public decimal QtyReserved { get; set; }
-            public DateTime? ProductionDate { get; set; }
-            public string? ProductNumber { get; set; }
-            public string? ProductNameTh { get; set; }
-            public string? ProductType { get; set; }
-            public string? ProductTypeName { get; set; }
-            public string? Mold { get; set; }
-            public string? MoldDesign { get; set; }
-            public string? ProductionType { get; set; }
-            public string? ProductionTypeSize { get; set; }
-            public string? ImagePath { get; set; }
-            public string? ImageName { get; set; }
-        }
-
-        // ดึงสต็อกทั้งหมด (IN_STOCK/RESERVED) กรองด้วย locationCodes เท่านั้น — ยังไม่กรอง productTypes/golds/goldSizes
-        // เพื่อให้ผู้เรียก (Summary) คำนวณ FilterOptions ได้ก่อนกรองต่อ ตาม pattern BuildFilteredSaleLines
-        // TK202610290003: 1 ล็อตอยู่ได้หลายคลัง — แถวสต็อกคือ (ล็อต x คลัง) นับจาก unit ที่ไม่ SOLD ตามคลังของแต่ละชิ้น
-        // Status ของแถว = RESERVED เมื่อชิ้นของล็อตในคลังนั้นถูกจองครบ · ล็อตที่ยังไม่มี unit ใช้ค่าจาก piece เป็นแถวเดียว (ตาข่ายนิรภัย)
+        // แถวสต็อก = (ล็อต x คลัง x วันเริ่มนับอายุ) นับจากชิ้น (tbt_stock_unit) ผ่าน StockUnitSnapshot — locationCodes กรองที่คลังของแต่ละชิ้น
+        // ยังไม่กรอง productTypes/golds/goldSizes เพื่อให้ผู้เรียก (Summary) คำนวณ FilterOptions ได้ก่อนกรองต่อ ตาม pattern BuildFilteredSaleLines
+        // Status ของแถว = RESERVED เมื่อชิ้นในแถวถูกจองครบ · Qty = จำนวนชิ้น · QtyReserved = ชิ้นที่ถูกจองในแถว
         private async Task<List<ResolvedStockLine>> BuildResolvedStockLinesAsync(List<string>? locationCodes)
         {
-            var pieceRows = await _jewelryContext.TbtStockPiece
-                .AsNoTracking()
-                .Where(x => x.Status == "IN_STOCK" || x.Status == "RESERVED")
-                .Select(x => new StockPieceRow
-                {
-                    StockNumber = x.StockNumber,
-                    StockNumberOrigin = x.StockNumberOrigin,
-                    SkuCode = x.SkuCode,
-                    ProductCode = x.ProductCode,
-                    LocationCode = x.LocationCode,
-                    Status = x.Status,
-                    Qty = x.Qty,
-                    QtyReserved = x.QtyReserved,
-                    ProductionDate = x.ProductionDate,
-                    ProductNumber = x.SkuCodeNavigation.ProductNumber,
-                    ProductNameTh = x.SkuCodeNavigation.ProductNameTh,
-                    ProductType = x.SkuCodeNavigation.ProductType,
-                    ProductTypeName = x.SkuCodeNavigation.ProductTypeName,
-                    Mold = x.SkuCodeNavigation.Mold,
-                    MoldDesign = x.SkuCodeNavigation.MoldDesign,
-                    ProductionType = x.SkuCodeNavigation.ProductionType,
-                    ProductionTypeSize = x.SkuCodeNavigation.ProductionTypeSize,
-                    ImagePath = x.SkuCodeNavigation.ImagePath,
-                    ImageName = x.SkuCodeNavigation.ImageName
-                })
-                .ToListAsync();
-
-            var unitGroups = await _jewelryContext.TbtStockUnit
-                .AsNoTracking()
-                .Where(u => u.Status != "SOLD")
-                .GroupBy(u => new { u.StockNumber, u.ProductCode, u.LocationCode })
-                .Select(g => new
-                {
-                    g.Key.StockNumber,
-                    g.Key.ProductCode,
-                    g.Key.LocationCode,
-                    Qty = g.Count(),
-                    Reserved = g.Count(x => x.Status == "RESERVED")
-                })
-                .ToListAsync();
-
-            var unitGroupsByLot = unitGroups
-                .GroupBy(g => (g.StockNumber, g.ProductCode))
-                .ToDictionary(g => g.Key, g => g.Select(x => (x.LocationCode, (decimal)x.Qty, (decimal)x.Reserved)).ToList());
+            var buckets = await StockUnitSnapshot.LoadAsync(_jewelryContext);
 
             var locationRows = await _jewelryContext.TbmStockLocation
                 .AsNoTracking()
@@ -214,47 +149,51 @@ namespace Jewelry.Service.Stock.StockReport
 
             var today = ThaiToday();
             var lines = new List<ResolvedStockLine>();
+            var filterLocations = locationCodes != null && locationCodes.Count > 0;
 
-            foreach (var x in pieceRows)
+            var groups = buckets
+                .Where(b => !filterLocations || locationCodes!.Contains(b.Location))
+                .GroupBy(b => (b.Lot, b.Location, AgeDate: b.AgeDate.HasValue ? StockAge.ThaiDate(b.AgeDate.Value) : (DateTime?)null));
+
+            foreach (var g in groups)
             {
-                var parts = unitGroupsByLot.TryGetValue((x.StockNumber, x.ProductCode), out var lotParts)
-                    ? lotParts
-                    : new List<(string LocationCode, decimal Qty, decimal Reserved)> { (x.LocationCode, x.Qty, x.QtyReserved) };
+                var x = g.Key.Lot;
+                var partLocation = g.Key.Location;
+                var partQty = (decimal)g.Sum(b => b.Pcs);
+                var partReserved = (decimal)g.Where(b => b.Status == StockUnitSnapshot.Reserved).Sum(b => b.Pcs);
+                var ageDate = g.First().AgeDate;
+                var ageThaiDate = g.Key.AgeDate;
 
-                foreach (var (partLocation, partQty, partReserved) in parts)
+                lines.Add(new ResolvedStockLine
                 {
-                    if (locationCodes != null && locationCodes.Count > 0 && !locationCodes.Contains(partLocation))
-                    {
-                        continue;
-                    }
-
-                    lines.Add(new ResolvedStockLine
-                    {
-                        StockNumber = x.StockNumber,
-                        StockNumberOrigin = x.StockNumberOrigin,
-                        SkuCode = x.SkuCode,
-                        ProductNumber = x.ProductNumber,
-                        ProductNameTh = x.ProductNameTh,
-                        ProductType = x.ProductType,
-                        ProductTypeName = x.ProductTypeName,
-                        ProductionType = x.ProductionType,
-                        ProductionTypeSize = x.ProductionTypeSize,
-                        Design = ResolveDesignKey(x.MoldDesign, x.Mold, x.SkuCode),
-                        ImagePath = x.ImagePath,
-                        ImageName = x.ImageName,
-                        LocationCode = partLocation,
-                        LocationName = locationNameByCode.TryGetValue(partLocation, out var locationName) ? locationName : partLocation,
-                        Status = partReserved >= partQty && partQty > 0 ? "RESERVED" : "IN_STOCK",
-                        Qty = partQty,
-                        QtyReserved = partReserved,
-                        ProductionDate = x.ProductionDate,
-                        AgeDays = x.ProductionDate.HasValue ? (int)(today - x.ProductionDate.Value.Date).TotalDays : 0
-                    });
-                }
+                    StockNumber = x.StockNumber,
+                    StockNumberOrigin = x.StockNumberOrigin,
+                    SkuCode = x.SkuCode,
+                    ProductNumber = x.ProductNumber,
+                    ProductNameTh = x.ProductNameTh,
+                    ProductType = x.ProductType,
+                    ProductTypeName = x.ProductTypeName,
+                    ProductionType = x.ProductionType,
+                    ProductionTypeSize = x.ProductionTypeSize,
+                    Design = ResolveDesignKey(x.MoldDesign, x.Mold, x.SkuCode),
+                    ImagePath = x.ImagePath,
+                    ImageName = x.ImageName,
+                    LocationCode = partLocation,
+                    LocationName = locationNameByCode.TryGetValue(partLocation, out var locationName) ? locationName : partLocation,
+                    Status = partReserved >= partQty && partQty > 0 ? "RESERVED" : "IN_STOCK",
+                    Qty = partQty,
+                    QtyReserved = partReserved,
+                    ProductionDate = x.ProductionDate,
+                    AgeDate = ageDate,
+                    AgeDays = ageThaiDate.HasValue ? (int)(today - ageThaiDate.Value).TotalDays : 0
+                });
             }
 
             return lines;
         }
+
+        // วันที่ใช้ bucket อายุ: ไม่มีวันเริ่มนับอายุ = วันนี้ (คงพฤติกรรมเดิมของหน้านี้)
+        private static DateTime AgeDay(ResolvedStockLine line, DateTime today) => line.AgeDate.HasValue ? StockAge.ThaiDate(line.AgeDate.Value) : today;
 
         private static List<ResolvedStockLine> ApplyTypeFilters(
             IEnumerable<ResolvedStockLine> lines, List<string>? productTypes, List<string>? golds, List<string>? goldSizes)
@@ -492,12 +431,12 @@ namespace Jewelry.Service.Stock.StockReport
 
             var pieceQty = filteredLines.Sum(x => x.Qty);
             var pieceRowCount = filteredLines.Select(x => x.StockNumber).Distinct().Count();
-            var reservedQty = filteredLines.Where(x => x.Status == "RESERVED").Sum(x => x.Qty);
+            var reservedQty = filteredLines.Sum(x => x.QtyReserved);
             var designCount = filteredLines.Select(x => x.Design).Distinct().Count();
 
             var today = ThaiToday();
             var agedCutoff = today.AddYears(-DefaultAgingThresholdYears);
-            var agedQty = filteredLines.Where(x => (x.ProductionDate?.Date ?? today) < agedCutoff).Sum(x => x.Qty);
+            var agedQty = filteredLines.Where(x => AgeDay(x, today) < agedCutoff).Sum(x => x.Qty);
             var agedPercent = pieceQty > 0 ? Math.Round(agedQty / pieceQty * 100, 1, MidpointRounding.AwayFromZero) : 0;
 
             var soldLines = await BuildResolvedSoldLinesAsync(
@@ -601,7 +540,7 @@ namespace Jewelry.Service.Stock.StockReport
 
             string BucketOf(ResolvedStockLine line)
             {
-                var date = line.ProductionDate?.Date ?? today;
+                var date = AgeDay(line, today);
                 if (date >= sixMonthsAgo) return "lt6m";
                 if (date >= oneYearAgo) return "m6to12";
                 if (date >= twoYearsAgo) return "y1to2";
@@ -621,7 +560,7 @@ namespace Jewelry.Service.Stock.StockReport
             }).ToList();
 
             var agedCutoff = today.AddYears(-thresholdYears);
-            var agedLines = filtered.Where(x => (x.ProductionDate?.Date ?? today) < agedCutoff).ToList();
+            var agedLines = filtered.Where(x => AgeDay(x, today) < agedCutoff).ToList();
             var agedQty = agedLines.Sum(x => x.Qty);
             var agedRowCount = agedLines.Count;
             var totalPieceQty = filtered.Sum(x => x.Qty);
@@ -635,7 +574,7 @@ namespace Jewelry.Service.Stock.StockReport
                     var list = g.ToList();
                     var first = list.First();
                     var pieceQty = list.Sum(x => x.Qty);
-                    var agedQtyGroup = list.Where(x => (x.ProductionDate?.Date ?? today) < agedCutoff).Sum(x => x.Qty);
+                    var agedQtyGroup = list.Where(x => AgeDay(x, today) < agedCutoff).Sum(x => x.Qty);
                     return new Aging.TopGroupData
                     {
                         Key = g.Key,
@@ -669,8 +608,8 @@ namespace Jewelry.Service.Stock.StockReport
             var today = ThaiToday();
             var agedCutoff = today.AddYears(-thresholdYears);
 
-            var agedLines = filtered.Where(x => (x.ProductionDate?.Date ?? today) < agedCutoff).ToList();
-            var ordered = agedLines.OrderBy(x => x.ProductionDate ?? DateTime.MaxValue).ToList();
+            var agedLines = filtered.Where(x => AgeDay(x, today) < agedCutoff).ToList();
+            var ordered = agedLines.OrderBy(x => x.AgeDate ?? DateTime.MaxValue).ToList();
 
             var take = request.Take <= 0 ? 50 : Math.Min(request.Take, 500);
             var skip = Math.Max(request.Skip, 0);
@@ -689,6 +628,7 @@ namespace Jewelry.Service.Stock.StockReport
                 LocationCode = x.LocationCode,
                 LocationName = x.LocationName,
                 ProductionDate = x.ProductionDate,
+                AgeDate = x.AgeDate,
                 AgeDays = x.AgeDays,
                 Qty = x.Qty
             }).ToList();

@@ -84,10 +84,11 @@ namespace Jewelry.Service.Report.Executive
 
         public static readonly string[] StockAgeLabels = { "<=90d", "91-365d", ">365d", Unknown };
 
-        public static string StockAgeLabel(DateTime? productionDate, DateTime now)
+        // ageDate = วันเริ่มนับอายุของชิ้น (ดู StockUnitSnapshot) · อายุนับเป็นวันปฏิทินเวลาไทย
+        public static string StockAgeLabel(DateTime? ageDate, DateTime now)
         {
-            if (!productionDate.HasValue) return Unknown;
-            var days = (now - productionDate.Value).TotalDays;
+            if (!ageDate.HasValue) return Unknown;
+            var days = Jewelry.Service.Stock.StockAge.DaysOld(ageDate.Value, now);
             if (days <= 90) return "<=90d";
             if (days <= 365) return "91-365d";
             return ">365d";

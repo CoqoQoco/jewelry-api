@@ -55,19 +55,28 @@ namespace jewelry.Model.Stock.Insight.Overview
 
     public class Kpi
     {
-        // สต็อกพร้อมขาย = piece status IN_STOCK (เหมือน StockHealth)
+        // TK202610290001: ตัวเลขสต็อกทั้งหมดนับเป็นชิ้น (tbt_stock_unit) ไม่ใช่ล็อต
+        // สต็อกพร้อมขาย = ชิ้นสถานะ IN_STOCK (ไม่รวมที่จองแล้ว)
         public int InStockCount { get; set; }
+        // เท่ากับ InStockCount (คงไว้เพื่อ compat)
         public decimal InStockQty { get; set; }
+        // จำนวนล็อต (แถว tbt_stock_piece) ที่มีชิ้น IN_STOCK
+        public int InStockLotCount { get; set; }
+        // ชิ้นที่จองแล้ว (RESERVED) แยกจาก InStockCount
+        public int ReservedCount { get; set; }
 
-        // ยอดคงเหลือรวมที่จองแล้วด้วย (qty > 0, IN_STOCK + RESERVED) — ฐานของ series.endStockQty
+        // ยอดคงเหลือรวมที่จองแล้วด้วย (IN_STOCK + RESERVED) — ฐานของ series.endStockQty
         public decimal OnHandQty { get; set; }
 
         public int NoCostCount { get; set; }
+        // จำนวนล็อตที่ไม่มีต้นทุน (ในชิ้น IN_STOCK)
+        public int NoCostLotCount { get; set; }
         public decimal NoCostPercent { get; set; }
+        // มูลค่า = Σ ต้นทุนต่อชิ้น x จำนวนชิ้น · CostThbQty เท่ากัน (คงไว้เพื่อ compat)
         public decimal CostThb { get; set; }
         public decimal CostThbQty { get; set; }
 
-        // อายุนับจาก production_date (production_date ว่าง = gt5y เหมือน StockHealth)
+        // อายุนับจากวันเริ่มนับของแต่ละชิ้น (ชิ้นเติมล็อต = วันรับรอบเติม · นอกนั้น production_date) ไม่มีวัน = gt5y
         public int AgedOver1yCount { get; set; }
         public decimal AgedOver1yPercent { get; set; }
         public int AgedOver5yCount { get; set; }
@@ -89,10 +98,12 @@ namespace jewelry.Model.Stock.Insight.Overview
     public class ReceiptTypeRow
     {
         public string? ReceiptType { get; set; }
+        // นับเป็นชิ้น · Qty เท่ากับ Count (คงไว้เพื่อ compat) · CostThb = CostThbQty = Σ ต้นทุน x ชิ้น
         public int Count { get; set; }
         public int NoCostCount { get; set; }
         public decimal Qty { get; set; }
         public decimal CostThb { get; set; }
+        public decimal CostThbQty { get; set; }
     }
 
     public class CategoryRow
@@ -103,6 +114,7 @@ namespace jewelry.Model.Stock.Insight.Overview
         public int Count { get; set; }
         public decimal Qty { get; set; }
         public decimal CostThb { get; set; }
+        public decimal CostThbQty { get; set; }
         public int NoCostCount { get; set; }
         public int AgedOver1yCount { get; set; }
     }

@@ -100,6 +100,7 @@ namespace Jewelry.Service.Report.Executive
             return (response, failed);
         }
 
+        // รายการต้นทุนขาดนับเป็นล็อต (แถวที่ต้องเข้าไปแก้) ไม่ใช่ชิ้น
         // ใช้ Summary (cached 60s) ที่คำนวณเลขเหล่านี้อยู่แล้ว — scope metal เดียวกันกับหน้าอื่น
         private async Task<List<DataQualityInput>> LoadSummaryChecks(string metal)
         {
@@ -109,7 +110,7 @@ namespace Jewelry.Service.Report.Executive
 
             return new List<DataQualityInput>
             {
-                new() { Code = ExecutiveDataQualityCalculator.NoCost, Count = s.Stock.NoCostCount, Total = s.Stock.InStockCount },
+                new() { Code = ExecutiveDataQualityCalculator.NoCost, Count = s.Stock.NoCostLotCount, Total = s.Stock.InStockLotCount },
                 new() { Code = ExecutiveDataQualityCalculator.InvoiceNoDue, Count = s.Receivables.NoDueDateCount, Total = s.Receivables.InvoiceCount },
                 // นับเฉพาะ SO เปิดที่ยังไม่มีใบแจ้งหนี้ (ตามนิยามของ Summary) -> ฐานคือ SO ที่ยังไม่มีบิล
                 new() { Code = ExecutiveDataQualityCalculator.SoNoDeliveryDate, Count = s.SalesOrders.NoDeliveryDateCount, Total = s.SalesOrders.NoInvoiceCount },

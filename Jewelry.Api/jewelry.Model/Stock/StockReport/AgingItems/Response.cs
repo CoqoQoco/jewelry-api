@@ -22,7 +22,10 @@ namespace jewelry.Model.Stock.StockReport.AgingItems
         public string? ImageBlobPath { get; set; }
         public string LocationCode { get; set; } = null!;
         public string? LocationName { get; set; }
+        // production_date ของล็อต (คงไว้เพื่อ compat)
         public DateTime? ProductionDate { get; set; }
+        // วันเริ่มนับอายุของชิ้นในแถวนี้ (ชิ้นเติมล็อต = วันรับรอบเติม · นอกนั้น = production_date) · AgeDays นับจากวันนี้ (เวลาไทย)
+        public DateTime? AgeDate { get; set; }
         public int AgeDays { get; set; }
         public decimal Qty { get; set; }
     }

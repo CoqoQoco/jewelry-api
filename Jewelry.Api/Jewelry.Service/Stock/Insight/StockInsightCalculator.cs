@@ -11,7 +11,6 @@ namespace Jewelry.Service.Stock.Insight
     public static class StockInsightCalculator
     {
         private const int ThaiOffsetHours = 7;
-        private const string LegacyImportRefPrefix = "TRANSFER_";
         public const string InvoiceRefDocType = "INVOICE";
         public const string InvoiceDeleteRefDocType = "INVOICE_DELETE";
 
@@ -32,27 +31,12 @@ namespace Jewelry.Service.Stock.Insight
         public static DateTime WindowStartUtc(DateTime firstThaiMonth)
             => DateTime.SpecifyKind(firstThaiMonth.AddHours(-ThaiOffsetHours), DateTimeKind.Utc);
 
-        // ผลต่อยอดคงเหลือ qty: +1 เข้า / -1 ออก / 0 ไม่กระทบ (reserve, unreserve, ย้ายคลัง)
-        // ตรงกับ ledger ของ StockReconciliationService (RECEIPT/RETURN +, SALE -) บวก convert (TRANSFORM_IN/OUT)
-        public static int QtySign(string? movementType)
-        {
-            switch (movementType?.Trim().ToUpperInvariant())
-            {
-                case "RECEIPT":
-                case "RETURN":
-                case "TRANSFORM_IN":
-                    return 1;
-                case "SALE":
-                case "TRANSFORM_OUT":
-                    return -1;
-                default:
-                    return 0;
-            }
-        }
+        // ผลต่อยอดคงเหลือ qty: +1 เข้า / -1 ออก / 0 ไม่กระทบ (reserve, unreserve, ย้ายคลัง) — กติกากลางอยู่ที่ StockLedger
+        public static int QtySign(string? movementType) => StockLedger.QtySign(movementType);
 
         public static bool IsLegacyImport(StockMovementInput m)
             => m.MovementType.Trim().ToUpperInvariant() == "RECEIPT"
-               && (m.RefDocType?.StartsWith(LegacyImportRefPrefix, StringComparison.OrdinalIgnoreCase) ?? false);
+               && StockLedger.IsLegacyImportRef(m.RefDocType);
 
         // endStock(เดือน m) = ยอดปัจจุบัน - ผลรวมสุทธิของ movement ที่เกิดหลังสิ้นเดือน m
         public static List<SeriesPoint> BuildSeries(IReadOnlyList<DateTime> months, IEnumerable<StockMovementInput> movements, decimal currentOnHandQty)
@@ -119,24 +103,27 @@ namespace Jewelry.Service.Stock.Insight
             return series.Skip(series.Count - months).All(p => p.OutflowQty == 0);
         }
 
-        public static string AgeBucketKey(DateTime? productionDate, DateTime utcNow)
+        // อายุนับเป็นวันปฏิทินเวลาไทย (ageDate = วันเริ่มนับอายุของชิ้น ดู StockUnitSnapshot) · ว่าง = เก่าสุด
+        public static string AgeBucketKey(DateTime? ageDate, DateTime utcNow)
         {
-            if (!productionDate.HasValue) return "gt5y";
-            var d = productionDate.Value;
-            if (d >= utcNow.AddYears(-1)) return "lt1y";
-            if (d >= utcNow.AddYears(-2)) return "y1to2";
-            if (d >= utcNow.AddYears(-5)) return "y2to5";
+            if (!ageDate.HasValue) return "gt5y";
+            var d = StockAge.ThaiDate(ageDate.Value);
+            var today = StockAge.ThaiToday(utcNow);
+            if (d >= today.AddYears(-1)) return "lt1y";
+            if (d >= today.AddYears(-2)) return "y1to2";
+            if (d >= today.AddYears(-5)) return "y2to5";
             return "gt5y";
         }
 
         // เดือนที่ (1..horizon) ที่ชิ้นอายุจะครบ 1 ปี — null ถ้าครบแล้ว (ไม่ใช่ชิ้นอายุน้อย) หรือเกิน horizon
-        public static int? TurningMonthIndex(DateTime productionDate, DateTime utcNow, int horizonMonths)
+        public static int? TurningMonthIndex(DateTime ageDate, DateTime utcNow, int horizonMonths)
         {
-            var turn = productionDate.AddYears(1);
-            if (turn <= utcNow) return null;
+            var today = StockAge.ThaiToday(utcNow);
+            var turn = StockAge.ThaiDate(ageDate).AddYears(1);
+            if (turn < today) return null;
             for (var k = 1; k <= horizonMonths; k++)
             {
-                if (turn <= utcNow.AddMonths(k)) return k;
+                if (turn <= today.AddMonths(k)) return k;
             }
             return null;
         }

@@ -407,9 +407,8 @@ namespace Jewelry.Service.Report.Executive
             var completedJobs = await completedQuery.CountAsync();
             var completedPcs = await completedQuery.SumAsync(p => (int?)p.ProductQty) ?? 0;
 
-            var receivedThisMonth = await _ctx.TbtStockProductReceiptItem
-                .AsNoTracking()
-                .CountAsync(r => r.ReceiptDate != null && r.ReceiptDate >= monthStart);
+            // รับเข้าสต็อกเดือนนี้ (ชิ้น) = ค่าเดียวกับสต็อกใหม่ของเดือนปัจจุบันในกราฟรายเดือน
+            var receivedThisMonth = series.NewStock.TryGetValue(MonthKey(monthStart), out var thisMonthNew) ? thisMonthNew : 0;
 
             return new FlowReceiveZone
             {
@@ -426,9 +425,9 @@ namespace Jewelry.Service.Report.Executive
 
         // ---------------------------------------------------------------- stock
 
-        private static List<FlowLabelPcs> BuildLens(IEnumerable<string> labels, string[]? order)
+        private static List<FlowLabelPcs> BuildLens(IEnumerable<(string Label, int Pcs)> weighted, string[]? order)
         {
-            var groups = labels.GroupBy(l => l).Select(g => new FlowLabelPcs { Label = g.Key, Pcs = g.Count() });
+            var groups = weighted.GroupBy(l => l.Label).Select(g => new FlowLabelPcs { Label = g.Key, Pcs = g.Sum(x => x.Pcs) });
             return order != null
                 ? groups.OrderBy(i => IndexOrMax(order, i.Label)).ThenBy(i => i.Label, StringComparer.Ordinal).ToList()
                 : groups.OrderByDescending(i => i.Pcs).ThenBy(i => i.Label, StringComparer.Ordinal).ToList();
@@ -436,28 +435,38 @@ namespace Jewelry.Service.Report.Executive
 
         private async Task<FlowStockZone> BuildStockZoneAsync(DateTime now)
         {
-            var rows = await LoadStockRowsAsync();
+            var allRows = await LoadStockRowsAsync();
+            var rows = InStockOnly(allRows);
             var locations = await _ctx.TbmStockLocation
                 .AsNoTracking()
                 .Select(l => new { l.Code, l.NameTh, l.IsSalesPoint })
                 .ToListAsync();
             var locationMap = locations.ToDictionary(l => l.Code, l => l);
 
-            var reserved = await _ctx.TbtStockPiece.AsNoTracking().CountAsync(p => p.Status == "RESERVED");
-            var sold = await _ctx.TbtStockPiece.AsNoTracking().CountAsync(p => p.Status == "SOLD");
+            // ทุกตัวเลขเป็นชิ้น: พร้อมขาย = unit IN_STOCK · จอง = unit RESERVED · ขาย = Σ SALE - Σ RETURN (movement)
+            var reserved = allRows.Where(r => r.Status != InStockStatus).Sum(r => r.Pcs);
+            var soldMovements = await _ctx.TbtStockMovement
+                .AsNoTracking()
+                .Where(m => m.MovementType == "SALE" || m.MovementType == "RETURN")
+                .GroupBy(m => m.MovementType)
+                .Select(g => new { Type = g.Key, Qty = g.Sum(x => x.Qty) })
+                .ToListAsync();
+            var soldQty = soldMovements.Where(m => m.Type == "SALE").Sum(m => m.Qty)
+                - soldMovements.Where(m => m.Type == "RETURN").Sum(m => m.Qty);
+            var sold = (int)Math.Max(0m, Math.Round(soldQty, MidpointRounding.AwayFromZero));
 
             var zone = new FlowStockZone();
             zone.Totals = new FlowStockTotals
             {
-                InStock = rows.Count,
+                InStock = rows.Sum(r => r.Pcs),
                 Reserved = reserved,
                 Sold = sold,
-                CostRecordedPcs = rows.Count(r => r.Cost > 0),
-                CostMissingPcs = rows.Count(r => !(r.Cost > 0)),
+                CostRecordedPcs = rows.Where(r => r.Cost > 0).Sum(r => r.Pcs),
+                CostMissingPcs = rows.Where(r => !(r.Cost > 0)).Sum(r => r.Pcs),
                 DesignsInStock = rows.Where(r => !string.IsNullOrWhiteSpace(r.Mold)).Select(r => r.Mold!.Trim()).Distinct().Count()
             };
 
-            var byLocation = rows.GroupBy(r => r.Location).Select(g => (Code: g.Key, Pcs: g.Count())).ToList();
+            var byLocation = rows.GroupBy(r => r.Location).Select(g => (Code: g.Key, Pcs: g.Sum(x => x.Pcs))).ToList();
             zone.Locations = byLocation
                 .Select(l =>
                 {
@@ -477,11 +486,11 @@ namespace Jewelry.Service.Report.Executive
             var sloc = ExecutiveFlowNormalizer.TopWithOther(
                 zone.Locations.Select(l => (l.Name, l.Pcs)), 3, n => $"Other {n}");
 
-            var goldLabels = rows.Select(r => ExecutiveFlowNormalizer.NormalizeStockGold(r.Gold)).ToList();
-            var sizeLabels = rows.Select(r => ExecutiveFlowNormalizer.NormalizeSize(r.Size)).ToList();
-            var typeCounts = rows.GroupBy(r => ExecutiveFlowNormalizer.LabelOrUnknown(r.PType)).Select(g => (g.Key, g.Count()));
+            var goldLabels = rows.Select(r => (Label: ExecutiveFlowNormalizer.NormalizeStockGold(r.Gold), r.Pcs)).ToList();
+            var sizeLabels = rows.Select(r => (Label: ExecutiveFlowNormalizer.NormalizeSize(r.Size), r.Pcs)).ToList();
+            var typeCounts = rows.GroupBy(r => ExecutiveFlowNormalizer.LabelOrUnknown(r.PType)).Select(g => (g.Key, g.Sum(x => x.Pcs)));
             var types = ExecutiveFlowNormalizer.TopWithOther(typeCounts, 5, _ => "Other");
-            var ageLabels = rows.Select(r => ExecutiveFlowNormalizer.StockAgeLabel(r.ProductionDate, now)).ToList();
+            var ageLabels = rows.Select(r => (Label: ExecutiveFlowNormalizer.StockAgeLabel(r.AgeDate, now), r.Pcs)).ToList();
 
             zone.Lenses = new FlowStockLenses
             {
@@ -492,9 +501,10 @@ namespace Jewelry.Service.Report.Executive
                 Age = BuildLens(ageLabels, ExecutiveFlowNormalizer.StockAgeLabels)
             };
 
-            zone.Matrix = goldLabels.Zip(sizeLabels, (g, s) => (Gold: g, Size: s))
-                .GroupBy(x => x)
-                .Select(g => new FlowStockMatrixCell { Gold = g.Key.Gold, Size = g.Key.Size, Pcs = g.Count() })
+            zone.Matrix = rows
+                .Select(r => (Gold: ExecutiveFlowNormalizer.NormalizeStockGold(r.Gold), Size: ExecutiveFlowNormalizer.NormalizeSize(r.Size), r.Pcs))
+                .GroupBy(x => (x.Gold, x.Size))
+                .Select(g => new FlowStockMatrixCell { Gold = g.Key.Gold, Size = g.Key.Size, Pcs = g.Sum(x => x.Pcs) })
                 .OrderBy(c => IndexOrMax(StockGoldOrder, c.Gold))
                 .ThenBy(c => IndexOrMax(SizeOrder, c.Size))
                 .ToList();

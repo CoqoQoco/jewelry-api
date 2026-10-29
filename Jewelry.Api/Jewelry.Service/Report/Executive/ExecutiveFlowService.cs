@@ -2,6 +2,7 @@ using jewelry.Model.Report.Executive.Flow;
 using Jewelry.Data.Context;
 using Jewelry.Service.Production.Insight;
 using Jewelry.Service.Production.Shared;
+using Jewelry.Service.Stock;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System;
@@ -138,11 +139,14 @@ namespace Jewelry.Service.Report.Executive
             public string? Worker { get; set; }
         }
 
+        // หนึ่งแถว = ชิ้นของล็อตที่คลัง/สถานะ/วันเริ่มนับอายุเดียวกัน (Pcs ชิ้น) — ทุกตัวเลขของโซนสต็อกถ่วงด้วย Pcs
         private class StockRow
         {
             public string Location { get; set; } = null!;
+            public string Status { get; set; } = null!;
+            public int Pcs { get; set; }
             public decimal? Cost { get; set; }
-            public DateTime? ProductionDate { get; set; }
+            public DateTime? AgeDate { get; set; }
             public string? Gold { get; set; }
             public string? Size { get; set; }
             public string? PType { get; set; }
@@ -374,23 +378,28 @@ namespace Jewelry.Service.Report.Executive
             });
         }
 
+        // ชิ้นที่ยังมีของทั้งหมด (IN_STOCK + RESERVED) จาก StockUnitSnapshot — ผู้ใช้กรอง IN_STOCK ผ่าน InStockOnly
         private async Task<List<StockRow>> LoadStockRowsAsync()
         {
-            return await CachedAsync("StockRows", async () => await _ctx.TbtStockPiece
-                .AsNoTracking()
-                .Where(x => x.Status == InStockStatus)
-                .Select(x => new StockRow
+            return await CachedAsync("StockRows", async () =>
+            {
+                var buckets = await StockUnitSnapshot.LoadAsync(_ctx);
+                return buckets.Select(b => new StockRow
                 {
-                    Location = x.LocationCode,
-                    Cost = x.ProductCost,
-                    ProductionDate = x.ProductionDate,
-                    Gold = x.SkuCodeNavigation.ProductionType,
-                    Size = x.SkuCodeNavigation.ProductionTypeSize,
-                    PType = x.SkuCodeNavigation.ProductType,
-                    Mold = x.SkuCodeNavigation.Mold
-                })
-                .ToListAsync());
+                    Location = b.Location,
+                    Status = b.Status,
+                    Pcs = b.Pcs,
+                    Cost = b.Lot.ProductCost,
+                    AgeDate = b.AgeDate,
+                    Gold = b.Lot.ProductionType,
+                    Size = b.Lot.ProductionTypeSize,
+                    PType = b.Lot.ProductType,
+                    Mold = b.Lot.Mold
+                }).ToList();
+            });
         }
+
+        private static List<StockRow> InStockOnly(IEnumerable<StockRow> rows) => rows.Where(r => r.Status == InStockStatus).ToList();
 
         // scope เดียวกับ ExecutiveReportService.InScopeInvoices: ไม่ถูกลบ และไม่ใช่ใบแจ้งหนี้วัตถุดิบ (MATERIAL)
         private async Task<List<InvoiceRow>> LoadInvoicesAsync()
@@ -452,7 +461,7 @@ namespace Jewelry.Service.Report.Executive
             });
         }
 
-        // 12 เดือนไทย: plan สร้าง/เสร็จ + ชิ้นสต็อกใหม่ (ดึงเฉพาะคอลัมน์วันที่ในช่วง แล้ว bucket ในหน่วยความจำเพื่อเลี่ยงปัญหา timezone ใน SQL)
+        // 12 เดือนไทย: plan สร้าง/เสร็จ + ชิ้นสต็อกใหม่ (ดึงเฉพาะคอลัมน์ที่ใช้ในช่วง แล้ว bucket ในหน่วยความจำเพื่อเลี่ยงปัญหา timezone ใน SQL)
         private async Task<SeriesData> LoadSeriesAsync(DateTime now)
         {
             return await CachedAsync("Series", async () =>
@@ -473,11 +482,14 @@ namespace Jewelry.Service.Report.Executive
                     .Select(p => new { Date = p.CompletedDate!.Value, p.ProductQty })
                     .ToListAsync();
 
-                var pieces = await _ctx.TbtStockPiece
+                // สต็อกใหม่ = Σ qty ของ movement RECEIPT + TRANSFORM_IN ไม่รวมการย้ายสต็อกระบบเก่า (RefDocType ขึ้นต้น TRANSFER_)
+                var receipts = (await _ctx.TbtStockMovement
                     .AsNoTracking()
-                    .Where(p => p.CreateDate >= windowStart)
-                    .Select(p => p.CreateDate)
-                    .ToListAsync();
+                    .Where(m => m.MovementDate >= windowStart && (m.MovementType == "RECEIPT" || m.MovementType == "TRANSFORM_IN"))
+                    .Select(m => new { m.MovementDate, m.MovementType, m.RefDocType, m.Qty })
+                    .ToListAsync())
+                    .Where(m => StockLedger.IsNewStockReceipt(m.MovementType, m.RefDocType))
+                    .ToList();
 
                 var data = new SeriesData { MonthKeys = keys };
                 foreach (var k in keys)
@@ -499,10 +511,10 @@ namespace Jewelry.Service.Report.Executive
                     if (data.Completed.ContainsKey(k)) data.Completed[k] += r.ProductQty;
                 }
 
-                foreach (var d in pieces)
+                foreach (var r in receipts)
                 {
-                    var k = ExecutiveFlowNormalizer.ThaiMonthKey(d);
-                    if (data.NewStock.ContainsKey(k)) data.NewStock[k] += 1;
+                    var k = ExecutiveFlowNormalizer.ThaiMonthKey(r.MovementDate);
+                    if (data.NewStock.ContainsKey(k)) data.NewStock[k] += (int)Math.Round(r.Qty, MidpointRounding.AwayFromZero);
                 }
 
                 return data;
@@ -751,11 +763,11 @@ namespace Jewelry.Service.Report.Executive
                 ExecutiveFlowNormalizer.NormalizeSize(p.Plan.TypeSize),
                 (decimal)p.Plan.Qty)));
 
-            var stock = BuildMixPopulation(stockRows.Select(s => (
+            var stock = BuildMixPopulation(InStockOnly(stockRows).Select(s => (
                 ExecutiveFlowNormalizer.NormalizePlanGold(s.Gold),
                 ExecutiveFlowNormalizer.LabelOrUnknown(s.PType),
                 ExecutiveFlowNormalizer.NormalizeSize(s.Size),
-                1m)));
+                (decimal)s.Pcs)));
 
             return new FlowMixData
             {
@@ -765,12 +777,13 @@ namespace Jewelry.Service.Report.Executive
             };
         }
 
-        // ขายแล้ว = Σ qty ของ tbt_sale_order_product ต่อ stock_number -> (piece ใดก็ได้ 1 แถวต่อ stock_number) -> sku
+        // ขายแล้ว = Σ qty ของ tbt_sale_order_product ที่ออกใบแจ้งหนี้แล้ว (Invoice != null) ต่อ stock_number -> (piece ใดก็ได้ 1 แถวต่อ stock_number) -> sku
         // ไม่ใช้ ToDictionary บน piece ดิบ (PK คือ stock_number + product_code) — GroupBy ก่อนแล้วเลือก 1 แถวในหน่วยความจำ
         private async Task<List<(string Gold, string PType, string Size, decimal Pcs)>> LoadSoldMixItemsAsync()
         {
             var sold = await _ctx.TbtSaleOrderProduct
                 .AsNoTracking()
+                .Where(p => p.Invoice != null)
                 .GroupBy(p => p.StockNumber)
                 .Select(g => new { StockNumber = g.Key, Qty = g.Sum(x => x.Qty) })
                 .ToListAsync();
@@ -835,11 +848,12 @@ namespace Jewelry.Service.Report.Executive
                 .Select(g => new ExecutiveFlowTrustEvaluator.NegativeGoldRow { Code = g.GoldCode, SizeCode = g.GoldSizeCode, Weight = g.Weight })
                 .ToListAsync();
 
-            input.InStockPieces = stockRows.Count;
-            input.InStockCostMissing = stockRows.Count(s => !(s.Cost > 0));
-            input.StockOldPieces = stockRows.Count(s => s.ProductionDate.HasValue && (now - s.ProductionDate.Value).TotalDays > 365);
-            var oldest = stockRows.Where(s => s.ProductionDate.HasValue).Select(s => s.ProductionDate!.Value).DefaultIfEmpty().Min();
-            input.OldestProductionYear = stockRows.Any(s => s.ProductionDate.HasValue) ? oldest.AddHours(7).Year : (int?)null;
+            var inStockRows = InStockOnly(stockRows);
+            input.InStockPieces = inStockRows.Sum(s => s.Pcs);
+            input.InStockCostMissing = inStockRows.Where(s => !(s.Cost > 0)).Sum(s => s.Pcs);
+            input.StockOldPieces = inStockRows.Where(s => s.AgeDate.HasValue && StockAge.DaysOld(s.AgeDate.Value, now) > 365).Sum(s => s.Pcs);
+            var datedRows = inStockRows.Where(s => s.AgeDate.HasValue).ToList();
+            input.OldestProductionYear = datedRows.Count > 0 ? datedRows.Min(s => s.AgeDate!.Value).AddHours(7).Year : (int?)null;
 
             var usdRateOne = invoices.Where(i => !i.IsThb && i.Rate == 1m).ToList();
             if (usdRateOne.Count > 0)

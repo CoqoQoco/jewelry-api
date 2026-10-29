@@ -5,6 +5,8 @@ using Jewelry.Service.Base;
 using Jewelry.Service.Helper;
 using Jewelry.Service.Production.Insight;
 using Jewelry.Service.Production.Shared;
+using Jewelry.Service.Stock;
+using Jewelry.Service.Stock.Insight;
 using Kendo.DynamicLinqCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -53,37 +55,22 @@ namespace Jewelry.Service.Report.Executive
                 .Where(x => x.StatusName != "Inactive");
         }
 
-        private class InStockRow
+        // สต็อกพร้อมขาย = ชิ้น IN_STOCK (tbt_stock_unit) · metal ของสต็อก: tbt_sku.production_type ผ่าน MetalClassifier (ว่าง = GOLD)
+        private async Task<List<StockUnitBucket>> GetStockBucketsAsync(string metalFilter)
         {
-            public decimal? ProductCost { get; set; }
-            public DateTime? ProductionDate { get; set; }
-            public string? ReceiptType { get; set; }
-
-            // ล็อตเงินเก็บจำนวน >1 บน piece เดียว (ทอง 1 ชิ้น = 1) — ใช้ถ่วงน้ำหนักควบคู่กับนับแถว
-            public decimal Qty { get; set; }
-            public string? ProductionType { get; set; }
-        }
-
-        // metal ของสต็อก: tbt_stock_piece → tbt_sku.production_type ผ่าน MetalClassifier (ว่าง = GOLD)
-        private async Task<List<InStockRow>> GetInStockRowsAsync(string metalFilter)
-        {
-            var rows = await _jewelryContext.TbtStockPiece
-                .AsNoTracking()
-                .Where(x => x.Status == InStockStatus)
-                .Select(x => new InStockRow
-                {
-                    ProductCost = x.ProductCost,
-                    ProductionDate = x.ProductionDate,
-                    ReceiptType = x.ReceiptType,
-                    Qty = x.Qty,
-                    ProductionType = x.SkuCodeNavigation.ProductionType
-                })
-                .ToListAsync();
+            var rows = await StockUnitSnapshot.LoadAsync(_jewelryContext);
 
             return metalFilter == MetalClassifier.All
                 ? rows
-                : rows.Where(x => MetalClassifier.Matches(metalFilter, x.ProductionType)).ToList();
+                : rows.Where(x => MetalClassifier.Matches(metalFilter, x.Lot.ProductionType)).ToList();
         }
+
+        private static bool IsNoCost(StockUnitBucket x) => (x.Lot.ProductCost ?? 0) == 0;
+
+        private static decimal CostOf(StockUnitBucket x) => (x.Lot.ProductCost ?? 0) * x.Pcs;
+
+        private static int LotCount(IEnumerable<StockUnitBucket> rows)
+            => rows.Select(x => (x.Lot.StockNumber, x.Lot.ProductCode)).Distinct().Count();
 
         // แผนเปิดที่กรองตามโลหะ (plan.Type = tbm_gold.name_en) — ALL คืนชุดเดิม
         private async Task<List<OpenPlanRow>> GetOpenPlansAsync(string metalFilter)
@@ -170,18 +157,24 @@ namespace Jewelry.Service.Report.Executive
             };
 
             // ---- Stock ----
-            var inStockRows = await GetInStockRowsAsync(metalFilter);
-            var agedCutoff1y = now.AddDays(-365);
+            var stockBuckets = await GetStockBucketsAsync(metalFilter);
+            var inStockRows = stockBuckets.Where(x => x.Status == InStockStatus).ToList();
+            var noCostRows = inStockRows.Where(IsNoCost).ToList();
+            var inStockPcs = inStockRows.Sum(x => x.Pcs);
+            var inStockCost = inStockRows.Sum(CostOf);
 
             var stock = new Summary.StockData
             {
-                InStockCount = inStockRows.Count,
-                NoCostCount = inStockRows.Count(x => (x.ProductCost ?? 0) == 0),
-                CostThb = inStockRows.Sum(x => x.ProductCost ?? 0),
-                // production_date ว่างไม่มีจริงใน prod ปัจจุบัน แต่ถ้ามีให้นับเป็นของเก่า (เหมือน StockHealth bucket gt5y)
-                AgedOver1yCount = inStockRows.Count(x => !x.ProductionDate.HasValue || x.ProductionDate.Value < agedCutoff1y),
-                InStockQty = inStockRows.Sum(x => x.Qty),
-                CostThbQty = inStockRows.Sum(x => (x.ProductCost ?? 0) * x.Qty)
+                InStockCount = inStockPcs,
+                InStockLotCount = LotCount(inStockRows),
+                ReservedCount = stockBuckets.Where(x => x.Status != InStockStatus).Sum(x => x.Pcs),
+                NoCostCount = noCostRows.Sum(x => x.Pcs),
+                NoCostLotCount = LotCount(noCostRows),
+                CostThb = inStockCost,
+                // ไม่มีวันเริ่มนับอายุให้นับเป็นของเก่า (เหมือน StockHealth bucket gt5y)
+                AgedOver1yCount = inStockRows.Where(x => !x.AgeDate.HasValue || StockAge.DaysOld(x.AgeDate.Value, now) > 365).Sum(x => x.Pcs),
+                InStockQty = inStockPcs,
+                CostThbQty = inStockCost
             };
 
             // ---- Gold Loss (เดือนปัจจุบัน + ย้อนหลัง 2 เดือน, เวลาไทย) ----
@@ -629,48 +622,42 @@ namespace Jewelry.Service.Report.Executive
         public async Task<StockHealth.Response> StockHealth(StockHealth.Request request)
         {
             var metalFilter = MetalClassifier.Normalize(request.Metal);
-            var rows = await GetInStockRowsAsync(metalFilter);
+            var rows = (await GetStockBucketsAsync(metalFilter)).Where(x => x.Status == InStockStatus).ToList();
 
             var now = DateTime.UtcNow;
-            var oneYearAgo = now.AddYears(-1);
-            var twoYearsAgo = now.AddYears(-2);
-            var fiveYearsAgo = now.AddYears(-5);
 
-            // production_date ว่างไม่มีจริงใน prod ปัจจุบัน (28 ก.ย. 2026) แต่ถ้ามีให้จัดกลุ่มเป็น gt5y (เก่าสุด)
-            string BucketOf(DateTime? productionDate)
-            {
-                if (!productionDate.HasValue) return "gt5y";
-                var date = productionDate.Value;
-                if (date >= oneYearAgo) return "lt1y";
-                if (date >= twoYearsAgo) return "y1to2";
-                if (date >= fiveYearsAgo) return "y2to5";
-                return "gt5y";
-            }
-
+            // ไม่มีวันเริ่มนับอายุจัดเป็น gt5y (เก่าสุด) — bucket เดียวกับ StockInsight
             var bucketOrder = new[] { "lt1y", "y1to2", "y2to5", "gt5y" };
 
             var ageBuckets = bucketOrder.Select(key =>
             {
-                var list = rows.Where(x => BucketOf(x.ProductionDate) == key).ToList();
+                var list = rows.Where(x => StockInsightCalculator.AgeBucketKey(x.AgeDate, now) == key).ToList();
+                var pcs = list.Sum(x => x.Pcs);
+                var cost = list.Sum(CostOf);
                 return new StockHealth.AgeBucketData
                 {
                     Key = key,
-                    Count = list.Count,
-                    NoCostCount = list.Count(x => (x.ProductCost ?? 0) == 0),
-                    CostThb = list.Sum(x => x.ProductCost ?? 0),
-                    Qty = list.Sum(x => x.Qty),
-                    CostThbQty = list.Sum(x => (x.ProductCost ?? 0) * x.Qty)
+                    Count = pcs,
+                    NoCostCount = list.Where(IsNoCost).Sum(x => x.Pcs),
+                    CostThb = cost,
+                    Qty = pcs,
+                    CostThbQty = cost
                 };
             }).ToList();
 
             var receiptTypes = rows
-                .GroupBy(x => x.ReceiptType)
-                .Select(g => new StockHealth.ReceiptTypeData
+                .GroupBy(x => x.Lot.ReceiptType)
+                .Select(g =>
                 {
-                    ReceiptType = g.Key,
-                    Count = g.Count(),
-                    NoCostCount = g.Count(x => (x.ProductCost ?? 0) == 0),
-                    Qty = g.Sum(x => x.Qty)
+                    var pcs = g.Sum(x => x.Pcs);
+                    return new StockHealth.ReceiptTypeData
+                    {
+                        ReceiptType = g.Key,
+                        Count = pcs,
+                        NoCostCount = g.Where(IsNoCost).Sum(x => x.Pcs),
+                        Qty = pcs,
+                        CostThbQty = g.Sum(CostOf)
+                    };
                 })
                 .OrderByDescending(x => x.Count)
                 .ToList();
