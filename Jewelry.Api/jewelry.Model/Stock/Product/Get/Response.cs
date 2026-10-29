@@ -42,6 +42,9 @@ namespace jewelry.Model.Stock.Product.Get
         public decimal QtyAvailable { get; set; }
 
         public string? Location { get; set; }
+
+        public List<jewelry.Model.Stock.Product.StockLocationQty> Locations { get; set; } = new();
+        public int LocationCount { get; set; }
         public string? Size { get; set; }
         public string? EarringStemSize { get; set; }
 

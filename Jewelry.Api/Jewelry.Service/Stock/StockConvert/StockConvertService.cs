@@ -93,36 +93,22 @@ public class StockConvertService : BaseService, IStockConvertService
 
             foreach (var piece in pieces)
             {
-                piece.QtyReserved += 1;
-                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now });
-                StockPieceQtyHelper.RecalcStatus(piece);
-                piece.UpdateDate = now;
-                piece.UpdateBy = CurrentUsername;
-                _jewelryContext.TbtStockPiece.Update(piece);
+                // จอง 1 ชิ้นของล็อต (คลังหลักก่อน) ด้วย ref CONVERT + เลขใบแปลง — เก็บคลังของชิ้นที่ถูกจองไว้ใน item
+                var reserve = await StockUnitOps.ReserveAsync(
+                    _jewelryContext, piece, 1, null, null,
+                    new ReservationKey(ReservationKey.Convert, running, null),
+                    new StockUnitSyncInfo { By = CurrentUsername, Now = now });
 
-                var balance = await _jewelryContext.TbtStockBalance
-                    .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
-                if (balance != null)
+                await StockBalanceApplier.ApplyAsync(_jewelryContext, reserve, new StockMovementTemplate
                 {
-                    balance.QtyReserved += 1;
-                    balance.LastMovementAt = now;
-                    _jewelryContext.TbtStockBalance.Update(balance);
-                }
-
-                _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                {
-                    MovementDate = now,
                     MovementType = "RESERVE",
-                    SkuCode = piece.SkuCode,
-                    StockNumber = piece.StockNumber,
-                    ProductCode = piece.ProductCode,
-                    FromLocation = piece.LocationCode,
-                    Qty = 1,
                     RefDocType = "CONVERT",
                     RefDocNo = running,
-                    CreateDate = now,
-                    CreateBy = CurrentUsername
+                    Date = now,
+                    By = CurrentUsername
                 });
+
+                var reservedLocation = reserve.Units.FirstOrDefault()?.LocationCode ?? piece.LocationCode;
 
                 _jewelryContext.TbtStockConvertItem.Add(new TbtStockConvertItem
                 {
@@ -131,7 +117,7 @@ public class StockConvertService : BaseService, IStockConvertService
                     StockNumber = piece.StockNumber,
                     ProductCode = piece.ProductCode,
                     SkuCode = piece.SkuCode,
-                    LocationCode = piece.LocationCode,
+                    LocationCode = reservedLocation,
                     Qty = 1,
                     ProductCost = piece.ProductCost,
                     CreateDate = now,
@@ -218,47 +204,35 @@ public class StockConvertService : BaseService, IStockConvertService
 
             decimal sourceCostSum = 0;
 
+            string? firstSourceLocation = null;
+
             foreach (var piece in pieces)
             {
-                piece.Qty -= 1;
-                piece.QtyReserved -= 1;
-                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now, SoldRef = header.Running, SoldDate = now });
-                StockPieceQtyHelper.RecalcStatus(piece);
-                piece.UpdateDate = now;
-                piece.UpdateBy = CurrentUsername;
-                _jewelryContext.TbtStockPiece.Update(piece);
+                // ใช้ชิ้นที่จองไว้ด้วยใบแปลงนี้ (ref CONVERT) — ตัดยอดที่คลังของชิ้นนั้น
+                var consume = await StockUnitOps.SellReservedAsync(
+                    _jewelryContext, piece,
+                    new ReservationKey(ReservationKey.Convert, header.Running, null),
+                    1, header.Running, now,
+                    new StockUnitSyncInfo { By = CurrentUsername, Now = now });
 
-                var balance = await _jewelryContext.TbtStockBalance
-                    .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
-                if (balance != null)
+                await StockBalanceApplier.ApplyAsync(_jewelryContext, consume, new StockMovementTemplate
                 {
-                    balance.QtyOnHand -= 1;
-                    balance.QtyReserved -= 1;
-                    balance.LastMovementAt = now;
-                    _jewelryContext.TbtStockBalance.Update(balance);
-                }
-
-                _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                {
-                    MovementDate = now,
                     MovementType = "TRANSFORM_OUT",
-                    SkuCode = piece.SkuCode,
-                    StockNumber = piece.StockNumber,
-                    ProductCode = piece.ProductCode,
-                    FromLocation = piece.LocationCode,
-                    Qty = 1,
                     RefDocType = "CONVERT",
                     RefDocNo = header.Running,
-                    CreateDate = now,
-                    CreateBy = CurrentUsername
+                    Date = now,
+                    By = CurrentUsername
                 });
+
+                firstSourceLocation ??= consume.Units.FirstOrDefault()?.LocationCode;
 
                 sourceCostSum += piece.ProductCost ?? 0;
             }
 
+            // คลังของสินค้าผลลัพธ์ = ที่ระบุมา · ไม่ระบุ = คลังของชิ้นต้นทางชิ้นแรกที่ถูกใช้
             var locationCode = !string.IsNullOrWhiteSpace(request.LocationCode)
                 ? request.LocationCode!
-                : pieces.First().LocationCode;
+                : (firstSourceLocation ?? pieces.First().LocationCode);
 
             var skuCode = $"SKU-{request.Result.ProductNumber.ToUpper()}";
             var productNumberUpper = request.Result.ProductNumber.ToUpper();
@@ -458,35 +432,19 @@ public class StockConvertService : BaseService, IStockConvertService
 
             foreach (var piece in pieces)
             {
-                piece.QtyReserved = Math.Max(0, piece.QtyReserved - 1);
-                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now });
-                StockPieceQtyHelper.RecalcStatus(piece);
-                piece.UpdateDate = now;
-                piece.UpdateBy = CurrentUsername;
-                _jewelryContext.TbtStockPiece.Update(piece);
+                var release = await StockUnitOps.ReleaseAsync(
+                    _jewelryContext, piece,
+                    new ReservationKey(ReservationKey.Convert, header.Running, null),
+                    1,
+                    new StockUnitSyncInfo { By = CurrentUsername, Now = now });
 
-                var balance = await _jewelryContext.TbtStockBalance
-                    .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
-                if (balance != null)
+                await StockBalanceApplier.ApplyAsync(_jewelryContext, release, new StockMovementTemplate
                 {
-                    balance.QtyReserved = Math.Max(0, balance.QtyReserved - 1);
-                    balance.LastMovementAt = now;
-                    _jewelryContext.TbtStockBalance.Update(balance);
-                }
-
-                _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                {
-                    MovementDate = now,
                     MovementType = "UNRESERVE",
-                    SkuCode = piece.SkuCode,
-                    StockNumber = piece.StockNumber,
-                    ProductCode = piece.ProductCode,
-                    ToLocation = piece.LocationCode,
-                    Qty = 1,
                     RefDocType = "CONVERT",
                     RefDocNo = header.Running,
-                    CreateDate = now,
-                    CreateBy = CurrentUsername
+                    Date = now,
+                    By = CurrentUsername
                 });
             }
 

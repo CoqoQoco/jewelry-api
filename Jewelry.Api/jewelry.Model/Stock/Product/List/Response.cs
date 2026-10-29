@@ -42,6 +42,10 @@ namespace jewelry.Model.Stock.Product.List
         public decimal QtyAvailable { get; set; }
 
         public string? Location { get; set; }
+
+        // ล็อตเดียวหลายคลัง: Location = คลังหลัก (มีชิ้นมากสุด) · Locations = ทุกคลังที่มีชิ้น (เติมหลังแบ่งหน้า)
+        public List<jewelry.Model.Stock.Product.StockLocationQty> Locations { get; set; } = new();
+        public int LocationCount { get; set; }
         public string? Size { get; set; }
         public string? EarringStemSize { get; set; }
 

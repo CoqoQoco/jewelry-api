@@ -68,6 +68,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtStockUnit> TbtStockUnit { get; set; }
 
+    public virtual DbSet<TbtStockMovementUnit> TbtStockMovementUnit { get; set; }
+
     public virtual DbSet<TbtStockPieceQuickPrice> TbtStockPieceQuickPrice { get; set; }
 
     public virtual DbSet<TbtStockPriceReviewAck> TbtStockPriceReviewAck { get; set; }
@@ -1193,6 +1195,32 @@ public partial class JewelryContext : DbContext
                 .HasConstraintName("tbt_stock_piece_rfid_unit_fk");
         });
 
+        modelBuilder.Entity<TbtStockMovementUnit>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_stock_movement_unit_pk");
+            entity.ToTable("tbt_stock_movement_unit");
+
+            entity.HasIndex(e => e.MovementId).HasDatabaseName("idx_tbt_stock_movement_unit_movement");
+            entity.HasIndex(e => e.UnitId).HasDatabaseName("idx_tbt_stock_movement_unit_unit");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.MovementId).HasColumnName("movement_id");
+            entity.Property(e => e.UnitId).HasColumnName("unit_id");
+
+            entity.HasOne(d => d.Movement)
+                .WithMany()
+                .HasForeignKey(d => d.MovementId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_movement_unit_movement_fk");
+            entity.HasOne(d => d.Unit)
+                .WithMany()
+                .HasForeignKey(d => d.UnitId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbt_stock_movement_unit_unit_fk");
+        });
+
         modelBuilder.Entity<TbtStockUnit>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("tbt_stock_unit_pk");
@@ -1205,6 +1233,7 @@ public partial class JewelryContext : DbContext
                 .HasDatabaseName("idx_tbt_stock_unit_lot_status");
             entity.HasIndex(e => e.ReceiptNumber).HasDatabaseName("idx_tbt_stock_unit_receipt");
             entity.HasIndex(e => new { e.LocationCode, e.Status }).HasDatabaseName("idx_tbt_stock_unit_location_status");
+            entity.HasIndex(e => new { e.ReservedRefType, e.ReservedLineId }).HasDatabaseName("idx_tbt_stock_unit_reserved_line");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedOnAdd()
@@ -1231,6 +1260,13 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("sold_ref");
             entity.Property(e => e.SoldDate).HasColumnName("sold_date");
+            entity.Property(e => e.ReservedRefType)
+                .HasColumnType("character varying")
+                .HasColumnName("reserved_ref_type");
+            entity.Property(e => e.ReservedRef)
+                .HasColumnType("character varying")
+                .HasColumnName("reserved_ref");
+            entity.Property(e => e.ReservedLineId).HasColumnName("reserved_line_id");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
             entity.Property(e => e.CreateBy)
                 .HasColumnType("character varying")

@@ -116,7 +116,9 @@ namespace Jewelry.Service.Sale.Pos
                     ProductNumber = i.ProductNumber,
                     Qty = i.Qty,
                     AppraisalPrice = i.AppraisalPrice,
-                    Discount = i.DiscountPercent
+                    Discount = i.DiscountPercent,
+                    UnitIds = i.UnitIds,
+                    LocationCode = i.LocationCode
                 }).ToList();
 
                 await _saleOrderService.ConfirmStockItemsForPos(soNumber, stockItems, now);
@@ -283,6 +285,17 @@ namespace Jewelry.Service.Sale.Pos
 
                 var piece = pieces.First();
                 var available = StockPieceQtyHelper.Available(piece);
+                var locationCode = item.LocationCode?.Trim();
+
+                // ระบุคลัง/ชิ้นมา: ตรวจยอดพร้อมขายเฉพาะชิ้นในคลังนั้น (ล็อตเดียวหลายคลัง)
+                if (!string.IsNullOrEmpty(locationCode) && (item.UnitIds == null || item.UnitIds.Count == 0))
+                {
+                    available = await _jewelryContext.TbtStockUnit
+                        .CountAsync(u => u.StockNumber == piece.StockNumber
+                                      && u.ProductCode == piece.ProductCode
+                                      && u.Status == "IN_STOCK"
+                                      && u.LocationCode == locationCode.ToUpper());
+                }
 
                 if (item.Qty > available)
                 {

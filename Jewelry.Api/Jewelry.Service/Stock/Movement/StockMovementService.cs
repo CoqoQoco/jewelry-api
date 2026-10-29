@@ -10,6 +10,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using MoveUnitsModel = jewelry.Model.Stock.Movement.MoveUnits;
 using SearchModel = jewelry.Model.Stock.Movement.Search;
 
 namespace Jewelry.Service.Stock.Movement
@@ -90,6 +92,7 @@ namespace Jewelry.Service.Stock.Movement
                 });
         }
 
+        // ย้ายทั้งล็อต (API เดิม) — ใช้ตัวเดียวกับ MoveUnits · MovedCount = จำนวนล็อตที่ย้ายจริง (ล็อตที่อยู่คลังปลายทางครบแล้วไม่นับ)
         public async Task<Response> MoveLocation(Request req)
         {
             if (req.StockNumbers == null || !req.StockNumbers.Any())
@@ -97,7 +100,54 @@ namespace Jewelry.Service.Stock.Movement
                 throw new HandleException("กรุณาระบุ StockNumbers อย่างน้อย 1 รายการ");
             }
 
-            var target = req.TargetLocationCode.ToUpper();
+            // เลขที่สแกน/พิมพ์อาจมีขีดหรือไม่มีขีด — แปลงเป็นเลขจริงใน DB ก่อน lock/lookup
+            var resolvedNumbers = await _jewelryContext.ResolveAsync(req.StockNumbers);
+            var realStockNumbers = resolvedNumbers.Values.Distinct().ToList();
+
+            var response = await MoveUnits(new MoveUnitsModel.Request
+            {
+                TargetLocationCode = req.TargetLocationCode,
+                Remark = req.Remark,
+                Items = realStockNumbers.Select(n => new MoveUnitsModel.MoveUnitsItem { StockNumber = n }).ToList()
+            });
+
+            return new Response { Message = "success", MovedCount = response.Lots.Count(l => l.Moved > 0) };
+        }
+
+        // ย้ายคลังรายชิ้น: เลือกชิ้นด้วย UnitIds / (FromLocationCode + Qty) / ทั้งล็อต / EPC ของแท็ก
+        // ชิ้นที่จองไว้ย้ายได้ (การจองย้ายไปด้วย) · ชิ้น SOLD ย้ายไม่ได้ · ชิ้นที่อยู่คลังปลายทางแล้วข้าม
+        public async Task<MoveUnitsModel.Response> MoveUnits(MoveUnitsModel.Request req)
+        {
+            if (string.IsNullOrWhiteSpace(req.TargetLocationCode))
+            {
+                throw new HandleException("กรุณาระบุคลังปลายทาง");
+            }
+
+            var items = (req.Items ?? new List<MoveUnitsModel.MoveUnitsItem>())
+                .Where(i => !string.IsNullOrWhiteSpace(i.StockNumber))
+                .ToList();
+            var epcs = (req.Epcs ?? new List<string>())
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .Select(e => e.Trim())
+                .Distinct()
+                .ToList();
+
+            if (items.Count == 0 && epcs.Count == 0)
+            {
+                throw new HandleException("กรุณาระบุสินค้าหรือแท็กที่ต้องการย้ายอย่างน้อย 1 รายการ");
+            }
+
+            foreach (var item in items)
+            {
+                var hasUnits = item.UnitIds != null && item.UnitIds.Count > 0;
+                var hasFrom = !string.IsNullOrWhiteSpace(item.FromLocationCode);
+                if (!hasUnits && hasFrom != item.Qty.HasValue)
+                {
+                    throw new HandleException($"สินค้า {item.StockNumber}: ต้องระบุ fromLocationCode และ qty ควบคู่กัน (หรือไม่ระบุทั้งคู่เพื่อย้ายทั้งล็อต)");
+                }
+            }
+
+            var target = req.TargetLocationCode.Trim().ToUpper();
 
             var targetLocation = _jewelryContext.TbmStockLocation
                 .FirstOrDefault(x => x.Code == target);
@@ -108,8 +158,30 @@ namespace Jewelry.Service.Stock.Movement
             }
 
             // เลขที่สแกน/พิมพ์อาจมีขีดหรือไม่มีขีด — แปลงเป็นเลขจริงใน DB ก่อน lock/lookup
-            var resolvedNumbers = await _jewelryContext.ResolveAsync(req.StockNumbers);
-            var realStockNumbers = resolvedNumbers.Values.Distinct().ToList();
+            if (items.Count > 0)
+            {
+                var resolvedNumbers = await _jewelryContext.ResolveAsync(items.Select(i => i.StockNumber));
+                foreach (var item in items)
+                {
+                    if (resolvedNumbers.TryGetValue(item.StockNumber, out var actual))
+                    {
+                        item.StockNumber = actual;
+                    }
+                }
+            }
+
+            // แท็ก -> ชิ้น: หาก่อนล็อต แล้วตรวจซ้ำอีกครั้งหลังล็อต (แท็กอาจถูกยกเลิกผูก/ชิ้นถูกขายระหว่างรอ)
+            var epcUnits = await ResolveEpcUnitsAsync(epcs);
+            foreach (var group in epcUnits.GroupBy(x => x.StockNumber))
+            {
+                items.Add(new MoveUnitsModel.MoveUnitsItem
+                {
+                    StockNumber = group.Key,
+                    UnitIds = group.Select(x => x.UnitId).ToList()
+                });
+            }
+
+            var lotNumbers = items.Select(i => i.StockNumber).Distinct().ToList();
 
             // เคารพ transaction เดิมถ้าถูกเรียกจากภายในอีก transaction ที่เปิดอยู่แล้ว เหมือน InvoiceService.Create
             var ownsTransaction = _jewelryContext.Database.CurrentTransaction == null;
@@ -121,124 +193,67 @@ namespace Jewelry.Service.Stock.Movement
             {
 
             // ล็อก piece ก่อน แล้วค่อยล็อก balance ของ SKU ที่เกี่ยวข้อง ตามลำดับ global: piece -> balance
-            await _jewelryContext.LockStockPiecesAsync(realStockNumbers);
+            await _jewelryContext.LockStockPiecesAsync(lotNumbers);
 
             var pieces = _jewelryContext.TbtStockPiece
-                .Where(p => realStockNumbers.Contains(p.StockNumber))
+                .Where(p => lotNumbers.Contains(p.StockNumber))
                 .ToList();
 
             await _jewelryContext.LockStockBalancesAsync(pieces.Select(p => p.SkuCode));
 
+            await VerifyEpcUnitsAsync(epcUnits);
+
             var now = DateTime.UtcNow;
             var username = CurrentUsername;
+            var info = new StockUnitSyncInfo { By = username, Now = now };
 
-            var balancesToUpdate = new List<TbtStockBalance>();
-            var balancesToAdd = new List<TbtStockBalance>();
-            var movementsToAdd = new List<TbtStockMovement>();
-            var piecesToUpdate = new List<TbtStockPiece>();
+            var response = new MoveUnitsModel.Response { Message = "success" };
+            var lotRows = new Dictionary<string, MoveUnitsModel.MovedLot>();
 
-            int movedCount = 0;
-
-            foreach (var piece in pieces)
+            foreach (var item in items)
             {
-                var oldLocation = piece.LocationCode;
+                var matched = pieces.Where(p => p.StockNumber == item.StockNumber).ToList();
+                if (matched.Count == 0)
+                {
+                    throw new HandleException($"ไม่พบสินค้า {item.StockNumber} ในคลัง");
+                }
+                if (matched.Count > 1)
+                {
+                    throw new HandleException($"พบสินค้าเลข {item.StockNumber} มากกว่า 1 รายการ ไม่สามารถย้ายคลังได้");
+                }
 
-                if (oldLocation == target)
+                var piece = matched[0];
+                var wholeLot = (item.UnitIds == null || item.UnitIds.Count == 0) && string.IsNullOrWhiteSpace(item.FromLocationCode);
+
+                // ล็อตที่ขายหมดแล้วและอยู่คลังปลายทางอยู่แล้วข้ามได้ (เหมือนพฤติกรรมเดิม) · คลังอื่นให้ ops แจ้งว่าย้ายไม่ได้
+                if (wholeLot && (piece.Status == "SOLD" || piece.Qty <= 0) && piece.LocationCode == target)
+                {
+                    GetLotRow(lotRows, response, piece);
                     continue;
-
-                // ชิ้นที่ขายไปแล้ว (SOLD) หรือไม่มีจำนวนคงเหลือ ไม่ใช่สต็อกที่ขายได้แล้ว ย้ายคลังไม่ได้
-                if (piece.Status == "SOLD" || piece.Qty <= 0)
-                {
-                    throw new HandleException($"ไม่สามารถย้ายคลังสินค้า {piece.StockNumber} ได้ เนื่องจากสถานะเป็น {piece.Status ?? "ไม่ทราบสถานะ"} ไม่ใช่สต็อกที่พร้อมขายแล้ว");
                 }
 
-                // ล็อตที่มีการจองค้าง (QtyReserved > 0) ย้ายทั้งล็อตไม่ได้ — ย้ายบางส่วน (split ล็อต) เป็นเฟส 2
-                if (piece.QtyReserved > 0)
+                var result = await StockUnitOps.MoveAsync(
+                    _jewelryContext, piece, item.UnitIds, item.FromLocationCode, item.Qty, target, info);
+
+                var row = GetLotRow(lotRows, response, piece);
+
+                if (result.Count > 0)
                 {
-                    throw new HandleException($"ไม่สามารถย้ายคลังสินค้า {piece.StockNumber} ได้ เนื่องจากมีการจองค้างอยู่ {piece.QtyReserved} ชิ้น");
-                }
-
-                // ย้ายทั้งล็อตเสมอ — qty ที่ย้าย = จำนวนคงเหลือทั้งหมดของเลขนี้
-                var moveQty = piece.Qty;
-
-                // ปรับ balance ต้นทาง
-                var srcBalance = _jewelryContext.TbtStockBalance
-                    .FirstOrDefault(b => b.SkuCode == piece.SkuCode && b.LocationCode == oldLocation);
-
-                if (srcBalance != null)
-                {
-                    srcBalance.QtyOnHand -= moveQty;
-                    srcBalance.LastMovementAt = now;
-                    srcBalance.UpdateDate = now;
-                    srcBalance.UpdateBy = username;
-                    balancesToUpdate.Add(srcBalance);
-                }
-
-                // ปรับ/สร้าง balance ปลายทาง
-                var dstBalance = _jewelryContext.TbtStockBalance
-                    .FirstOrDefault(b => b.SkuCode == piece.SkuCode && b.LocationCode == target);
-
-                if (dstBalance == null)
-                {
-                    dstBalance = new TbtStockBalance
+                    await StockBalanceApplier.ApplyAsync(_jewelryContext, result, new StockMovementTemplate
                     {
-                        SkuCode = piece.SkuCode,
-                        LocationCode = target,
-                        QtyOnHand = moveQty,
-                        QtyReserved = 0,
-                        LastMovementAt = now,
-                        CreateDate = now,
-                        CreateBy = username
-                    };
-                    balancesToAdd.Add(dstBalance);
-                }
-                else
-                {
-                    dstBalance.QtyOnHand += moveQty;
-                    dstBalance.LastMovementAt = now;
-                    dstBalance.UpdateDate = now;
-                    dstBalance.UpdateBy = username;
-                    balancesToUpdate.Add(dstBalance);
+                        MovementType = "Transfer",
+                        RefDocType = "MoveLocation",
+                        Remark = req.Remark,
+                        Date = now,
+                        By = username
+                    });
+
+                    row.Moved += result.Count;
+                    response.MovedCount += result.Count;
                 }
 
-                // สร้าง movement record
-                movementsToAdd.Add(new TbtStockMovement
-                {
-                    MovementDate = now,
-                    MovementType = "Transfer",
-                    SkuCode = piece.SkuCode,
-                    StockNumber = piece.StockNumber,
-                    ProductCode = piece.ProductCode,
-                    FromLocation = oldLocation,
-                    ToLocation = target,
-                    Qty = moveQty,
-                    RefDocType = "MoveLocation",
-                    Remark = req.Remark,
-                    CreateDate = now,
-                    CreateBy = username
-                });
-
-                // อัปเดต piece
-                piece.LocationCode = target;
-                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = username, Now = now });
-                piece.UpdateDate = now;
-                piece.UpdateBy = username;
-                piecesToUpdate.Add(piece);
-
-                movedCount++;
+                row.PrimaryLocation = piece.LocationCode;
             }
-
-            if (balancesToUpdate.Any())
-                _jewelryContext.TbtStockBalance.UpdateRange(balancesToUpdate);
-
-            if (balancesToAdd.Any())
-                _jewelryContext.TbtStockBalance.AddRange(balancesToAdd);
-
-            if (movementsToAdd.Any())
-                _jewelryContext.TbtStockMovement.AddRange(movementsToAdd);
-
-            if (piecesToUpdate.Any())
-                _jewelryContext.TbtStockPiece.UpdateRange(piecesToUpdate);
 
             await _jewelryContext.SaveChangesAsync();
 
@@ -247,7 +262,7 @@ namespace Jewelry.Service.Stock.Movement
                 await transaction!.CommitAsync();
             }
 
-            return new Response { Message = "success", MovedCount = movedCount };
+            return response;
             }
             catch
             {
@@ -264,6 +279,80 @@ namespace Jewelry.Service.Stock.Movement
                     await transaction!.DisposeAsync();
                 }
             }
+        }
+
+        private static MoveUnitsModel.MovedLot GetLotRow(Dictionary<string, MoveUnitsModel.MovedLot> rows, MoveUnitsModel.Response response, TbtStockPiece piece)
+        {
+            if (!rows.TryGetValue(piece.StockNumber, out var row))
+            {
+                row = new MoveUnitsModel.MovedLot { StockNumber = piece.StockNumber, PrimaryLocation = piece.LocationCode };
+                rows[piece.StockNumber] = row;
+                response.Lots.Add(row);
+            }
+
+            return row;
+        }
+
+        private async Task<List<EpcUnit>> ResolveEpcUnitsAsync(List<string> epcs)
+        {
+            if (epcs.Count == 0)
+            {
+                return new List<EpcUnit>();
+            }
+
+            var tags = await _jewelryContext.TbtStockPieceRfid
+                .AsNoTracking()
+                .Where(r => r.IsActive && epcs.Contains(r.Epc))
+                .Select(r => new { r.Epc, r.StockNumber, r.ProductCode, r.UnitId })
+                .ToListAsync();
+
+            var missing = epcs.Where(e => !tags.Any(t => t.Epc == e)).ToList();
+            if (missing.Count > 0)
+            {
+                throw new HandleException($"ไม่พบแท็กที่ผูกกับสินค้า: {string.Join(", ", missing.Take(5))}{(missing.Count > 5 ? $" และอีก {missing.Count - 5} แท็ก" : string.Empty)}");
+            }
+
+            var noUnit = tags.Where(t => !t.UnitId.HasValue).Select(t => t.Epc).ToList();
+            if (noUnit.Count > 0)
+            {
+                throw new HandleException($"แท็กยังไม่ได้ผูกกับชิ้นใดชิ้นหนึ่ง: {string.Join(", ", noUnit.Take(5))}");
+            }
+
+            return tags
+                .Select(t => new EpcUnit { Epc = t.Epc, StockNumber = t.StockNumber, UnitId = t.UnitId!.Value })
+                .ToList();
+        }
+
+        // หลังล็อต: แท็กต้องยังผูกกับชิ้นเดิมอยู่ (ไม่ถูกยกเลิกผูก/ปลดเพราะขายระหว่างรอ)
+        private async Task VerifyEpcUnitsAsync(List<EpcUnit> epcUnits)
+        {
+            if (epcUnits.Count == 0)
+            {
+                return;
+            }
+
+            var epcs = epcUnits.Select(e => e.Epc).ToList();
+            var current = await _jewelryContext.TbtStockPieceRfid
+                .AsNoTracking()
+                .Where(r => r.IsActive && epcs.Contains(r.Epc))
+                .Select(r => new { r.Epc, r.UnitId })
+                .ToListAsync();
+
+            foreach (var epcUnit in epcUnits)
+            {
+                var tag = current.FirstOrDefault(c => c.Epc == epcUnit.Epc);
+                if (tag == null || tag.UnitId != epcUnit.UnitId)
+                {
+                    throw new HandleException($"แท็ก {epcUnit.Epc} เปลี่ยนสถานะระหว่างทำรายการ กรุณาสแกนใหม่อีกครั้ง");
+                }
+            }
+        }
+
+        private sealed class EpcUnit
+        {
+            public string Epc { get; set; } = null!;
+            public string StockNumber { get; set; } = null!;
+            public long UnitId { get; set; }
         }
     }
 }

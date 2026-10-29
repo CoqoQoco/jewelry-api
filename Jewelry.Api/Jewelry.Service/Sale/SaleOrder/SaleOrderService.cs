@@ -554,15 +554,6 @@ namespace Jewelry.Service.Sale.SaleOrder
                     .Where(p => stockArray.Contains(p.StockNumber))
                     .ToListAsync();
 
-                var skuLocationPairs = pieces
-                    .Select(p => new { p.SkuCode, p.LocationCode })
-                    .Distinct()
-                    .ToList();
-
-                var balances = await _jewelryContext.TbtStockBalance
-                    .Where(b => skuLocationPairs.Select(x => x.SkuCode).Contains(b.SkuCode))
-                    .ToListAsync();
-
                 if (pieces.Any())
                 {
                     foreach (var stock in response.StockConfirm)
@@ -570,8 +561,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                         var piece = pieces.FirstOrDefault(p => p.StockNumber == stock.StockNumber);
                         if (piece != null)
                         {
-                            var balance = balances.FirstOrDefault(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
-                            var qtyRemaining = balance != null ? balance.QtyOnHand - balance.QtyReserved : 0;
+                            var qtyRemaining = StockPieceQtyHelper.Available(piece);
                             if (qtyRemaining <= 0)
                             {
                                 stock.IsRemainProduct = false;
@@ -1004,6 +994,7 @@ namespace Jewelry.Service.Sale.SaleOrder
         private async Task<List<string>> ConfirmStockItemsCore(TbtSaleOrder saleOrder, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems, DateTime confirmedDate)
         {
             var confirmedStockNumbers = new List<string>();
+            var created = new List<(jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation Item, TbtSaleOrderProduct Product)>();
 
             foreach (var stockItem in stockItems)
             {
@@ -1027,52 +1018,40 @@ namespace Jewelry.Service.Sale.SaleOrder
                 };
 
                 _jewelryContext.TbtSaleOrderProduct.Add(newProduct);
+                created.Add((stockItem, newProduct));
+                confirmedStockNumbers.Add(stockItem.StockNumber);
+            }
 
-                // placeholder = รายการรอของ (เลขพนักงานพิมพ์เอง) — ไม่มีของจริงให้จอง ข้าม stock effect ทั้งหมด
-                if (!stockItem.IsPlaceholder)
+            // ต้องได้ id ของบรรทัดก่อน เพื่อผูกชิ้นที่จอง (reserved_line_id) — ผู้เรียกเปิด transaction ไว้เสมอ ถ้าพังจะ rollback ทั้งก้อน
+            if (created.Any(c => !c.Item.IsPlaceholder))
+            {
+                await _jewelryContext.SaveChangesAsync();
+            }
+
+            // placeholder = รายการรอของ (เลขพนักงานพิมพ์เอง) — ไม่มีของจริงให้จอง ข้าม stock effect ทั้งหมด
+            foreach (var (stockItem, newProduct) in created.Where(c => !c.Item.IsPlaceholder))
+            {
+                var piece = await _jewelryContext.TbtStockPiece
+                    .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
+
+                if (piece == null)
                 {
-                    var piece = await _jewelryContext.TbtStockPiece
-                        .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
-
-                    if (piece == null)
-                    {
-                        throw new HandleException($"ไม่พบเลขสินค้า {stockItem.StockNumber} ในคลัง ไม่สามารถยืนยันรายการนี้ได้");
-                    }
-
-                    var balance = await _jewelryContext.TbtStockBalance
-                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
-
-                    if (balance != null)
-                    {
-                        balance.QtyReserved += stockItem.Qty;
-                        balance.LastMovementAt = confirmedDate;
-                        _jewelryContext.TbtStockBalance.Update(balance);
-                    }
-
-                    piece.QtyReserved += stockItem.Qty;
-                    await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = confirmedDate });
-                    StockPieceQtyHelper.RecalcStatus(piece);
-                    piece.UpdateDate = confirmedDate;
-                    piece.UpdateBy = CurrentUsername;
-                    _jewelryContext.TbtStockPiece.Update(piece);
-
-                    _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                    {
-                        MovementDate = confirmedDate,
-                        MovementType = "RESERVE",
-                        SkuCode = piece.SkuCode,
-                        StockNumber = piece.StockNumber,
-                        ProductCode = piece.ProductCode,
-                        FromLocation = piece.LocationCode,
-                        Qty = stockItem.Qty,
-                        RefDocType = "SO",
-                        RefDocNo = saleOrder.SoNumber,
-                        CreateDate = confirmedDate,
-                        CreateBy = CurrentUsername
-                    });
+                    throw new HandleException($"ไม่พบเลขสินค้า {stockItem.StockNumber} ในคลัง ไม่สามารถยืนยันรายการนี้ได้");
                 }
 
-                confirmedStockNumbers.Add(stockItem.StockNumber);
+                var reserve = await StockUnitOps.ReserveAsync(
+                    _jewelryContext, piece, stockItem.Qty, stockItem.UnitIds, stockItem.LocationCode,
+                    new ReservationKey(ReservationKey.So, saleOrder.SoNumber, newProduct.Id),
+                    new StockUnitSyncInfo { By = CurrentUsername, Now = confirmedDate });
+
+                await StockBalanceApplier.ApplyAsync(_jewelryContext, reserve, new StockMovementTemplate
+                {
+                    MovementType = "RESERVE",
+                    RefDocType = "SO",
+                    RefDocNo = saleOrder.SoNumber,
+                    Date = confirmedDate,
+                    By = CurrentUsername
+                });
             }
 
             return confirmedStockNumbers;
@@ -1140,36 +1119,19 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                     if (piece != null)
                     {
-                        var balance = await _jewelryContext.TbtStockBalance
-                            .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+                        var release = await StockUnitOps.ReleaseAsync(
+                            _jewelryContext, piece,
+                            new ReservationKey(ReservationKey.So, saleOrder.SoNumber, product.Id),
+                            product.Qty,
+                            new StockUnitSyncInfo { By = CurrentUsername, Now = now });
 
-                        if (balance != null)
+                        await StockBalanceApplier.ApplyAsync(_jewelryContext, release, new StockMovementTemplate
                         {
-                            balance.QtyReserved -= product.Qty;
-                            balance.LastMovementAt = now;
-                            _jewelryContext.TbtStockBalance.Update(balance);
-                        }
-
-                        piece.QtyReserved = Math.Max(0, piece.QtyReserved - product.Qty);
-                        await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now });
-                        StockPieceQtyHelper.RecalcStatus(piece);
-                        piece.UpdateDate = now;
-                        piece.UpdateBy = CurrentUsername;
-                        _jewelryContext.TbtStockPiece.Update(piece);
-
-                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                        {
-                            MovementDate = now,
                             MovementType = "UNRESERVE",
-                            SkuCode = piece.SkuCode,
-                            StockNumber = piece.StockNumber,
-                            ProductCode = piece.ProductCode,
-                            ToLocation = piece.LocationCode,
-                            Qty = product.Qty,
                             RefDocType = "SO",
                             RefDocNo = saleOrder.SoNumber,
-                            CreateDate = now,
-                            CreateBy = CurrentUsername
+                            Date = now,
+                            By = CurrentUsername
                         });
                     }
                 }
@@ -1296,36 +1258,19 @@ namespace Jewelry.Service.Sale.SaleOrder
 
                     if (piece != null)
                     {
-                        var balance = await _jewelryContext.TbtStockBalance
-                            .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
+                        var release = await StockUnitOps.ReleaseAsync(
+                            _jewelryContext, piece,
+                            new ReservationKey(ReservationKey.So, soNumberUpper, confirmedProduct.Id),
+                            confirmedProduct.Qty,
+                            new StockUnitSyncInfo { By = CurrentUsername, Now = unconfirmedDate });
 
-                        if (balance != null)
+                        await StockBalanceApplier.ApplyAsync(_jewelryContext, release, new StockMovementTemplate
                         {
-                            balance.QtyReserved -= confirmedProduct.Qty;
-                            balance.LastMovementAt = unconfirmedDate;
-                            _jewelryContext.TbtStockBalance.Update(balance);
-                        }
-
-                        piece.QtyReserved = Math.Max(0, piece.QtyReserved - confirmedProduct.Qty);
-                        await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = unconfirmedDate });
-                        StockPieceQtyHelper.RecalcStatus(piece);
-                        piece.UpdateDate = unconfirmedDate;
-                        piece.UpdateBy = CurrentUsername;
-                        _jewelryContext.TbtStockPiece.Update(piece);
-
-                        _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
-                        {
-                            MovementDate = unconfirmedDate,
                             MovementType = "UNRESERVE",
-                            SkuCode = piece.SkuCode,
-                            StockNumber = piece.StockNumber,
-                            ProductCode = piece.ProductCode,
-                            ToLocation = piece.LocationCode,
-                            Qty = confirmedProduct.Qty,
                             RefDocType = "SO",
                             RefDocNo = soNumberUpper,
-                            CreateDate = unconfirmedDate,
-                            CreateBy = CurrentUsername
+                            Date = unconfirmedDate,
+                            By = CurrentUsername
                         });
                     }
                 }
@@ -1411,9 +1356,6 @@ namespace Jewelry.Service.Sale.SaleOrder
                     throw new HandleException($"เลข {request.NewStockNumber} พร้อมขาย {available:0.##} ชิ้น แต่ขอ {qty:0.##} ชิ้น");
                 }
 
-                var balance = await _jewelryContext.TbtStockBalance
-                    .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == piece.LocationCode);
-
                 // เก็บ identity เดิมของแถวไว้ — เปลี่ยนเฉพาะเลขสต็อก/สถานะ placeholder/จำนวน/audit fields
                 // ราคาที่ตกลงกับลูกค้าไว้แล้ว (LineKey, Id, PriceOrigin, Discount, NetPrice) ห้ามแตะ
                 soProduct.StockNumber = request.NewStockNumber;
@@ -1424,33 +1366,18 @@ namespace Jewelry.Service.Sale.SaleOrder
                 soProduct.UpdateDate = replacedDate;
                 _jewelryContext.TbtSaleOrderProduct.Update(soProduct);
 
-                if (balance != null)
-                {
-                    balance.QtyReserved += qty;
-                    balance.LastMovementAt = replacedDate;
-                    _jewelryContext.TbtStockBalance.Update(balance);
-                }
+                var reserve = await StockUnitOps.ReserveAsync(
+                    _jewelryContext, piece, StockUnitSync.ToUnits(qty), request.UnitIds, request.LocationCode,
+                    new ReservationKey(ReservationKey.So, soNumberUpper, soProduct.Id),
+                    new StockUnitSyncInfo { By = CurrentUsername, Now = replacedDate });
 
-                piece.QtyReserved += qty;
-                await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = replacedDate });
-                StockPieceQtyHelper.RecalcStatus(piece);
-                piece.UpdateDate = replacedDate;
-                piece.UpdateBy = CurrentUsername;
-                _jewelryContext.TbtStockPiece.Update(piece);
-
-                _jewelryContext.TbtStockMovement.Add(new TbtStockMovement
+                await StockBalanceApplier.ApplyAsync(_jewelryContext, reserve, new StockMovementTemplate
                 {
-                    MovementDate = replacedDate,
                     MovementType = "RESERVE",
-                    SkuCode = piece.SkuCode,
-                    StockNumber = piece.StockNumber,
-                    ProductCode = piece.ProductCode,
-                    FromLocation = piece.LocationCode,
-                    Qty = qty,
                     RefDocType = "SO",
                     RefDocNo = soNumberUpper,
-                    CreateDate = replacedDate,
-                    CreateBy = CurrentUsername
+                    Date = replacedDate,
+                    By = CurrentUsername
                 });
 
                 await _jewelryContext.SaveChangesAsync();

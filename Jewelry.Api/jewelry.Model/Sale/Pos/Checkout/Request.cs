@@ -37,6 +37,10 @@ namespace jewelry.Model.Sale.Pos.Checkout
         public decimal AppraisalPrice { get; set; }
         public decimal DiscountPercent { get; set; }
         public int Qty { get; set; } = 1;
+
+        public List<long>? UnitIds { get; set; }
+
+        public string? LocationCode { get; set; }
     }
 
     public class CheckoutPayment

@@ -35,6 +35,12 @@ public class Unit
 
     public DateTime? SoldDate { get; set; }
 
+    public string? ReservedRefType { get; set; }
+
+    public string? ReservedRef { get; set; }
+
+    public long? ReservedLineId { get; set; }
+
     public string? Epc { get; set; }
 
     public string? Tid { get; set; }

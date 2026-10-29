@@ -247,7 +247,12 @@ public class ExportShipmentService : BaseService, IExportShipmentService
             {
                 if (filter.LocationCodes != null && filter.LocationCodes.Any())
                 {
-                    pieceQuery = pieceQuery.Where(p => filter.LocationCodes.Contains(p.LocationCode));
+                    // ล็อตเดียวหลายคลัง: มีชิ้นที่ยังไม่ขายอยู่คลังใดคลังหนึ่งที่เลือก
+                    pieceQuery = pieceQuery.Where(p => _jewelryContext.TbtStockUnit.Any(u =>
+                        u.StockNumber == p.StockNumber
+                        && u.ProductCode == p.ProductCode
+                        && u.Status != "SOLD"
+                        && filter.LocationCodes.Contains(u.LocationCode)));
                 }
 
                 if (filter.ProductType != null && filter.ProductType.Any())

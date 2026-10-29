@@ -24,6 +24,12 @@ public partial class TbtStockUnit
 
     public DateTime? SoldDate { get; set; }
 
+    public string? ReservedRefType { get; set; }
+
+    public string? ReservedRef { get; set; }
+
+    public long? ReservedLineId { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;

@@ -19,12 +19,18 @@ namespace Jewelry.Service.Stock
 
         // คืนของ: ถ้า qty เพิ่ม ให้ฟื้น unit ที่ SOLD ด้วย SoldRef นี้ก่อนสร้าง unit ใหม่
         public string? ReviveSoldRef { get; set; }
+
+        // คลังของ unit ที่สร้างใหม่ — ว่าง = คลังหลักของล็อต (piece.LocationCode)
+        public string? LocationCode { get; set; }
     }
 
-    // ซิงก์ tbt_stock_unit (ชิ้นจริง) ให้ตรงกับ qty / qty_reserved / location_code ของล็อต (tbt_stock_piece)
+    // ซิงก์จำนวน tbt_stock_unit (ชิ้นจริง) ให้ตรงกับ qty / qty_reserved ของล็อต (tbt_stock_piece) — "ตาข่ายนิรภัย" นับจำนวนเท่านั้น
+    // - TK202610290003: unit เป็นความจริงรายคลัง (ล็อตเดียวอยู่ได้หลายคลัง) จึงไม่บังคับคลังของ unit ให้ตรงกับ piece.LocationCode อีกต่อไป
+    //   flow ปกติ (จอง/ขาย/ย้าย/รับ) ใช้ StockUnitOps แทน — ReconcileAsync ใช้เฉพาะ self-heal ล็อตที่จำนวนไม่ตรง (เช่นล็อตที่ยังไม่มี unit)
+    //   unit ใหม่ที่สร้างอยู่คลัง info.LocationCode ?? piece.LocationCode · ไม่แตะ balance/movement
     // - ต้องเรียกหลังแก้ค่าของ piece ใน transaction เดียวกับ SaveChanges ของผู้เรียก (helper นี้ไม่ SaveChanges เอง)
     // - ลำดับ lock คงเดิม: piece -> balance — unit ถูกแก้ภายใต้ lock ของ piece อยู่แล้ว ไม่ต้องล็อกเพิ่ม
-    // - กติกาเลือกชิ้น (ชั่วคราวจน TK202610290003): ชิ้นที่ยังไม่มีแท็กก่อน แล้วค่อย unit_no สูงสุด
+    // - กติกาเลือกชิ้น: ชิ้นที่ยังไม่มีแท็กก่อน แล้วค่อย unit_no สูงสุด
     public static class StockUnitSync
     {
         public const string InStock = "IN_STOCK";
@@ -88,10 +94,7 @@ namespace Jewelry.Service.Stock
             var targetReserved = Math.Min(ToUnits(piece.QtyReserved), targetQty);
             var currentReserved = active.Count(u => u.Status == Reserved);
 
-            var needsLocation = !string.IsNullOrEmpty(piece.LocationCode)
-                && active.Any(u => u.LocationCode != piece.LocationCode);
-
-            if (active.Count == targetQty && currentReserved == targetReserved && !needsLocation)
+            if (active.Count == targetQty && currentReserved == targetReserved)
             {
                 return;
             }
@@ -159,7 +162,6 @@ namespace Jewelry.Service.Stock
                         unit.Status = InStock;
                         unit.SoldRef = null;
                         unit.SoldDate = null;
-                        unit.LocationCode = piece.LocationCode;
                         Touch(unit, info);
                         modified.Add(unit);
                         active.Add(unit);
@@ -184,7 +186,7 @@ namespace Jewelry.Service.Stock
                         StockNumber = stockNumber,
                         ProductCode = productCode,
                         UnitNo = nextNo++,
-                        LocationCode = piece.LocationCode,
+                        LocationCode = info.LocationCode ?? piece.LocationCode,
                         Status = InStock,
                         ReceiptNumber = receiptNumber,
                         ReceiptDate = receiptDate,
@@ -216,19 +218,12 @@ namespace Jewelry.Service.Stock
                     foreach (var unit in Pick(active.Where(u => u.Status == Reserved), currentReserved - targetReserved, tagged))
                     {
                         unit.Status = InStock;
+                        unit.ReservedRefType = null;
+                        unit.ReservedRef = null;
+                        unit.ReservedLineId = null;
                         Touch(unit, info);
                         if (unit.Id != 0) modified.Add(unit);
                     }
-                }
-            }
-
-            if (!string.IsNullOrEmpty(piece.LocationCode))
-            {
-                foreach (var unit in active.Where(u => u.LocationCode != piece.LocationCode))
-                {
-                    unit.LocationCode = piece.LocationCode;
-                    Touch(unit, info);
-                    if (unit.Id != 0) modified.Add(unit);
                 }
             }
 
@@ -241,6 +236,41 @@ namespace Jewelry.Service.Stock
             {
                 context.TbtStockUnit.AddRange(added);
             }
+        }
+
+        // จำนวน unit ที่ไม่ SOLD / RESERVED ตรงกับ qty / qty_reserved ของล็อตหรือยัง
+        public static bool CountsMatch(TbtStockPiece piece, IEnumerable<TbtStockUnit> units)
+        {
+            var active = units.Where(u => u.Status != Sold).ToList();
+            var targetQty = ToUnits(piece.Qty);
+            var targetReserved = Math.Min(ToUnits(piece.QtyReserved), targetQty);
+
+            return active.Count == targetQty && active.Count(u => u.Status == Reserved) == targetReserved;
+        }
+
+        // คลังหลักของล็อต = คลังที่มีชิ้นไม่ SOLD มากสุด · เสมอกัน: คงคลังเดิมถ้าเป็นหนึ่งในที่มากสุด ไม่งั้นเลือกรหัสต่ำสุด
+        // ไม่มีชิ้นเหลือเลย (ล็อตขายหมด) คงค่าเดิม — คืนค่า true เมื่อ piece.LocationCode เปลี่ยน
+        public static bool RecalcPrimaryLocation(TbtStockPiece piece, IEnumerable<TbtStockUnit> units)
+        {
+            var groups = units
+                .Where(u => u.Status != Sold && !string.IsNullOrEmpty(u.LocationCode))
+                .GroupBy(u => u.LocationCode)
+                .Select(g => new { Code = g.Key, Count = g.Count() })
+                .ToList();
+
+            if (groups.Count == 0) return false;
+
+            var max = groups.Max(g => g.Count);
+            var top = groups.Where(g => g.Count == max).Select(g => g.Code).ToList();
+
+            var primary = top.Contains(piece.LocationCode)
+                ? piece.LocationCode
+                : top.OrderBy(c => c, StringComparer.Ordinal).First();
+
+            if (primary == piece.LocationCode) return false;
+
+            piece.LocationCode = primary;
+            return true;
         }
 
         private static IEnumerable<TbtStockUnit> Pick(IEnumerable<TbtStockUnit> candidates, int count, HashSet<long> taggedIds)
@@ -260,7 +290,7 @@ namespace Jewelry.Service.Stock
             unit.UpdateBy = info.By;
         }
 
-        private static async Task<List<TbtStockUnit>> LoadUnitsAsync(JewelryContext context, string stockNumber, string productCode)
+        public static async Task<List<TbtStockUnit>> LoadUnitsAsync(JewelryContext context, string stockNumber, string productCode)
         {
             var fromDb = await context.TbtStockUnit
                 .Where(u => u.StockNumber == stockNumber && u.ProductCode == productCode)
@@ -272,7 +302,7 @@ namespace Jewelry.Service.Stock
             return fromDb.Union(fromLocal).ToList();
         }
 
-        private static async Task<List<TbtStockPieceRfid>> LoadActiveTagsAsync(JewelryContext context, string stockNumber, string productCode)
+        public static async Task<List<TbtStockPieceRfid>> LoadActiveTagsAsync(JewelryContext context, string stockNumber, string productCode)
         {
             var fromDb = await context.TbtStockPieceRfid
                 .Where(r => r.IsActive && r.StockNumber == stockNumber && r.ProductCode == productCode)

@@ -26,5 +26,11 @@ namespace jewelry.Model.Sale.SaleOrder.ConfirmStock
 
         public bool IsPlaceholder { get; set; }
 
+        // ระบุชิ้นที่จอง (tbt_stock_unit.id) — ว่าง = ให้ระบบเลือก · จำนวนต้องเท่ากับ Qty
+        public List<long>? UnitIds { get; set; }
+
+        // จองจากคลังนี้เท่านั้น (ถ้าระบุ UnitIds ทุกชิ้นต้องอยู่คลังนี้) — ว่าง = คลังหลักก่อน แล้วคลังที่มีมากสุด
+        public string? LocationCode { get; set; }
+
     }
 }

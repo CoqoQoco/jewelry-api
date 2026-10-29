@@ -56,6 +56,7 @@ namespace Jewelry.Api.Controllers.Stock
                 if (result.Data != null)
                 {
                     await _service.AttachQuickPrice(result.Data.OfType<jewelry.Model.Stock.Product.List.Response>());
+                    await _service.AttachLocations(result.Data.OfType<jewelry.Model.Stock.Product.List.Response>());
                 }
                 return result;
 

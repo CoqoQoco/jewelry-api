@@ -766,31 +766,30 @@ namespace Jewelry.Service.TransferStock
                     var (code, qty, piece) = targets[i];
                     await _jewelryContext.Entry(piece).ReloadAsync();
 
-                    piece.Qty += qty;
-                    await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo
+                    // เติมเข้าคลังหลักของล็อต ณ ตอนนี้ — unit และ balance ใช้คลังเดียวกัน
+                    var location = piece.LocationCode;
+
+                    var add = await StockUnitOps.AddUnitsAsync(_jewelryContext, piece, qty, location, new StockUnitSyncInfo
                     {
                         By = user,
                         Now = now,
                         ReceiptNumber = batchRef,
                         ReceiptDate = now
                     });
-                    StockPieceQtyHelper.RecalcStatus(piece);
-                    piece.UpdateBy = user;
-                    piece.UpdateDate = now;
                     response.Items[i].QtyAfter = piece.Qty;
                     response.Items[i].StatusAfter = piece.Status;
 
-                    var balanceKey = $"{piece.SkuCode}|{piece.LocationCode}";
+                    var balanceKey = $"{piece.SkuCode}|{location}";
                     if (!balanceCache.TryGetValue(balanceKey, out var balance))
                     {
                         balance = await _jewelryContext.TbtStockBalance
-                            .FirstOrDefaultAsync(x => x.SkuCode == piece.SkuCode && x.LocationCode == piece.LocationCode);
+                            .FirstOrDefaultAsync(x => x.SkuCode == piece.SkuCode && x.LocationCode == location);
                         if (balance == null)
                         {
                             balance = new TbtStockBalance
                             {
                                 SkuCode = piece.SkuCode,
-                                LocationCode = piece.LocationCode,
+                                LocationCode = location,
                                 QtyOnHand = 0,
                                 QtyReserved = 0,
                                 CreateBy = user,
@@ -803,8 +802,14 @@ namespace Jewelry.Service.TransferStock
                     balance.QtyOnHand += qty;
                     balance.LastMovementAt = now;
 
-                    newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(
-                        piece.SkuCode, piece.StockNumber, piece.ProductCode, piece.LocationCode, batchRef!, user, refDocType, qty: qty));
+                    var movement = ReceiptProductionServiceExtention.MapNewReceiptMovement(
+                        piece.SkuCode, piece.StockNumber, piece.ProductCode, location, batchRef!, user, refDocType, qty: qty);
+                    newMovements.Add(movement);
+
+                    foreach (var unit in add.Units)
+                    {
+                        _jewelryContext.TbtStockMovementUnit.Add(new TbtStockMovementUnit { Movement = movement, Unit = unit });
+                    }
                 }
 
                 _jewelryContext.TbtStockPiece.UpdateRange(targets.Select(x => x.Piece));

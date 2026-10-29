@@ -14,5 +14,9 @@ namespace jewelry.Model.Sale.SaleOrder.ReplaceConfirmedStock
         public string NewStockNumber { get; set; } = null!;
 
         public decimal? Qty { get; set; }
+
+        public List<long>? UnitIds { get; set; }
+
+        public string? LocationCode { get; set; }
     }
 }

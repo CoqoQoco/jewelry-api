@@ -54,6 +54,24 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("MoveUnits")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Movement.MoveUnits.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> MoveUnits([FromBody] jewelry.Model.Stock.Movement.MoveUnits.Request request)
+        {
+            try
+            {
+                var response = await _service.MoveUnits(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("Search")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(IQueryable<SearchModel.Response>))]

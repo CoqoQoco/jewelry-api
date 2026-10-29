@@ -111,7 +111,8 @@ namespace Jewelry.Service.Stock.Location
                 throw new HandleException($"ไม่พบ Location {code} ในระบบ");
             }
 
-            var hasPiece = _jewelryContext.TbtStockPiece.Any(p => p.LocationCode == code);
+            var hasPiece = _jewelryContext.TbtStockPiece.Any(p => p.LocationCode == code)
+                || _jewelryContext.TbtStockUnit.Any(u => u.LocationCode == code && u.Status != "SOLD");
             var hasBalance = _jewelryContext.TbtStockBalance.Any(b => b.LocationCode == code);
 
             if (hasPiece || hasBalance)

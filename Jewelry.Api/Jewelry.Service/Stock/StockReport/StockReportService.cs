@@ -130,30 +130,49 @@ namespace Jewelry.Service.Stock.StockReport
             return AllowedAgingThresholdYears.Contains(requested) ? requested : DefaultAgingThresholdYears;
         }
 
+        private class StockPieceRow
+        {
+            public string StockNumber { get; set; } = null!;
+            public string? StockNumberOrigin { get; set; }
+            public string SkuCode { get; set; } = null!;
+            public string ProductCode { get; set; } = null!;
+            public string LocationCode { get; set; } = null!;
+            public string? Status { get; set; }
+            public decimal Qty { get; set; }
+            public decimal QtyReserved { get; set; }
+            public DateTime? ProductionDate { get; set; }
+            public string? ProductNumber { get; set; }
+            public string? ProductNameTh { get; set; }
+            public string? ProductType { get; set; }
+            public string? ProductTypeName { get; set; }
+            public string? Mold { get; set; }
+            public string? MoldDesign { get; set; }
+            public string? ProductionType { get; set; }
+            public string? ProductionTypeSize { get; set; }
+            public string? ImagePath { get; set; }
+            public string? ImageName { get; set; }
+        }
+
         // ดึงสต็อกทั้งหมด (IN_STOCK/RESERVED) กรองด้วย locationCodes เท่านั้น — ยังไม่กรอง productTypes/golds/goldSizes
         // เพื่อให้ผู้เรียก (Summary) คำนวณ FilterOptions ได้ก่อนกรองต่อ ตาม pattern BuildFilteredSaleLines
+        // TK202610290003: 1 ล็อตอยู่ได้หลายคลัง — แถวสต็อกคือ (ล็อต x คลัง) นับจาก unit ที่ไม่ SOLD ตามคลังของแต่ละชิ้น
+        // Status ของแถว = RESERVED เมื่อชิ้นของล็อตในคลังนั้นถูกจองครบ · ล็อตที่ยังไม่มี unit ใช้ค่าจาก piece เป็นแถวเดียว (ตาข่ายนิรภัย)
         private async Task<List<ResolvedStockLine>> BuildResolvedStockLinesAsync(List<string>? locationCodes)
         {
-            var query = _jewelryContext.TbtStockPiece
+            var pieceRows = await _jewelryContext.TbtStockPiece
                 .AsNoTracking()
-                .Where(x => x.Status == "IN_STOCK" || x.Status == "RESERVED");
-
-            if (locationCodes != null && locationCodes.Count > 0)
-            {
-                query = query.Where(x => locationCodes.Contains(x.LocationCode));
-            }
-
-            var rows = await query
-                .Select(x => new
+                .Where(x => x.Status == "IN_STOCK" || x.Status == "RESERVED")
+                .Select(x => new StockPieceRow
                 {
-                    x.StockNumber,
-                    x.StockNumberOrigin,
-                    x.SkuCode,
-                    x.LocationCode,
-                    x.Status,
-                    x.Qty,
-                    x.QtyReserved,
-                    x.ProductionDate,
+                    StockNumber = x.StockNumber,
+                    StockNumberOrigin = x.StockNumberOrigin,
+                    SkuCode = x.SkuCode,
+                    ProductCode = x.ProductCode,
+                    LocationCode = x.LocationCode,
+                    Status = x.Status,
+                    Qty = x.Qty,
+                    QtyReserved = x.QtyReserved,
+                    ProductionDate = x.ProductionDate,
                     ProductNumber = x.SkuCodeNavigation.ProductNumber,
                     ProductNameTh = x.SkuCodeNavigation.ProductNameTh,
                     ProductType = x.SkuCodeNavigation.ProductType,
@@ -163,38 +182,78 @@ namespace Jewelry.Service.Stock.StockReport
                     ProductionType = x.SkuCodeNavigation.ProductionType,
                     ProductionTypeSize = x.SkuCodeNavigation.ProductionTypeSize,
                     ImagePath = x.SkuCodeNavigation.ImagePath,
-                    ImageName = x.SkuCodeNavigation.ImageName,
-                    LocationNameTh = x.LocationCodeNavigation.NameTh,
-                    LocationNameEn = x.LocationCodeNavigation.NameEn
+                    ImageName = x.SkuCodeNavigation.ImageName
                 })
                 .ToListAsync();
 
-            var today = ThaiToday();
+            var unitGroups = await _jewelryContext.TbtStockUnit
+                .AsNoTracking()
+                .Where(u => u.Status != "SOLD")
+                .GroupBy(u => new { u.StockNumber, u.ProductCode, u.LocationCode })
+                .Select(g => new
+                {
+                    g.Key.StockNumber,
+                    g.Key.ProductCode,
+                    g.Key.LocationCode,
+                    Qty = g.Count(),
+                    Reserved = g.Count(x => x.Status == "RESERVED")
+                })
+                .ToListAsync();
 
-            return rows.Select(x => new ResolvedStockLine
+            var unitGroupsByLot = unitGroups
+                .GroupBy(g => (g.StockNumber, g.ProductCode))
+                .ToDictionary(g => g.Key, g => g.Select(x => (x.LocationCode, (decimal)x.Qty, (decimal)x.Reserved)).ToList());
+
+            var locationRows = await _jewelryContext.TbmStockLocation
+                .AsNoTracking()
+                .Select(l => new { l.Code, l.NameTh, l.NameEn })
+                .ToListAsync();
+            var locationNameByCode = locationRows.ToDictionary(
+                l => l.Code,
+                l => !string.IsNullOrEmpty(l.NameTh) ? l.NameTh : (!string.IsNullOrEmpty(l.NameEn) ? l.NameEn : l.Code));
+
+            var today = ThaiToday();
+            var lines = new List<ResolvedStockLine>();
+
+            foreach (var x in pieceRows)
             {
-                StockNumber = x.StockNumber,
-                StockNumberOrigin = x.StockNumberOrigin,
-                SkuCode = x.SkuCode,
-                ProductNumber = x.ProductNumber,
-                ProductNameTh = x.ProductNameTh,
-                ProductType = x.ProductType,
-                ProductTypeName = x.ProductTypeName,
-                ProductionType = x.ProductionType,
-                ProductionTypeSize = x.ProductionTypeSize,
-                Design = ResolveDesignKey(x.MoldDesign, x.Mold, x.SkuCode),
-                ImagePath = x.ImagePath,
-                ImageName = x.ImageName,
-                LocationCode = x.LocationCode,
-                LocationName = !string.IsNullOrEmpty(x.LocationNameTh)
-                    ? x.LocationNameTh
-                    : (!string.IsNullOrEmpty(x.LocationNameEn) ? x.LocationNameEn : x.LocationCode),
-                Status = x.Status,
-                Qty = x.Qty,
-                QtyReserved = x.QtyReserved,
-                ProductionDate = x.ProductionDate,
-                AgeDays = x.ProductionDate.HasValue ? (int)(today - x.ProductionDate.Value.Date).TotalDays : 0
-            }).ToList();
+                var parts = unitGroupsByLot.TryGetValue((x.StockNumber, x.ProductCode), out var lotParts)
+                    ? lotParts
+                    : new List<(string LocationCode, decimal Qty, decimal Reserved)> { (x.LocationCode, x.Qty, x.QtyReserved) };
+
+                foreach (var (partLocation, partQty, partReserved) in parts)
+                {
+                    if (locationCodes != null && locationCodes.Count > 0 && !locationCodes.Contains(partLocation))
+                    {
+                        continue;
+                    }
+
+                    lines.Add(new ResolvedStockLine
+                    {
+                        StockNumber = x.StockNumber,
+                        StockNumberOrigin = x.StockNumberOrigin,
+                        SkuCode = x.SkuCode,
+                        ProductNumber = x.ProductNumber,
+                        ProductNameTh = x.ProductNameTh,
+                        ProductType = x.ProductType,
+                        ProductTypeName = x.ProductTypeName,
+                        ProductionType = x.ProductionType,
+                        ProductionTypeSize = x.ProductionTypeSize,
+                        Design = ResolveDesignKey(x.MoldDesign, x.Mold, x.SkuCode),
+                        ImagePath = x.ImagePath,
+                        ImageName = x.ImageName,
+                        LocationCode = partLocation,
+                        LocationName = locationNameByCode.TryGetValue(partLocation, out var locationName) ? locationName : partLocation,
+                        Status = partReserved >= partQty && partQty > 0 ? "RESERVED" : "IN_STOCK",
+                        Qty = partQty,
+                        QtyReserved = partReserved,
+                        ProductionDate = x.ProductionDate,
+                        AgeDays = x.ProductionDate.HasValue ? (int)(today - x.ProductionDate.Value.Date).TotalDays : 0
+                    });
+                }
+            }
+
+            return lines;
         }
 
         private static List<ResolvedStockLine> ApplyTypeFilters(
@@ -316,6 +375,23 @@ namespace Jewelry.Service.Stock.StockReport
 
             var skuCodes = pieceByStockNumber.Values.Select(x => x.SkuCode).Distinct().ToList();
 
+            // กรองคลัง: ชิ้นที่ขายไปอยู่คลังไหนดูจาก unit ที่ถูกขายด้วย invoice นั้น (ล็อตเดียวอาจอยู่หลายคลัง) ไม่ใช่คลังหลักของล็อตตอนนี้
+            var soldUnitLocations = new Dictionary<(string StockNumber, string Invoice), List<(string Location, int Count)>>();
+            if (locationCodes != null && locationCodes.Count > 0)
+            {
+                var soldUnits = await _jewelryContext.TbtStockUnit
+                    .AsNoTracking()
+                    .Where(u => u.Status == "SOLD" && u.SoldRef != null
+                        && runningNumbers.Contains(u.SoldRef) && stockNumbers.Contains(u.StockNumber))
+                    .GroupBy(u => new { u.StockNumber, u.SoldRef, u.LocationCode })
+                    .Select(g => new { g.Key.StockNumber, g.Key.SoldRef, g.Key.LocationCode, Count = g.Count() })
+                    .ToListAsync();
+
+                soldUnitLocations = soldUnits
+                    .GroupBy(u => (u.StockNumber, u.SoldRef!))
+                    .ToDictionary(g => g.Key, g => g.Select(u => (u.LocationCode, u.Count)).ToList());
+            }
+
             var skuRows = await _jewelryContext.TbtSku
                 .AsNoTracking()
                 .Where(x => skuCodes.Contains(x.SkuCode))
@@ -346,9 +422,27 @@ namespace Jewelry.Service.Stock.StockReport
                     continue;
                 }
 
-                if (locationCodes != null && locationCodes.Count > 0 && !locationCodes.Contains(piece.LocationCode))
+                var lineQty = line.Qty;
+                if (locationCodes != null && locationCodes.Count > 0)
                 {
-                    continue;
+                    if (line.Invoice != null && soldUnitLocations.TryGetValue((line.StockNumber, line.Invoice), out var soldAt))
+                    {
+                        var inScope = soldAt.Where(p => locationCodes.Contains(p.Location)).Sum(p => p.Count);
+                        var soldTotal = soldAt.Sum(p => p.Count);
+                        if (inScope == 0)
+                        {
+                            continue;
+                        }
+
+                        if (inScope < soldTotal && soldTotal > 0)
+                        {
+                            lineQty = line.Qty * inScope / soldTotal;
+                        }
+                    }
+                    else if (!locationCodes.Contains(piece.LocationCode))
+                    {
+                        continue;
+                    }
                 }
 
                 var sku = skuBySkuCode.TryGetValue(piece.SkuCode, out var s) ? s : null;
@@ -366,7 +460,7 @@ namespace Jewelry.Service.Stock.StockReport
                     Design = ResolveDesignKey(sku?.MoldDesign, sku?.Mold, piece.SkuCode),
                     ImagePath = sku?.ImagePath,
                     ImageName = sku?.ImageName,
-                    Qty = line.Qty,
+                    Qty = lineQty,
                     InvoiceDate = line.Invoice != null && invoiceDateByRunning.TryGetValue(line.Invoice, out var d) ? d : default
                 });
             }
@@ -397,7 +491,7 @@ namespace Jewelry.Service.Stock.StockReport
             var filteredLines = ApplyTypeFilters(allStockLines, request.ProductTypes, request.Golds, request.GoldSizes);
 
             var pieceQty = filteredLines.Sum(x => x.Qty);
-            var pieceRowCount = filteredLines.Count;
+            var pieceRowCount = filteredLines.Select(x => x.StockNumber).Distinct().Count();
             var reservedQty = filteredLines.Where(x => x.Status == "RESERVED").Sum(x => x.Qty);
             var designCount = filteredLines.Select(x => x.Design).Distinct().Count();
 

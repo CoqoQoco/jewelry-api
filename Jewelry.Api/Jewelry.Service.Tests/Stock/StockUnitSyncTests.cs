@@ -234,19 +234,46 @@ public class StockUnitSyncTests
     }
 
     [Fact]
-    public async Task Reconcile_LocationChange_MovesOnlyUnsoldUnits()
+    public async Task Reconcile_PieceLocationChange_DoesNotForceUnitLocations()
     {
         using var context = CreateContext();
         var piece = await SeedLotAsync(context, 3);
-        piece.Qty = 2;
-        await SyncAsync(context, piece, new StockUnitSyncInfo { By = "u", SoldRef = "INV1" });
 
         piece.LocationCode = "L2";
         await SyncAsync(context, piece);
 
         var units = await context.TbtStockUnit.ToListAsync();
-        Assert.All(units.Where(u => u.Status != "SOLD"), u => Assert.Equal("L2", u.LocationCode));
-        Assert.Equal("L1", units.Single(u => u.Status == "SOLD").LocationCode);
+        Assert.All(units, u => Assert.Equal("L1", u.LocationCode));
+    }
+
+    [Fact]
+    public async Task Reconcile_Increase_NewUnitsUseInfoLocation_ElsePieceLocation()
+    {
+        using var context = CreateContext();
+        var piece = await SeedLotAsync(context, 1);
+
+        piece.Qty = 2;
+        await SyncAsync(context, piece, new StockUnitSyncInfo { By = "u", LocationCode = "L9" });
+        piece.Qty = 3;
+        await SyncAsync(context, piece);
+
+        var byNo = await context.TbtStockUnit.OrderBy(u => u.UnitNo).Select(u => u.LocationCode).ToListAsync();
+        Assert.Equal(new[] { "L1", "L9", "L1" }, byNo);
+    }
+
+    [Fact]
+    public async Task Reconcile_SplitLot_WithMatchingCounts_DoesNothing()
+    {
+        using var context = CreateContext();
+        var piece = await SeedLotAsync(context, 3);
+        var second = await context.TbtStockUnit.SingleAsync(u => u.UnitNo == 2);
+        second.LocationCode = "L2";
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context, piece);
+
+        Assert.Equal("L2", (await context.TbtStockUnit.SingleAsync(u => u.UnitNo == 2)).LocationCode);
+        Assert.Equal("L1", piece.LocationCode);
     }
 
     [Fact]

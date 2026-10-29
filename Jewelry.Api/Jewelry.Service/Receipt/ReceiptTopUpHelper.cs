@@ -19,9 +19,13 @@ namespace Jewelry.Service.Receipt
         public string? Location { get; set; }
         public decimal Qty { get; set; }
         public string ReceiptNumber { get; set; } = null!;
+
+        // คลังที่รับเข้าจริงของแถวนี้ (resolve จาก Location ใน LoadAndValidateAsync) — ล็อตเดียวหลายคลัง: เติมเข้าคลังนี้ได้แม้ต่างจากคลังหลักของล็อต
+        public string? ResolvedLocation { get; set; }
     }
 
-    // เติมจำนวนเข้า lot เดิมจากหน้ารับสินค้า (ทอง/เงิน) — แตะเฉพาะ qty/status ของ piece + balance + movement เท่านั้น
+    // เติมจำนวนเข้า lot เดิมจากหน้ารับสินค้า (ทอง/เงิน) — แตะเฉพาะ qty/status ของ piece + unit + balance + movement เท่านั้น
+    // ชิ้นที่เติมเข้าคลังตามที่รับจริง (ไม่ต้องตรงกับคลังหลักของล็อต)
     internal static class ReceiptTopUpHelper
     {
         public static string? CleanStockNumber(string? value)
@@ -75,11 +79,7 @@ namespace Jewelry.Service.Receipt
             {
                 var piece = result[row.StockNumber];
 
-                var locationCode = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(context, row.Location, operatorBy, locationCache);
-                if (!string.Equals(locationCode, piece.LocationCode, StringComparison.Ordinal))
-                {
-                    throw new HandleException($"ล็อต {piece.StockNumber} อยู่คลัง {piece.LocationCode} ไม่ตรงกับคลังที่รับ ({locationCode}) กรุณาสร้างเลขใหม่");
-                }
+                row.ResolvedLocation = await ReceiptProductionServiceExtention.ResolveLocationCodeAsync(context, row.Location, operatorBy, locationCache);
 
                 productionTypeBySku.TryGetValue(piece.SkuCode, out var lotProductionType);
                 var lotIsSilver = MetalClassifier.IsSilver(lotProductionType);
@@ -119,29 +119,27 @@ namespace Jewelry.Service.Receipt
                     piece.Qty = 0;
                 }
 
-                piece.Qty += n;
-                await StockUnitSync.ReconcileAsync(context, piece, new StockUnitSyncInfo
+                var location = row.ResolvedLocation ?? piece.LocationCode;
+
+                var add = await StockUnitOps.AddUnitsAsync(context, piece, StockUnitSync.ToUnits(n), location, new StockUnitSyncInfo
                 {
                     By = operatorBy,
                     Now = now,
                     ReceiptNumber = row.ReceiptNumber,
                     ReceiptDate = now
                 });
-                StockPieceQtyHelper.RecalcStatus(piece);
-                piece.UpdateBy = operatorBy;
-                piece.UpdateDate = now;
 
-                var balanceKey = $"{piece.SkuCode}|{piece.LocationCode}";
+                var balanceKey = $"{piece.SkuCode}|{location}";
                 if (!balanceCache.TryGetValue(balanceKey, out var balance))
                 {
                     balance = await context.TbtStockBalance
-                        .FirstOrDefaultAsync(x => x.SkuCode == piece.SkuCode && x.LocationCode == piece.LocationCode);
+                        .FirstOrDefaultAsync(x => x.SkuCode == piece.SkuCode && x.LocationCode == location);
                     if (balance == null)
                     {
                         balance = new TbtStockBalance
                         {
                             SkuCode = piece.SkuCode,
-                            LocationCode = piece.LocationCode,
+                            LocationCode = location,
                             QtyOnHand = 0,
                             QtyReserved = 0,
                             CreateBy = operatorBy,
@@ -154,8 +152,14 @@ namespace Jewelry.Service.Receipt
                 balance.QtyOnHand += n;
                 balance.LastMovementAt = now;
 
-                newMovements.Add(ReceiptProductionServiceExtention.MapNewReceiptMovement(
-                    piece.SkuCode, piece.StockNumber, piece.ProductCode, piece.LocationCode, row.ReceiptNumber, operatorBy, qty: n));
+                var movement = ReceiptProductionServiceExtention.MapNewReceiptMovement(
+                    piece.SkuCode, piece.StockNumber, piece.ProductCode, location, row.ReceiptNumber, operatorBy, qty: n);
+                newMovements.Add(movement);
+
+                foreach (var unit in add.Units)
+                {
+                    context.TbtStockMovementUnit.Add(new TbtStockMovementUnit { Movement = movement, Unit = unit });
+                }
             }
         }
     }

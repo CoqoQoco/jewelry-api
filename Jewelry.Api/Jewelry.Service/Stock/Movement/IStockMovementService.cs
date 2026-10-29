@@ -9,6 +9,7 @@ namespace Jewelry.Service.Stock.Movement
     {
         IQueryable<object> List();
         Task<Response> MoveLocation(Request req);
+        Task<jewelry.Model.Stock.Movement.MoveUnits.Response> MoveUnits(jewelry.Model.Stock.Movement.MoveUnits.Request req);
         IQueryable<SearchModel.Response> Search(SearchModel.Request request);
     }
 }

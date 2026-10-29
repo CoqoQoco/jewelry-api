@@ -46,6 +46,63 @@ namespace Jewelry.Service.Stock.Balance
                                     PieceQtyReserved = p.QtyReserved,
                                     PieceQtyAvailable = (p.Qty - p.QtyReserved) > 0 ? (p.Qty - p.QtyReserved) : 0
                                 }).ToListAsync(ct);
+
+            if (result.Count == 0)
+            {
+                return result;
+            }
+
+            var lotNumbers = result.Select(r => r.StockNumber).Distinct().ToList();
+
+            var unitGroups = await (from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+                                    where lotNumbers.Contains(u.StockNumber) && u.Status != "SOLD"
+                                    group u by new { u.StockNumber, u.LocationCode } into g
+                                    select new
+                                    {
+                                        g.Key.StockNumber,
+                                        g.Key.LocationCode,
+                                        Qty = g.Count(),
+                                        Reserved = g.Count(x => x.Status == "RESERVED")
+                                    }).ToListAsync(ct);
+
+            var skuCodes = result.Select(r => r.SkuCode).Distinct().ToList();
+            var balances = await _jewelryContext.TbtStockBalance.AsNoTracking()
+                .Where(b => skuCodes.Contains(b.SkuCode))
+                .Select(b => new { b.SkuCode, b.LocationCode, b.QtyOnHand, b.QtyReserved })
+                .ToListAsync(ct);
+
+            var locationCodes = unitGroups.Select(g => g.LocationCode).Distinct().ToList();
+            var locationNames = await _jewelryContext.TbmStockLocation.AsNoTracking()
+                .Where(l => locationCodes.Contains(l.Code))
+                .ToDictionaryAsync(l => l.Code, l => l.NameTh, ct);
+
+            foreach (var row in result)
+            {
+                row.Locations = unitGroups
+                    .Where(g => g.StockNumber == row.StockNumber)
+                    .OrderByDescending(g => g.Qty)
+                    .ThenBy(g => g.LocationCode, StringComparer.Ordinal)
+                    .Select(g =>
+                    {
+                        var balance = balances.FirstOrDefault(b => b.SkuCode == row.SkuCode && b.LocationCode == g.LocationCode);
+                        var onHand = balance?.QtyOnHand ?? 0;
+                        var reserved = balance?.QtyReserved ?? 0;
+                        return new jewelry.Model.Stock.Balance.ByStockNumbers.LocationBalance
+                        {
+                            Code = g.LocationCode,
+                            Name = locationNames.GetValueOrDefault(g.LocationCode),
+                            Qty = g.Qty,
+                            Reserved = g.Reserved,
+                            Available = g.Qty - g.Reserved,
+                            BalanceOnHand = onHand,
+                            BalanceReserved = reserved,
+                            BalanceAvailable = onHand - reserved
+                        };
+                    })
+                    .ToList();
+                row.LocationCount = row.Locations.Count;
+            }
+
             return result;
         }
 

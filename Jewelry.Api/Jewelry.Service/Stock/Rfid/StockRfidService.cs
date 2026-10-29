@@ -334,6 +334,9 @@ public class StockRfidService : BaseService, IStockRfidService
                 u.ReceiptDate,
                 u.SoldRef,
                 u.SoldDate,
+                u.ReservedRefType,
+                u.ReservedRef,
+                u.ReservedLineId,
                 Epc = r != null ? r.Epc : null,
                 Tid = r != null ? r.Tid : null,
                 BoundDate = r != null ? (DateTime?)r.CreateDate : null,
@@ -345,6 +348,9 @@ public class StockRfidService : BaseService, IStockRfidService
 
         var units = rows.Select(x => new jewelry.Model.Stock.Rfid.GetByStock.Unit
         {
+            ReservedRefType = x.ReservedRefType,
+            ReservedRef = x.ReservedRef,
+            ReservedLineId = x.ReservedLineId,
             UnitId = x.Id,
             UnitNo = x.UnitNo,
             Status = x.Status,
@@ -820,8 +826,15 @@ public class StockRfidService : BaseService, IStockRfidService
                 }
                 else
                 {
+                    // ล็อตเดียวหลายคลัง: สลับได้เฉพาะชิ้นที่อยู่คลังเดียวกับชิ้นที่ถูกขาย และสถานะ/บรรทัดจองเดียวกับตอนก่อนขาย
+                    // (ชิ้นที่ขายไปจองให้บรรทัด L -> ต้องสลับกับชิ้นที่ยังจองบรรทัด L อยู่ ไม่มีบรรทัดจอง -> ต้องเป็นชิ้นว่าง)
+                    // ไม่เข้าเงื่อนไข = ไม่แตะข้อมูล คืน mismatch ให้ผู้เรียกแสดงเตือน เพื่อไม่ให้ยอดรายคลัง/การจองเพี้ยน
                     var replacement = units
-                        .Where(u => u.Status != StockUnitSync.Sold && !taggedUnitIds.Contains(u.Id))
+                        .Where(u => u.Status != StockUnitSync.Sold
+                            && !taggedUnitIds.Contains(u.Id)
+                            && u.LocationCode == scanned.LocationCode
+                            && u.ReservedLineId == scanned.ReservedLineId
+                            && u.Status == (scanned.ReservedLineId.HasValue ? StockUnitSync.Reserved : StockUnitSync.InStock))
                         .OrderByDescending(u => u.UnitNo)
                         .FirstOrDefault();
 
@@ -835,9 +848,11 @@ public class StockRfidService : BaseService, IStockRfidService
                     var soldDate = scanned.SoldDate;
 
                     scanned.Status = replacement.Status;
-                    scanned.LocationCode = replacement.LocationCode;
                     scanned.SoldRef = null;
                     scanned.SoldDate = null;
+                    scanned.ReservedRefType = replacement.ReservedRefType;
+                    scanned.ReservedRef = replacement.ReservedRef;
+                    scanned.ReservedLineId = replacement.ReservedLineId;
                     scanned.UpdateDate = now;
                     scanned.UpdateBy = username;
 

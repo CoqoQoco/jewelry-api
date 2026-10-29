@@ -104,7 +104,14 @@ namespace Jewelry.Service.Stock.Product
             if (request.LocationCodes != null && request.LocationCodes.Any())
             {
                 var locationArray = request.LocationCodes.ToArray();
-                pieces = pieces.Where(x => locationArray.Contains(x.LocationCode));
+                // ล็อตเดียวหลายคลัง: มีชิ้นที่ไม่ SOLD อยู่คลังใดคลังหนึ่งที่เลือก (ล็อตที่ขายหมดแล้วใช้คลังหลักล่าสุด)
+                pieces = pieces.Where(x =>
+                    (x.Qty <= 0 && locationArray.Contains(x.LocationCode))
+                    || _jewelryContext.TbtStockUnit.Any(u =>
+                        u.StockNumber == x.StockNumber
+                        && u.ProductCode == x.ProductCode
+                        && u.Status != "SOLD"
+                        && locationArray.Contains(u.LocationCode)));
             }
             if (!string.IsNullOrEmpty(request.ProductNumber))
             {
@@ -641,6 +648,26 @@ namespace Jewelry.Service.Stock.Product
                 })
                 .ToListAsync();
 
+            var lotLocations = await LoadLotLocationsAsync(new List<(string StockNumber, string ProductCode)> { (piece.StockNumber, piece.ProductCode) });
+            if (lotLocations.TryGetValue((piece.StockNumber, piece.ProductCode), out var pieceLocations))
+            {
+                response.Locations = pieceLocations;
+            }
+            else if (piece.Qty > 0)
+            {
+                response.Locations = new List<jewelry.Model.Stock.Product.StockLocationQty>
+                {
+                    new jewelry.Model.Stock.Product.StockLocationQty
+                    {
+                        Code = piece.LocationCode,
+                        Qty = piece.Qty,
+                        Reserved = piece.QtyReserved,
+                        Available = StockPieceQtyHelper.Available(piece)
+                    }
+                };
+            }
+            response.LocationCount = response.Locations.Count;
+
             TbtProductionPlan plan = null;
             if (!string.IsNullOrEmpty(response.Wo) && response.WoNumber.HasValue)
             {
@@ -822,6 +849,84 @@ namespace Jewelry.Service.Stock.Product
                 row.QuickPriceRemark = q.Remark;
                 row.QuickPriceBy = q.CreateBy;
             }
+        }
+
+        public async Task AttachLocations(IEnumerable<jewelry.Model.Stock.Product.List.Response> items)
+        {
+            var rows = items.ToList();
+            if (rows.Count == 0) return;
+
+            var byLot = await LoadLotLocationsAsync(rows.Select(x => (x.StockNumber, x.ProductCode ?? string.Empty)).Distinct().ToList());
+
+            foreach (var row in rows)
+            {
+                if (byLot.TryGetValue((row.StockNumber, row.ProductCode ?? string.Empty), out var locations) && locations.Count > 0)
+                {
+                    row.Locations = locations;
+                }
+                else if (row.Qty > 0 && !string.IsNullOrEmpty(row.Location))
+                {
+                    row.Locations = new List<jewelry.Model.Stock.Product.StockLocationQty>
+                    {
+                        new jewelry.Model.Stock.Product.StockLocationQty
+                        {
+                            Code = row.Location,
+                            Qty = row.Qty,
+                            Reserved = row.QtyReserved,
+                            Available = row.QtyAvailable
+                        }
+                    };
+                }
+
+                row.LocationCount = row.Locations.Count;
+            }
+        }
+
+        private async Task<Dictionary<(string StockNumber, string ProductCode), List<jewelry.Model.Stock.Product.StockLocationQty>>> LoadLotLocationsAsync(
+            List<(string StockNumber, string ProductCode)> lots)
+        {
+            var result = new Dictionary<(string StockNumber, string ProductCode), List<jewelry.Model.Stock.Product.StockLocationQty>>();
+            if (lots.Count == 0) return result;
+
+            var stockNumbers = lots.Select(l => l.StockNumber).Distinct().ToList();
+
+            var groups = await _jewelryContext.TbtStockUnit
+                .AsNoTracking()
+                .Where(u => stockNumbers.Contains(u.StockNumber) && u.Status != "SOLD")
+                .GroupBy(u => new { u.StockNumber, u.ProductCode, u.LocationCode })
+                .Select(g => new
+                {
+                    g.Key.StockNumber,
+                    g.Key.ProductCode,
+                    g.Key.LocationCode,
+                    Qty = g.Count(),
+                    Reserved = g.Count(x => x.Status == "RESERVED")
+                })
+                .ToListAsync();
+
+            var codes = groups.Select(g => g.LocationCode).Distinct().ToList();
+            var names = await _jewelryContext.TbmStockLocation
+                .AsNoTracking()
+                .Where(l => codes.Contains(l.Code))
+                .ToDictionaryAsync(l => l.Code, l => l.NameTh);
+
+            foreach (var lot in groups.GroupBy(g => (g.StockNumber, g.ProductCode)))
+            {
+                result[lot.Key] = lot
+                    .OrderByDescending(g => g.Qty)
+                    .ThenBy(g => g.LocationCode, StringComparer.Ordinal)
+                    .Select(g => new jewelry.Model.Stock.Product.StockLocationQty
+                    {
+                        Code = g.LocationCode,
+                        Name = names.GetValueOrDefault(g.LocationCode),
+                        Qty = g.Qty,
+                        Reserved = g.Reserved,
+                        Available = g.Qty - g.Reserved
+                    })
+                    .ToList();
+            }
+
+            return result;
         }
 
         public async Task<jewelry.Model.Stock.Product.QuickPrice.Response> QuickPriceCreate(jewelry.Model.Stock.Product.QuickPrice.CreateRequest request)
@@ -1064,6 +1169,19 @@ namespace Jewelry.Service.Stock.Product
                 var finalLocation = request.Location ?? oldLocation;
                 var locationChanged = finalLocation != oldLocation;
                 var forked = false;
+                var unitInfo = new StockUnitSyncInfo { By = CurrentUsername, Now = now };
+
+                // ล็อตเดียวหลายคลัง: แก้คลังจากหน้านี้ไม่ได้ (ต้องใช้หน้าย้ายคลังที่ระบุชิ้น) — ตรวจก่อนแตะอะไร
+                var lotUnits = await StockUnitOps.LoadLotAsync(_jewelryContext, piece, unitInfo);
+                var activeByLocation = lotUnits
+                    .Where(u => u.Status != StockUnitSync.Sold)
+                    .GroupBy(u => u.LocationCode)
+                    .ToList();
+
+                if (locationChanged && activeByLocation.Count > 1)
+                {
+                    throw new HandleException($"สินค้า {piece.StockNumber} มีชิ้นกระจายอยู่ {activeByLocation.Count} คลัง ไม่สามารถแก้คลังจากหน้านี้ได้ กรุณาใช้หน้าย้ายคลังเพื่อเลือกชิ้นที่จะย้าย");
+                }
 
                 if (IsSkuLevelChanged(sku, request))
                 {
@@ -1090,33 +1208,35 @@ namespace Jewelry.Service.Stock.Product
                         skuToEdit = forkedSku;
 
                         // ชิ้นที่ไม่มีของคงเหลือ (qty 0) ไม่มี balance ให้ย้าย/สร้าง
+                        // ย้ายยอดตามคลังจริงของแต่ละชิ้น (ล็อตเดียวอาจอยู่หลายคลัง) — ถ้าแก้คลังพร้อมกัน (ล็อตคลังเดียว) ยอดไปอยู่คลังใหม่เลย
                         if (piece.Qty > 0)
                         {
-                            var oldBalance = await _jewelryContext.TbtStockBalance
-                                .FirstOrDefaultAsync(x => x.SkuCode == oldSkuCode && x.LocationCode == oldLocation);
-                            if (oldBalance != null)
+                            foreach (var group in activeByLocation)
                             {
-                                oldBalance.QtyOnHand -= piece.Qty;
-                                oldBalance.LastMovementAt = now;
-                                oldBalance.UpdateDate = now;
-                                oldBalance.UpdateBy = CurrentUsername;
-                                _jewelryContext.TbtStockBalance.Update(oldBalance);
-                            }
+                                var groupQty = group.Count();
+                                var forkedLocation = locationChanged ? finalLocation : group.Key;
 
-                            _jewelryContext.TbtStockBalance.Add(new TbtStockBalance
-                            {
-                                SkuCode = forkedSkuCode,
-                                LocationCode = finalLocation,
-                                QtyOnHand = piece.Qty,
-                                QtyReserved = 0,
-                                LastMovementAt = now,
-                                CreateBy = CurrentUsername,
-                                CreateDate = now
-                            });
+                                var oldBalance = await _jewelryContext.TbtStockBalance
+                                    .FirstOrDefaultAsync(x => x.SkuCode == oldSkuCode && x.LocationCode == group.Key);
+                                if (oldBalance != null)
+                                {
+                                    oldBalance.QtyOnHand -= groupQty;
+                                    oldBalance.LastMovementAt = now;
+                                    oldBalance.UpdateDate = now;
+                                    oldBalance.UpdateBy = CurrentUsername;
+                                    _jewelryContext.TbtStockBalance.Update(oldBalance);
+                                }
 
-                            if (locationChanged)
-                            {
-                                _jewelryContext.TbtStockMovement.Add(BuildEditLocationMovement(piece, forkedSkuCode, oldLocation, finalLocation, now));
+                                _jewelryContext.TbtStockBalance.Add(new TbtStockBalance
+                                {
+                                    SkuCode = forkedSkuCode,
+                                    LocationCode = forkedLocation,
+                                    QtyOnHand = groupQty,
+                                    QtyReserved = 0,
+                                    LastMovementAt = now,
+                                    CreateBy = CurrentUsername,
+                                    CreateDate = now
+                                });
                             }
                         }
 
@@ -1146,55 +1266,24 @@ namespace Jewelry.Service.Stock.Product
                     }
                 }
 
-                if (locationChanged && !forked && piece.Qty > 0)
+                if (locationChanged && piece.Qty > 0)
                 {
-                    if (piece.QtyReserved > 0)
-                    {
-                        throw new HandleException($"ไม่สามารถย้ายคลังสินค้า {piece.StockNumber} ได้ เนื่องจากมีการจองค้างอยู่ {piece.QtyReserved} ชิ้น");
-                    }
+                    // ย้ายทุกชิ้นที่ยังไม่ขาย (ล็อตนี้อยู่คลังเดียว — ตรวจแล้วข้างบน) ชิ้นที่จองย้ายพร้อมการจอง
+                    // ถ้าแยก SKU ใหม่ไปพร้อมกัน balance ของ SKU ใหม่ถูกสร้างที่คลังปลายทางแล้ว จึงเขียนเฉพาะ movement
+                    var move = await StockUnitOps.MoveAsync(_jewelryContext, piece, null, null, null, finalLocation, unitInfo);
 
-                    var srcBalance = await _jewelryContext.TbtStockBalance
-                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == oldLocation);
-                    if (srcBalance != null)
+                    await StockBalanceApplier.ApplyAsync(_jewelryContext, move, new StockMovementTemplate
                     {
-                        srcBalance.QtyOnHand -= piece.Qty;
-                        srcBalance.LastMovementAt = now;
-                        srcBalance.UpdateDate = now;
-                        srcBalance.UpdateBy = CurrentUsername;
-                        _jewelryContext.TbtStockBalance.Update(srcBalance);
-                    }
-
-                    var dstBalance = await _jewelryContext.TbtStockBalance
-                        .FirstOrDefaultAsync(b => b.SkuCode == piece.SkuCode && b.LocationCode == finalLocation);
-                    if (dstBalance == null)
-                    {
-                        _jewelryContext.TbtStockBalance.Add(new TbtStockBalance
-                        {
-                            SkuCode = piece.SkuCode,
-                            LocationCode = finalLocation,
-                            QtyOnHand = piece.Qty,
-                            QtyReserved = 0,
-                            LastMovementAt = now,
-                            CreateDate = now,
-                            CreateBy = CurrentUsername
-                        });
-                    }
-                    else
-                    {
-                        dstBalance.QtyOnHand += piece.Qty;
-                        dstBalance.LastMovementAt = now;
-                        dstBalance.UpdateDate = now;
-                        dstBalance.UpdateBy = CurrentUsername;
-                        _jewelryContext.TbtStockBalance.Update(dstBalance);
-                    }
-
-                    _jewelryContext.TbtStockMovement.Add(BuildEditLocationMovement(piece, piece.SkuCode, oldLocation, finalLocation, now));
+                        MovementType = "Transfer",
+                        RefDocType = "EditProduct",
+                        Date = now,
+                        By = CurrentUsername
+                    }, writeBalance: !forked);
                 }
 
-                piece.LocationCode = finalLocation;
-                if (locationChanged)
+                if (locationChanged && (piece.Qty <= 0 || piece.LocationCode != finalLocation))
                 {
-                    await StockUnitSync.ReconcileAsync(_jewelryContext, piece, new StockUnitSyncInfo { By = CurrentUsername, Now = now });
+                    piece.LocationCode = finalLocation;
                 }
                 piece.SizeActual = request.Size;
                 piece.Remark = request.Remark;
@@ -1268,25 +1357,6 @@ namespace Jewelry.Service.Stock.Product
             }
 
             return "success";
-        }
-
-        private TbtStockMovement BuildEditLocationMovement(TbtStockPiece piece, string skuCode, string? fromLocation, string toLocation, DateTime now)
-        {
-            return new TbtStockMovement
-            {
-                MovementDate = now,
-                MovementType = "Transfer",
-                SkuCode = skuCode,
-                StockNumber = piece.StockNumber,
-                ProductCode = piece.ProductCode,
-                FromLocation = fromLocation,
-                ToLocation = toLocation,
-                Qty = piece.Qty,
-                RefDocType = "EditProduct",
-                Remark = null,
-                CreateDate = now,
-                CreateBy = CurrentUsername
-            };
         }
 
         private static string? NormalizeText(string? value) => string.IsNullOrEmpty(value) ? null : value;

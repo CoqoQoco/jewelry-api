@@ -26,17 +26,20 @@ namespace Jewelry.Service.Stock.Reconciliation
             report.NewPieceCount = await _jewelryContext.TbtStockPiece
                 .AsNoTracking().CountAsync(ct);
 
-            var pieceGroups = await _jewelryContext.TbtStockPiece
-                .AsNoTracking()
-                .GroupBy(p => new { p.SkuCode, p.LocationCode })
-                .Select(g => new
+            // TK202610290003: ล็อตเดียวอยู่ได้หลายคลัง — ยอดที่ควรเป็นของ (SKU x คลัง) นับจาก unit ที่ไม่ SOLD ตามคลังของแต่ละชิ้น
+            // (SKU มาจาก piece) ไม่ใช่จาก piece.LocationCode
+            var pieceGroups = await (
+                from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+                where u.Status != "SOLD"
+                join p in _jewelryContext.TbtStockPiece.AsNoTracking()
+                    on new { u.StockNumber, u.ProductCode } equals new { p.StockNumber, p.ProductCode }
+                group u by new { p.SkuCode, u.LocationCode } into g
+                select new
                 {
                     g.Key.SkuCode,
                     g.Key.LocationCode,
-                    // IN_STOCK/RESERVED เท่านั้น กัน piece SOLD เก่า (ก่อนขึ้น qty) ที่ยังเหลือ qty=1 ค้างจาก default ของ migration
-                    ExpectedOnHand   = g.Sum(p => (p.Status == "IN_STOCK" || p.Status == "RESERVED") ? p.Qty : 0),
-                    // ไม่กรอง status เพราะล็อตที่จองบางส่วนยังเป็น IN_STOCK (qtyReserved < qty) แต่ต้องนับ qtyReserved ด้วย
-                    ExpectedReserved = g.Sum(p => p.QtyReserved)
+                    ExpectedOnHand = (decimal)g.Count(),
+                    ExpectedReserved = (decimal)g.Count(x => x.Status == "RESERVED")
                 })
                 .ToListAsync(ct);
 
@@ -106,6 +109,27 @@ namespace Jewelry.Service.Stock.Reconciliation
                     });
                 }
             }
+
+            // จำนวน unit ต้องตรงกับ qty / qty_reserved ของ piece (ถ้าไม่ตรง ยอดรายคลังข้างบนเชื่อถือไม่ได้)
+            var unitMismatches = await _jewelryContext.TbtStockPiece
+                .AsNoTracking()
+                .Select(p => new UnitCountMismatch
+                {
+                    StockNumber = p.StockNumber,
+                    ProductCode = p.ProductCode,
+                    PieceQty = p.Qty,
+                    UnitQty = _jewelryContext.TbtStockUnit
+                        .Count(u => u.StockNumber == p.StockNumber && u.ProductCode == p.ProductCode && u.Status != "SOLD"),
+                    PieceReserved = p.QtyReserved,
+                    UnitReserved = _jewelryContext.TbtStockUnit
+                        .Count(u => u.StockNumber == p.StockNumber && u.ProductCode == p.ProductCode && u.Status == "RESERVED")
+                })
+                .Where(x => Math.Floor(x.PieceQty) != x.UnitQty
+                    || Math.Floor(x.PieceReserved <= x.PieceQty ? x.PieceReserved : x.PieceQty) != x.UnitReserved)
+                .ToListAsync(ct);
+
+            report.UnitCountMismatchCount = unitMismatches.Count;
+            report.UnitCountMismatches = unitMismatches.Take(100).ToList();
 
             report.OnHandMismatches = onHandMismatches.Take(100).ToList();
             report.BalanceOnHandMismatchCount = onHandMismatches.Count;
@@ -205,15 +229,19 @@ namespace Jewelry.Service.Stock.Reconciliation
                 .ToListAsync(ct);
             var allBalanceKeySet = allBalanceKeys.Select(b => (b.SkuCode, b.LocationCode)).ToHashSet();
 
-            var aggregated = await _jewelryContext.TbtStockPiece
-                .AsNoTracking()
-                .GroupBy(p => new { p.SkuCode, p.LocationCode })
-                .Select(g => new
+            // ยอดรายคลังนับจาก unit ที่ไม่ SOLD ตามคลังของแต่ละชิ้น (ล็อตเดียวอยู่ได้หลายคลัง) — SKU มาจาก piece
+            var aggregated = await (
+                from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+                where u.Status != "SOLD"
+                join p in _jewelryContext.TbtStockPiece.AsNoTracking()
+                    on new { u.StockNumber, u.ProductCode } equals new { p.StockNumber, p.ProductCode }
+                group u by new { p.SkuCode, u.LocationCode } into g
+                select new
                 {
                     g.Key.SkuCode,
                     g.Key.LocationCode,
-                    QtyOnHand = g.Sum(p => (p.Status == "IN_STOCK" || p.Status == "RESERVED") ? p.Qty : 0),
-                    QtyReserved = g.Sum(p => p.QtyReserved)
+                    QtyOnHand = (decimal)g.Count(),
+                    QtyReserved = (decimal)g.Count(x => x.Status == "RESERVED")
                 })
                 .ToListAsync(ct);
 
