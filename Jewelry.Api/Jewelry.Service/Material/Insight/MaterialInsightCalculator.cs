@@ -155,6 +155,12 @@ namespace Jewelry.Service.Material.Insight
                     SizeCode = input.SizeCode,
                     SizeName = input.SizeName,
                     Label = Label(input),
+                    Unit = input.Unit,
+                    GroupCode = input.GroupCode,
+                    GroupName = input.GroupName,
+                    UnitValue = input.UnitValue,
+                    Value = ValueOf(input.OnHand, input.UnitValue),
+                    OnProcessValue = ValueOf(input.OnProcess, input.UnitValue),
                     GoldCode = kind == "GOLD" ? input.Code : null,
                     GoldName = kind == "GOLD" ? input.Name : null,
                     OnHand = input.OnHand,
@@ -183,6 +189,67 @@ namespace Jewelry.Service.Material.Insight
             return result;
         }
 
+        public static decimal? ValueOf(decimal qty, decimal? unitValue)
+            => unitValue.HasValue ? Math.Round(qty * unitValue.Value, 2, MidpointRounding.AwayFromZero) : null;
+
+        public static List<string> DistinctUnits(IEnumerable<string> units)
+            => units.Distinct(StringComparer.Ordinal).OrderBy(u => u, StringComparer.Ordinal).ToList();
+
+        // series แยกรายหน่วย: movement/ยอดปัจจุบันเฉพาะ item ของหน่วยนั้น (qty คนละหน่วยห้ามรวมกัน)
+        public static List<UnitSeries> BuildSeriesByUnit(IReadOnlyList<DateTime> months, IReadOnlyList<MaterialItemInput> inputs, IEnumerable<MaterialMovement> movements)
+        {
+            var unitByKey = inputs.ToDictionary(i => i.ItemKey, i => i.Unit);
+            var list = movements.ToList();
+            return DistinctUnits(inputs.Select(i => i.Unit))
+                .Select(u => new UnitSeries
+                {
+                    Unit = u,
+                    Points = BuildSeries(months,
+                        list.Where(m => unitByKey.TryGetValue(m.ItemKey, out var mu) && mu == u),
+                        inputs.Where(i => i.Unit == u).Sum(i => i.OnHand))
+                })
+                .ToList();
+        }
+
+        // series มูลค่า (บาท): movement x ราคาต่อหน่วยของ item (ราคาปัจจุบัน) — null เมื่อไม่มี item ที่มีราคา
+        public static List<ValuePoint>? BuildValueSeries(IReadOnlyList<DateTime> months, IReadOnlyList<MaterialItemInput> inputs, IEnumerable<MaterialMovement> movements)
+        {
+            if (!inputs.Any(i => i.UnitValue.HasValue)) return null;
+
+            var priceByKey = inputs.Where(i => i.UnitValue.HasValue).ToDictionary(i => i.ItemKey, i => i.UnitValue!.Value);
+            var points = months.Select(m => new ValuePoint { Month = m.ToString("yyyy-MM-dd") }).ToList();
+            var netByMonth = new decimal[months.Count];
+            var indexByMonth = months.Select((m, i) => (m, i)).ToDictionary(x => x.m, x => x.i);
+
+            foreach (var mv in movements)
+            {
+                if (!priceByKey.TryGetValue(mv.ItemKey, out var price)) continue;
+                if (!indexByMonth.TryGetValue(ThaiMonthStart(mv.DateUtc), out var idx)) continue;
+
+                var v = mv.Qty * price;
+                netByMonth[idx] += mv.Sign * v;
+                switch (mv.Kind)
+                {
+                    case MaterialMovementKind.Inflow: points[idx].InflowValue += v; break;
+                    case MaterialMovementKind.Consumed: points[idx].ConsumedValue += v; break;
+                    case MaterialMovementKind.Returned: points[idx].ReturnedValue += v; break;
+                }
+            }
+
+            var after = 0m;
+            var current = inputs.Where(i => i.UnitValue.HasValue).Sum(i => i.OnHand * i.UnitValue!.Value);
+            for (var i = months.Count - 1; i >= 0; i--)
+            {
+                points[i].EndStockValue = Math.Round(current - after, 2, MidpointRounding.AwayFromZero);
+                points[i].InflowValue = Math.Round(points[i].InflowValue, 2, MidpointRounding.AwayFromZero);
+                points[i].ConsumedValue = Math.Round(points[i].ConsumedValue, 2, MidpointRounding.AwayFromZero);
+                points[i].ReturnedValue = Math.Round(points[i].ReturnedValue, 2, MidpointRounding.AwayFromZero);
+                after += netByMonth[i];
+            }
+
+            return points;
+        }
+
         // endStock(เดือน m) = ยอดคงเหลือปัจจุบัน - ผลรวมสุทธิ (sign x qty) ของ movement ที่เกิดหลังสิ้นเดือน m
         public static List<SeriesPoint> BuildSeries(IReadOnlyList<DateTime> months, IEnumerable<MaterialMovement> movements, decimal currentOnHand)
         {
@@ -192,7 +259,6 @@ namespace Jewelry.Service.Material.Insight
 
             foreach (var mv in movements)
             {
-                if (mv.Sign == 0) continue;
                 if (!indexByMonth.TryGetValue(ThaiMonthStart(mv.DateUtc), out var idx)) continue;
 
                 netByMonth[idx] += mv.Sign * mv.Qty;
@@ -215,7 +281,7 @@ namespace Jewelry.Service.Material.Insight
             return points;
         }
 
-        public static Kpi BuildKpi(IReadOnlyList<Item> items, bool onProcessAgeSupported, PolicyValues policy, bool inboundRecorded = false)
+        public static UnitTotal BuildUnitTotal(string unit, IReadOnlyList<Item> items, bool onProcessAgeSupported, PolicyValues policy)
         {
             var nonNegative = items.Where(i => i.Status != StatusNegative).ToList();
             var negatives = items.Where(i => i.Status == StatusNegative).ToList();
@@ -223,44 +289,109 @@ namespace Jewelry.Service.Material.Insight
                 ? items.Where(i => i.OnProcess > 0 && i.OnProcessAgeDays.HasValue && i.OnProcessAgeDays.Value > policy.OnProcessStaleDays).ToList()
                 : new List<Item>();
             var dead = items.Where(i => i.IsDead).ToList();
+            var priced = items.Any(i => i.Value.HasValue);
 
-            return new Kpi
+            return new UnitTotal
             {
+                Unit = unit,
                 ItemCount = items.Count,
                 TotalOnHand = nonNegative.Sum(i => i.OnHand),
                 TotalOnProcess = items.Sum(i => i.OnProcess),
                 TotalAvailable = nonNegative.Sum(i => i.Available),
-                ZeroCount = items.Count(i => i.Status == StatusZero),
-                BelowMinCount = items.Count(i => i.Status == StatusBelow),
-                NearMinCount = items.Count(i => i.Status == StatusNear),
                 DeadCount = dead.Count,
                 DeadOnHand = dead.Sum(i => i.OnHand),
                 OnProcessStaleCount = stale.Count,
                 OnProcessStaleWeight = stale.Sum(i => i.OnProcess),
+                NegativeCount = negatives.Count,
+                NegativeWeight = negatives.Sum(i => i.OnHand),
+                Value = priced ? nonNegative.Sum(i => i.Value ?? 0m) : null,
+                OnProcessValue = priced ? items.Sum(i => i.OnProcessValue ?? 0m) : null
+            };
+        }
+
+        public static Kpi BuildKpi(IReadOnlyList<Item> items, bool onProcessAgeSupported, PolicyValues policy, bool inboundRecorded = false)
+        {
+            var byUnit = items
+                .GroupBy(i => i.Unit, StringComparer.Ordinal)
+                .OrderBy(g => g.Key, StringComparer.Ordinal)
+                .Select(g => BuildUnitTotal(g.Key, g.ToList(), onProcessAgeSupported, policy))
+                .ToList();
+            var mixed = byUnit.Count > 1;
+
+            var nonNegative = items.Where(i => i.Status != StatusNegative).ToList();
+            var negatives = items.Where(i => i.Status == StatusNegative).ToList();
+            var stale = onProcessAgeSupported
+                ? items.Where(i => i.OnProcess > 0 && i.OnProcessAgeDays.HasValue && i.OnProcessAgeDays.Value > policy.OnProcessStaleDays).ToList()
+                : new List<Item>();
+            var dead = items.Where(i => i.IsDead).ToList();
+            var priced = items.Any(i => i.Value.HasValue);
+
+            // ผลรวม qty ข้ามหน่วยไม่มีความหมาย -> 0 เมื่อหลายหน่วย (ใช้ ByUnit)
+            decimal Qty(Func<IEnumerable<Item>, decimal> f, IEnumerable<Item> src) => mixed ? 0m : f(src);
+
+            return new Kpi
+            {
+                ItemCount = items.Count,
+                TotalOnHand = Qty(l => l.Sum(i => i.OnHand), nonNegative),
+                TotalOnProcess = Qty(l => l.Sum(i => i.OnProcess), items),
+                TotalAvailable = Qty(l => l.Sum(i => i.Available), nonNegative),
+                ZeroCount = items.Count(i => i.Status == StatusZero),
+                BelowMinCount = items.Count(i => i.Status == StatusBelow),
+                NearMinCount = items.Count(i => i.Status == StatusNear),
+                DeadCount = dead.Count,
+                DeadOnHand = Qty(l => l.Sum(i => i.OnHand), dead),
+                OnProcessStaleCount = stale.Count,
+                OnProcessStaleWeight = Qty(l => l.Sum(i => i.OnProcess), stale),
                 OnProcessAgeSupported = onProcessAgeSupported,
                 StockoutRiskCount = items.Count(i => i.StockoutRisk && i.Available > 0),
                 OverrideCount = items.Count(i => i.MinSource == MinSourceOverride),
                 WithUsageCount = items.Count(i => i.AvgDailyUsage > 0),
                 NegativeCount = negatives.Count,
-                NegativeWeight = negatives.Sum(i => i.OnHand),
-                InboundRecorded = inboundRecorded
+                NegativeWeight = Qty(l => l.Sum(i => i.OnHand), negatives),
+                InboundRecorded = inboundRecorded,
+                MixedUnits = mixed,
+                ByUnit = byUnit,
+                TotalValue = priced ? nonNegative.Sum(i => i.Value ?? 0m) : null,
+                TotalOnProcessValue = priced ? items.Sum(i => i.OnProcessValue ?? 0m) : null,
+                DeadValue = priced ? dead.Sum(i => i.Value ?? 0m) : null
             };
         }
 
         public static List<GroupRow> BuildGroups(IReadOnlyList<Item> items)
         {
             return items
-                .GroupBy(i => i.Code)
-                .Select(g => new GroupRow
+                .GroupBy(i => i.GroupCode ?? i.Code)
+                .Select(g =>
                 {
-                    Code = g.Key,
-                    Name = g.Select(i => i.Name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)),
-                    ItemCount = g.Count(),
-                    OnHand = g.Sum(i => i.OnHand),
-                    OnProcess = g.Sum(i => i.OnProcess),
-                    NegativeCount = g.Count(i => i.Status == StatusNegative)
+                    var byUnit = g.GroupBy(i => i.Unit, StringComparer.Ordinal)
+                        .OrderBy(u => u.Key, StringComparer.Ordinal)
+                        .Select(u => new UnitTotal
+                        {
+                            Unit = u.Key,
+                            ItemCount = u.Count(),
+                            TotalOnHand = u.Sum(i => i.OnHand),
+                            TotalOnProcess = u.Sum(i => i.OnProcess),
+                            NegativeCount = u.Count(i => i.Status == StatusNegative),
+                            Value = u.Any(i => i.Value.HasValue) ? u.Sum(i => i.Value ?? 0m) : null
+                        })
+                        .ToList();
+                    var single = byUnit.Count == 1;
+                    return new GroupRow
+                    {
+                        Code = g.Key,
+                        Name = g.Select(i => i.GroupName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n))
+                            ?? g.Select(i => i.Name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)),
+                        ItemCount = g.Count(),
+                        OnHand = single ? g.Sum(i => i.OnHand) : 0m,
+                        OnProcess = single ? g.Sum(i => i.OnProcess) : 0m,
+                        NegativeCount = g.Count(i => i.Status == StatusNegative),
+                        Unit = single ? byUnit[0].Unit : null,
+                        ByUnit = byUnit,
+                        Value = g.Any(i => i.Value.HasValue) ? g.Sum(i => i.Value ?? 0m) : null
+                    };
                 })
-                .OrderByDescending(g => g.OnHand)
+                .OrderByDescending(g => g.Value ?? g.OnHand)
+                .ThenByDescending(g => g.OnHand)
                 .ThenBy(g => g.Code, StringComparer.Ordinal)
                 .ToList();
         }

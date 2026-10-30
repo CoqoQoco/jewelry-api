@@ -178,6 +178,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionInsightService, ProductionInsightService>();
             services.AddScoped<Jewelry.Service.Stock.Insight.IStockInsightService, Jewelry.Service.Stock.Insight.StockInsightService>();
             services.AddScoped<Jewelry.Service.Material.Insight.IMaterialInsightProvider, Jewelry.Service.Material.Insight.GoldMaterialInsightProvider>();
+            services.AddScoped<Jewelry.Service.Material.Insight.IMaterialInsightProvider, Jewelry.Service.Material.Insight.GemMaterialInsightProvider>();
             services.AddScoped<Jewelry.Service.Material.Insight.IMaterialInsightService, Jewelry.Service.Material.Insight.MaterialInsightService>();
             services.AddScoped<Jewelry.Service.Sale.Insight.ISalesInsightService, Jewelry.Service.Sale.Insight.SalesInsightService>();
 

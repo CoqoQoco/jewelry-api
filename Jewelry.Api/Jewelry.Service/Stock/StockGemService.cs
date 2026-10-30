@@ -50,9 +50,9 @@ namespace Jewelry.Service.Stock
         private readonly JewelryContext _jewelryContext;
         private IHostEnvironment _hostingEnvironment;
         private readonly bool _valPass = false;
-        private static readonly int[] InboundTypes = { 1, 2, 3, 6 };
-        private static readonly int[] OutboundTypes = { 4, 5, 7 };
-        private static readonly int[] ConsumedTypes = { 4, 7 };
+        public static readonly int[] InboundTypes = { 1, 2, 3, 6 };
+        public static readonly int[] OutboundTypes = { 4, 5, 7 };
+        public static readonly int[] ConsumedTypes = { 4, 7 };
         private const int LowStockThreshold = 10;
         private const decimal InventoryDaysLowThreshold = 30;
         private const decimal InventoryDaysExcessThreshold = 90;

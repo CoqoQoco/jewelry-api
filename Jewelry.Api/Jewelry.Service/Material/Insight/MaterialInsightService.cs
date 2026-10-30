@@ -67,7 +67,13 @@ namespace Jewelry.Service.Material.Insight
             var items = MaterialInsightCalculator.BuildItems(kind, dataset.Items, movements, overrideMap, policy, now);
 
             var monthStarts = MaterialInsightCalculator.MonthStarts(now, months);
-            var series = MaterialInsightCalculator.BuildSeries(monthStarts, movements, dataset.Items.Sum(i => i.OnHand));
+            var seriesByUnit = MaterialInsightCalculator.BuildSeriesByUnit(monthStarts, dataset.Items, movements);
+            var units = seriesByUnit.Select(s => s.Unit).ToList();
+            // series รวม: เฉพาะเมื่อหน่วยเดียว (ทอง) — หลายหน่วยห้ามบวกกัน
+            var series = units.Count <= 1
+                ? MaterialInsightCalculator.BuildSeries(monthStarts, movements, dataset.Items.Sum(i => i.OnHand))
+                : new List<Overview.SeriesPoint>();
+            var valueSeries = MaterialInsightCalculator.BuildValueSeries(monthStarts, dataset.Items, movements) ?? new List<Overview.ValuePoint>();
 
             var firstConsumed = MaterialInsightCalculator.FirstConsumedUtc(movements);
             var startMonth = firstConsumed.HasValue ? MaterialInsightCalculator.ThaiMonthStart(firstConsumed.Value) : (DateTime?)null;
@@ -95,6 +101,7 @@ namespace Jewelry.Service.Material.Insight
                 AsOf = now,
                 Kind = kind,
                 Unit = provider.Unit,
+                Units = units,
                 Status = MaterialInsightRuleEngine.WorstSeverity(problems.Concat(forecasts)),
                 Policy = policy,
                 UsageHistory = new Overview.UsageHistory
@@ -106,6 +113,8 @@ namespace Jewelry.Service.Material.Insight
                 Items = items,
                 Groups = MaterialInsightCalculator.BuildGroups(items),
                 Series = series,
+                SeriesByUnit = seriesByUnit,
+                ValueSeries = valueSeries,
                 Problems = problems,
                 Forecasts = forecasts,
                 Actions = MaterialInsightRuleEngine.BuildActions(problems, forecasts)

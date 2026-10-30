@@ -17,6 +17,22 @@ namespace Jewelry.Service.Material.Insight
         private static List<string> Top(IEnumerable<Item> ordered)
             => ordered.Take(TopItemCount).Select(i => i.Label).ToList();
 
+        // รวม qty แยกหน่วย: หน่วยเดียว (ทอง) -> ใส่ key เดิมเป็นตัวเลขเดียว (คงรูปเดิม)
+        // หลายหน่วย (พลอย) -> ไม่ใส่ key เดิม (ห้ามบวก เม็ด + กะรัต) แต่ใส่ byUnit = [{unit,total}] แทน
+        private static void AddTotal(Dictionary<string, object> p, string key, IReadOnlyList<Item> list, Func<Item, decimal> selector)
+        {
+            var groups = list.GroupBy(i => i.Unit, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal).ToList();
+            if (groups.Count <= 1)
+            {
+                p[key] = list.Sum(selector);
+                return;
+            }
+
+            p["byUnit"] = groups
+                .Select(g => new Dictionary<string, object> { ["unit"] = g.Key, ["total"] = g.Sum(selector) })
+                .ToList();
+        }
+
         private static decimal Round1(decimal v) => Math.Round(v, 1, MidpointRounding.AwayFromZero);
 
         // ---- problems ----
@@ -27,7 +43,7 @@ namespace Jewelry.Service.Material.Insight
             var list = items.Where(i => i.Status == MaterialInsightCalculator.StatusNegative).ToList();
             if (list.Count == 0) return null;
 
-            return new Wip.Finding
+            var finding = new Wip.Finding
             {
                 Code = "MAT_NEGATIVE_BALANCE",
                 Severity = Warning,
@@ -35,11 +51,12 @@ namespace Jewelry.Service.Material.Insight
                 Params = new Dictionary<string, object>
                 {
                     ["count"] = list.Count,
-                    ["totalWeight"] = list.Sum(i => Math.Abs(i.OnHand)),
                     ["topItems"] = Top(list.OrderByDescending(i => Math.Abs(i.OnHand)).ThenBy(i => i.Label, StringComparer.Ordinal)),
                     ["ledgerHasInbound"] = inboundRecorded
                 }
             };
+            AddTotal(finding.Params, "totalWeight", list, i => Math.Abs(i.OnHand));
+            return finding;
         }
 
         // หมดสต็อก (critical) — เรียงตามอัตราใช้สูงสุดก่อน
@@ -103,7 +120,7 @@ namespace Jewelry.Service.Material.Insight
             var list = items.Where(i => i.IsDead).ToList();
             if (list.Count == 0) return null;
 
-            return new Wip.Finding
+            var finding = new Wip.Finding
             {
                 Code = "MAT_DEAD_STOCK",
                 Severity = Warning,
@@ -111,10 +128,11 @@ namespace Jewelry.Service.Material.Insight
                 Params = new Dictionary<string, object>
                 {
                     ["count"] = list.Count,
-                    ["totalOnHand"] = list.Sum(i => i.OnHand),
                     ["days"] = t.DeadStockDays
                 }
             };
+            AddTotal(finding.Params, "totalOnHand", list, i => i.OnHand);
+            return finding;
         }
 
         // ประเมินเฉพาะเมื่อ provider มีอายุของที่ค้างในกระบวนการ (onProcessAgeSupported) — ทองยังไม่มี => ข้าม
@@ -125,7 +143,7 @@ namespace Jewelry.Service.Material.Insight
             var list = items.Where(i => i.OnProcess > 0 && i.OnProcessAgeDays.HasValue && i.OnProcessAgeDays.Value > t.OnProcessStaleDays).ToList();
             if (list.Count == 0) return null;
 
-            return new Wip.Finding
+            var finding = new Wip.Finding
             {
                 Code = "MAT_ON_PROCESS_STALE",
                 Severity = Warning,
@@ -133,10 +151,11 @@ namespace Jewelry.Service.Material.Insight
                 Params = new Dictionary<string, object>
                 {
                     ["count"] = list.Count,
-                    ["totalOnProcess"] = list.Sum(i => i.OnProcess),
                     ["days"] = t.OnProcessStaleDays
                 }
             };
+            AddTotal(finding.Params, "totalOnProcess", list, i => i.OnProcess);
+            return finding;
         }
 
         // ---- forecasts ----
@@ -227,6 +246,25 @@ namespace Jewelry.Service.Material.Insight
         }
 
         private static Dictionary<string, object> BuildActionParams(string actionCode, ILookup<string, Wip.Finding> findings)
+        {
+            var result = BuildActionParamsCore(actionCode, findings);
+            var source = actionCode switch
+            {
+                "ACT_RECORD_OPENING_BALANCE" => "MAT_NEGATIVE_BALANCE",
+                "ACT_CLEAR_DEAD_STOCK" => "MAT_DEAD_STOCK",
+                "ACT_RETURN_ON_PROCESS" => "MAT_ON_PROCESS_STALE",
+                _ => null
+            };
+            var byUnit = source == null ? null : Param(findings, source, "byUnit");
+            if (byUnit != null)
+            {
+                result["byUnit"] = byUnit;
+                foreach (var key in new[] { "totalWeight", "totalOnHand", "totalOnProcess" }) result.Remove(key);
+            }
+            return result;
+        }
+
+        private static Dictionary<string, object> BuildActionParamsCore(string actionCode, ILookup<string, Wip.Finding> findings)
         {
             switch (actionCode)
             {

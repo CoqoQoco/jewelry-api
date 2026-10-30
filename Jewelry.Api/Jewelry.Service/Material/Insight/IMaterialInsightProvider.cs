@@ -27,6 +27,16 @@ namespace Jewelry.Service.Material.Insight
         public string? SizeCode { get; set; }
         public string? SizeName { get; set; }
 
+        // หน่วยของ OnHand/OnProcess/movement ของ item นี้ (ทอง = g; พลอยตัดสินรายตัว pcs|ct)
+        public string Unit { get; set; } = "g";
+
+        // กลุ่มสำหรับ "ตามกลุ่ม" (null = ใช้ Code เป็นกลุ่ม แบบทอง)
+        public string? GroupCode { get; set; }
+        public string? GroupName { get; set; }
+
+        // ราคาต่อ 1 Unit (บาท); null = provider ไม่มีราคา (ทอง) -> ไม่คำนวณมูลค่า
+        public decimal? UnitValue { get; set; }
+
         // ในคลัง (พร้อมเบิก)
         public decimal OnHand { get; set; }
 
@@ -56,6 +66,7 @@ namespace Jewelry.Service.Material.Insight
     public interface IMaterialInsightProvider
     {
         string Kind { get; }
+        // unit ระดับ provider (ทอง = g; พลอย = "mixed" เพราะแต่ละ item มี unit ของตัวเอง)
         string Unit { get; }
         Task<MaterialDataset> LoadAsync();
     }

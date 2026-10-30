@@ -11,7 +11,11 @@ namespace jewelry.Model.Material.Insight.Overview
         public string Kind { get; set; } = "GOLD";
 
         // หน่วยของ qty ทุกตัว (ทอง = g)
+        // GEM = "mixed" (แต่ละ item มี unit ของตัวเอง ดู Items[].Unit / Units)
         public string Unit { get; set; } = "g";
+
+        // unit ที่มีอยู่จริงใน Items (ทอง = ["g"], พลอย = ["pcs","ct"] เท่าที่มี)
+        public List<string> Units { get; set; } = new List<string>();
 
         // 'critical' | 'warning' | 'ok' — severity ที่แย่ที่สุดใน problems+forecasts
         public string Status { get; set; } = "ok";
@@ -21,7 +25,14 @@ namespace jewelry.Model.Material.Insight.Overview
         public Kpi Kpi { get; set; } = new Kpi();
         public List<Item> Items { get; set; } = new List<Item>();
         public List<GroupRow> Groups { get; set; } = new List<GroupRow>();
+        // series รวม — เติมเฉพาะเมื่อทุก item หน่วยเดียวกัน (ทอง); หลาย unit (พลอย) = ว่าง ให้ใช้ SeriesByUnit
         public List<SeriesPoint> Series { get; set; } = new List<SeriesPoint>();
+
+        // series แยกตาม unit (qty คนละหน่วยห้ามรวมกัน)
+        public List<UnitSeries> SeriesByUnit { get; set; } = new List<UnitSeries>();
+
+        // series มูลค่า (บาท) รวมข้ามหน่วย — เติมเมื่อ provider มีราคา (พลอย); ทอง = ว่าง
+        public List<ValuePoint> ValueSeries { get; set; } = new List<ValuePoint>();
 
         public List<Finding> Problems { get; set; } = new List<Finding>();
         public List<Finding> Forecasts { get; set; } = new List<Finding>();
@@ -74,6 +85,49 @@ namespace jewelry.Model.Material.Insight.Overview
 
         // มี movement รับเข้า/ยอดยกมา (type 1/2) ที่ยังมีผลอยู่ใน ledger หรือไม่ (false = คลังไม่เคยมียอดตั้งต้น)
         public bool InboundRecorded { get; set; }
+
+        // true เมื่อ Items มีมากกว่า 1 unit -> field รวมด้านบน (totalOnHand ฯลฯ) = 0 ให้ใช้ ByUnit
+        public bool MixedUnits { get; set; }
+
+        // ผลรวมแยกตาม unit
+        public List<UnitTotal> ByUnit { get; set; } = new List<UnitTotal>();
+
+        // มูลค่า (บาท) รวมข้ามหน่วย — null = provider ไม่มีราคา (ทอง)
+        public decimal? TotalValue { get; set; }
+        public decimal? TotalOnProcessValue { get; set; }
+        public decimal? DeadValue { get; set; }
+    }
+
+    public class UnitTotal
+    {
+        public string Unit { get; set; } = null!;
+        public int ItemCount { get; set; }
+        public decimal TotalOnHand { get; set; }
+        public decimal TotalOnProcess { get; set; }
+        public decimal TotalAvailable { get; set; }
+        public int DeadCount { get; set; }
+        public decimal DeadOnHand { get; set; }
+        public int OnProcessStaleCount { get; set; }
+        public decimal OnProcessStaleWeight { get; set; }
+        public int NegativeCount { get; set; }
+        public decimal NegativeWeight { get; set; }
+        public decimal? Value { get; set; }
+        public decimal? OnProcessValue { get; set; }
+    }
+
+    public class UnitSeries
+    {
+        public string Unit { get; set; } = null!;
+        public List<SeriesPoint> Points { get; set; } = new List<SeriesPoint>();
+    }
+
+    public class ValuePoint
+    {
+        public string Month { get; set; } = null!;
+        public decimal InflowValue { get; set; }
+        public decimal ConsumedValue { get; set; }
+        public decimal ReturnedValue { get; set; }
+        public decimal EndStockValue { get; set; }
     }
 
     public class Item
@@ -84,6 +138,18 @@ namespace jewelry.Model.Material.Insight.Overview
         public string? SizeCode { get; set; }
         public string? SizeName { get; set; }
         public string Label { get; set; } = null!;
+
+        // หน่วยของ qty ทุกตัวใน item นี้ ('g' ทอง | 'pcs' เม็ด | 'ct' กะรัต)
+        public string Unit { get; set; } = "g";
+
+        // กลุ่ม (พลอย = ชนิดพลอย tbm_gem); null = ทองใช้ Code เป็นกลุ่ม
+        public string? GroupCode { get; set; }
+        public string? GroupName { get; set; }
+
+        // ราคาต่อ 1 unit (บาท) และมูลค่า (บาท) ของยอดในคลัง/ในกระบวนการ; null = ไม่มีราคา (ทอง)
+        public decimal? UnitValue { get; set; }
+        public decimal? Value { get; set; }
+        public decimal? OnProcessValue { get; set; }
 
         // เฉพาะ kind GOLD (null สำหรับ kind อื่น) — ตาม contract
         public string? GoldCode { get; set; }
@@ -131,6 +197,11 @@ namespace jewelry.Model.Material.Insight.Overview
         public decimal OnHand { get; set; }
         public decimal OnProcess { get; set; }
         public int NegativeCount { get; set; }
+
+        // unit ของกลุ่ม; null เมื่อกลุ่มมีหลาย unit (OnHand/OnProcess = 0 ใช้ ByUnit)
+        public string? Unit { get; set; }
+        public List<UnitTotal> ByUnit { get; set; } = new List<UnitTotal>();
+        public decimal? Value { get; set; }
     }
 
     public class SeriesPoint

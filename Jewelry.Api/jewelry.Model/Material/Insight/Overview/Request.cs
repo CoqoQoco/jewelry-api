@@ -2,7 +2,7 @@ namespace jewelry.Model.Material.Insight.Overview
 {
     public class Request
     {
-        // 'GOLD' (default) — 'GEM' จะรองรับภายหลัง
+        // 'GOLD' (default) | 'GEM'
         public string Kind { get; set; } = "GOLD";
 
         // จำนวนเดือนย้อนหลังของ series (รวมเดือนปัจจุบัน) — clamp 3..36
