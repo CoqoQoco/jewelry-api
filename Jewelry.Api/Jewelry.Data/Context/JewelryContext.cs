@@ -259,6 +259,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtPrintJob> TbtPrintJob { get; set; }
 
+    public virtual DbSet<TbtLabelPrintJob> TbtLabelPrintJob { get; set; }
+
     public virtual DbSet<TbmNotificationType> TbmNotificationType { get; set; }
 
     public virtual DbSet<TbtNotification> TbtNotification { get; set; }
@@ -5832,6 +5834,51 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.Payload)
                 .HasColumnType("text")
                 .HasColumnName("payload");
+            entity.Property(e => e.Status)
+                .HasColumnType("character varying")
+                .HasColumnName("status");
+            entity.Property(e => e.ErrorMessage)
+                .HasColumnType("text")
+                .HasColumnName("error_message");
+            entity.Property(e => e.RetryCount).HasColumnName("retry_count");
+            entity.Property(e => e.StationId)
+                .HasColumnType("character varying")
+                .HasColumnName("station_id");
+            entity.Property(e => e.ClaimToken)
+                .HasColumnType("character varying")
+                .HasColumnName("claim_token");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.ClaimedDate).HasColumnName("claimed_date");
+            entity.Property(e => e.PrintedDate).HasColumnName("printed_date");
+            entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+            entity.Property(e => e.DeletedBy)
+                .HasColumnType("character varying")
+                .HasColumnName("deleted_by");
+            entity.Property(e => e.DeletedDate).HasColumnName("deleted_date");
+        });
+
+        modelBuilder.Entity<TbtLabelPrintJob>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_label_print_job_pk");
+
+            entity.ToTable("tbt_label_print_job");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.LabelType)
+                .HasColumnType("character varying")
+                .HasColumnName("label_type");
+            entity.Property(e => e.ReferenceCode)
+                .HasColumnType("character varying")
+                .HasColumnName("reference_code");
+            entity.Property(e => e.Payload)
+                .HasColumnType("text")
+                .HasColumnName("payload");
+            entity.Property(e => e.Copies).HasColumnName("copies");
             entity.Property(e => e.Status)
                 .HasColumnType("character varying")
                 .HasColumnName("status");

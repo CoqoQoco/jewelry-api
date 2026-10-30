@@ -44,6 +44,7 @@ using Jewelry.Service.Stock.StockReport;
 using Jewelry.Service.Stock.ProductImage;
 using Jewelry.Service.TransferStock;
 using Jewelry.Service.Permission;
+using Jewelry.Service.LabelPrint;
 using Jewelry.Service.Print;
 using Jewelry.Service.Setting.PrintLayout;
 using Jewelry.Service.Stock.Balance;
@@ -188,6 +189,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IAnnouncementService, AnnouncementService>();
 
             services.AddScoped<IPrintJobService, PrintJobService>();
+            services.AddScoped<ILabelPrintJobService, LabelPrintJobService>();
 
             services.AddScoped<IPublicProductService, PublicProductService>();
 
