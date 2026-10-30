@@ -55,7 +55,7 @@ namespace Jewelry.Service.Worker
 
             var totalGoldReturnAmount = returnItems.Where(r => r.CountInCalc).Sum(r => r.Amount);
             var totalReturnWeight = returnItems.Where(r => r.CountInCalc).Sum(r => r.Weight);
-            var netWeightLoss = totalWeightLoss - totalReturnWeight;
+            var netWeightLoss = totalWeightLoss + totalReturnWeight;
 
             var documentNo = await GenerateGlsDocumentNo();
 
@@ -445,7 +445,7 @@ namespace Jewelry.Service.Worker
                     TotalMoneyLoss = totalMoneyLoss,
                     ReturnWeight = returnWeight,
                     ReturnAmount = returnAmount,
-                    NetWeight = totalWeightLoss - returnWeight,
+                    NetWeight = totalWeightLoss + returnWeight,
                     NetAmount = totalMoneyLoss + returnAmount,
                 };
             }).ToList();
