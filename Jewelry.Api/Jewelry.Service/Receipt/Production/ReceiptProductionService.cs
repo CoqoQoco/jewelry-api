@@ -158,7 +158,7 @@ namespace Jewelry.Service.Receipt.Production
                          //from gems in joinedGem.DefaultIfEmpty()
 
                          where item.Running == request.running
-                         select new { item, plan }).FirstOrDefault();
+                         select new { item, plan }).AsSplitQuery().FirstOrDefault();
 
             if (query == null)
             {
@@ -473,7 +473,7 @@ namespace Jewelry.Service.Receipt.Production
                          on receipt.WoText equals plan.WoText
 
                          where receipt.Running == request.ReceiptNumber
-                         select new { receipt, plan }).FirstOrDefault();
+                         select new { receipt, plan }).AsSplitQuery().FirstOrDefault();
 
             if (query == null)
             {
