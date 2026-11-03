@@ -876,7 +876,8 @@ namespace Jewelry.Service.Sale.Invoice
                         && ((normalized != "" && EF.Functions.ILike(p.StockNumber.Replace("-", ""), normalizedPattern))
                             || _jewelryContext.TbtStockPiece.Any(piece => piece.StockNumber == p.StockNumber
                                 && piece.StockNumberOrigin != null
-                                && EF.Functions.ILike(piece.StockNumberOrigin, pattern)))));
+                                && (EF.Functions.ILike(piece.StockNumberOrigin, pattern)
+                                    || (normalized != "" && EF.Functions.ILike(piece.StockNumberOrigin.Replace("-", ""), normalizedPattern)))))));
             }
 
             if (!string.IsNullOrEmpty(request.ProductNumber))

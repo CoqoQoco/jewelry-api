@@ -110,9 +110,12 @@ public static class ProductGalleryHelper
         if (candidates.Count == 0)
         {
             var upperTrimmed = trimmed.ToUpper();
+            var normalizedOrigin = StockNumberSearch.Normalize(trimmed);
             candidates = await context.TbtStockPiece
                 .Include(p => p.SkuCodeNavigation)
-                .Where(p => p.StockNumberOrigin != null && p.StockNumberOrigin.Trim().ToUpper() == upperTrimmed)
+                .Where(p => p.StockNumberOrigin != null
+                    && (p.StockNumberOrigin.Trim().ToUpper() == upperTrimmed
+                        || (normalizedOrigin != "" && p.StockNumberOrigin.Replace("-", "").ToUpper() == normalizedOrigin)))
                 .ToListAsync();
         }
 

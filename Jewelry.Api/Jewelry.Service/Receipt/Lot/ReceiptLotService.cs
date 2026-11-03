@@ -30,7 +30,9 @@ namespace Jewelry.Service.Receipt.Lot
             var rows = await (from piece in _jewelryContext.TbtStockPiece.AsNoTracking()
                               join sku in _jewelryContext.TbtSku.AsNoTracking()
                               on piece.SkuCode equals sku.SkuCode
-                              where (piece.StockNumberOrigin != null && piece.StockNumberOrigin.Trim().ToUpper() == keyword)
+                              where (piece.StockNumberOrigin != null
+                                     && (piece.StockNumberOrigin.Trim().ToUpper() == keyword
+                                         || piece.StockNumberOrigin.Replace("-", "").ToUpper() == normalized))
                                  || piece.StockNumber.Replace("-", "").ToUpper() == normalized
                               orderby piece.StockNumber
                               select new jewelry.Model.Receipt.Lot.Search.Response

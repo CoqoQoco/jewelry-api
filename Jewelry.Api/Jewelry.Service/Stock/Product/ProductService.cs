@@ -72,7 +72,11 @@ namespace Jewelry.Service.Stock.Product
             }
             if (!string.IsNullOrEmpty(request.StockNumberOrigin))
             {
-                pieces = pieces.Where(x => x.StockNumberOrigin != null && x.StockNumberOrigin.Contains(request.StockNumberOrigin));
+                var normalizedOrigin = StockNumberSearch.Normalize(request.StockNumberOrigin);
+                if (!string.IsNullOrEmpty(normalizedOrigin))
+                {
+                    pieces = pieces.Where(x => x.StockNumberOrigin != null && x.StockNumberOrigin.Replace("-", "").ToUpper().Contains(normalizedOrigin));
+                }
             }
             if (!string.IsNullOrEmpty(request.Mold))
             {
@@ -149,7 +153,8 @@ namespace Jewelry.Service.Stock.Product
                     (x.SkuCodeNavigation.ProductNumber != null && x.SkuCodeNavigation.ProductNumber.Contains(keyword)) ||
                     x.SkuCodeNavigation.ProductNameEn.Contains(keyword) ||
                     x.SkuCodeNavigation.ProductNameTh.Contains(keyword) ||
-                    (x.StockNumberOrigin != null && x.StockNumberOrigin.Contains(keyword)));
+                    (x.StockNumberOrigin != null && (x.StockNumberOrigin.Contains(keyword)
+                        || (normalizedKeyword != "" && x.StockNumberOrigin.Replace("-", "").ToUpper().Contains(normalizedKeyword)))));
             }
             if (request.HasCostDetail.HasValue)
             {
@@ -508,7 +513,11 @@ namespace Jewelry.Service.Stock.Product
 
             if (!string.IsNullOrEmpty(request.StockNumberOrigin))
             {
-                query = query.Where(x => x.StockNumberOrigin == request.StockNumberOrigin);
+                var originExact = request.StockNumberOrigin;
+                var originNormalized = StockNumberSearch.Normalize(originExact);
+                query = query.Where(x => x.StockNumberOrigin != null
+                    && (x.StockNumberOrigin == originExact
+                        || (originNormalized != "" && x.StockNumberOrigin.Replace("-", "").ToUpper() == originNormalized)));
             }
 
             if (!string.IsNullOrEmpty(request.ProductNumber))
@@ -531,7 +540,11 @@ namespace Jewelry.Service.Stock.Product
 
                 if (!string.IsNullOrEmpty(request.StockNumberOrigin))
                 {
-                    fallbackQuery = fallbackQuery.Where(x => x.StockNumberOrigin == request.StockNumberOrigin);
+                    var fbOriginExact = request.StockNumberOrigin;
+                    var fbOriginNormalized = StockNumberSearch.Normalize(fbOriginExact);
+                    fallbackQuery = fallbackQuery.Where(x => x.StockNumberOrigin != null
+                        && (x.StockNumberOrigin == fbOriginExact
+                            || (fbOriginNormalized != "" && x.StockNumberOrigin.Replace("-", "").ToUpper() == fbOriginNormalized)));
                 }
 
                 if (!string.IsNullOrEmpty(request.ProductNumber))

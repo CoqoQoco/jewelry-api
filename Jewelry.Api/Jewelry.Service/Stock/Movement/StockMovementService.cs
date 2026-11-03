@@ -73,7 +73,13 @@ namespace Jewelry.Service.Stock.Movement
             if (!string.IsNullOrWhiteSpace(request.MovedBy))
                 query = query.Where(x => x.CreateBy != null && x.CreateBy.Contains(request.MovedBy));
             if (!string.IsNullOrWhiteSpace(request.StockNumberOrigin))
-                query = query.Where(x => x.StockNumberNavigation != null && x.StockNumberNavigation.StockNumberOrigin != null && x.StockNumberNavigation.StockNumberOrigin.Contains(request.StockNumberOrigin));
+            {
+                var normalizedOrigin = StockNumberSearch.Normalize(request.StockNumberOrigin);
+                if (!string.IsNullOrEmpty(normalizedOrigin))
+                {
+                    query = query.Where(x => x.StockNumberNavigation != null && x.StockNumberNavigation.StockNumberOrigin != null && x.StockNumberNavigation.StockNumberOrigin.Replace("-", "").ToUpper().Contains(normalizedOrigin));
+                }
+            }
 
             return query
                 .OrderByDescending(x => x.MovementDate)

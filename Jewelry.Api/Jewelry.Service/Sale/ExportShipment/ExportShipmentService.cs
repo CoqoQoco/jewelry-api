@@ -285,7 +285,8 @@ public class ExportShipmentService : BaseService, IExportShipmentService
                         (p.SkuCodeNavigation.ProductNumber != null && p.SkuCodeNavigation.ProductNumber.Contains(keyword)) ||
                         p.SkuCodeNavigation.ProductNameEn.Contains(keyword) ||
                         p.SkuCodeNavigation.ProductNameTh.Contains(keyword) ||
-                        (p.StockNumberOrigin != null && p.StockNumberOrigin.Contains(keyword)));
+                        (p.StockNumberOrigin != null && (p.StockNumberOrigin.Contains(keyword)
+                            || (normalizedKeyword != "" && p.StockNumberOrigin.Replace("-", "").ToUpper().Contains(normalizedKeyword)))));
                 }
             }
 
