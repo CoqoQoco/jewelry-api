@@ -79,6 +79,72 @@ namespace Jewelry.Service.Stock
         }
     }
 
+    // โหลด piece / unit / tag / balance ของหลายเลขสต็อกครั้งเดียว (ไม่ล็อก) เพื่อให้ validate + reserve ไม่ยิง query ซ้ำต่อบรรทัด
+    // entity ทั้งหมดถูก track ใน context แล้ว จึงเป็น instance เดียวกับที่ flow เดิมจะโหลดเอง — ต้องสร้างหลังล็อก piece/balance แล้วเท่านั้น
+    public sealed class StockLotPreload
+    {
+        private readonly HashSet<(string, string)> _lots = new();
+        private readonly Dictionary<(string, string), HashSet<long>> _tagged = new();
+        private readonly HashSet<string> _balanceSkus = new();
+
+        public Dictionary<string, TbtStockPiece> Pieces { get; } = new();
+
+        public static async Task<StockLotPreload> LoadAsync(JewelryContext context, IEnumerable<string> stockNumbers)
+        {
+            var preload = new StockLotPreload();
+            var numbers = stockNumbers.Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList();
+            if (numbers.Count == 0) return preload;
+
+            var pieces = await context.TbtStockPiece
+                .Where(p => numbers.Contains(p.StockNumber))
+                .ToListAsync();
+
+            foreach (var piece in pieces)
+            {
+                preload.Pieces.TryAdd(piece.StockNumber, piece);
+                preload._lots.Add((piece.StockNumber, piece.ProductCode));
+            }
+
+            await context.TbtStockUnit
+                .Where(u => numbers.Contains(u.StockNumber))
+                .ToListAsync();
+
+            var tags = await context.TbtStockPieceRfid
+                .Where(r => r.IsActive && numbers.Contains(r.StockNumber))
+                .ToListAsync();
+
+            foreach (var tag in tags)
+            {
+                if (!tag.UnitId.HasValue) continue;
+                var key = (tag.StockNumber, tag.ProductCode);
+                if (!preload._tagged.TryGetValue(key, out var set))
+                {
+                    set = new HashSet<long>();
+                    preload._tagged[key] = set;
+                }
+                set.Add(tag.UnitId.Value);
+            }
+
+            var skus = pieces.Select(p => p.SkuCode).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList();
+            if (skus.Count > 0)
+            {
+                await context.TbtStockBalance
+                    .Where(b => skus.Contains(b.SkuCode))
+                    .ToListAsync();
+                foreach (var sku in skus) preload._balanceSkus.Add(sku);
+            }
+
+            return preload;
+        }
+
+        internal bool HasLot(TbtStockPiece piece) => _lots.Contains((piece.StockNumber, piece.ProductCode));
+
+        internal HashSet<long> TaggedIds(TbtStockPiece piece) =>
+            _tagged.TryGetValue((piece.StockNumber, piece.ProductCode), out var set) ? set : new HashSet<long>();
+
+        internal bool HasBalances(string skuCode) => _balanceSkus.Contains(skuCode);
+    }
+
     // Operation รายชิ้นของล็อต (tbt_stock_unit) — TK202610290003
     // - ไม่ล็อกและไม่ SaveChanges เอง: ผู้เรียกต้องล็อก piece -> balance ตามลำดับ global ก่อน แล้ว SaveChanges ใน transaction เดียวกัน
     // - แก้ทั้ง unit และ piece (qty / qty_reserved / status / คลังหลัก) และคืนผลต่างรายคลัง (Deltas) + แถว movement (Lines)
@@ -86,9 +152,13 @@ namespace Jewelry.Service.Stock
     public static class StockUnitOps
     {
         // โหลด unit ของล็อต (รวมที่ยังไม่ save) — ถ้าจำนวนไม่ตรงกับ piece ซิงก์จำนวนก่อน (ล็อตที่ยังไม่มี unit ฯลฯ)
-        public static async Task<List<TbtStockUnit>> LoadLotAsync(JewelryContext context, TbtStockPiece piece, StockUnitSyncInfo info)
+        public static async Task<List<TbtStockUnit>> LoadLotAsync(JewelryContext context, TbtStockPiece piece, StockUnitSyncInfo info, StockLotPreload? preload = null)
         {
-            var units = await StockUnitSync.LoadUnitsAsync(context, piece.StockNumber, piece.ProductCode);
+            var units = preload != null && preload.HasLot(piece)
+                ? context.TbtStockUnit.Local
+                    .Where(u => u.StockNumber == piece.StockNumber && u.ProductCode == piece.ProductCode)
+                    .ToList()
+                : await StockUnitSync.LoadUnitsAsync(context, piece.StockNumber, piece.ProductCode);
 
             if (!StockUnitSync.CountsMatch(piece, units))
             {
@@ -108,14 +178,15 @@ namespace Jewelry.Service.Stock
             IReadOnlyList<long>? unitIds,
             string? locationCode,
             ReservationKey key,
-            StockUnitSyncInfo info)
+            StockUnitSyncInfo info,
+            StockLotPreload? preload = null)
         {
             if (qty <= 0)
             {
                 throw new HandleException("จำนวนที่จองต้องมากกว่า 0");
             }
 
-            var units = await LoadLotAsync(context, piece, info);
+            var units = await LoadLotAsync(context, piece, info, preload);
             var result = new UnitOpResult(piece);
             var location = NormalizeLocation(locationCode);
             var picked = new List<TbtStockUnit>();
@@ -167,7 +238,9 @@ namespace Jewelry.Service.Stock
             else
             {
                 var free = units.Where(u => u.Status == StockUnitSync.InStock).ToList();
-                var tagged = await TaggedIdsAsync(context, piece);
+                var tagged = preload != null && preload.HasLot(piece)
+                    ? preload.TaggedIds(piece)
+                    : await TaggedIdsAsync(context, piece);
 
                 if (location != null)
                 {

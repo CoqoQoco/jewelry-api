@@ -19,7 +19,7 @@ namespace Jewelry.Service.Stock
     public static class StockBalanceApplier
     {
         // writeBalance = false: เขียนเฉพาะ movement (ผู้เรียกจัดการ balance เองแล้ว เช่น ProductService แยก SKU)
-        public static async Task ApplyAsync(JewelryContext context, UnitOpResult result, StockMovementTemplate template, bool writeBalance = true)
+        public static async Task ApplyAsync(JewelryContext context, UnitOpResult result, StockMovementTemplate template, bool writeBalance = true, StockLotPreload? preload = null)
         {
             if (result.Units.Count == 0)
             {
@@ -32,7 +32,7 @@ namespace Jewelry.Service.Stock
             {
                 if (delta.OnHand == 0 && delta.Reserved == 0) continue;
 
-                var balance = await FindBalanceAsync(context, result.SkuCode, delta.Location);
+                var balance = await FindBalanceAsync(context, result.SkuCode, delta.Location, preload);
 
                 if (balance == null)
                 {
@@ -94,13 +94,18 @@ namespace Jewelry.Service.Stock
             }
         }
 
-        private static async Task<TbtStockBalance?> FindBalanceAsync(JewelryContext context, string skuCode, string location)
+        private static async Task<TbtStockBalance?> FindBalanceAsync(JewelryContext context, string skuCode, string location, StockLotPreload? preload)
         {
             var local = context.TbtStockBalance.Local
                 .FirstOrDefault(b => b.SkuCode == skuCode && b.LocationCode == location);
             if (local != null)
             {
                 return local;
+            }
+
+            if (preload != null && preload.HasBalances(skuCode))
+            {
+                return null;
             }
 
             return await context.TbtStockBalance

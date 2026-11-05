@@ -764,9 +764,12 @@ namespace Jewelry.Service.Sale.SaleOrder
                 await _jewelryContext.LockStockPiecesAsync(requestStockNumbers);
                 await LockStockBalancesForStockNumbersAsync(requestStockNumbers);
 
-                await ValidateStockItemConfirmations(saleOrder.SoNumber, request.StockItems);
+                var requestNumbers = requestStockNumbers.ToList();
+                var preload = await StockLotPreload.LoadAsync(_jewelryContext, requestNumbers);
 
-                var confirmedStockNumbers = await ConfirmStockItemsCore(saleOrder, request.StockItems, confirmedDate);
+                await ValidateStockItemConfirmations(saleOrder.SoNumber, request.StockItems, preload);
+
+                var confirmedStockNumbers = await ConfirmStockItemsCore(saleOrder, request.StockItems, confirmedDate, preload);
 
                 // Save all changes
                 await _jewelryContext.SaveChangesAsync();
@@ -822,9 +825,11 @@ namespace Jewelry.Service.Sale.SaleOrder
             await _jewelryContext.LockStockPiecesAsync(requestStockNumbers);
             await LockStockBalancesForStockNumbersAsync(requestStockNumbers);
 
-            await ValidateStockItemConfirmations(saleOrder.SoNumber, stockItems);
+            var preload = await StockLotPreload.LoadAsync(_jewelryContext, requestStockNumbers.ToList());
 
-            return await ConfirmStockItemsCore(saleOrder, stockItems, confirmedDate);
+            await ValidateStockItemConfirmations(saleOrder.SoNumber, stockItems, preload);
+
+            return await ConfirmStockItemsCore(saleOrder, stockItems, confirmedDate, preload);
         }
 
         // เลขที่สแกน/พิมพ์อาจมีขีดหรือไม่มีขีด — แปลงรายการจริง (ไม่ใช่ placeholder) เป็นเลขจริงใน DB ก่อน lock/validate/บันทึก
@@ -856,7 +861,7 @@ namespace Jewelry.Service.Sale.SaleOrder
             await _jewelryContext.LockStockBalancesAsync(skuCodes);
         }
 
-        private async Task ValidateStockItemConfirmations(string soNumber, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems)
+        private async Task ValidateStockItemConfirmations(string soNumber, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems, StockLotPreload preload)
         {
             var errors = new List<string>();
 
@@ -962,8 +967,7 @@ namespace Jewelry.Service.Sale.SaleOrder
 
             foreach (var group in groupedByStockNumber)
             {
-                var piece = await _jewelryContext.TbtStockPiece
-                    .FirstOrDefaultAsync(p => p.StockNumber == group.StockNumber);
+                preload.Pieces.TryGetValue(group.StockNumber, out var piece);
 
                 // ของจริงต้องมี piece อยู่ในคลังเสมอ ไม่งั้นจะกลายเป็นแถวยืนยันที่ไม่กระทบสต็อกแบบมองไม่เห็น (เคยเป็นบั๊กเงียบ)
                 if (piece == null)
@@ -991,7 +995,7 @@ namespace Jewelry.Service.Sale.SaleOrder
             }
         }
 
-        private async Task<List<string>> ConfirmStockItemsCore(TbtSaleOrder saleOrder, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems, DateTime confirmedDate)
+        private async Task<List<string>> ConfirmStockItemsCore(TbtSaleOrder saleOrder, List<jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation> stockItems, DateTime confirmedDate, StockLotPreload preload)
         {
             var confirmedStockNumbers = new List<string>();
             var created = new List<(jewelry.Model.Sale.SaleOrder.ConfirmStock.StockItemConfirmation Item, TbtSaleOrderProduct Product)>();
@@ -1031,8 +1035,7 @@ namespace Jewelry.Service.Sale.SaleOrder
             // placeholder = รายการรอของ (เลขพนักงานพิมพ์เอง) — ไม่มีของจริงให้จอง ข้าม stock effect ทั้งหมด
             foreach (var (stockItem, newProduct) in created.Where(c => !c.Item.IsPlaceholder))
             {
-                var piece = await _jewelryContext.TbtStockPiece
-                    .FirstOrDefaultAsync(p => p.StockNumber == stockItem.StockNumber);
+                preload.Pieces.TryGetValue(stockItem.StockNumber, out var piece);
 
                 if (piece == null)
                 {
@@ -1042,7 +1045,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                 var reserve = await StockUnitOps.ReserveAsync(
                     _jewelryContext, piece, stockItem.Qty, stockItem.UnitIds, stockItem.LocationCode,
                     new ReservationKey(ReservationKey.So, saleOrder.SoNumber, newProduct.Id),
-                    new StockUnitSyncInfo { By = CurrentUsername, Now = confirmedDate });
+                    new StockUnitSyncInfo { By = CurrentUsername, Now = confirmedDate }, preload);
 
                 await StockBalanceApplier.ApplyAsync(_jewelryContext, reserve, new StockMovementTemplate
                 {
@@ -1051,7 +1054,7 @@ namespace Jewelry.Service.Sale.SaleOrder
                     RefDocNo = saleOrder.SoNumber,
                     Date = confirmedDate,
                     By = CurrentUsername
-                });
+                }, preload: preload);
             }
 
             return confirmedStockNumbers;
