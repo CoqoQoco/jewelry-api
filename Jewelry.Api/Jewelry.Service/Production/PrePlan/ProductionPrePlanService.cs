@@ -170,6 +170,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                 ProductQty = i.ProductQty,
                 ProductQtyUnit = i.ProductQtyUnit,
                 ProductDetail = i.ProductDetail,
+                RingSize = i.RingSize,
                 ProductImagePath = i.ProductImagePath,
                 LinkedProductionPlanId = i.LinkedProductionPlanId,
                 Wo = i.Wo,
@@ -242,6 +243,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                 ProductQty = itemReq.ProductQty,
                 ProductQtyUnit = itemReq.ProductQtyUnit,
                 ProductDetail = itemReq.ProductDetail,
+                RingSize = itemReq.RingSize,
                 ProductImagePath = itemReq.ProductImagePath,
                 CreateBy = CurrentUsername,
                 CreateDate = DateTime.UtcNow,
@@ -326,6 +328,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                 ProductQty = itemReq.ProductQty,
                 ProductQtyUnit = itemReq.ProductQtyUnit,
                 ProductDetail = itemReq.ProductDetail,
+                RingSize = itemReq.RingSize,
                 ProductImagePath = itemReq.ProductImagePath,
                 CreateBy = CurrentUsername,
                 CreateDate = DateTime.UtcNow,
@@ -453,6 +456,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                         ProductQty = i.ProductQty,
                         ProductQtyUnit = i.ProductQtyUnit,
                         ProductDetail = i.ProductDetail,
+                        RingSize = i.RingSize,
                     };
 
         if (!string.IsNullOrEmpty(moldCode))

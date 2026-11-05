@@ -23,6 +23,8 @@ public partial class TbtProductionPrePlanItem
 
     public string? ProductDetail { get; set; }
 
+    public string? RingSize { get; set; }
+
     public string? ProductImagePath { get; set; }
 
     public int? LinkedProductionPlanId { get; set; }

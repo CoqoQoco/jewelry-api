@@ -88,6 +88,7 @@ public class GetPrePlanItemResponse
     public int? ProductQty { get; set; }
     public string? ProductQtyUnit { get; set; }
     public string? ProductDetail { get; set; }
+    public string? RingSize { get; set; }
     public string? ProductImagePath { get; set; }
     public int? LinkedProductionPlanId { get; set; }
     public string? Wo { get; set; }
@@ -118,6 +119,7 @@ public class AvailableForPlanResponse
     public int? ProductQty { get; set; }
     public string? ProductQtyUnit { get; set; }
     public string? ProductDetail { get; set; }
+    public string? RingSize { get; set; }
     public List<GetPrePlanMaterialResponse> Materials { get; set; } = new List<GetPrePlanMaterialResponse>();
 }
 

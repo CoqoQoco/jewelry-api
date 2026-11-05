@@ -3945,6 +3945,9 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("product_qty_unit");
             entity.Property(e => e.ProductDetail).HasColumnName("product_detail");
+            entity.Property(e => e.RingSize)
+                .HasMaxLength(50)
+                .HasColumnName("ring_size");
             entity.Property(e => e.ProductImagePath)
                 .HasColumnType("character varying")
                 .HasColumnName("product_image_path");
