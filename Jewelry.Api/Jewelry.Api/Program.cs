@@ -115,7 +115,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 }
             };
         }
-    });
+    })
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, Jewelry.Api.Extension.DeviceKeyAuthenticationHandler>(
+        Jewelry.Api.Extension.DeviceKeyDefaults.AuthenticationScheme, null);
 
 // Permission authorization
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, Jewelry.Api.Extension.PermissionPolicyProvider>();

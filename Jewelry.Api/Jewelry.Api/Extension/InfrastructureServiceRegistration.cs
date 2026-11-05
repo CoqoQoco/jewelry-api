@@ -190,6 +190,8 @@ namespace Jewelry.Api.Extension
 
             services.AddScoped<IPrintJobService, PrintJobService>();
             services.AddScoped<ILabelPrintJobService, LabelPrintJobService>();
+            services.AddMemoryCache();
+            services.AddScoped<ILabelStationKeyService, LabelStationKeyService>();
 
             services.AddScoped<IPublicProductService, PublicProductService>();
 

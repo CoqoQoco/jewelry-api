@@ -11,7 +11,6 @@ namespace Jewelry.Api.Controllers.LabelPrint
 {
     [Route("/[controller]")]
     [ApiController]
-    [Authorize]
     public class LabelPrintController : ApiControllerBase
     {
         private readonly ILogger<LabelPrintController> _logger;
@@ -26,6 +25,7 @@ namespace Jewelry.Api.Controllers.LabelPrint
             _service = service;
         }
 
+        [Authorize]
         [Route("Enqueue")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.LabelPrint.Enqueue.Response))]
@@ -44,6 +44,7 @@ namespace Jewelry.Api.Controllers.LabelPrint
             }
         }
 
+        [Authorize(AuthenticationSchemes = DeviceKeyDefaults.AuthenticationScheme)]
         [Route("List")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.LabelPrint.List.Response>))]
@@ -62,6 +63,7 @@ namespace Jewelry.Api.Controllers.LabelPrint
             }
         }
 
+        [Authorize(AuthenticationSchemes = DeviceKeyDefaults.AuthenticationScheme)]
         [Route("Claim")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.LabelPrint.Claim.Response))]
@@ -80,6 +82,7 @@ namespace Jewelry.Api.Controllers.LabelPrint
             }
         }
 
+        [Authorize(AuthenticationSchemes = DeviceKeyDefaults.AuthenticationScheme)]
         [Route("Ack")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.LabelPrint.Ack.Response))]
@@ -98,6 +101,7 @@ namespace Jewelry.Api.Controllers.LabelPrint
             }
         }
 
+        [Authorize(AuthenticationSchemes = DeviceKeyDefaults.AuthenticationScheme)]
         [Route("Retry")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.LabelPrint.Retry.Response))]
@@ -116,6 +120,7 @@ namespace Jewelry.Api.Controllers.LabelPrint
             }
         }
 
+        [Authorize(AuthenticationSchemes = DeviceKeyDefaults.AuthenticationScheme)]
         [Route("Delete")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.LabelPrint.Delete.Response))]

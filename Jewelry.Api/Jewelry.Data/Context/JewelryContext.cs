@@ -261,6 +261,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtLabelPrintJob> TbtLabelPrintJob { get; set; }
 
+    public virtual DbSet<TbtLabelStationKey> TbtLabelStationKey { get; set; }
+
     public virtual DbSet<TbmNotificationType> TbmNotificationType { get; set; }
 
     public virtual DbSet<TbtNotification> TbtNotification { get; set; }
@@ -5903,6 +5905,29 @@ public partial class JewelryContext : DbContext
                 .HasColumnType("character varying")
                 .HasColumnName("deleted_by");
             entity.Property(e => e.DeletedDate).HasColumnName("deleted_date");
+        });
+
+        modelBuilder.Entity<TbtLabelStationKey>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_label_station_key_pk");
+
+            entity.ToTable("tbt_label_station_key");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.DeviceKey)
+                .HasColumnType("text")
+                .HasColumnName("device_key");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
+            entity.Property(e => e.RevokedDate).HasColumnName("revoked_date");
+            entity.Property(e => e.RevokedBy)
+                .HasColumnType("character varying")
+                .HasColumnName("revoked_by");
         });
 
         modelBuilder.Entity<TbmNotificationType>(entity =>
