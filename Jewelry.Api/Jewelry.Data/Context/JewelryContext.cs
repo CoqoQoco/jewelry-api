@@ -4003,6 +4003,9 @@ public partial class JewelryContext : DbContext
                 .ValueGeneratedOnAdd()
                 .HasColumnName("id");
             entity.Property(e => e.PrePlanItemId).HasColumnName("pre_plan_item_id");
+            entity.Property(e => e.RingSize)
+                .HasMaxLength(50)
+                .HasColumnName("ring_size");
             entity.Property(e => e.Gold)
                 .HasColumnType("character varying")
                 .HasColumnName("gold");

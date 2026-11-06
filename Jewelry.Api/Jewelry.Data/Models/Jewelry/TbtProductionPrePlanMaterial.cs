@@ -40,6 +40,8 @@ public partial class TbtProductionPrePlanMaterial
 
     public string? DiamondQuality { get; set; }
 
+    public string? RingSize { get; set; }
+
     public string? CreateBy { get; set; }
 
     public DateTime? CreateDate { get; set; }

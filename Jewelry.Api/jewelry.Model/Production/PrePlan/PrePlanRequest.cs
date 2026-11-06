@@ -66,6 +66,7 @@ public class CreatePrePlanItemRequest
 
 public class CreatePrePlanMaterialRequest
 {
+    public string? RingSize { get; set; }
     public string? Gold { get; set; }
     public string? GoldSize { get; set; }
     public decimal? GoldQty { get; set; }

@@ -42,6 +42,7 @@ public class SearchPrePlanItemResponse
 
 public class SearchPrePlanMaterialBrief
 {
+    public string? RingSize { get; set; }
     public string? Gold { get; set; }
     public decimal? GoldQty { get; set; }
     public string? Gem { get; set; }
@@ -137,6 +138,7 @@ public class GetPrePlanMaterialResponse
 {
     public int Id { get; set; }
     public int PrePlanItemId { get; set; }
+    public string? RingSize { get; set; }
     public string? Gold { get; set; }
     public string? GoldSize { get; set; }
     public decimal? GoldQty { get; set; }

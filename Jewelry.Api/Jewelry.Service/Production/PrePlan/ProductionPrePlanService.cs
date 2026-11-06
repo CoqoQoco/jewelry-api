@@ -112,6 +112,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                 Materials = materials.Where(m => m.PrePlanItemId == i.Id)
                     .Select(m => new SearchPrePlanMaterialBrief
                     {
+                        RingSize = m.RingSize,
                         Gold = m.Gold,
                         GoldQty = m.GoldQty,
                         Gem = m.Gem,
@@ -183,6 +184,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
                 IsCancelled = i.IsCancelled,
                 Materials = i.Materials.Select(m => new GetPrePlanMaterialResponse
                 {
+                    RingSize = m.RingSize,
                     Id = m.Id,
                     PrePlanItemId = m.PrePlanItemId,
                     Gold = m.Gold,
@@ -253,6 +255,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             {
                 item.Materials.Add(new TbtProductionPrePlanMaterial
                 {
+                    RingSize = matReq.RingSize,
                     Gold = matReq.Gold,
                     GoldSize = matReq.GoldSize,
                     GoldQty = matReq.GoldQty,
@@ -338,6 +341,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             {
                 item.Materials.Add(new TbtProductionPrePlanMaterial
                 {
+                    RingSize = matReq.RingSize,
                     Gold = matReq.Gold,
                     GoldSize = matReq.GoldSize,
                     GoldQty = matReq.GoldQty,
@@ -472,6 +476,7 @@ public class ProductionPrePlanService : BaseService, IProductionPrePlanService
             it.Materials = materials.Where(m => m.PrePlanItemId == it.ItemId)
                 .Select(m => new GetPrePlanMaterialResponse
                 {
+                    RingSize = m.RingSize,
                     Id = m.Id,
                     PrePlanItemId = m.PrePlanItemId,
                     Gold = m.Gold,
