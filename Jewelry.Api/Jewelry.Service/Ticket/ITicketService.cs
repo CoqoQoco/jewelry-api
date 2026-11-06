@@ -12,6 +12,7 @@ public interface ITicketService
     Task<DataSourceResult> GetMyTickets(SearchTicketRequest request);
     Task<string> UpdateTicketStatus(UpdateTicketStatusRequest request);
     Task<string> UpdateTicketDev(UpdateTicketDevRequest request);
+    Task<string> UpdateTicketCommit(UpdateTicketCommitRequest request);
     Task<string> AddTicketLog(AddTicketLogRequest request);
     Task<string> AddTicketComment(AddTicketCommentRequest request);
     Task<string> AddMyTicketComment(AddMyTicketCommentRequest request);

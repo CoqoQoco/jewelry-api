@@ -132,6 +132,28 @@ namespace Jewelry.Api.Controllers.Ticket
             }
         }
 
+        [Route("UpdateCommit")]
+        [HttpPost]
+        [RequirePermission("ticket:manage")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> UpdateCommit([FromBody] UpdateTicketCommitRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return ModelStateBadRequest();
+
+                var response = await _service.UpdateTicketCommit(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("AddLog")]
         [HttpPost]
         [RequirePermission("ticket:manage")]

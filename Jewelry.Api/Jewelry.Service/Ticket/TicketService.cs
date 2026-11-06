@@ -238,6 +238,10 @@ public class TicketService : BaseService, ITicketService
                 CreateDate = x.CreateDate,
                 UpdateDate = x.UpdateDate,
                 UpdateBy = x.UpdateBy,
+                DeployStatus = x.DeployStatus,
+                DeployDate = x.DeployDate,
+                CommitUi = x.CommitUi,
+                CommitApi = x.CommitApi,
                 HasNewMessage = hasNew,
                 ImageUrls = imagesByTicket.TryGetValue(x.Id, out var urls) ? urls : new List<string>(),
                 Logs = logsByTicket.TryGetValue(x.Id, out var ticketLogs) ? ticketLogs : new List<TicketLogResponse>(),
@@ -423,6 +427,30 @@ public class TicketService : BaseService, ITicketService
         _jewelryContext.TbtTicket.Update(ticket);
         _jewelryContext.TbtTicketLog.Add(BuildLog(ticket.Id, "dev", "อัปเดตผลวิเคราะห์ / คำตอบถึงผู้แจ้ง", null, null));
         await _jewelryContext.SaveChangesAsync();
+
+        return "success";
+    }
+
+    public async Task<string> UpdateTicketCommit(UpdateTicketCommitRequest request)
+    {
+        TicketDeployRules.ValidateRequest(request.DeployStatus, request.CommitUi, request.CommitApi);
+
+        var ticket = await _jewelryContext.TbtTicket
+            .Where(x => x.Id == request.TicketId)
+            .SingleOrDefaultAsync();
+
+        if (ticket == null)
+            throw new HandleException($"ไม่พบ Ticket รหัส {request.TicketId}");
+
+        var changed = TicketDeployRules.Apply(ticket, request.DeployStatus, request.CommitUi, request.CommitApi, DateTime.UtcNow);
+
+        if (changed)
+        {
+            ticket.UpdateDate = DateTime.UtcNow;
+            ticket.UpdateBy = CurrentUsername;
+            _jewelryContext.TbtTicket.Update(ticket);
+            await _jewelryContext.SaveChangesAsync();
+        }
 
         return "success";
     }

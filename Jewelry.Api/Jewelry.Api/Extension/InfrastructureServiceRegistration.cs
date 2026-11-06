@@ -186,6 +186,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<ICatalogService, CatalogService>();
 
             services.AddScoped<ITicketService, TicketService>();
+            services.AddScoped<Jewelry.Service.ReleaseLog.IReleaseLogService, Jewelry.Service.ReleaseLog.ReleaseLogService>();
             services.AddScoped<IAnnouncementService, AnnouncementService>();
 
             services.AddScoped<IPrintJobService, PrintJobService>();

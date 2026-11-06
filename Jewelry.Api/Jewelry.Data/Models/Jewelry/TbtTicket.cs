@@ -35,6 +35,14 @@ public partial class TbtTicket
 
     public string? UpdateBy { get; set; }
 
+    public string DeployStatus { get; set; } = "none";
+
+    public DateTime? DeployDate { get; set; }
+
+    public string? CommitUi { get; set; }
+
+    public string? CommitApi { get; set; }
+
     public virtual TbmTicketStatus StatusNavigation { get; set; } = null!;
 
     public virtual ICollection<TbtTicketImage> TbtTicketImage { get; set; } = new List<TbtTicketImage>();

@@ -35,6 +35,10 @@ public class TicketListResponse
     public DateTime CreateDate { get; set; }
     public DateTime? UpdateDate { get; set; }
     public string? UpdateBy { get; set; }
+    public string? DeployStatus { get; set; }
+    public DateTime? DeployDate { get; set; }
+    public string? CommitUi { get; set; }
+    public string? CommitApi { get; set; }
     public bool HasNewMessage { get; set; }
     public List<TicketLogResponse> Logs { get; set; } = new();
     public List<TicketCommentResponse> Comments { get; set; } = new();

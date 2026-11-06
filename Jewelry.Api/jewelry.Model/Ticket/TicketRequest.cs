@@ -36,6 +36,14 @@ public class UpdateTicketDevRequest
     public string? DevResponse { get; set; }
 }
 
+public class UpdateTicketCommitRequest
+{
+    public long TicketId { get; set; }
+    public string? DeployStatus { get; set; }
+    public string? CommitUi { get; set; }
+    public string? CommitApi { get; set; }
+}
+
 public class AddTicketLogRequest { public long TicketId { get; set; } public string Detail { get; set; } = null!; }
 
 public class AddTicketCommentRequest { public long TicketId { get; set; } public string Type { get; set; } = null!; public string Message { get; set; } = null!; }

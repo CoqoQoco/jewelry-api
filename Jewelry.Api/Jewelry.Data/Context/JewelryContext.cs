@@ -243,6 +243,8 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtTicket> TbtTicket { get; set; }
 
+    public virtual DbSet<TbtReleaseLog> TbtReleaseLog { get; set; }
+
     public virtual DbSet<TbtAnnouncement> TbtAnnouncement { get; set; }
 
     public virtual DbSet<TbtTicketImage> TbtTicketImage { get; set; }
@@ -5311,6 +5313,17 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
+            entity.Property(e => e.DeployStatus)
+                .HasColumnType("character varying")
+                .HasDefaultValue("none")
+                .HasColumnName("deploy_status");
+            entity.Property(e => e.DeployDate).HasColumnName("deploy_date");
+            entity.Property(e => e.CommitUi)
+                .HasColumnType("character varying")
+                .HasColumnName("commit_ui");
+            entity.Property(e => e.CommitApi)
+                .HasColumnType("character varying")
+                .HasColumnName("commit_api");
 
             entity.HasOne(d => d.StatusNavigation)
                 .WithMany(p => p.TbtTicket)
@@ -5323,6 +5336,43 @@ public partial class JewelryContext : DbContext
                 .HasForeignKey(e => e.TicketId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbt_ticket_image_ticket_fk");
+        });
+
+        modelBuilder.Entity<TbtReleaseLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_release_log_pk");
+
+            entity.ToTable("tbt_release_log");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("id");
+            entity.Property(e => e.AnnouncementId).HasColumnName("announcement_id");
+            entity.Property(e => e.UiCommit)
+                .HasColumnType("character varying")
+                .HasColumnName("ui_commit");
+            entity.Property(e => e.ApiCommit)
+                .HasColumnType("character varying")
+                .HasColumnName("api_commit");
+            entity.Property(e => e.AppVersion)
+                .HasColumnType("character varying")
+                .HasColumnName("app_version");
+            entity.Property(e => e.TicketNos)
+                .HasColumnType("jsonb")
+                .HasColumnName("ticket_nos");
+            entity.Property(e => e.ClosedTicketNos)
+                .HasColumnType("jsonb")
+                .HasColumnName("closed_ticket_nos");
+            entity.Property(e => e.ManualSteps)
+                .HasColumnType("jsonb")
+                .HasColumnName("manual_steps");
+            entity.Property(e => e.Note)
+                .HasColumnType("character varying")
+                .HasColumnName("note");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.CreateBy)
+                .HasColumnType("character varying")
+                .HasColumnName("create_by");
         });
 
         modelBuilder.Entity<TbtAnnouncement>(entity =>
