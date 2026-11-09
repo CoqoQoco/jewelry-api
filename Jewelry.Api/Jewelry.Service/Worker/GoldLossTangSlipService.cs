@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -1018,7 +1019,7 @@ namespace Jewelry.Service.Worker
         private async Task<string> GenerateGltDocumentNo()
         {
             var now = DateTime.UtcNow;
-            var dateStr = now.ToString("yyyyMM");
+            var dateStr = now.ToString("yyyyMM", CultureInfo.InvariantCulture);
             var key = $"GLT-{dateStr}";
 
             var running = await _jewelryContext.TbtRunningNumber.FindAsync(key);

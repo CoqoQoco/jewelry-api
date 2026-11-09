@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using NPOI.SS.Formula.Functions;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -55,14 +56,14 @@ namespace Jewelry.Service.Helper
 
         public async Task<string> GenerateRunningNumber(string key)
         {
-            var name = $"{key}{DateTime.UtcNow.ToString("yyyyMMdd")}";
+            var name = $"{key}{DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture)}";
             var jobRunning = await Next(name);
             name = $"{name}{jobRunning.ToString("0000")}";
             return name;
         }
         public async Task<string> GenerateRunningNumberForGold(string key)
         {
-            var name = $"{key}{DateTime.UtcNow.ToString("yyMMdd")}";
+            var name = $"{key}{DateTime.UtcNow.ToString("yyMMdd", CultureInfo.InvariantCulture)}";
             var jobRunning = await Next(name);
             name = $"{name}{jobRunning.ToString("000")}";
             return name;
@@ -70,7 +71,7 @@ namespace Jewelry.Service.Helper
 
         public async Task<string> GenerateRunningNumberForStockProduct(string key)
         {
-            var name = $"{key}-{DateTime.UtcNow.ToString("yyMM")}";
+            var name = $"{key}-{DateTime.UtcNow.ToString("yyMM", CultureInfo.InvariantCulture)}";
             var jobRunning = await Next(name);
             name = $"{name}-{jobRunning.ToString("000")}";
             return name;
@@ -79,7 +80,7 @@ namespace Jewelry.Service.Helper
         public async Task<string> GenerateRunningNumberForStockProductHash(string key)
         {
             // แปลงปีเดือน (2609 → 20H)
-            int yearMonth = int.Parse(DateTime.UtcNow.ToString("yyMM"));
+            int yearMonth = int.Parse(DateTime.UtcNow.ToString("yyMM", CultureInfo.InvariantCulture));
             string encodedMonth = ToBase36(yearMonth);
 
             // เก็บ key ของ counter ให้มีขีดเหมือนเดิม (เช่น "DK-18K-20H") เพื่อให้ตัวนับต่อเนื่องจากค่าเดิมที่มีอยู่แล้วใน DB
@@ -100,7 +101,7 @@ namespace Jewelry.Service.Helper
 
         public async Task<string> GenerateQuotationNumber()
         {
-            var dateStr = DateTime.UtcNow.ToString("yyMMdd");
+            var dateStr = DateTime.UtcNow.ToString("yyMMdd", CultureInfo.InvariantCulture);
             var key = $"QT{dateStr}";
             var jobRunning = await Next(key);
             return $"QT-{dateStr}-{jobRunning.ToString("000")}";
@@ -108,7 +109,7 @@ namespace Jewelry.Service.Helper
 
         public async Task<string> GeneratePrePlanNumber()
         {
-            var dateStr = DateTime.UtcNow.ToString("yyMMdd");
+            var dateStr = DateTime.UtcNow.ToString("yyMMdd", CultureInfo.InvariantCulture);
             var key = $"PP{dateStr}";
             var jobRunning = await Next(key);
             return $"PP-{dateStr}-{jobRunning.ToString("000")}";
@@ -116,7 +117,7 @@ namespace Jewelry.Service.Helper
 
         public async Task<string> GenerateBillingNoteNumber()
         {
-            var dateStr = DateTime.UtcNow.ToString("yyMMdd");
+            var dateStr = DateTime.UtcNow.ToString("yyMMdd", CultureInfo.InvariantCulture);
             var key = $"BILLNOTE{dateStr}";
             var jobRunning = await Next(key);
             return $"BN{dateStr}{jobRunning.ToString("000")}";
