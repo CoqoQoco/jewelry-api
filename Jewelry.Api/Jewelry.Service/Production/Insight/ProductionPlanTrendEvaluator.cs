@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using WipTrend = jewelry.Model.Production.Insight.WipTrend;
 
@@ -113,7 +114,7 @@ namespace Jewelry.Service.Production.Insight
                 while (true)
                 {
                     var bucketEndUtc = DateTime.SpecifyKind(currentBucketEndThai.AddHours(-7), DateTimeKind.Utc);
-                    result.Add(new BucketDef { End = bucketEndUtc, Label = cursorMonthStartThai.ToString("yyyy-MM") });
+                    result.Add(new BucketDef { End = bucketEndUtc, Label = cursorMonthStartThai.ToString("yyyy-MM", CultureInfo.InvariantCulture) });
 
                     if (cursorMonthStartThai <= startMonthThai || result.Count >= 60) break;
 
@@ -139,8 +140,8 @@ namespace Jewelry.Service.Production.Insight
         {
             var thai = bucketEndUtc.AddHours(7);
             return string.Equals(bucket, "month", StringComparison.OrdinalIgnoreCase)
-                ? thai.ToString("yyyy-MM")
-                : thai.ToString("dd/MM");
+                ? thai.ToString("yyyy-MM", CultureInfo.InvariantCulture)
+                : thai.ToString("dd/MM", CultureInfo.InvariantCulture);
         }
 
         // ---- Timeline (สถานะของแผนตามเวลา) ----

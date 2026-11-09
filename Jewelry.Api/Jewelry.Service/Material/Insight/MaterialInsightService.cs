@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using jewelry.Model.Material.Insight;
@@ -106,7 +107,7 @@ namespace Jewelry.Service.Material.Insight
                 Policy = policy,
                 UsageHistory = new Overview.UsageHistory
                 {
-                    StartMonth = startMonth?.ToString("yyyy-MM-dd"),
+                    StartMonth = startMonth?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     FullMonths = historyMonths
                 },
                 Kpi = kpi,

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using jewelry.Model.Sale.Insight.Overview;
 using Jewelry.Service.Report.Executive;
@@ -96,7 +97,7 @@ namespace Jewelry.Service.Sale.Insight
 
         public static List<SeriesPoint> BuildSeries(IReadOnlyList<DateTime> monthStarts, IEnumerable<InvoiceMoneyRow> rows)
         {
-            var points = monthStarts.Select(m => new SeriesPoint { Month = m.ToString("yyyy-MM-dd") }).ToList();
+            var points = monthStarts.Select(m => new SeriesPoint { Month = m.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }).ToList();
             var sums = new decimal[monthStarts.Count];
             var index = monthStarts.Select((m, i) => (m, i)).ToDictionary(x => x.m, x => x.i);
 
@@ -118,7 +119,7 @@ namespace Jewelry.Service.Sale.Insight
             var start = StockInsightCalculator.ThaiMonthStart(rows.Min(x => x.CreateDate));
             return new SalesHistory
             {
-                StartMonth = start.ToString("yyyy-MM-dd"),
+                StartMonth = start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 FullMonths = StockInsightCalculator.FullMonthsSince(start, StockInsightCalculator.ThaiMonthStart(now))
             };
         }

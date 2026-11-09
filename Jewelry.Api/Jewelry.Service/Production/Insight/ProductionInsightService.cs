@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -2191,7 +2192,7 @@ namespace Jewelry.Service.Production.Insight
                 }
             }
             var peak = peakIndex >= 0 ? seriesRaw[peakIndex] : null;
-            var peakMonthLabel = peakIndex >= 0 ? bucketStarts[peakIndex].AddHours(7).ToString("yyyy-MM") : null;
+            var peakMonthLabel = peakIndex >= 0 ? bucketStarts[peakIndex].AddHours(7).ToString("yyyy-MM", CultureInfo.InvariantCulture) : null;
 
             AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateCapInflowOverOutput(overloadMonths, monthsInRangeRounded, peakMonthLabel, peak?.Inflow ?? 0, outputPerMonth));
             AddIfNotNull(problems, ProductionInsightRuleEngine.EvaluateCapCostCardSlow(cc.MedianDays, cc.P90Days, cc.PendingNow, cc.PendingActive, cc.PendingOver30d));

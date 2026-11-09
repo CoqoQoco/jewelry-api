@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using jewelry.Model.Stock.Insight.Overview;
 
@@ -41,7 +42,7 @@ namespace Jewelry.Service.Stock.Insight
         // endStock(เดือน m) = ยอดปัจจุบัน - ผลรวมสุทธิของ movement ที่เกิดหลังสิ้นเดือน m
         public static List<SeriesPoint> BuildSeries(IReadOnlyList<DateTime> months, IEnumerable<StockMovementInput> movements, decimal currentOnHandQty)
         {
-            var points = months.Select(m => new SeriesPoint { Month = m.ToString("yyyy-MM-dd") }).ToList();
+            var points = months.Select(m => new SeriesPoint { Month = m.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }).ToList();
             var netByMonth = new decimal[months.Count];
             var indexByMonth = months.Select((m, i) => (m, i)).ToDictionary(x => x.m, x => x.i);
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using jewelry.Model.Material.Insight;
 using jewelry.Model.Material.Insight.Overview;
@@ -217,7 +218,7 @@ namespace Jewelry.Service.Material.Insight
             if (!inputs.Any(i => i.UnitValue.HasValue)) return null;
 
             var priceByKey = inputs.Where(i => i.UnitValue.HasValue).ToDictionary(i => i.ItemKey, i => i.UnitValue!.Value);
-            var points = months.Select(m => new ValuePoint { Month = m.ToString("yyyy-MM-dd") }).ToList();
+            var points = months.Select(m => new ValuePoint { Month = m.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }).ToList();
             var netByMonth = new decimal[months.Count];
             var indexByMonth = months.Select((m, i) => (m, i)).ToDictionary(x => x.m, x => x.i);
 
@@ -253,7 +254,7 @@ namespace Jewelry.Service.Material.Insight
         // endStock(เดือน m) = ยอดคงเหลือปัจจุบัน - ผลรวมสุทธิ (sign x qty) ของ movement ที่เกิดหลังสิ้นเดือน m
         public static List<SeriesPoint> BuildSeries(IReadOnlyList<DateTime> months, IEnumerable<MaterialMovement> movements, decimal currentOnHand)
         {
-            var points = months.Select(m => new SeriesPoint { Month = m.ToString("yyyy-MM-dd") }).ToList();
+            var points = months.Select(m => new SeriesPoint { Month = m.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }).ToList();
             var netByMonth = new decimal[months.Count];
             var indexByMonth = months.Select((m, i) => (m, i)).ToDictionary(x => x.m, x => x.i);
 

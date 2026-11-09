@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Overview = jewelry.Model.Stock.Insight.Overview;
@@ -85,7 +86,7 @@ namespace Jewelry.Service.Stock.Insight
                 Thresholds = thresholds,
                 SalesHistory = new Overview.SalesHistory
                 {
-                    StartMonth = salesStart?.ToString("yyyy-MM-dd"),
+                    StartMonth = salesStart?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     FullMonths = historyMonths
                 },
                 Kpi = kpi,
