@@ -564,6 +564,28 @@ namespace Jewelry.Service.TransferStock
                 newMaterial.TypeBarcode = $"{newMaterial.Weight} {newMaterial.WeightUnit} {newMaterial.Type} {newMaterial.Size ?? null}";
             }
 
+            var isGramUnit = !string.IsNullOrWhiteSpace(weghtUnit) && weghtUnit.Trim().StartsWith("g", StringComparison.OrdinalIgnoreCase);
+            if (check.TrimStart().StartsWith("SIL", StringComparison.OrdinalIgnoreCase) && isGramUnit)
+            {
+                newMaterial.Type = "Silver";
+                newMaterial.TypeCode = "SV";
+                if (newMaterial.Qty == 0)
+                {
+                    newMaterial.Qty = 1;
+                }
+                newMaterial.TypeBarcode = $"{newMaterial.Weight.Value.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)} {newMaterial.WeightUnit.Trim()} Silver";
+            }
+            else if (string.Equals(newMaterial.Type, "Gem", StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(newMaterial.TypeCode) && !string.IsNullOrWhiteSpace(newMaterial.TypeOrigin)
+                && !newMaterial.TypeOrigin.TrimStart().StartsWith("Sil", StringComparison.OrdinalIgnoreCase))
+            {
+                var gemName = newMaterial.TypeOrigin.Split('(')[0].Trim();
+                if (gemName.Length > 0)
+                {
+                    newMaterial.TypeCode = gemName;
+                }
+            }
+
             return newMaterial;
         }
 
