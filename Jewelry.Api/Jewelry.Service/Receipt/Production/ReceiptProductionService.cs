@@ -416,7 +416,7 @@ namespace Jewelry.Service.Receipt.Production
                         StockReceiptNumber = receipt.StockReceiptNumber,
                         StockNumber = null,
 
-                        ProductNumber = $"{response.ProductNumber}-{running.ToString()}",
+                        ProductNumber = query.plan.Type == "Silver" ? response.ProductNumber : $"{response.ProductNumber}-{running.ToString()}",
                         ProductNameTH = query.plan.ProductName,
                         ProductNameEN = query.plan.ProductName,
 

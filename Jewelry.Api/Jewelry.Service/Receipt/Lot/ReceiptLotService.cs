@@ -10,6 +10,8 @@ namespace Jewelry.Service.Receipt.Lot
     public class ReceiptLotService : IReceiptLotService
     {
         private const int MaxResults = 20;
+        private const int MaxProductNumbers = 50;
+        private const int MaxLotsPerProduct = 10;
 
         private readonly JewelryContext _jewelryContext;
 
@@ -50,6 +52,8 @@ namespace Jewelry.Service.Receipt.Lot
                                   ProductionType = sku.ProductionType,
                                   ProductionTypeSize = sku.ProductionTypeSize,
                                   Size = sku.Size,
+                                  StudEarring = sku.StudEarring,
+                                  EarringStemSize = sku.EarringStemSize,
 
                                   LocationCode = piece.LocationCode,
 
@@ -70,6 +74,91 @@ namespace Jewelry.Service.Receipt.Lot
             }
 
             return rows;
+        }
+
+        public async Task<List<jewelry.Model.Receipt.Lot.SuggestByProduct.Response>> SuggestByProduct(jewelry.Model.Receipt.Lot.SuggestByProduct.Request request)
+        {
+            var keys = (request?.ProductNumbers ?? new List<string>())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim().ToUpper())
+                .Distinct()
+                .Take(MaxProductNumbers)
+                .ToList();
+
+            var result = keys
+                .Select(k => new jewelry.Model.Receipt.Lot.SuggestByProduct.Response { ProductNumber = k })
+                .ToList();
+            if (keys.Count == 0)
+            {
+                return result;
+            }
+
+            var rows = await (from piece in _jewelryContext.TbtStockPiece.AsNoTracking()
+                              join sku in _jewelryContext.TbtSku.AsNoTracking()
+                              on piece.SkuCode equals sku.SkuCode
+                              where sku.ProductNumber != null && keys.Contains(sku.ProductNumber.ToUpper())
+                                 && sku.ProductionType != null
+                                 && (sku.ProductionType.Trim().ToUpper() == "SV" || sku.ProductionType.Trim().ToUpper().StartsWith("SIL"))
+                              select new jewelry.Model.Receipt.Lot.Search.Response
+                              {
+                                  StockNumber = piece.StockNumber,
+                                  ProductCode = piece.ProductCode,
+                                  StockNumberOrigin = piece.StockNumberOrigin,
+
+                                  ProductNumber = sku.ProductNumber,
+                                  ProductNameTh = sku.ProductNameTh,
+                                  ProductNameEn = sku.ProductNameEn,
+
+                                  ProductType = sku.ProductType,
+                                  ProductTypeName = sku.ProductTypeName,
+                                  ProductionType = sku.ProductionType,
+                                  ProductionTypeSize = sku.ProductionTypeSize,
+                                  Size = sku.Size,
+                                  StudEarring = sku.StudEarring,
+                                  EarringStemSize = sku.EarringStemSize,
+
+                                  LocationCode = piece.LocationCode,
+
+                                  Qty = piece.Qty,
+                                  QtyReserved = piece.QtyReserved,
+                                  Status = piece.Status,
+
+                                  ReceiptDate = piece.ReceiptDate,
+                                  ImagePath = sku.ImagePath
+                              })
+                              .OrderBy(x => x.Status == "SOLD" ? 1 : 0)
+                              .ThenByDescending(x => x.ReceiptDate)
+                              .ThenBy(x => x.StockNumber)
+                              .Take(MaxProductNumbers * 50)
+                              .ToListAsync();
+
+            var byKey = rows
+                .Where(r => MetalClassifier.IsSilver(r.ProductionType))
+                .GroupBy(r => r.ProductNumber!.Trim().ToUpper())
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var item in result)
+            {
+                if (!byKey.TryGetValue(item.ProductNumber, out var lots))
+                {
+                    continue;
+                }
+
+                foreach (var row in lots)
+                {
+                    var available = row.Qty - row.QtyReserved;
+                    row.QtyAvailable = available > 0 ? available : 0;
+                }
+
+                item.Lots = lots
+                    .OrderBy(x => string.Equals(x.Status, "SOLD", System.StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                    .ThenByDescending(x => x.ReceiptDate)
+                    .ThenBy(x => x.StockNumber)
+                    .Take(MaxLotsPerProduct)
+                    .ToList();
+            }
+
+            return result;
         }
     }
 }

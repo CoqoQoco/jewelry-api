@@ -6,5 +6,6 @@ namespace Jewelry.Service.Receipt.Lot
     public interface IReceiptLotService
     {
         Task<List<jewelry.Model.Receipt.Lot.Search.Response>> Search(jewelry.Model.Receipt.Lot.Search.Request request);
+        Task<List<jewelry.Model.Receipt.Lot.SuggestByProduct.Response>> SuggestByProduct(jewelry.Model.Receipt.Lot.SuggestByProduct.Request request);
     }
 }

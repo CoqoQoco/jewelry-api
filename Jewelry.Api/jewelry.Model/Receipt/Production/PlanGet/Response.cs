@@ -79,6 +79,10 @@ namespace jewelry.Model.Receipt.Production.PlanGet
         public string? Remark { get; set; }
         public bool IsReceipt { get; set; }
 
+        public string? TopUpStockNumber { get; set; }
+        public string? SuggestDismissedFor { get; set; }
+        public bool? SuggestAuto { get; set; }
+
         public List<Material> Materials { get; set; } = new List<Material>();
     }
     public class Material

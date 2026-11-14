@@ -17,6 +17,8 @@ namespace jewelry.Model.Receipt.Lot.Search
         public string? ProductionType { get; set; }
         public string? ProductionTypeSize { get; set; }
         public string? Size { get; set; }
+        public string? StudEarring { get; set; }
+        public string? EarringStemSize { get; set; }
 
         public string LocationCode { get; set; } = null!;
 

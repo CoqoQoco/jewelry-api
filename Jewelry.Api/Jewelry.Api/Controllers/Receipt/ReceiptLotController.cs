@@ -42,5 +42,22 @@ namespace Jewelry.Api.Controllers.Receipt
                 return BadRequest(new NotFoundResponse() { Message = ex.Message });
             }
         }
+
+        [Route("SuggestByProduct")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Receipt.Lot.SuggestByProduct.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> SuggestByProduct([FromBody] jewelry.Model.Receipt.Lot.SuggestByProduct.Request request)
+        {
+            try
+            {
+                var response = await _receiptLot.SuggestByProduct(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
     }
 }
