@@ -352,6 +352,7 @@ namespace Jewelry.Service.Stock.Product
 
                                    TagPriceMultiplier = item.SkuCodeNavigation.TagPriceMultiplier ?? 1,
                                    HasNormalAppraisal = (item.ProductCostDetail != null && item.ProductCostDetail != "") || item.TbtStockPieceCostVersion.Any(),
+                                   RfidTagCount = _jewelryContext.TbtStockPieceRfid.Count(r => r.IsActive && r.StockNumber == item.StockNumber && r.ProductCode == item.ProductCode),
 
                                    Materials = item.TbtStockPieceMaterial.Any()
                                        ? (from material in item.TbtStockPieceMaterial
@@ -442,6 +443,7 @@ namespace Jewelry.Service.Stock.Product
 
                                TagPriceMultiplier = item.SkuCodeNavigation.TagPriceMultiplier ?? 1,
                                HasNormalAppraisal = (item.ProductCostDetail != null && item.ProductCostDetail != "") || item.TbtStockPieceCostVersion.Any(),
+                               RfidTagCount = _jewelryContext.TbtStockPieceRfid.Count(r => r.IsActive && r.StockNumber == item.StockNumber && r.ProductCode == item.ProductCode),
 
                                Materials = item.TbtStockPieceMaterial.Any()
                                    ? (from material in item.TbtStockPieceMaterial
