@@ -37,5 +37,6 @@ namespace Jewelry.Service.Stock.Product
         Task<List<jewelry.Model.Stock.Product.QuickPrice.Response>> QuickPriceList(jewelry.Model.Stock.Product.QuickPrice.ListRequest request);
         Task AttachQuickPrice(IEnumerable<jewelry.Model.Stock.Product.List.Response> items);
         Task AttachLocations(IEnumerable<jewelry.Model.Stock.Product.List.Response> items);
+        Task AttachRfidTagCount(IEnumerable<jewelry.Model.Stock.Product.List.Response> items);
     }
 }

@@ -352,7 +352,6 @@ namespace Jewelry.Service.Stock.Product
 
                                    TagPriceMultiplier = item.SkuCodeNavigation.TagPriceMultiplier ?? 1,
                                    HasNormalAppraisal = (item.ProductCostDetail != null && item.ProductCostDetail != "") || item.TbtStockPieceCostVersion.Any(),
-                                   RfidTagCount = _jewelryContext.TbtStockPieceRfid.Count(r => r.IsActive && r.StockNumber == item.StockNumber && r.ProductCode == item.ProductCode),
 
                                    Materials = item.TbtStockPieceMaterial.Any()
                                        ? (from material in item.TbtStockPieceMaterial
@@ -443,7 +442,6 @@ namespace Jewelry.Service.Stock.Product
 
                                TagPriceMultiplier = item.SkuCodeNavigation.TagPriceMultiplier ?? 1,
                                HasNormalAppraisal = (item.ProductCostDetail != null && item.ProductCostDetail != "") || item.TbtStockPieceCostVersion.Any(),
-                               RfidTagCount = _jewelryContext.TbtStockPieceRfid.Count(r => r.IsActive && r.StockNumber == item.StockNumber && r.ProductCode == item.ProductCode),
 
                                Materials = item.TbtStockPieceMaterial.Any()
                                    ? (from material in item.TbtStockPieceMaterial
@@ -863,6 +861,28 @@ namespace Jewelry.Service.Stock.Product
                 row.QuickPriceRounding = q.Rounding;
                 row.QuickPriceRemark = q.Remark;
                 row.QuickPriceBy = q.CreateBy;
+            }
+        }
+
+        public async Task AttachRfidTagCount(IEnumerable<jewelry.Model.Stock.Product.List.Response> items)
+        {
+            var rows = items.ToList();
+            if (rows.Count == 0) return;
+
+            var stockNumbers = rows.Select(x => x.StockNumber).Distinct().ToList();
+
+            var counts = await _jewelryContext.TbtStockPieceRfid
+                .AsNoTracking()
+                .Where(r => r.IsActive && stockNumbers.Contains(r.StockNumber))
+                .GroupBy(r => new { r.StockNumber, r.ProductCode })
+                .Select(g => new { g.Key.StockNumber, g.Key.ProductCode, Count = g.Count() })
+                .ToListAsync();
+
+            var byLot = counts.ToDictionary(c => (c.StockNumber, c.ProductCode ?? string.Empty), c => c.Count);
+
+            foreach (var row in rows)
+            {
+                row.RfidTagCount = byLot.TryGetValue((row.StockNumber, row.ProductCode ?? string.Empty), out var n) ? n : 0;
             }
         }
 

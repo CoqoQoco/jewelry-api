@@ -57,6 +57,7 @@ namespace Jewelry.Api.Controllers.Stock
                 {
                     await _service.AttachQuickPrice(result.Data.OfType<jewelry.Model.Stock.Product.List.Response>());
                     await _service.AttachLocations(result.Data.OfType<jewelry.Model.Stock.Product.List.Response>());
+                    await _service.AttachRfidTagCount(result.Data.OfType<jewelry.Model.Stock.Product.List.Response>());
                 }
                 return result;
 
