@@ -1593,12 +1593,13 @@ namespace Jewelry.Service.ProductionPlan
                     await HandleProductionWoker(header, request, addStatusItems);
                     if (request.Gems?.Any() == true)
                     {
-                        var existingGems = header.TbtProductionPlanStatusDetailGem.ToList();
+                        var existingGems = header.TbtProductionPlanStatusDetailGem
+                            .Where(x => string.IsNullOrEmpty(x.OutboundRunning))
+                            .ToList();
                         if (existingGems.Any())
                         {
                             _jewelryContext.TbtProductionPlanStatusDetailGem.RemoveRange(existingGems);
                             await _jewelryContext.SaveChangesAsync();
-                            header.TbtProductionPlanStatusDetailGem.Clear();
                         }
                         await HandleGemDetails(header, request, addStatusItemGems, updateStatusItemGems);
                     }
@@ -1721,9 +1722,9 @@ namespace Jewelry.Service.ProductionPlan
         {
             _jewelryContext.TbtProductionPlanStatusDetail.RemoveRange(header.TbtProductionPlanStatusDetail);
 
-            //ใหลบทุกกรณี
-            var removeGems = header.TbtProductionPlanStatusDetailGem;
-            //.Where(item => string.IsNullOrEmpty(item.OutboundRunning));
+            var removeGems = header.TbtProductionPlanStatusDetailGem
+                .Where(item => string.IsNullOrEmpty(item.OutboundRunning))
+                .ToList();
 
             if (removeGems.Any())
             {
@@ -1797,10 +1798,25 @@ namespace Jewelry.Service.ProductionPlan
         {
             var validGems = request.Gems.Where(x => !string.IsNullOrEmpty(x.Code) && x.Id.HasValue).ToList();
 
+            var keptOutboundGems = header.TbtProductionPlanStatusDetailGem
+                .Where(x => !string.IsNullOrEmpty(x.OutboundRunning))
+                .ToList();
+
             foreach (var gem in validGems)
             {
-                var existingGem = header.TbtProductionPlanStatusDetailGem
-                    .SingleOrDefault(x => x.OutboundRunning == gem.OutboundRunning && x.ItemNo == gem.ItemNo);
+                TbtProductionPlanStatusDetailGem existingGem = null;
+                if (!string.IsNullOrEmpty(gem.OutboundRunning))
+                {
+                    existingGem = keptOutboundGems
+                        .FirstOrDefault(x => x.OutboundRunning == gem.OutboundRunning && x.ItemNo == gem.ItemNo)
+                        ?? keptOutboundGems
+                        .FirstOrDefault(x => x.OutboundRunning == gem.OutboundRunning && x.GemCode == gem.Code);
+                }
+
+                if (existingGem == null && !string.IsNullOrEmpty(gem.OutboundRunning))
+                {
+                    continue;
+                }
 
                 if (existingGem != null)
                 {
