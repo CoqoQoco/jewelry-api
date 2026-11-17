@@ -3,6 +3,7 @@ name: api-implementer
 description: Implement API plans — สร้าง/แก้ไข .NET controller, service, model ตาม plan ที่ confirm แล้ว ใช้เมื่อ implement, build API, create endpoint, fix backend
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
+effort: medium
 skills:
   - md-instruction
 ---
