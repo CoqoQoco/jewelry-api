@@ -368,7 +368,8 @@ namespace Jewelry.Service.Stock.Product
                                               WeightUnit = material.WeightUnit,
                                               Size = material.Size,
                                               Region = material.Region,
-                                              Price = material.Price
+                                              Price = material.Price,
+                                              UpdateDate = material.UpdateDate ?? material.CreateDate
                                           }).ToList()
                                        : new List<jewelry.Model.Stock.Product.List.Material>(),
 
@@ -458,7 +459,8 @@ namespace Jewelry.Service.Stock.Product
                                           WeightUnit = material.WeightUnit,
                                           Size = material.Size,
                                           Region = material.Region,
-                                          Price = material.Price
+                                          Price = material.Price,
+                                          UpdateDate = material.UpdateDate ?? material.CreateDate
                                       }).ToList()
                                    : new List<jewelry.Model.Stock.Product.List.Material>(),
                            };
@@ -617,7 +619,8 @@ namespace Jewelry.Service.Stock.Product
                                  WeightUnit = material.WeightUnit,
                                  Size = material.Size,
                                  Region = material.Region,
-                                 Price = material.Price
+                                 Price = material.Price,
+                                 UpdateDate = material.UpdateDate ?? material.CreateDate
                              }).ToList(),
             };
 

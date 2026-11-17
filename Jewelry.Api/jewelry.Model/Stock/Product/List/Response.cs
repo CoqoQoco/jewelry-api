@@ -99,6 +99,7 @@ namespace jewelry.Model.Stock.Product.List
         public string? Size { get; set; }
         public string? Region { get; set; }
         public decimal? Price { get; set; }
+        public DateTime? UpdateDate { get; set; }
     }
 
     public class PriceTransection
