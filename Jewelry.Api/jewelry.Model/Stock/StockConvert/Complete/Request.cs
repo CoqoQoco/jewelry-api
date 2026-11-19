@@ -37,4 +37,5 @@ public class MaterialRequest
     public string? WeightUnit { get; set; }
     public string? Region { get; set; }
     public decimal? Price { get; set; }
+    public decimal? PriceWeight { get; set; }
 }

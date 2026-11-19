@@ -50,5 +50,6 @@ namespace jewelry.Model.Stock.Product.Update
         public string? Size { get; set; }
         public string? Region { get; set; }
         public decimal? Price { get; set; }
+        public decimal? PriceWeight { get; set; }
     }
 }

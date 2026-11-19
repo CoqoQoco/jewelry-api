@@ -35,6 +35,8 @@ public partial class TbtStockPieceMaterial
 
     public decimal? Price { get; set; }
 
+    public decimal? PriceWeight { get; set; }
+
     public DateTime CreateDate { get; set; }
 
     public string CreateBy { get; set; } = null!;

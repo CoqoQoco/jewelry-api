@@ -230,6 +230,7 @@ namespace Jewelry.Service.Receipt.Production
                     Size = item.Size,
                     Region = item.Region,
                     Price = price,
+                    PriceWeight = item.QtyWeightPrice > 0 ? item.QtyWeightPrice : null,
 
                     CreateBy = operatorBy,
                     CreateDate = DateTime.UtcNow

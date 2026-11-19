@@ -118,6 +118,7 @@ namespace jewelry.Model.Stock.Product.Get
         public string? Size { get; set; }
         public string? Region { get; set; }
         public decimal? Price { get; set; }
+        public decimal? PriceWeight { get; set; }
         public DateTime? UpdateDate { get; set; }
 
         public string TextGold => $"{TypeCode} {Weight} {WeightUnit}";

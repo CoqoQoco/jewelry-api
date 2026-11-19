@@ -301,6 +301,7 @@ public class StockConvertService : BaseService, IStockConvertService
                     WeightUnit = m.WeightUnit,
                     Region = m.Region,
                     Price = m.Price,
+                    PriceWeight = m.PriceWeight,
                     CreateBy = CurrentUsername,
                     CreateDate = now
                 }).ToList();

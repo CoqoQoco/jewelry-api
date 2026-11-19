@@ -369,6 +369,7 @@ namespace Jewelry.Service.Stock.Product
                                               Size = material.Size,
                                               Region = material.Region,
                                               Price = material.Price,
+                                              PriceWeight = material.PriceWeight,
                                               UpdateDate = material.UpdateDate ?? material.CreateDate
                                           }).ToList()
                                        : new List<jewelry.Model.Stock.Product.List.Material>(),
@@ -460,6 +461,7 @@ namespace Jewelry.Service.Stock.Product
                                           Size = material.Size,
                                           Region = material.Region,
                                           Price = material.Price,
+                                          PriceWeight = material.PriceWeight,
                                           UpdateDate = material.UpdateDate ?? material.CreateDate
                                       }).ToList()
                                    : new List<jewelry.Model.Stock.Product.List.Material>(),
@@ -620,6 +622,7 @@ namespace Jewelry.Service.Stock.Product
                                  Size = material.Size,
                                  Region = material.Region,
                                  Price = material.Price,
+                                 PriceWeight = material.PriceWeight,
                                  UpdateDate = material.UpdateDate ?? material.CreateDate
                              }).ToList(),
             };
@@ -1329,16 +1332,29 @@ namespace Jewelry.Service.Stock.Product
                 piece.UpdateDate = now;
                 piece.UpdateBy = CurrentUsername;
 
-                if (piece.TbtStockPieceMaterial.Any())
+                var oldMats = piece.TbtStockPieceMaterial.ToList();
+                if (oldMats.Any())
                 {
-                    _jewelryContext.TbtStockPieceMaterial.RemoveRange(piece.TbtStockPieceMaterial);
+                    _jewelryContext.TbtStockPieceMaterial.RemoveRange(oldMats);
                 }
+                var usedOldMats = new HashSet<long>();
 
                 var newMats = new List<TbtStockPieceMaterial>();
                 if (request.Materials.Any())
                 {
                     foreach (var item in request.Materials)
                     {
+                        var priceWeight = item.PriceWeight == 0 ? null : item.PriceWeight;
+                        if (item.PriceWeight == null)
+                        {
+                            var oldMat = oldMats.FirstOrDefault(o => !usedOldMats.Contains(o.Id) && o.Type == item.Type && o.TypeCode == item.TypeCode);
+                            if (oldMat != null)
+                            {
+                                usedOldMats.Add(oldMat.Id);
+                                priceWeight = oldMat.PriceWeight;
+                            }
+                        }
+
                         newMats.Add(new TbtStockPieceMaterial
                         {
                             StockNumber = piece.StockNumber,
@@ -1358,6 +1374,7 @@ namespace Jewelry.Service.Stock.Product
                             Size = item.Size,
                             Region = item.Region,
                             Price = item.Price,
+                            PriceWeight = priceWeight,
 
                             CreateBy = CurrentUsername,
                             CreateDate = now
