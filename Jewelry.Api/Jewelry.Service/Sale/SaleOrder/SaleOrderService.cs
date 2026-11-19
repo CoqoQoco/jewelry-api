@@ -151,8 +151,15 @@ namespace Jewelry.Service.Sale.SaleOrder
                 saleOrder.Data = request.Data;
 
                 // Customer Information
-                //saleOrder.CustomerName = request.CustomerName ?? saleOrder.CustomerName;
-                //saleOrder.CustomerCode = request.CustomerCode ?? saleOrder.CustomerCode;
+                if (!string.IsNullOrEmpty(request.CustomerCode) && request.CustomerCode != saleOrder.CustomerCode)
+                {
+                    var hasInvoicedLines = await _jewelryContext.TbtSaleOrderProduct
+                        .AnyAsync(x => x.SoNumber == soNumber && !string.IsNullOrEmpty(x.Invoice));
+                    if (hasInvoicedLines)
+                        throw new HandleException("ใบสั่งขายนี้มีใบแจ้งหนี้ที่ออกแล้ว ต้องยกเลิกใบแจ้งหนี้ก่อนจึงจะเปลี่ยนลูกค้าได้");
+                }
+                saleOrder.CustomerName = request.CustomerName ?? saleOrder.CustomerName;
+                saleOrder.CustomerCode = request.CustomerCode ?? saleOrder.CustomerCode;
                 saleOrder.CustomerAddress = request.CustomerAddress;
                 saleOrder.CustomerTel = request.CustomerTel;
                 saleOrder.CustomerEmail = request.CustomerEmail;
