@@ -1804,14 +1804,7 @@ namespace Jewelry.Service.ProductionPlan
 
             foreach (var gem in validGems)
             {
-                TbtProductionPlanStatusDetailGem existingGem = null;
-                if (!string.IsNullOrEmpty(gem.OutboundRunning))
-                {
-                    existingGem = keptOutboundGems
-                        .FirstOrDefault(x => x.OutboundRunning == gem.OutboundRunning && x.ItemNo == gem.ItemNo)
-                        ?? keptOutboundGems
-                        .FirstOrDefault(x => x.OutboundRunning == gem.OutboundRunning && x.GemCode == gem.Code);
-                }
+                var existingGem = ProductionPlanGemMatcher.FindOutboundGem(keptOutboundGems, gem);
 
                 if (existingGem == null && !string.IsNullOrEmpty(gem.OutboundRunning))
                 {
@@ -1820,7 +1813,7 @@ namespace Jewelry.Service.ProductionPlan
 
                 if (existingGem != null)
                 {
-                    existingGem.GemPrice = gem.Price;
+                    ProductionPlanGemMatcher.ApplyOutboundGemUpdate(existingGem, gem);
                     updateStatusItemGems.Add(existingGem);
                 }
                 else
