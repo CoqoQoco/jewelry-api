@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace jewelry.Model.Receipt
 {
     public class ReceiptHistoryMaterial
@@ -19,6 +21,24 @@ namespace jewelry.Model.Receipt
 
         public decimal OtherQty { get; set; }
         public decimal OtherWeight { get; set; }
+
+        public List<ReceiptHistoryMaterialLine>? Materials { get; set; }
+    }
+
+    public class ReceiptHistoryMaterialLine
+    {
+        public string Type { get; set; } = string.Empty;
+        public string? TypeName { get; set; }
+        public string? TypeCode { get; set; }
+        public string? TypeOrigin { get; set; }
+        public string? Size { get; set; }
+        public decimal? Qty { get; set; }
+        public string? QtyUnit { get; set; }
+        public decimal? Weight { get; set; }
+        public string? WeightUnit { get; set; }
+        public string? Region { get; set; }
+        public decimal? Price { get; set; }
+        public decimal? PriceWeight { get; set; }
     }
 
     public class ReceiptHistorySummary

@@ -27,7 +27,7 @@ namespace Jewelry.Service.Receipt
             return Group.Other;
         }
 
-        public static void Enrich<T>(JewelryContext context, IEnumerable<T> rows, Func<T, string?> stockNumberOf) where T : ReceiptHistoryMaterial
+        public static void Enrich<T>(JewelryContext context, IEnumerable<T> rows, Func<T, string?> stockNumberOf, bool includeMaterials = false) where T : ReceiptHistoryMaterial
         {
             var list = rows.ToList();
             if (list.Count == 0) return;
@@ -42,7 +42,7 @@ namespace Jewelry.Service.Receipt
             var materials = context.TbtStockPieceMaterial
                 .AsNoTracking()
                 .Where(m => stockNumbers.Contains(m.StockNumber))
-                .Select(m => new { m.StockNumber, m.Type, m.TypeCode, m.Qty, m.Weight })
+                .Select(m => new { m.Id, m.StockNumber, m.Type, m.TypeName, m.TypeCode, m.TypeOrigin, m.Size, m.Qty, m.QtyUnit, m.Weight, m.WeightUnit, m.Region, m.Price, m.PriceWeight })
                 .ToList()
                 .ToLookup(m => m.StockNumber);
 
@@ -71,6 +71,29 @@ namespace Jewelry.Service.Receipt
                     }
                 }
                 row.GoldType = goldCodes.Count > 0 ? string.Join("/", goldCodes) : null;
+
+                if (includeMaterials)
+                {
+                    row.Materials = materials[stockNumber]
+                        .OrderBy(m => Classify(m.Type, m.TypeCode) == Group.Gold ? 0 : Classify(m.Type, m.TypeCode) == Group.Diamond ? 1 : 2)
+                        .ThenBy(m => m.Id)
+                        .Select(m => new ReceiptHistoryMaterialLine
+                        {
+                            Type = m.Type,
+                            TypeName = m.TypeName,
+                            TypeCode = m.TypeCode,
+                            TypeOrigin = m.TypeOrigin,
+                            Size = m.Size,
+                            Qty = m.Qty,
+                            QtyUnit = m.QtyUnit,
+                            Weight = m.Weight,
+                            WeightUnit = m.WeightUnit,
+                            Region = m.Region,
+                            Price = m.Price,
+                            PriceWeight = m.PriceWeight
+                        })
+                        .ToList();
+                }
             }
         }
 

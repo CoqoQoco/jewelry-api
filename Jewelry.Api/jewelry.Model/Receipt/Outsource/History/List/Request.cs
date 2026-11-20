@@ -10,6 +10,7 @@ namespace jewelry.Model.Receipt.Outsource.History.List
 
     public class Search
     {
+        public bool IncludeMaterials { get; set; }
         public DateTimeOffset? ReceiptDateStart { get; set; }
         public DateTimeOffset? ReceiptDateEnd { get; set; }
 

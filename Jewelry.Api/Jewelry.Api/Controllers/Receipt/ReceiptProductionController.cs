@@ -106,7 +106,7 @@ namespace Jewelry.Api.Controllers.Receipt
                 var result = response.ToDataSource(request);
                 if (result.Data != null)
                 {
-                    _receiptProduction.FillHistoryMaterials(result.Data.Cast<jewelry.Model.Receipt.Production.History.List.Response>());
+                    _receiptProduction.FillHistoryMaterials(result.Data.Cast<jewelry.Model.Receipt.Production.History.List.Response>(), request.Search?.IncludeMaterials ?? false);
                 }
                 if (result.Aggregates == null)
                 {

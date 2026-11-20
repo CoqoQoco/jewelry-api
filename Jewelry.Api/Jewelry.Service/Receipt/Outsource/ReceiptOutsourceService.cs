@@ -502,9 +502,9 @@ namespace Jewelry.Service.Receipt.Outsource
             return query;
         }
 
-        public void FillHistoryMaterials(IEnumerable<jewelry.Model.Receipt.Outsource.History.List.Response> rows)
+        public void FillHistoryMaterials(IEnumerable<jewelry.Model.Receipt.Outsource.History.List.Response> rows, bool includeMaterials = false)
         {
-            ReceiptHistoryMaterialHelper.Enrich(_jewelryContext, rows, x => x.StockNumber);
+            ReceiptHistoryMaterialHelper.Enrich(_jewelryContext, rows, x => x.StockNumber, includeMaterials);
         }
 
         public jewelry.Model.Receipt.ReceiptHistorySummary GetHistorySummary(jewelry.Model.Receipt.Outsource.History.List.Search request)
