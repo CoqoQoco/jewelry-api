@@ -1,3 +1,4 @@
+using jewelry.Model.Constant;
 using jewelry.Model.Exceptions;
 using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
@@ -113,11 +114,21 @@ namespace Jewelry.Service.Certificate
             }
 
             var invoiceHeader = await _jewelryContext.TbtSaleInvoiceHeader
-                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber && x.IsDelete == false);
+                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber);
 
             if (invoiceHeader == null)
             {
-                throw new HandleException($"Invoice not found: {request.InvoiceNumber}");
+                throw new HandleException($"ไม่พบใบแจ้งหนี้ {request.InvoiceNumber}");
+            }
+
+            if (invoiceHeader.IsDelete)
+            {
+                throw new HandleException($"ใบแจ้งหนี้ {request.InvoiceNumber} ถูกยกเลิกแล้ว ออกใบรับรองสินค้าไม่ได้ครับ");
+            }
+
+            if (invoiceHeader.InvoiceType == InvoiceTypes.Material)
+            {
+                throw new HandleException("ใบแจ้งหนี้วัตถุดิบออกใบรับรองสินค้าไม่ได้ครับ");
             }
 
             if (request.Certificates == null || !request.Certificates.Any())
@@ -160,6 +171,19 @@ namespace Jewelry.Service.Certificate
             if (request.Brand.Mode == "customer" && string.IsNullOrEmpty(request.Brand.Name))
             {
                 throw new HandleException("กรุณาระบุชื่อแบรนด์ลูกค้า");
+            }
+
+            var requestedStocks = request.Certificates.Select(c => c.StockNumber).Distinct().ToList();
+            var invoiceStocks = await _jewelryContext.TbtSaleOrderProduct
+                .AsNoTracking()
+                .Where(x => x.Invoice == invoiceHeader.Running && requestedStocks.Contains(x.StockNumber))
+                .Select(x => x.StockNumber)
+                .Distinct()
+                .ToListAsync();
+            var missingStocks = requestedStocks.Except(invoiceStocks).ToList();
+            if (missingStocks.Count > 0)
+            {
+                throw new HandleException($"สินค้า {string.Join(", ", missingStocks)} ไม่อยู่ในใบแจ้งหนี้ {request.InvoiceNumber} ออกใบรับรองไม่ได้ครับ");
             }
 
             using var transaction = await _jewelryContext.Database.BeginTransactionAsync();

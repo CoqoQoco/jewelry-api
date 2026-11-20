@@ -1779,9 +1779,22 @@ namespace Jewelry.Service.Sale.Invoice
 
             // Resolve invoice_running from invoice_no
             var invoiceHeader = await _jewelryContext.TbtSaleInvoiceHeader
-                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber && x.IsDelete == false);
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber);
 
-            string? invoiceRunning = invoiceHeader?.Running;
+            if (request.PaperType == "guarantee-card")
+            {
+                if (invoiceHeader == null)
+                {
+                    throw new HandleException($"ไม่พบใบแจ้งหนี้ {request.InvoiceNumber}");
+                }
+                if (invoiceHeader.IsDelete)
+                {
+                    throw new HandleException($"ใบแจ้งหนี้ {request.InvoiceNumber} ถูกยกเลิกแล้ว ออกใบรับประกันไม่ได้ครับ");
+                }
+            }
+
+            string? invoiceRunning = invoiceHeader != null && !invoiceHeader.IsDelete ? invoiceHeader.Running : null;
 
             // Compute copy_no = max copy_no for this invoice_no + 1
             var maxCopyNo = await _jewelryContext.TbtSaleInvoicePrintLog
