@@ -18,5 +18,7 @@ namespace Jewelry.Service.Stock.ProductImage
         Task<List<jewelry.Model.Stock.Product.Image.BulkPreview.Response>> BulkPreview(jewelry.Model.Stock.Product.Image.BulkPreview.Request request);
 
         Task<jewelry.Model.Stock.Product.Image.CreateBulk.Response> CreateBulk(jewelry.Model.Stock.Product.Image.CreateBulk.Request request);
+
+        Task<List<jewelry.Model.Stock.Product.Image.SuggestByProduct.Response>> SuggestByProduct(jewelry.Model.Stock.Product.Image.SuggestByProduct.Request request);
     }
 }

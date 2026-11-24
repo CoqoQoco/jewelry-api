@@ -102,6 +102,24 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("SuggestByProduct")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<jewelry.Model.Stock.Product.Image.SuggestByProduct.Response>))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> SuggestByProduct([FromBody] jewelry.Model.Stock.Product.Image.SuggestByProduct.Request request)
+        {
+            try
+            {
+                var response = await _service.SuggestByProduct(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("List")]
         [HttpPost]
         [ProducesResponseType((int)System.Net.HttpStatusCode.Accepted, Type = typeof(IQueryable<jewelry.Model.Stock.Product.Image.List.Response>))]

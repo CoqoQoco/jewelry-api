@@ -767,6 +767,18 @@ namespace Jewelry.Service.Receipt.Production
                     {
                         newSkus.Add(stock.MapNewSku(skuCode, CurrentUsername));
                     }
+                    else if (!string.IsNullOrWhiteSpace(stock.ImagePath))
+                    {
+                        var existingSku = await _jewelryContext.TbtSku.FirstOrDefaultAsync(x => x.SkuCode == skuCode);
+                        if (existingSku != null && string.IsNullOrWhiteSpace(existingSku.ImagePath))
+                        {
+                            existingSku.ImageName = stock.ImageName;
+                            existingSku.ImagePath = stock.ImagePath;
+                            existingSku.UpdateBy = CurrentUsername;
+                            existingSku.UpdateDate = DateTime.UtcNow;
+                            _jewelryContext.TbtSku.Update(existingSku);
+                        }
+                    }
                     skuCache[skuCode] = true;
                 }
 

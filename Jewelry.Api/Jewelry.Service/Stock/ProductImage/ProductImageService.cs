@@ -34,6 +34,77 @@ namespace Jewelry.Service.Stock.ProductImage
             _azureBlobService = azureBlobService;
         }
 
+        public async Task<List<jewelry.Model.Stock.Product.Image.SuggestByProduct.Response>> SuggestByProduct(jewelry.Model.Stock.Product.Image.SuggestByProduct.Request request)
+        {
+            const int maxItems = 500;
+            const int minStemLength = 4;
+
+            var items = (request?.Items ?? new List<jewelry.Model.Stock.Product.Image.SuggestByProduct.Item>())
+                .Where(x => !string.IsNullOrWhiteSpace(x.Key) && !string.IsNullOrWhiteSpace(x.ProductNumber))
+                .Take(maxItems)
+                .Select(x => new { Key = x.Key!, Stem = ProductImageStem.Compute(x.ProductNumber) })
+                .Where(x => x.Stem.Length >= minStemLength)
+                .ToList();
+            if (items.Count == 0) return new List<jewelry.Model.Stock.Product.Image.SuggestByProduct.Response>();
+
+            var stems = items.Select(x => x.Stem).Distinct().ToList();
+
+            var candidates = new List<(string SkuCode, string ProductNumber, string ImageName, string ImagePath, DateTime At)>();
+            foreach (var chunk in stems.Chunk(50))
+            {
+                var chunkStems = chunk.ToList();
+                var rows = await _jewelryContext.TbtSku
+                    .AsNoTracking()
+                    .Where(x => x.IsActive
+                        && x.ProductNumber != null
+                        && x.ImagePath != null && x.ImagePath != ""
+                        && !x.ImagePath.Contains("/") && !x.ImagePath.Contains("\\")
+                        )
+                    .Where(BuildStemPrefixFilter(chunkStems))
+                    .Select(x => new { x.SkuCode, x.ProductNumber, x.ImageName, x.ImagePath, x.CreateDate, x.UpdateDate })
+                    .ToListAsync();
+                foreach (var r in rows)
+                {
+                    candidates.Add((r.SkuCode, r.ProductNumber!, r.ImageName ?? string.Empty, r.ImagePath!, r.UpdateDate ?? r.CreateDate));
+                }
+            }
+
+            var bestByStem = candidates
+                .GroupBy(x => ProductImageStem.Compute(x.ProductNumber))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.At).First());
+
+            var result = new List<jewelry.Model.Stock.Product.Image.SuggestByProduct.Response>();
+            foreach (var item in items)
+            {
+                if (!bestByStem.TryGetValue(item.Stem, out var best)) continue;
+                result.Add(new jewelry.Model.Stock.Product.Image.SuggestByProduct.Response
+                {
+                    Key = item.Key,
+                    ImageName = best.ImageName,
+                    ImagePath = best.ImagePath,
+                    SourceSkuCode = best.SkuCode,
+                    SourceProductNumber = best.ProductNumber,
+                });
+            }
+            return result;
+        }
+
+        private static System.Linq.Expressions.Expression<Func<TbtSku, bool>> BuildStemPrefixFilter(List<string> stems)
+        {
+            var param = System.Linq.Expressions.Expression.Parameter(typeof(TbtSku), "x");
+            var upper = System.Linq.Expressions.Expression.Call(
+                System.Linq.Expressions.Expression.Property(param, nameof(TbtSku.ProductNumber)),
+                typeof(string).GetMethod(nameof(string.ToUpper), Type.EmptyTypes)!);
+            var startsWith = typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) })!;
+            System.Linq.Expressions.Expression? body = null;
+            foreach (var stem in stems)
+            {
+                var call = System.Linq.Expressions.Expression.Call(upper, startsWith, System.Linq.Expressions.Expression.Constant(stem));
+                body = body == null ? call : System.Linq.Expressions.Expression.OrElse(body, call);
+            }
+            return System.Linq.Expressions.Expression.Lambda<Func<TbtSku, bool>>(body!, param);
+        }
+
         public async Task<string> Create(jewelry.Model.Stock.Product.Image.Create.Request request)
         {
             var name = request.Name.ToUpper();
