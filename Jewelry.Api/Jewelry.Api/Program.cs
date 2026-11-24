@@ -1,5 +1,6 @@
 using Base.API.Extensions;
 using Jewelry.Api.Extension;
+using Jewelry.Api.AiConnector;
 using Jewelry.Data.Context;
 using Jewelry.Service.Helper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -154,6 +155,9 @@ builder.Services.AddCors(c =>
     });
 });
 
+// AI Connector (MCP /mcp + OAuth) — scheme/CORS/rate limit แยกจากของเว็บ
+builder.AddAiConnectorWeb();
+
 // Learn more about configuring Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -217,11 +221,13 @@ if (!app.Environment.IsProduction())
     app.UseHttpsRedirection();
 }
 
+app.UseAiConnectorWeb();
 app.UseCors("AllowAnyOrigin");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapAiConnectorWeb();
 
 // Health check endpoint for Azure App Service
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))

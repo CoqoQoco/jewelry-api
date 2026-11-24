@@ -245,6 +245,18 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtReleaseLog> TbtReleaseLog { get; set; }
 
+    public virtual DbSet<TbmAiScope> TbmAiScope { get; set; }
+
+    public virtual DbSet<TbmAiGlossary> TbmAiGlossary { get; set; }
+
+    public virtual DbSet<TbtAiClient> TbtAiClient { get; set; }
+
+    public virtual DbSet<TbtAiAuthCode> TbtAiAuthCode { get; set; }
+
+    public virtual DbSet<TbtAiToken> TbtAiToken { get; set; }
+
+    public virtual DbSet<TbtAiAccessLog> TbtAiAccessLog { get; set; }
+
     public virtual DbSet<TbtAnnouncement> TbtAnnouncement { get; set; }
 
     public virtual DbSet<TbtTicketImage> TbtTicketImage { get; set; }
@@ -6160,6 +6172,99 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.UpdateBy)
                 .HasColumnType("character varying")
                 .HasColumnName("update_by");
+        });
+
+        modelBuilder.Entity<TbmAiScope>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("tbm_ai_scope_pk");
+            entity.ToTable("tbm_ai_scope");
+            entity.Property(e => e.Code).HasColumnType("character varying").HasColumnName("code");
+            entity.Property(e => e.NameTh).HasColumnType("character varying").HasColumnName("name_th");
+            entity.Property(e => e.DescriptionTh).HasColumnType("character varying").HasColumnName("description_th");
+            entity.Property(e => e.Kind).HasColumnType("character varying").HasColumnName("kind");
+            entity.Property(e => e.AllowPat).HasColumnName("allow_pat");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.Sort).HasColumnName("sort");
+        });
+
+        modelBuilder.Entity<TbmAiGlossary>(entity =>
+        {
+            entity.HasKey(e => e.MetricCode).HasName("tbm_ai_glossary_pk");
+            entity.ToTable("tbm_ai_glossary");
+            entity.Property(e => e.MetricCode).HasColumnType("character varying").HasColumnName("metric_code");
+            entity.Property(e => e.Module).HasColumnType("character varying").HasColumnName("module");
+            entity.Property(e => e.NameTh).HasColumnType("character varying").HasColumnName("name_th");
+            entity.Property(e => e.DefinitionTh).HasColumnType("text").HasColumnName("definition_th");
+            entity.Property(e => e.CaveatTh).HasColumnType("text").HasColumnName("caveat_th");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.UpdateDate).HasColumnName("update_date");
+        });
+
+        modelBuilder.Entity<TbtAiClient>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ai_client_pk");
+            entity.ToTable("tbt_ai_client");
+            entity.HasIndex(e => e.ClientId, "tbt_ai_client_client_id_uq").IsUnique();
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasColumnName("id");
+            entity.Property(e => e.ClientId).HasColumnType("character varying").HasColumnName("client_id");
+            entity.Property(e => e.ClientName).HasColumnType("character varying").HasColumnName("client_name");
+            entity.Property(e => e.Kind).HasColumnType("character varying").HasColumnName("kind");
+            entity.Property(e => e.RedirectUris).HasColumnType("jsonb").HasColumnName("redirect_uris");
+            entity.Property(e => e.MetadataUrl).HasColumnType("character varying").HasColumnName("metadata_url");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+            entity.Property(e => e.LastSeen).HasColumnName("last_seen");
+        });
+
+        modelBuilder.Entity<TbtAiAuthCode>(entity =>
+        {
+            entity.HasKey(e => e.CodeHash).HasName("tbt_ai_auth_code_pk");
+            entity.ToTable("tbt_ai_auth_code");
+            entity.Property(e => e.CodeHash).HasColumnType("character varying").HasColumnName("code_hash");
+            entity.Property(e => e.ClientId).HasColumnType("character varying").HasColumnName("client_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.RedirectUri).HasColumnType("character varying").HasColumnName("redirect_uri");
+            entity.Property(e => e.CodeChallenge).HasColumnType("character varying").HasColumnName("code_challenge");
+            entity.Property(e => e.Scopes).HasColumnType("character varying").HasColumnName("scopes");
+            entity.Property(e => e.Resource).HasColumnType("character varying").HasColumnName("resource");
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(e => e.UsedAt).HasColumnName("used_at");
+        });
+
+        modelBuilder.Entity<TbtAiToken>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ai_token_pk");
+            entity.ToTable("tbt_ai_token");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasColumnName("id");
+            entity.Property(e => e.Kind).HasColumnType("character varying").HasColumnName("kind");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.ClientId).HasColumnType("character varying").HasColumnName("client_id");
+            entity.Property(e => e.Name).HasColumnType("character varying").HasColumnName("name");
+            entity.Property(e => e.Scopes).HasColumnType("character varying").HasColumnName("scopes");
+            entity.Property(e => e.TokenHash).HasColumnType("character varying").HasColumnName("token_hash");
+            entity.Property(e => e.RefreshHash).HasColumnType("character varying").HasColumnName("refresh_hash");
+            entity.Property(e => e.FamilyId).HasColumnType("character varying").HasColumnName("family_id");
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(e => e.RefreshExpiresAt).HasColumnName("refresh_expires_at");
+            entity.Property(e => e.RevokedAt).HasColumnName("revoked_at");
+            entity.Property(e => e.LastUsedAt).HasColumnName("last_used_at");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
+        });
+
+        modelBuilder.Entity<TbtAiAccessLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ai_access_log_pk");
+            entity.ToTable("tbt_ai_access_log");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasColumnName("id");
+            entity.Property(e => e.TokenId).HasColumnName("token_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Tool).HasColumnType("character varying").HasColumnName("tool");
+            entity.Property(e => e.Scopes).HasColumnType("character varying").HasColumnName("scopes");
+            entity.Property(e => e.Params).HasColumnType("jsonb").HasColumnName("params");
+            entity.Property(e => e.RowCount).HasColumnName("row_count");
+            entity.Property(e => e.MaskedCount).HasColumnName("masked_count");
+            entity.Property(e => e.DurationMs).HasColumnName("duration_ms");
+            entity.Property(e => e.ErrorCode).HasColumnType("character varying").HasColumnName("error_code");
+            entity.Property(e => e.CreateDate).HasColumnName("create_date");
         });
 
         OnModelCreatingPartial(modelBuilder);

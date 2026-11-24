@@ -1,5 +1,6 @@
 ﻿using jewelry.Model.Azure;
 using Jewelry.Data.Context;
+using Jewelry.Service.AiConnector;
 using Jewelry.Service.Announcement;
 using Jewelry.Service.Authentication.Login;
 using Jewelry.Service.Certificate;
@@ -172,6 +173,7 @@ namespace Jewelry.Api.Extension
             services.AddScoped<IProductionWorkerLookupService, ProductionWorkerLookupService>();
             services.AddScoped<IProductionMaterialGemDataProvider, ProductionMaterialGemDataProvider>();
             services.AddSingleton<Jewelry.Service.Common.InsightCache>();
+            services.AddAiConnector(configuration);
             services.AddScoped<IExecutiveReportService, ExecutiveReportService>();
             services.AddScoped<IExecutiveFlowService, ExecutiveFlowService>();
             services.AddScoped<IExecutiveDigestService, ExecutiveDigestService>();
