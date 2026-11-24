@@ -208,20 +208,6 @@ namespace Jewelry.Service.Stock.ProductImage
                 throw new HandleException($"ไม่สามารถบันทึกรูปภาพได้ {result.ErrorMessage}");
             }
 
-            var oldImageName = sku.ImageName;
-
-            if (!string.IsNullOrEmpty(oldImageName))
-            {
-                try
-                {
-                    await _azureBlobService.DeleteImageAsync("Stock/Product", oldImageName);
-                }
-                catch
-                {
-                    // non-critical — ignore deletion failure
-                }
-            }
-
             sku.ImageName = newFileName;
             sku.ImagePath = "Stock/Product";
             sku.UpdateDate = DateTime.UtcNow;
