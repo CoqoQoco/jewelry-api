@@ -53,5 +53,17 @@ namespace jewelry.Model.Stock.Product.List
 
         // null/"" = ทั้งหมด, NO_NORMAL = ยังไม่เคยตีราคาปกติ, HAS_QUICK = มีราคาตีด่วน
         public string? PriceStatus { get; set; }
+
+        // กรองเป็นคู่ (stockNumber, productCode) exact ไม่เกิน 500 — ใช้กับการอ่านแท็ก
+        public List<PieceKey>? Pieces { get; set; }
+
+        // null/"" = ทั้งหมด, bound = ผูกครบทุกชิ้น, unbound = ยังไม่ผูกเลย, partial = ผูกบางชิ้น
+        public string? TagStatus { get; set; }
+    }
+
+    public class PieceKey
+    {
+        public string? StockNumber { get; set; }
+        public string? ProductCode { get; set; }
     }
 }

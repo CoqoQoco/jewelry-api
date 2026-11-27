@@ -81,6 +81,8 @@ namespace jewelry.Model.Stock.Product.List
         public string? QuickPriceBy { get; set; }
         public bool HasNormalAppraisal { get; set; }
         public int RfidTagCount { get; set; }
+        public int TagTotalUnits { get; set; }
+        public int TagBoundUnits { get; set; }
     }
 
     public class Material

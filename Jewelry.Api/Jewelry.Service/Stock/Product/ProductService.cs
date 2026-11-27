@@ -301,6 +301,91 @@ namespace Jewelry.Service.Stock.Product
                 pieces = pieces.Where(x => ((x.SkuCodeNavigation.DefaultPrice ?? 0) * (x.SkuCodeNavigation.TagPriceMultiplier ?? 1)) <= priceMax);
             }
 
+            if (request.Pieces != null && request.Pieces.Count > 0)
+            {
+                if (request.Pieces.Count > 500)
+                {
+                    throw new HandleException("Pieces must not exceed 500");
+                }
+
+                var wanted = request.Pieces
+                    .Where(p => !string.IsNullOrWhiteSpace(p.StockNumber) && !string.IsNullOrWhiteSpace(p.ProductCode))
+                    .Select(p => (Stock: StockNumberSearch.Normalize(p.StockNumber), Code: p.ProductCode!.Trim()))
+                    .ToHashSet();
+                var rawStocks = request.Pieces
+                    .Where(p => !string.IsNullOrWhiteSpace(p.StockNumber))
+                    .Select(p => p.StockNumber!.Trim())
+                    .Distinct()
+                    .ToList();
+
+                // ทางหลัก: เทียบเลขตามที่ส่งมาตรง ๆ (ใช้ index) — เลขที่ไม่เจอค่อย fallback เทียบแบบตัดขีด
+                var candidates = _jewelryContext.TbtStockPiece
+                    .AsNoTracking()
+                    .Where(x => rawStocks.Contains(x.StockNumber))
+                    .Select(x => new { x.StockNumber, x.ProductCode })
+                    .ToList();
+                var foundStocks = candidates.Select(c => StockNumberSearch.Normalize(c.StockNumber)).ToHashSet();
+                var missingStock = wanted.Select(w => w.Stock).Where(n => !foundStocks.Contains(n)).Distinct().ToList();
+                if (missingStock.Count > 0)
+                {
+                    candidates.AddRange(_jewelryContext.TbtStockPiece
+                        .AsNoTracking()
+                        .Where(x => missingStock.Contains(x.StockNumber.Replace("-", "")))
+                        .Select(x => new { x.StockNumber, x.ProductCode })
+                        .ToList());
+                }
+
+                var pieceKeys = candidates
+                    .Where(c => wanted.Contains((StockNumberSearch.Normalize(c.StockNumber), c.ProductCode)))
+                    .Select(c => c.StockNumber + "|" + c.ProductCode)
+                    .Distinct()
+                    .ToList();
+                var keyStocks = candidates.Select(c => c.StockNumber).Distinct().ToList();
+
+                pieces = pieces.Where(x => keyStocks.Contains(x.StockNumber));
+                pieces = pieces.Where(x => pieceKeys.Contains(x.StockNumber + "|" + x.ProductCode));
+            }
+
+            var tagFilter = request.TagStatus?.Trim().ToLowerInvariant();
+            if (tagFilter == "bound" || tagFilter == "unbound" || tagFilter == "partial")
+            {
+                // total = unit IN_STOCK/RESERVED (ล็อตไม่มี unit ใช้ FLOOR(qty)) · bound = unit ที่มีแท็ก active (ล็อตไม่มี unit นับแท็ก active ของล็อต)
+                var ctx = _jewelryContext;
+                if (tagFilter == "bound")
+                {
+                    pieces = pieces.Where(x =>
+                        (ctx.TbtStockUnit.Any(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode)
+                            ? ctx.TbtStockUnit.Count(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode && (u.Status == "IN_STOCK" || u.Status == "RESERVED"))
+                            : (int)Math.Floor(x.Qty)) > 0
+                        && (ctx.TbtStockUnit.Any(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode)
+                            ? ctx.TbtStockUnit.Count(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode && (u.Status == "IN_STOCK" || u.Status == "RESERVED") && ctx.TbtStockPieceRfid.Any(r => r.UnitId == u.Id && r.IsActive))
+                            : ctx.TbtStockPieceRfid.Count(r => r.StockNumber == x.StockNumber && r.ProductCode == x.ProductCode && r.IsActive))
+                        >= (ctx.TbtStockUnit.Any(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode)
+                            ? ctx.TbtStockUnit.Count(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode && (u.Status == "IN_STOCK" || u.Status == "RESERVED"))
+                            : (int)Math.Floor(x.Qty)));
+                }
+                else if (tagFilter == "unbound")
+                {
+                    pieces = pieces.Where(x =>
+                        (ctx.TbtStockUnit.Any(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode)
+                            ? ctx.TbtStockUnit.Count(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode && (u.Status == "IN_STOCK" || u.Status == "RESERVED") && ctx.TbtStockPieceRfid.Any(r => r.UnitId == u.Id && r.IsActive))
+                            : ctx.TbtStockPieceRfid.Count(r => r.StockNumber == x.StockNumber && r.ProductCode == x.ProductCode && r.IsActive)) == 0);
+                }
+                else
+                {
+                    pieces = pieces.Where(x =>
+                        (ctx.TbtStockUnit.Any(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode)
+                            ? ctx.TbtStockUnit.Count(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode && (u.Status == "IN_STOCK" || u.Status == "RESERVED") && ctx.TbtStockPieceRfid.Any(r => r.UnitId == u.Id && r.IsActive))
+                            : ctx.TbtStockPieceRfid.Count(r => r.StockNumber == x.StockNumber && r.ProductCode == x.ProductCode && r.IsActive)) > 0
+                        && (ctx.TbtStockUnit.Any(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode)
+                            ? ctx.TbtStockUnit.Count(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode && (u.Status == "IN_STOCK" || u.Status == "RESERVED") && ctx.TbtStockPieceRfid.Any(r => r.UnitId == u.Id && r.IsActive))
+                            : ctx.TbtStockPieceRfid.Count(r => r.StockNumber == x.StockNumber && r.ProductCode == x.ProductCode && r.IsActive))
+                        < (ctx.TbtStockUnit.Any(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode)
+                            ? ctx.TbtStockUnit.Count(u => u.StockNumber == x.StockNumber && u.ProductCode == x.ProductCode && (u.Status == "IN_STOCK" || u.Status == "RESERVED"))
+                            : (int)Math.Floor(x.Qty)));
+                }
+            }
+
             if (request.IncludeLastMovement == true)
             {
                 var responseWithMovement = from item in pieces
@@ -573,6 +658,7 @@ namespace Jewelry.Service.Stock.Product
             {
                 SkuPieceCount = skuPieceCount,
                 StockNumber = piece.StockNumber,
+                ProductCode = piece.ProductCode,
                 StockNumberOrigin = piece.StockNumberOrigin,
 
                 ReceiptNumber = piece.ReceiptNumber,
@@ -889,6 +975,36 @@ namespace Jewelry.Service.Stock.Product
             foreach (var row in rows)
             {
                 row.RfidTagCount = byLot.TryGetValue((row.StockNumber, row.ProductCode ?? string.Empty), out var n) ? n : 0;
+            }
+
+            var unitCounts = await _jewelryContext.TbtStockUnit
+                .AsNoTracking()
+                .Where(u => stockNumbers.Contains(u.StockNumber))
+                .GroupBy(u => new { u.StockNumber, u.ProductCode })
+                .Select(g => new
+                {
+                    g.Key.StockNumber,
+                    g.Key.ProductCode,
+                    Total = g.Count(u => u.Status == "IN_STOCK" || u.Status == "RESERVED"),
+                    Bound = g.Count(u => (u.Status == "IN_STOCK" || u.Status == "RESERVED")
+                        && _jewelryContext.TbtStockPieceRfid.Any(r => r.UnitId == u.Id && r.IsActive)),
+                    AnyUnit = g.Count()
+                })
+                .ToListAsync();
+            var unitsByLot = unitCounts.ToDictionary(c => (c.StockNumber, c.ProductCode ?? string.Empty));
+
+            foreach (var row in rows)
+            {
+                if (unitsByLot.TryGetValue((row.StockNumber, row.ProductCode ?? string.Empty), out var u) && u.AnyUnit > 0)
+                {
+                    row.TagTotalUnits = u.Total;
+                    row.TagBoundUnits = u.Bound;
+                }
+                else
+                {
+                    row.TagTotalUnits = (int)Math.Floor(row.Qty);
+                    row.TagBoundUnits = row.RfidTagCount;
+                }
             }
         }
 

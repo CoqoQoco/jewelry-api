@@ -10,6 +10,7 @@ namespace jewelry.Model.Stock.Product.Get
     public class Response
     {
         public string StockNumber { get; set; }
+        public string? ProductCode { get; set; }
         public int SkuPieceCount { get; set; }
         public string? StockNumberOrigin { get; set; }
         public string ReceiptNumber { get; set; }
