@@ -4199,6 +4199,8 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.GoldReturn).HasColumnName("gold_return");
             entity.Property(e => e.TotalWeightLoss).HasColumnName("total_weight_loss");
             entity.Property(e => e.NetWeightLoss).HasColumnName("net_weight_loss");
+            entity.Property(e => e.NetWeightLossGold).HasColumnName("net_weight_loss_gold");
+            entity.Property(e => e.NetWeightLossSilver).HasColumnName("net_weight_loss_silver");
             entity.Property(e => e.TotalMoneyDiff).HasColumnName("total_money_diff");
             entity.Property(e => e.TotalGoldReturnAmount).HasColumnName("total_gold_return_amount");
             entity.Property(e => e.Remark)

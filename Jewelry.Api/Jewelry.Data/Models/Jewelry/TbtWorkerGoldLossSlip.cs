@@ -23,6 +23,10 @@ public partial class TbtWorkerGoldLossSlip
 
     public decimal? NetWeightLoss { get; set; }
 
+    public decimal? NetWeightLossGold { get; set; }
+
+    public decimal? NetWeightLossSilver { get; set; }
+
     public decimal? TotalMoneyDiff { get; set; }
 
     public decimal? TotalGoldReturnAmount { get; set; }

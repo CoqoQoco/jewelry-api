@@ -57,6 +57,9 @@ namespace Jewelry.Service.Worker
             var totalGoldReturnAmount = returnItems.Where(r => r.CountInCalc).Sum(r => r.Amount);
             var totalReturnWeight = returnItems.Where(r => r.CountInCalc).Sum(r => r.Weight);
             var netWeightLoss = totalWeightLoss + totalReturnWeight;
+            var (netGold, netSilver) = ComputeNetWeightByMetal(
+                request.Items.Select(i => (i.Gold, i.GoldSize, i.WeightLossActual)),
+                returnItems);
 
             var documentNo = await GenerateGlsDocumentNo();
 
@@ -69,6 +72,8 @@ namespace Jewelry.Service.Worker
                 RequestDateEnd = request.RequestDateEnd.UtcDateTime,
                 TotalWeightLoss = totalWeightLoss,
                 NetWeightLoss = netWeightLoss,
+                NetWeightLossGold = netGold,
+                NetWeightLossSilver = netSilver,
                 TotalMoneyDiff = totalLossAmount,
                 TotalGoldReturnAmount = totalGoldReturnAmount,
                 Remark = request.Remark,
@@ -182,6 +187,8 @@ namespace Jewelry.Service.Worker
                     RequestDateEnd = x.RequestDateEnd,
                     TotalWeightLoss = x.TotalWeightLoss,
                     NetWeightLoss = x.NetWeightLoss,
+                    NetWeightLossGold = x.NetWeightLossGold,
+                    NetWeightLossSilver = x.NetWeightLossSilver,
                     TotalMoneyDiff = x.TotalMoneyDiff,
                     TotalGoldReturnAmount = x.TotalGoldReturnAmount,
                     Remark = x.Remark,
@@ -367,6 +374,8 @@ namespace Jewelry.Service.Worker
                 RequestDateEnd = header.RequestDateEnd,
                 TotalWeightLoss = header.TotalWeightLoss,
                 NetWeightLoss = header.NetWeightLoss,
+                NetWeightLossGold = header.NetWeightLossGold,
+                NetWeightLossSilver = header.NetWeightLossSilver,
                 TotalLossAmount = totalLossAmount,
                 TotalGoldReturnAmount = totalGoldReturnAmount,
                 NetPayAmount = netPayAmount,
@@ -411,6 +420,29 @@ namespace Jewelry.Service.Worker
             };
         }
 
+        public static (decimal? Gold, decimal? Silver) ComputeNetWeightByMetal(
+            IEnumerable<(string? Gold, string? GoldSize, decimal? WeightLossActual)> items,
+            IEnumerable<TbtWorkerGoldLossSlipReturn> returnItems)
+        {
+            decimal? gold = null;
+            decimal? silver = null;
+
+            foreach (var i in items)
+            {
+                var w = i.WeightLossActual ?? 0;
+                if (PurityKey(i.Gold, i.GoldSize) == "SILVER") silver = (silver ?? 0) + w;
+                else gold = (gold ?? 0) + w;
+            }
+
+            foreach (var r in returnItems.Where(r => r.CountInCalc))
+            {
+                if (PurityKey(r.Gold, r.GoldSize) == "SILVER") silver = (silver ?? 0) + r.Weight;
+                else gold = (gold ?? 0) + r.Weight;
+            }
+
+            return (gold, silver);
+        }
+
         private static string PurityKey(string? gold, string? goldSize)
         {
             if (gold == "SV") return "SILVER";
@@ -418,7 +450,7 @@ namespace Jewelry.Service.Worker
             return !string.IsNullOrEmpty(goldSize) ? goldSize : (gold ?? "");
         }
 
-        private List<GoldLossTypeSummaryResponse> BuildTypeSummaries(List<TbtWorkerGoldLossSlipItem> items, List<TbtWorkerGoldLossSlipReturn> returnItems)
+        public static List<GoldLossTypeSummaryResponse> BuildTypeSummaries(List<TbtWorkerGoldLossSlipItem> items, List<TbtWorkerGoldLossSlipReturn> returnItems)
         {
             var countedReturnItems = returnItems.Where(r => r.CountInCalc).ToList();
 
