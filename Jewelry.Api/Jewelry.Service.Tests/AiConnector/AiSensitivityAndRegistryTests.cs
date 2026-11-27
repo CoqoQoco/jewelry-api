@@ -173,7 +173,7 @@ public class AiSensitivityAndRegistryTests
             .Where(t => typeof(IAiTool).IsAssignableFrom(t) && t is { IsClass: true, IsAbstract: false })
             .Select(t => (IAiTool)Activator.CreateInstance(t)!)
             .ToList();
-        Assert.Equal(3, tools.Count);
+        Assert.Equal(4, tools.Count);
         var registry = new AiToolRegistry(tools);
         Assert.All(registry.Tools, t =>
         {

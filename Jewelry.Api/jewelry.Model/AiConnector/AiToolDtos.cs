@@ -149,4 +149,49 @@ namespace jewelry.Model.AiConnector
         public string Metric { get; set; } = "";
         public string Caveat { get; set; } = "";
     }
+
+    public class AiCustomerStatusInput
+    {
+        // ชื่อหรือรหัสลูกค้า — ค้นด้วยชื่อได้เฉพาะเมื่อได้รับอนุญาตให้ดูชื่อลูกค้า
+        public string? Customer { get; set; }
+    }
+
+    public class AiStageCount
+    {
+        [AiNotSensitive] public int Status { get; set; }
+        [AiNotSensitive] public string? StatusName { get; set; }
+        [AiNotSensitive] public int Count { get; set; }
+    }
+
+    public class AiCustomerPlan
+    {
+        [AiNotSensitive] public string Wo { get; set; } = "";
+        [AiNotSensitive] public int WoNumber { get; set; }
+        [AiNotSensitive] public string ProductNumber { get; set; } = "";
+        [AiNotSensitive] public string Mold { get; set; } = "";
+        [AiNotSensitive] public int Status { get; set; }
+        [AiNotSensitive] public string? StatusName { get; set; }
+        [AiNotSensitive] public DateTime LastMoveDate { get; set; }
+        [AiNotSensitive] public int DaysSinceMove { get; set; }
+    }
+
+    public class AiCustomerProduction
+    {
+        [AiNotSensitive] public string? CustomerCode { get; set; }
+        [AiSensitive(SensitiveCategory.CustomerName)] public string? CustomerName { get; set; }
+        [AiNotSensitive] public int OpenPlanCount { get; set; }
+        [AiNotSensitive] public int MeltedCount { get; set; }
+        [AiNotSensitive] public List<AiStageCount> StageCounts { get; set; } = new List<AiStageCount>();
+        [AiNotSensitive] public bool Truncated { get; set; }
+        [AiNotSensitive] public List<AiCustomerPlan> Plans { get; set; } = new List<AiCustomerPlan>();
+    }
+
+    public class AiCustomerStatusOutput
+    {
+        [AiNotSensitive] public DateTime AsOf { get; set; }
+        [AiSensitive(SensitiveCategory.CustomerName)] public string? Query { get; set; }
+        [AiNotSensitive] public string? Message { get; set; }
+        [AiNotSensitive] public bool Truncated { get; set; }
+        [AiNotSensitive] public List<AiCustomerProduction> Customers { get; set; } = new List<AiCustomerProduction>();
+    }
 }

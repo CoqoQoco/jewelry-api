@@ -39,6 +39,7 @@ using Materials = jewelry.Model.Production.Insight.Materials;
 using MaterialWaitingPlans = jewelry.Model.Production.Insight.MaterialWaitingPlans;
 using MaterialGemDemand = jewelry.Model.Production.Insight.MaterialGemDemand;
 using MaterialGemLowCover = jewelry.Model.Production.Insight.MaterialGemLowCover;
+using CustomerStatus = jewelry.Model.Production.Insight.CustomerStatus;
 
 namespace Jewelry.Api.Controllers.Production
 {
@@ -660,6 +661,24 @@ namespace Jewelry.Api.Controllers.Production
             try
             {
                 var response = await _service.MaterialGemLowCover(request);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Route("CustomerStatus")]
+        [HttpPost]
+        [RequirePermission("executive:view", "production:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(CustomerStatus.Response))]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> CustomerStatus([FromBody] CustomerStatus.Request request)
+        {
+            try
+            {
+                var response = await _service.CustomerStatus(request);
                 return Ok(response);
             }
             catch (Exception ex)

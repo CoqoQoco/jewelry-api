@@ -32,6 +32,7 @@ using Materials = jewelry.Model.Production.Insight.Materials;
 using MaterialWaitingPlans = jewelry.Model.Production.Insight.MaterialWaitingPlans;
 using MaterialGemDemand = jewelry.Model.Production.Insight.MaterialGemDemand;
 using MaterialGemLowCover = jewelry.Model.Production.Insight.MaterialGemLowCover;
+using CustomerStatus = jewelry.Model.Production.Insight.CustomerStatus;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -77,5 +78,7 @@ namespace Jewelry.Service.Production.Insight
         Task<DataSourceResult> MaterialWaitingPlans(MaterialWaitingPlans.Request request);
         Task<DataSourceResult> MaterialGemDemand(MaterialGemDemand.Request request);
         Task<DataSourceResult> MaterialGemLowCover(MaterialGemLowCover.Request request);
+
+        Task<CustomerStatus.Response> CustomerStatus(CustomerStatus.Request request);
     }
 }

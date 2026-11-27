@@ -46,6 +46,7 @@ using Materials = jewelry.Model.Production.Insight.Materials;
 using MaterialWaitingPlans = jewelry.Model.Production.Insight.MaterialWaitingPlans;
 using MaterialGemDemand = jewelry.Model.Production.Insight.MaterialGemDemand;
 using MaterialGemLowCover = jewelry.Model.Production.Insight.MaterialGemLowCover;
+using CustomerStatus = jewelry.Model.Production.Insight.CustomerStatus;
 
 namespace Jewelry.Service.Production.Insight
 {
@@ -4095,6 +4096,116 @@ namespace Jewelry.Service.Production.Insight
         private static void AddIfNotNull(List<Wip.Finding> list, Wip.Finding? finding)
         {
             if (finding != null) list.Add(finding);
+        }
+
+        public const int CustomerStatusMaxCustomers = 10;
+        public const int CustomerStatusMaxPlans = 200;
+
+        // ใบงานของลูกค้า — "ค้าง" = ใบเปิดจากแท็บ WIP (GetOpenPlansAsync: active, ไม่ใช่ 100/500)
+        // แต่ตัด WaitCVD/CVD + ใบปิดย้อนหลัง + ใบทดสอบ · หลอม(500) นับแยก · อ่านอย่างเดียว ไม่มี free-text
+        // customer_number เป็น free text — จับกลุ่มแบบตัดช่องว่าง/ไม่สนตัวพิมพ์ · ค่าที่ไม่อยู่ใน tbm_customer ถือเป็นชื่อ (customerCode = null)
+        public async Task<CustomerStatus.Response> CustomerStatus(CustomerStatus.Request request)
+        {
+            var now = DateTime.UtcNow;
+            var response = new CustomerStatus.Response { AsOf = now };
+
+            var keys = (request.CustomerCodes ?? new List<string>())
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Select(c => c.Trim())
+                .GroupBy(c => c.ToUpperInvariant())
+                .Select(g => g.First())
+                .Take(CustomerStatusMaxCustomers)
+                .ToList();
+            if (keys.Count == 0) return response;
+            var normKeys = keys.Select(k => k.ToUpperInvariant()).ToList();
+
+            var master = (await _jewelryContext.TbmCustomer
+                .AsNoTracking()
+                .Where(c => normKeys.Contains(c.Code.Trim().ToUpper()))
+                .Select(c => new { c.Code, c.NameTh })
+                .ToListAsync())
+                .GroupBy(c => c.Code.Trim().ToUpperInvariant())
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // ไม่ดึง 100 (สำเร็จ) — ใช้แค่ id/customer/status จึงเบา; ExcludeTest เทียบกับ ExcludeTestPlans ของ detail
+            var planRows = await _jewelryContext.TbtProductionPlan
+                .AsNoTracking()
+                .Where(p => p.IsActive == true && normKeys.Contains(p.CustomerNumber.Trim().ToUpper()) && p.Status != BackdateClosedPlans.StatusCompleted)
+                .Where(p => !(p.Wo != null && p.Wo.ToUpper().Contains("TEST"))
+                    && !(p.ProductName != null && p.ProductName.ToUpper().Contains("TEST"))
+                    && !(p.ProductNumber != null && p.ProductNumber.ToUpper().Contains("TEST"))
+                    && !(p.CustomerNumber != null && p.CustomerNumber.ToUpper().Contains("TEST")))
+                .Select(p => new { p.Id, p.CustomerNumber, p.Status })
+                .ToListAsync();
+            var planGroups = planRows.GroupBy(p => p.CustomerNumber.Trim().ToUpperInvariant()).ToDictionary(g => g.Key, g => g.ToList());
+
+            var openById = (await _wipHelper.GetOpenPlansAsync()).ToDictionary(p => p.Id);
+            var backdateClosed = await BackdateClosedPlans.LoadAsync(_jewelryContext);
+            var lastMoveDates = await _wipHelper.GetLastMoveDatesAsync();
+            var statusNames = await _wipHelper.GetStatusNamesAsync();
+
+            var remaining = CustomerStatusMaxPlans;
+            foreach (var key in keys.OrderBy(k => k.ToUpperInvariant(), StringComparer.Ordinal))
+            {
+                var norm = key.ToUpperInvariant();
+                master.TryGetValue(norm, out var m);
+                var mine = planGroups.TryGetValue(norm, out var grp) ? grp : new();
+                var meltedCount = mine.Count(p => p.Status == ProductionPlanStatusConst.Melted);
+                var open = mine
+                    .Where(p => p.Status != ProductionPlanStatusConst.Melted
+                        && p.Status != ProductionPlanStatusConst.WaitCVD
+                        && p.Status != ProductionPlanStatusConst.CVD
+                        && !backdateClosed.ContainsKey(p.Id)
+                        && openById.ContainsKey(p.Id))
+                    .Select(p => openById[p.Id])
+                    .ToList();
+
+                var plans = open
+                    .Select(p =>
+                    {
+                        var lastMove = ProductionPlanDepartments.LastMoveOf(p, lastMoveDates);
+                        return new CustomerStatus.PlanItem
+                        {
+                            Wo = p.Wo,
+                            WoNumber = p.WoNumber,
+                            ProductNumber = p.ProductNumber,
+                            Mold = p.Mold,
+                            Status = p.Status,
+                            StatusName = statusNames.TryGetValue(p.Status, out var sn) ? sn : null,
+                            LastMoveDate = lastMove,
+                            DaysSinceMove = (int)(now - lastMove).TotalDays
+                        };
+                    })
+                    .OrderBy(p => p.LastMoveDate)
+                    .ThenBy(p => p.Wo, StringComparer.Ordinal)
+                    .ToList();
+
+                var take = Math.Min(plans.Count, remaining);
+                remaining -= take;
+                var truncated = take < plans.Count;
+                if (truncated) response.Truncated = true;
+
+                response.Customers.Add(new CustomerStatus.CustomerItem
+                {
+                    CustomerCode = m?.Code,
+                    CustomerName = m != null ? m.NameTh : key,
+                    OpenPlanCount = open.Count,
+                    MeltedCount = meltedCount,
+                    StageCounts = open.GroupBy(p => p.Status)
+                        .OrderBy(g => g.Key)
+                        .Select(g => new CustomerStatus.StageCount
+                        {
+                            Status = g.Key,
+                            StatusName = statusNames.TryGetValue(g.Key, out var sn) ? sn : null,
+                            Count = g.Count()
+                        })
+                        .ToList(),
+                    Truncated = truncated,
+                    Plans = plans.Take(take).ToList()
+                });
+            }
+
+            return response;
         }
     }
 }

@@ -69,6 +69,7 @@ namespace Jewelry.Service.AiConnector
     public static class AiScopes
     {
         public const string ModuleExecutive = "module:executive";
+        public const string ModuleProduction = "module:production";
         public const string DataCustomerNames = "data:customer-names";
         public const string DataWorkerNames = "data:worker-names";
         public const string DataCost = "data:cost";

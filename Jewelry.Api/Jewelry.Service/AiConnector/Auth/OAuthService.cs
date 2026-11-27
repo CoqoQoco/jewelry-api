@@ -121,7 +121,7 @@ namespace Jewelry.Service.AiConnector.Auth
             foreach (var s in v.Catalog)
             {
                 var required = s.Kind == "MODULE" && v.RequestedScopes.Contains(s.Code);
-                if (s.Kind == "MODULE" && !required) continue;
+                // MODULE ที่ client ไม่ได้ขอ แสดงเป็น checkbox เสริม (ไม่ติ๊กเป็นค่าเริ่มต้น) เหมือน DATA
                 if (s.Kind != "MODULE" && s.Kind != "DATA") continue;
 
                 var available = true;
@@ -166,7 +166,7 @@ namespace Jewelry.Service.AiConnector.Auth
                     if (rule == null || !user.Permissions.Contains(rule.Permission))
                         throw new AiOAuthException("invalid_scope", "บัญชีนี้ไม่มีสิทธิ์ให้ scope " + s);
                 }
-                else if (entry.Kind != "MODULE" || !v.RequestedScopes.Contains(s))
+                else if (entry.Kind != "MODULE")
                 {
                     throw new AiOAuthException("invalid_scope", "scope ไม่ถูกต้อง");
                 }

@@ -27,6 +27,7 @@ namespace Jewelry.Service.AiConnector
             services.AddScoped<IAiConnectionService, AiConnectionService>();
             services.AddScoped<IAiGlossaryService, AiGlossaryService>();
             services.AddScoped<IAiToolPipeline, AiToolPipeline>();
+            services.AddScoped<Tools.Production.IAiCustomerLookup, Tools.Production.AiCustomerLookup>();
 
             // convention ใหม่ (ต่างจากส่วนอื่นของ repo ที่ register ทีละตัว):
             // IAiTool ทุก class ใน assembly นี้ถูก scan เข้ามาเป็น singleton อัตโนมัติ — เพิ่ม tool ใหม่ = สร้าง class เดียว ไม่ต้องแก้ไฟล์นี้
