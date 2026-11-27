@@ -591,6 +591,592 @@ public class StockRfidService : BaseService, IStockRfidService
         };
     }
 
+    public async Task<jewelry.Model.Stock.Rfid.ListUnits.Response> ListUnits(jewelry.Model.Stock.Rfid.ListUnits.Request request)
+    {
+        var (skip, take) = NormalizePaging(request.Skip, request.Take, 50, 500);
+        var tagStatus = request.TagStatus?.Trim().ToLowerInvariant();
+
+        var pieces = _jewelryContext.TbtStockPiece.AsNoTracking().AsQueryable();
+
+        var normalizedOrigin = StockNumberSearch.Normalize(request.StockNumberOrigin);
+        if (normalizedOrigin != "")
+        {
+            pieces = pieces.Where(x => x.StockNumberOrigin != null && x.StockNumberOrigin.Replace("-", "").ToUpper().Contains(normalizedOrigin));
+        }
+
+        var exactWo = request.Wo?.Trim();
+        var exactWoNumber = request.WoNumber;
+        string? woKeyword = null;
+        if (!string.IsNullOrWhiteSpace(request.WoText))
+        {
+            if (TryParsePlan(request.WoText, out var parsedWo, out var parsedWoNumber))
+            {
+                exactWo = parsedWo;
+                exactWoNumber = parsedWoNumber;
+            }
+            else
+            {
+                var keyword = new string(request.WoText.Where(c => c != '-' && c != '/' && !char.IsWhiteSpace(c)).ToArray()).ToLower();
+                woKeyword = keyword == "" ? null : keyword;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(exactWo))
+        {
+            pieces = pieces.Where(x => x.Wo == exactWo);
+        }
+
+        if (exactWoNumber.HasValue)
+        {
+            var wn = exactWoNumber.Value;
+            pieces = pieces.Where(x => x.WoNumber == wn);
+        }
+
+        if (woKeyword != null)
+        {
+            pieces = pieces.Where(x => ((x.Wo ?? "") + (x.WoNumber != null ? x.WoNumber.Value.ToString() : "")).ToLower().Contains(woKeyword));
+        }
+
+        if (request.Materials != null && request.Materials.Any(m => !string.IsNullOrWhiteSpace(m)))
+        {
+            pieces = ApplyMaterialFilter(pieces, request.Materials, request.MaterialMatchAll != false);
+        }
+
+        var query =
+            from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+            join p in pieces
+                on new { u.StockNumber, u.ProductCode } equals new { p.StockNumber, p.ProductCode }
+            join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode
+            where u.Status == StockUnitSync.InStock || u.Status == StockUnitSync.Reserved
+            select new { u, p, s };
+
+        if (tagStatus == "bound")
+        {
+            query = query.Where(x => _jewelryContext.TbtStockPieceRfid.Any(r => r.IsActive && r.UnitId == x.u.Id));
+        }
+        else if (tagStatus != "all")
+        {
+            query = query.Where(x => !_jewelryContext.TbtStockPieceRfid.Any(r => r.IsActive && r.UnitId == x.u.Id));
+        }
+
+        if (request.UnitIds != null && request.UnitIds.Length > 0)
+        {
+            var unitIds = request.UnitIds.Distinct().Take(500).ToArray();
+            query = query.Where(x => unitIds.Contains(x.u.Id));
+        }
+
+        var normalizedStock = StockNumberSearch.Normalize(request.StockNumber);
+        if (normalizedStock != "")
+        {
+            query = query.Where(x => x.u.StockNumber.Replace("-", "").ToUpper().Contains(normalizedStock));
+        }
+
+        if (!string.IsNullOrEmpty(request.ProductNumber))
+        {
+            var productNumber = request.ProductNumber.Trim();
+            query = query.Where(x => x.u.ProductCode.Contains(productNumber));
+        }
+
+        if (request.LocationCodes != null && request.LocationCodes.Any())
+        {
+            var locations = request.LocationCodes.ToArray();
+            query = query.Where(x => locations.Contains(x.u.LocationCode));
+        }
+
+        if (request.ProductType != null && request.ProductType.Any())
+        {
+            var types = request.ProductType.ToArray();
+            query = query.Where(x => types.Contains(x.s.ProductType));
+        }
+
+        if (request.Gold != null && request.Gold.Any())
+        {
+            var gold = request.Gold.ToArray();
+            query = query.Where(x => gold.Contains(x.s.ProductionType));
+        }
+
+        if (request.GoldSize != null && request.GoldSize.Any())
+        {
+            var goldSize = request.GoldSize.ToArray();
+            query = query.Where(x => goldSize.Contains(x.s.ProductionTypeSize));
+        }
+
+        if (request.ReceiptType != null && request.ReceiptType.Any())
+        {
+            var receiptTypes = request.ReceiptType.ToArray();
+            query = query.Where(x => x.p.ReceiptType != null && receiptTypes.Contains(x.p.ReceiptType));
+        }
+
+        if (!string.IsNullOrEmpty(request.ReceiptNumber))
+        {
+            var receiptNumber = request.ReceiptNumber.Trim();
+            query = query.Where(x => (x.u.ReceiptNumber ?? x.p.ReceiptNumber) != null
+                && (x.u.ReceiptNumber ?? x.p.ReceiptNumber)!.Contains(receiptNumber));
+        }
+
+        if (request.ReceiptDateFrom.HasValue)
+        {
+            var from = request.ReceiptDateFrom.Value.StartOfDayUtc().UtcDateTime;
+            query = query.Where(x => x.u.ReceiptDate != null && x.u.ReceiptDate >= from);
+        }
+
+        if (request.ReceiptDateTo.HasValue)
+        {
+            var to = request.ReceiptDateTo.Value.EndOfDayUtc().UtcDateTime;
+            query = query.Where(x => x.u.ReceiptDate != null && x.u.ReceiptDate <= to);
+        }
+
+        if (!string.IsNullOrEmpty(request.Mold))
+        {
+            var mold = request.Mold.Trim();
+            query = query.Where(x => x.s.MoldDesign != null && x.s.MoldDesign.Contains(mold));
+        }
+
+        if (!string.IsNullOrEmpty(request.ProductName))
+        {
+            var name = request.ProductName.Trim();
+            query = query.Where(x => x.s.ProductNameTh.Contains(name) || x.s.ProductNameEn.Contains(name));
+        }
+
+        if (!string.IsNullOrEmpty(request.Size))
+        {
+            var size = request.Size.Trim();
+            query = query.Where(x => x.s.Size != null && x.s.Size.Contains(size));
+        }
+
+        var total = await query.CountAsync();
+
+        var rows = await query
+            .OrderBy(x => x.u.LocationCode)
+            .ThenBy(x => x.u.StockNumber)
+            .ThenBy(x => x.u.UnitNo)
+            .Skip(skip)
+            .Take(take)
+            .Select(x => new UnitRow
+            {
+                UnitId = x.u.Id,
+                UnitNo = x.u.UnitNo,
+                LotQty = _jewelryContext.TbtStockUnit.Count(o => o.StockNumber == x.u.StockNumber && o.ProductCode == x.u.ProductCode),
+                UnitStatus = x.u.Status,
+                StockNumber = x.u.StockNumber,
+                StockNumberOrigin = x.p.StockNumberOrigin,
+                ProductCode = x.u.ProductCode,
+                ProductNumber = x.s.ProductNumber,
+                ProductNameTh = x.s.ProductNameTh,
+                ProductNameEn = x.s.ProductNameEn,
+                ProductType = x.s.ProductType,
+                ProductTypeName = x.s.ProductTypeName,
+                LocationCode = x.u.LocationCode,
+                ImagePath = x.s.ImagePath,
+                ImageName = x.s.ImageName,
+                ReceiptNumber = x.u.ReceiptNumber ?? x.p.ReceiptNumber,
+                ReceiptDate = x.u.ReceiptDate ?? x.p.ReceiptDate,
+                Wo = x.p.Wo,
+                WoNumber = x.p.WoNumber
+            })
+            .ToListAsync();
+
+        return new jewelry.Model.Stock.Rfid.ListUnits.Response
+        {
+            Total = total,
+            Items = await BuildUnitItemsAsync(rows)
+        };
+    }
+
+    public async Task<jewelry.Model.Stock.Rfid.ListPlans.Response> ListPlans(jewelry.Model.Stock.Rfid.ListPlans.Request request)
+    {
+        var (skip, take) = NormalizePaging(request.Skip, request.Take, 50, 200);
+
+        var query =
+            from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+            join p in _jewelryContext.TbtStockPiece.AsNoTracking()
+                on new { u.StockNumber, u.ProductCode } equals new { p.StockNumber, p.ProductCode }
+            where (u.Status == StockUnitSync.InStock || u.Status == StockUnitSync.Reserved)
+                && p.Wo != null && p.Wo != "" && p.WoNumber != null
+            select new { u, p };
+
+        var search = request.Search?.Trim();
+        if (!string.IsNullOrEmpty(search))
+        {
+            if (TryParsePlan(search, out var wo, out var woNumber))
+            {
+                query = query.Where(x => x.p.Wo == wo && x.p.WoNumber == woNumber);
+            }
+            else if (search.Contains('/'))
+            {
+                return new jewelry.Model.Stock.Rfid.ListPlans.Response();
+            }
+            else
+            {
+                query = query.Where(x => x.p.Wo!.Contains(search));
+            }
+        }
+
+        DateTime? rangeFrom = request.ReceiptDateFrom?.StartOfDayUtc().UtcDateTime;
+        DateTime? rangeTo = request.ReceiptDateTo?.EndOfDayUtc().UtcDateTime;
+        var hasRange = rangeFrom.HasValue || rangeTo.HasValue;
+
+        var grouped = query
+            .GroupBy(x => new { x.p.Wo, x.p.WoNumber })
+            .Select(g => new
+            {
+                Wo = g.Key.Wo!,
+                WoNumber = g.Key.WoNumber!.Value,
+                LotCount = g.Select(x => x.u.StockNumber).Distinct().Count(),
+                TotalUnits = g.Count(),
+                UnboundUnits = g.Sum(x => _jewelryContext.TbtStockPieceRfid.Any(r => r.IsActive && r.UnitId == x.u.Id) ? 0 : 1),
+                LastReceiptDate = g.Max(x => x.u.ReceiptDate ?? x.p.ReceiptDate),
+                InRange = g.Sum(x =>
+                    (x.u.ReceiptDate ?? x.p.ReceiptDate) != null
+                    && (rangeFrom == null || (x.u.ReceiptDate ?? x.p.ReceiptDate) >= rangeFrom)
+                    && (rangeTo == null || (x.u.ReceiptDate ?? x.p.ReceiptDate) <= rangeTo) ? 1 : 0)
+            });
+
+        if (hasRange)
+        {
+            grouped = grouped.Where(g => g.InRange > 0);
+        }
+
+        if (request.OnlyIncomplete)
+        {
+            grouped = grouped.Where(g => g.UnboundUnits > 0);
+        }
+
+        var total = await grouped.CountAsync();
+
+        var plans = await grouped
+            .OrderBy(g => g.LastReceiptDate == null)
+            .ThenByDescending(g => g.LastReceiptDate)
+            .ThenBy(g => g.Wo)
+            .ThenBy(g => g.WoNumber)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        var info = new Dictionary<(string, int), (string? Th, string? En, string? Image, string? Mold)>();
+        if (plans.Count > 0)
+        {
+            var wos = plans.Select(x => x.Wo).Distinct().ToList();
+            var numbers = plans.Select(x => (int?)x.WoNumber).Distinct().ToList();
+            var lots = await (
+                from p in _jewelryContext.TbtStockPiece.AsNoTracking()
+                join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode
+                where p.Wo != null && wos.Contains(p.Wo) && numbers.Contains(p.WoNumber)
+                select new { Wo = p.Wo!, WoNumber = p.WoNumber!.Value, p.StockNumber, s.ProductNameTh, s.ProductNameEn, s.ImagePath, s.ImageName, s.MoldDesign, s.Mold }
+            ).ToListAsync();
+
+            var wanted = plans.Select(x => (x.Wo, x.WoNumber)).ToHashSet();
+            foreach (var lot in lots.Where(l => wanted.Contains((l.Wo, l.WoNumber))).OrderBy(l => l.StockNumber, StringComparer.Ordinal))
+            {
+                var key = (lot.Wo, lot.WoNumber);
+                if (!info.ContainsKey(key))
+                {
+                    info[key] = (lot.ProductNameTh, lot.ProductNameEn, StockImagePath.Build(lot.ImagePath, lot.ImageName), lot.MoldDesign ?? lot.Mold);
+                }
+            }
+        }
+
+        return new jewelry.Model.Stock.Rfid.ListPlans.Response
+        {
+            Total = total,
+            Items = plans.Select(x =>
+            {
+                info.TryGetValue((x.Wo, x.WoNumber), out var i);
+                return new jewelry.Model.Stock.Rfid.ListPlans.Item
+                {
+                    Wo = x.Wo,
+                    WoNumber = x.WoNumber,
+                    WoText = $"{x.Wo}/{x.WoNumber}",
+                    ProductNameTh = i.Th,
+                    ProductNameEn = i.En,
+                    ImagePath = i.Image,
+                    Mold = i.Mold,
+                    LotCount = x.LotCount,
+                    TotalUnits = x.TotalUnits,
+                    UnboundUnits = x.UnboundUnits,
+                    LastReceiptDate = x.LastReceiptDate
+                };
+            }).ToList()
+        };
+    }
+
+    public static bool TryParsePlan(string? text, out string wo, out int woNumber)
+    {
+        wo = "";
+        woNumber = 0;
+        var t = text?.Trim();
+        if (string.IsNullOrEmpty(t))
+        {
+            return false;
+        }
+
+        if (t.StartsWith("WO", StringComparison.OrdinalIgnoreCase))
+        {
+            t = t.Substring(2).TrimStart();
+        }
+
+        var idx = t.IndexOf('/');
+        if (idx <= 0 || idx != t.LastIndexOf('/'))
+        {
+            return false;
+        }
+
+        wo = t.Substring(0, idx).Trim();
+        return wo != "" && int.TryParse(t.Substring(idx + 1).Trim(), out woNumber);
+    }
+
+    public async Task<jewelry.Model.Stock.Rfid.ResolveLabel.Response> ResolveLabel(jewelry.Model.Stock.Rfid.ResolveLabel.Request request)
+    {
+        var candidates = ExtractLabelCandidates(request.Code);
+        if (candidates.Count == 0)
+        {
+            return new jewelry.Model.Stock.Rfid.ResolveLabel.Response();
+        }
+
+        var exact = new List<string>();
+        var rawCode = request.Code!.Trim();
+        exact.Add(rawCode);
+        exact.Add(rawCode.ToUpperInvariant());
+        foreach (var c in candidates)
+        {
+            exact.Add(c);
+            exact.Add(c.ToLowerInvariant());
+        }
+
+        var rows = await QueryLabelRowsAsync(exact, normalized: false, candidates: candidates);
+        if (rows.Count == 0)
+        {
+            rows = await QueryLabelRowsAsync(exact, normalized: true, candidates: candidates);
+        }
+
+        return new jewelry.Model.Stock.Rfid.ResolveLabel.Response
+        {
+            Items = await BuildUnitItemsAsync(rows)
+        };
+    }
+
+    private async Task<List<UnitRow>> QueryLabelRowsAsync(List<string> exact, bool normalized, List<string> candidates)
+    {
+        var query =
+            from u in _jewelryContext.TbtStockUnit.AsNoTracking()
+            join p in _jewelryContext.TbtStockPiece.AsNoTracking()
+                on new { u.StockNumber, u.ProductCode } equals new { p.StockNumber, p.ProductCode }
+            join s in _jewelryContext.TbtSku.AsNoTracking() on p.SkuCode equals s.SkuCode
+            where u.Status == StockUnitSync.InStock || u.Status == StockUnitSync.Reserved
+            select new { u, p, s };
+
+        query = normalized
+            ? query.Where(x => candidates.Contains(x.u.StockNumber.Replace("-", "").ToUpper())
+                || (x.p.StockNumberOrigin != null && candidates.Contains(x.p.StockNumberOrigin.Replace("-", "").ToUpper())))
+            : query.Where(x => exact.Contains(x.u.StockNumber)
+                || (x.p.StockNumberOrigin != null && exact.Contains(x.p.StockNumberOrigin)));
+
+        return await query
+            .OrderBy(x => x.u.StockNumber)
+            .ThenBy(x => x.u.ProductCode)
+            .ThenBy(x => x.u.UnitNo)
+            .Take(500)
+            .Select(x => new UnitRow
+            {
+                UnitId = x.u.Id,
+                UnitNo = x.u.UnitNo,
+                LotQty = _jewelryContext.TbtStockUnit.Count(o => o.StockNumber == x.u.StockNumber && o.ProductCode == x.u.ProductCode),
+                UnitStatus = x.u.Status,
+                StockNumber = x.u.StockNumber,
+                StockNumberOrigin = x.p.StockNumberOrigin,
+                ProductCode = x.u.ProductCode,
+                ProductNumber = x.s.ProductNumber,
+                ProductNameTh = x.s.ProductNameTh,
+                ProductNameEn = x.s.ProductNameEn,
+                ProductType = x.s.ProductType,
+                ProductTypeName = x.s.ProductTypeName,
+                LocationCode = x.u.LocationCode,
+                ImagePath = x.s.ImagePath,
+                ImageName = x.s.ImageName,
+                ReceiptNumber = x.u.ReceiptNumber ?? x.p.ReceiptNumber,
+                ReceiptDate = x.u.ReceiptDate ?? x.p.ReceiptDate,
+                Wo = x.p.Wo,
+                WoNumber = x.p.WoNumber
+            })
+            .ToListAsync();
+    }
+
+    public static List<string> ExtractLabelCandidates(string? code)
+    {
+        var raw = code?.Trim();
+        if (string.IsNullOrEmpty(raw))
+        {
+            return new List<string>();
+        }
+
+        var result = new List<string>();
+        var idx = raw.IndexOf("/p/", StringComparison.OrdinalIgnoreCase);
+        if (idx >= 0)
+        {
+            var segment = raw.Substring(idx + 3);
+            var cut = segment.IndexOfAny(new[] { '?', '#', '/' });
+            if (cut >= 0)
+            {
+                segment = segment.Substring(0, cut);
+            }
+
+            segment = Uri.UnescapeDataString(segment).Trim();
+            var dash = segment.LastIndexOf('-');
+            if (dash > 0 && segment.Length - dash - 1 == 8)
+            {
+                result.Add(StockNumberSearch.Normalize(segment.Substring(0, dash)));
+            }
+
+            result.Add(StockNumberSearch.Normalize(segment));
+        }
+        else
+        {
+            result.Add(StockNumberSearch.Normalize(raw));
+        }
+
+        return result.Where(x => x != "").Distinct().ToList();
+    }
+
+    private IQueryable<TbtStockPiece> ApplyMaterialFilter(IQueryable<TbtStockPiece> pieces, string[] materials, bool matchAll)
+    {
+        var selected = materials
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .Select(m => m.Trim())
+            .Distinct()
+            .ToList();
+
+        var wantDiamond = selected.Any(m => string.Equals(m, "DIAMOND", StringComparison.OrdinalIgnoreCase));
+        var gemCodes = selected.Where(m => !string.Equals(m, "DIAMOND", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        var gemMasters = gemCodes.Any()
+            ? _jewelryContext.TbmGem.AsNoTracking().Where(g => gemCodes.Contains(g.Code)).ToList()
+            : new List<TbmGem>();
+
+        var tokensByCode = gemCodes.ToDictionary(
+            code => code,
+            code =>
+            {
+                var tokens = new List<string>();
+                var master = gemMasters.FirstOrDefault(g => g.Code == code);
+                if (master != null)
+                {
+                    if (!string.IsNullOrEmpty(master.NameEn)) tokens.Add(master.NameEn.Trim().ToUpper());
+                    if (!string.IsNullOrEmpty(master.Code)) tokens.Add(master.Code.Trim().ToUpper());
+                }
+                return tokens.Distinct().ToList();
+            });
+
+        if (matchAll)
+        {
+            if (wantDiamond)
+            {
+                pieces = pieces.Where(x => x.TbtStockPieceMaterial.Any(m =>
+                    m.Type.Trim().ToUpper() == "DIAMOND"
+                    || (m.TypeCode != null && (m.TypeCode.Trim().ToUpper() == "DIAMOND" || m.TypeCode.Trim().ToUpper() == "DI"))));
+            }
+
+            foreach (var code in gemCodes)
+            {
+                var tokens = tokensByCode[code];
+                if (tokens.Count == 0)
+                {
+                    pieces = pieces.Where(x => false);
+                }
+                else
+                {
+                    pieces = pieces.Where(x => x.TbtStockPieceMaterial.Any(m =>
+                        m.Type.Trim().ToUpper() == "GEM"
+                        && m.TypeCode != null
+                        && tokens.Contains(m.TypeCode.Trim().ToUpper())));
+                }
+            }
+
+            return pieces;
+        }
+
+        var allTokens = gemCodes.SelectMany(code => tokensByCode[code]).Distinct().ToList();
+        if (!wantDiamond && allTokens.Count == 0)
+        {
+            return pieces.Where(x => false);
+        }
+
+        return pieces.Where(x => x.TbtStockPieceMaterial.Any(m =>
+            (wantDiamond && (m.Type.Trim().ToUpper() == "DIAMOND"
+                || (m.TypeCode != null && (m.TypeCode.Trim().ToUpper() == "DIAMOND" || m.TypeCode.Trim().ToUpper() == "DI"))))
+            || (allTokens.Count > 0 && m.Type.Trim().ToUpper() == "GEM" && m.TypeCode != null && allTokens.Contains(m.TypeCode.Trim().ToUpper()))));
+    }
+
+    private async Task<List<jewelry.Model.Stock.Rfid.ListUnits.Item>> BuildUnitItemsAsync(List<UnitRow> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return new List<jewelry.Model.Stock.Rfid.ListUnits.Item>();
+        }
+
+        var unitIds = rows.Select(x => x.UnitId).ToList();
+        var tags = await _jewelryContext.TbtStockPieceRfid.AsNoTracking()
+            .Where(r => r.IsActive && r.UnitId != null && unitIds.Contains(r.UnitId.Value))
+            .Select(r => new { UnitId = r.UnitId!.Value, r.Epc, r.CreateDate, r.Id })
+            .ToListAsync();
+        var tagByUnit = tags
+            .GroupBy(t => t.UnitId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(t => t.Id).First());
+
+        var locationNames = await LoadLocationNamesAsync(rows.Select(x => x.LocationCode));
+
+        return rows.Select(x =>
+        {
+            tagByUnit.TryGetValue(x.UnitId, out var tag);
+            return new jewelry.Model.Stock.Rfid.ListUnits.Item
+            {
+                UnitId = x.UnitId,
+                UnitNo = x.UnitNo,
+                LotQty = x.LotQty,
+                UnitStatus = x.UnitStatus,
+                StockNumber = x.StockNumber,
+                StockNumberOrigin = x.StockNumberOrigin,
+                ProductCode = x.ProductCode,
+                ProductNumber = x.ProductNumber,
+                ProductNameTh = x.ProductNameTh,
+                ProductNameEn = x.ProductNameEn,
+                ProductType = x.ProductType,
+                ProductTypeName = x.ProductTypeName,
+                LocationCode = x.LocationCode,
+                LocationName = locationNames.GetValueOrDefault(x.LocationCode),
+                ImagePath = StockImagePath.Build(x.ImagePath, x.ImageName),
+                ReceiptNumber = x.ReceiptNumber,
+                ReceiptDate = x.ReceiptDate,
+                Wo = x.Wo,
+                WoNumber = x.WoNumber,
+                Epc = tag?.Epc,
+                BoundDate = tag?.CreateDate
+            };
+        }).ToList();
+    }
+
+    private sealed class UnitRow
+    {
+        public long UnitId { get; set; }
+        public int UnitNo { get; set; }
+        public decimal LotQty { get; set; }
+        public string UnitStatus { get; set; } = null!;
+        public string StockNumber { get; set; } = null!;
+        public string? StockNumberOrigin { get; set; }
+        public string ProductCode { get; set; } = null!;
+        public string? ProductNumber { get; set; }
+        public string? ProductNameTh { get; set; }
+        public string? ProductNameEn { get; set; }
+        public string? ProductType { get; set; }
+        public string? ProductTypeName { get; set; }
+        public string LocationCode { get; set; } = null!;
+        public string? ImagePath { get; set; }
+        public string? ImageName { get; set; }
+        public string? ReceiptNumber { get; set; }
+        public DateTime? ReceiptDate { get; set; }
+        public string? Wo { get; set; }
+        public int? WoNumber { get; set; }
+    }
+
     public async Task<jewelry.Model.Stock.Rfid.ListRecent.Response> ListRecent(jewelry.Model.Stock.Rfid.ListRecent.Request request)
     {
         var take = request.Take <= 0 ? 50 : Math.Min(request.Take, 200);

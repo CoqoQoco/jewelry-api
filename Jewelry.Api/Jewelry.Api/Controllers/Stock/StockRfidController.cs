@@ -175,6 +175,63 @@ namespace Jewelry.Api.Controllers.Stock
             }
         }
 
+        [Route("ListUnits")]
+        [HttpPost]
+        [RequirePermission("stock-rfid:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.ListUnits.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ListUnits([FromBody] jewelry.Model.Stock.Rfid.ListUnits.Request request)
+        {
+            try
+            {
+                var response = await _service.ListUnits(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListPlans")]
+        [HttpPost]
+        [RequirePermission("stock-rfid:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.ListPlans.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ListPlans([FromBody] jewelry.Model.Stock.Rfid.ListPlans.Request request)
+        {
+            try
+            {
+                var response = await _service.ListPlans(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ResolveLabel")]
+        [HttpPost]
+        [RequirePermission("stock-rfid:view")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(jewelry.Model.Stock.Rfid.ResolveLabel.Response))]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+        public async Task<IActionResult> ResolveLabel([FromBody] jewelry.Model.Stock.Rfid.ResolveLabel.Request request)
+        {
+            try
+            {
+                var response = await _service.ResolveLabel(request);
+                return Ok(response);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
         [Route("ListRecent")]
         [HttpPost]
         [RequirePermission("stock-rfid:view")]

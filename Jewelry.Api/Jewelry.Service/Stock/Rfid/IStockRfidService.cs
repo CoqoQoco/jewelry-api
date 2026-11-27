@@ -18,5 +18,11 @@ public interface IStockRfidService
 
     Task<jewelry.Model.Stock.Rfid.ListUnbound.Response> ListUnbound(jewelry.Model.Stock.Rfid.ListUnbound.Request request);
 
+    Task<jewelry.Model.Stock.Rfid.ListUnits.Response> ListUnits(jewelry.Model.Stock.Rfid.ListUnits.Request request);
+
+    Task<jewelry.Model.Stock.Rfid.ListPlans.Response> ListPlans(jewelry.Model.Stock.Rfid.ListPlans.Request request);
+
+    Task<jewelry.Model.Stock.Rfid.ResolveLabel.Response> ResolveLabel(jewelry.Model.Stock.Rfid.ResolveLabel.Request request);
+
     Task<jewelry.Model.Stock.Rfid.ListRecent.Response> ListRecent(jewelry.Model.Stock.Rfid.ListRecent.Request request);
 }
