@@ -838,7 +838,16 @@ namespace Jewelry.Service.Sale.Invoice
             if (!string.IsNullOrEmpty(request.InvoiceNumber))
             {
                 var pattern = $"%{LikePattern.EscapeLikePattern(request.InvoiceNumber)}%";
-                entityQuery = entityQuery.Where(x => EF.Functions.ILike(x.Running, pattern));
+                entityQuery = entityQuery.Where(x => EF.Functions.ILike(x.Running, pattern)
+                    || (x.DkInvoiceNumber != null && EF.Functions.ILike(x.DkInvoiceNumber, pattern))
+                    || _jewelryContext.TbtSaleInvoicePrintLog.Any(l => l.InvoiceRunning == x.Running
+                        && l.InvoiceNo != null && EF.Functions.ILike(l.InvoiceNo, pattern)));
+            }
+
+            if (!string.IsNullOrEmpty(request.SoNumber))
+            {
+                var pattern = $"%{LikePattern.EscapeLikePattern(request.SoNumber)}%";
+                entityQuery = entityQuery.Where(x => EF.Functions.ILike(x.SoRunning, pattern));
             }
 
             if (!string.IsNullOrEmpty(request.DKInvoiceNumber))
@@ -998,6 +1007,13 @@ namespace Jewelry.Service.Sale.Invoice
                         {
                             InvoiceNumber = invoice.Running,
                             DKInvoiceNumber = invoice.DkInvoiceNumber,
+                            SoNumber = invoice.SoRunning,
+                            PrintedInvoiceNumbers = _jewelryContext.TbtSaleInvoicePrintLog
+                                .Where(l => l.InvoiceRunning == invoice.Running && l.InvoiceNo != invoice.Running && l.PaperType != "guarantee-card")
+                                .OrderByDescending(l => l.PrintedAt)
+                                .Select(l => l.InvoiceNo)
+                                .Take(20)
+                                .ToList(),
                             InvoiceType = invoice.InvoiceType,
 
                             CreateBy = invoice.CreateBy,
@@ -1820,35 +1836,34 @@ namespace Jewelry.Service.Sale.Invoice
                 throw new HandleException("Paper Type is Required.");
             }
 
-            // Resolve invoice_running from invoice_no
+            var lookupKey = !string.IsNullOrEmpty(request.InvoiceRunning) ? request.InvoiceRunning : request.InvoiceNumber;
             var invoiceHeader = await _jewelryContext.TbtSaleInvoiceHeader
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Running == request.InvoiceNumber);
+                .FirstOrDefaultAsync(x => x.Running == lookupKey);
 
             if (request.PaperType == "guarantee-card")
             {
                 if (invoiceHeader == null)
                 {
-                    throw new HandleException($"ไม่พบใบแจ้งหนี้ {request.InvoiceNumber}");
+                    throw new HandleException($"ไม่พบใบแจ้งหนี้ {lookupKey}");
                 }
                 if (invoiceHeader.IsDelete)
                 {
-                    throw new HandleException($"ใบแจ้งหนี้ {request.InvoiceNumber} ถูกยกเลิกแล้ว ออกใบรับประกันไม่ได้ครับ");
+                    throw new HandleException($"ใบแจ้งหนี้ {lookupKey} ถูกยกเลิกแล้ว ออกใบรับประกันไม่ได้ครับ");
                 }
             }
 
             string? invoiceRunning = invoiceHeader != null && !invoiceHeader.IsDelete ? invoiceHeader.Running : null;
 
-            // Compute copy_no = max copy_no for this invoice_no + 1
             var maxCopyNo = await _jewelryContext.TbtSaleInvoicePrintLog
-                .Where(x => x.InvoiceNo == request.InvoiceNumber)
+                .Where(x => invoiceRunning != null ? x.InvoiceRunning == invoiceRunning : x.InvoiceNo == request.InvoiceNumber)
                 .Select(x => (int?)x.CopyNo)
                 .MaxAsync();
 
             var copyNo = (maxCopyNo ?? 0) + 1;
 
             // Generate running using running number service
-            var running = await _runningNumberService.GenerateRunningNumberForGold($"PRINT-{request.InvoiceNumber}");
+            var running = await _runningNumberService.GenerateRunningNumberForGold($"PRINT-{invoiceRunning ?? request.InvoiceNumber}");
 
             var printLog = new Jewelry.Data.Models.Jewelry.TbtSaleInvoicePrintLog
             {
@@ -1876,7 +1891,8 @@ namespace Jewelry.Service.Sale.Invoice
             }
 
             var query = from log in _jewelryContext.TbtSaleInvoicePrintLog
-                        where log.InvoiceNo == request.InvoiceNumber
+                        where log.InvoiceRunning == request.InvoiceNumber
+                            || (log.InvoiceRunning == null && log.InvoiceNo == request.InvoiceNumber)
                         orderby log.PrintedAt descending
                         select new jewelry.Model.Sale.Invoice.PrintLog.List.Response
                         {

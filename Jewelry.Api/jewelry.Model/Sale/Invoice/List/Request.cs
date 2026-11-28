@@ -10,6 +10,7 @@ namespace jewelry.Model.Sale.Invoice.List
     public class Search
     {
         public string? InvoiceNumber { get; set; }
+        public string? SoNumber { get; set; }
         public string? DKInvoiceNumber { get; set; }
         public string? InvoiceType { get; set; }
         public string? CustomerName { get; set; }
