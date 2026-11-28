@@ -25,6 +25,7 @@ namespace Jewelry.Service.AiConnector
             services.AddScoped<IAiTokenValidator, AiTokenValidator>();
             services.AddScoped<IAiOAuthService, OAuthService>();
             services.AddScoped<IAiConnectionService, AiConnectionService>();
+            services.AddScoped<IAiAdminService, AiAdminService>();
             services.AddScoped<IAiGlossaryService, AiGlossaryService>();
             services.AddScoped<IAiToolPipeline, AiToolPipeline>();
             services.AddScoped<Tools.Production.IAiCustomerLookup, Tools.Production.AiCustomerLookup>();

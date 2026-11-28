@@ -257,6 +257,10 @@ public partial class JewelryContext : DbContext
 
     public virtual DbSet<TbtAiAccessLog> TbtAiAccessLog { get; set; }
 
+    public virtual DbSet<TbtAiUserGrant> TbtAiUserGrant { get; set; }
+
+    public virtual DbSet<TbtAiUserSuspension> TbtAiUserSuspension { get; set; }
+
     public virtual DbSet<TbtAnnouncement> TbtAnnouncement { get; set; }
 
     public virtual DbSet<TbtTicketImage> TbtTicketImage { get; set; }
@@ -6270,6 +6274,36 @@ public partial class JewelryContext : DbContext
             entity.Property(e => e.DurationMs).HasColumnName("duration_ms");
             entity.Property(e => e.ErrorCode).HasColumnType("character varying").HasColumnName("error_code");
             entity.Property(e => e.CreateDate).HasColumnName("create_date");
+        });
+
+        modelBuilder.Entity<TbtAiUserGrant>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ai_user_grant_pk");
+            entity.ToTable("tbt_ai_user_grant");
+            entity.HasIndex(e => new { e.UserId, e.Scope }, "idx_tbt_ai_user_grant_active").IsUnique().HasFilter("(revoked_at IS NULL)");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Scope).HasColumnType("character varying").HasColumnName("scope");
+            entity.Property(e => e.GrantedBy).HasColumnType("character varying").HasColumnName("granted_by");
+            entity.Property(e => e.GrantedAt).HasColumnName("granted_at");
+            entity.Property(e => e.RevokedBy).HasColumnType("character varying").HasColumnName("revoked_by");
+            entity.Property(e => e.RevokedAt).HasColumnName("revoked_at");
+        });
+
+        modelBuilder.Entity<TbtAiUserSuspension>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbt_ai_user_suspension_pk");
+            entity.ToTable("tbt_ai_user_suspension");
+            entity.HasIndex(e => e.UserId, "idx_tbt_ai_user_suspension_active").IsUnique().HasFilter("(lifted_at IS NULL)");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd().HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Source).HasColumnType("character varying").HasColumnName("source");
+            entity.Property(e => e.ReasonCode).HasColumnType("character varying").HasColumnName("reason_code");
+            entity.Property(e => e.ReasonDetail).HasColumnType("jsonb").HasColumnName("reason_detail");
+            entity.Property(e => e.CreatedBy).HasColumnType("character varying").HasColumnName("created_by");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.LiftedBy).HasColumnType("character varying").HasColumnName("lifted_by");
+            entity.Property(e => e.LiftedAt).HasColumnName("lifted_at");
         });
 
         OnModelCreatingPartial(modelBuilder);

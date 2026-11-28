@@ -215,22 +215,27 @@ public class AiOAuthTests
     }
 
     [Fact]
-    public async Task Approve_DataScopeWithoutPermission_Rejected()
-    {
-        var env = new AiTestEnv();
-        var req = new ApproveRequest { ResponseType = "code", ClientId = AiTestEnv.ClientUrl, RedirectUri = AiTestEnv.Redirect, CodeChallenge = AiTestEnv.Challenge(AiTestEnv.Verifier), CodeChallengeMethod = "S256", ApprovedScopes = { AiScopes.ModuleExecutive, AiScopes.DataCost } };
-        var ex = await Assert.ThrowsAsync<AiOAuthException>(() => env.OAuth.Approve(req, 1, AiTestEnv.Resource));
-        Assert.Equal("invalid_scope", ex.Error);
-    }
-
-    [Fact]
-    public async Task Approve_DataScopeWithPermission_Granted()
+    public async Task Approve_DataScope_SilentlyDroppedFromCode()
     {
         var env = new AiTestEnv();
         env.AddRoleToBoss(9);
         await env.Context.SaveChangesAsync();
+        var req = new ApproveRequest { ResponseType = "code", ClientId = AiTestEnv.ClientUrl, RedirectUri = AiTestEnv.Redirect, CodeChallenge = AiTestEnv.Challenge(AiTestEnv.Verifier), CodeChallengeMethod = "S256", ApprovedScopes = { AiScopes.ModuleExecutive, AiScopes.DataCost } };
+        await env.OAuth.Approve(req, 1, AiTestEnv.Resource);
+        var code = await env.Context.TbtAiAuthCode.SingleAsync();
+        Assert.Equal(AiScopes.ModuleExecutive, code.Scopes);
+    }
+
+    [Fact]
+    public async Task Issue_DataScopeNeverCopiedIntoToken()
+    {
+        var env = new AiTestEnv();
+        env.AddRoleToBoss(9);
+        await env.Context.SaveChangesAsync();
+        env.GrantData(1, AiScopes.DataCost);
         var t = await env.IssueTokens(AiScopes.ModuleExecutive, AiScopes.DataCost);
-        Assert.Contains(AiScopes.DataCost, AiScopes.Split(t.Scope));
+        Assert.DoesNotContain(AiScopes.DataCost, AiScopes.Split(t.Scope));
+        Assert.DoesNotContain(AiScopes.DataCost, AiScopes.Split((await env.Context.TbtAiToken.SingleAsync()).Scopes));
     }
 
     [Fact]
@@ -256,8 +261,8 @@ public class AiOAuthTests
         Assert.Equal("client.example.com", c.RedirectHost);
         var module = Assert.Single(c.Scopes, s => s.Kind == "MODULE");
         Assert.True(module.Required);
-        Assert.All(c.Scopes.Where(s => s.Kind == "DATA"), s => Assert.False(s.DefaultChecked));
-        Assert.False(c.Scopes.Single(s => s.Code == AiScopes.DataCost).Available);
-        Assert.True(c.Scopes.Single(s => s.Code == AiScopes.DataReceivables).Available);
+        Assert.DoesNotContain(c.Scopes, s => s.Kind == "DATA");
+        Assert.Empty(c.GrantedCategories);
+        Assert.False(string.IsNullOrEmpty(c.ExternalProviderWarningTh));
     }
 }

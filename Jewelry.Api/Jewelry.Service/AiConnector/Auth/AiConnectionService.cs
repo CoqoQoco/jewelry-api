@@ -92,6 +92,8 @@ namespace Jewelry.Service.AiConnector.Auth
             var user = await _users.Load(userId);
             if (user == null || !user.Permissions.Contains(PermissionCodes.AiConnect))
                 throw new UnauthorizedAccessException("บัญชีนี้ไม่มีสิทธิ์เชื่อมต่อ AI");
+            if (await AiAccessRules.IsSuspended(_context, userId))
+                throw new UnauthorizedAccessException(AiErrorMessages.SuspendedTh);
 
             var activePats = await _context.TbtAiToken.CountAsync(t => t.UserId == userId && t.Kind == AiTokenKinds.Pat && t.RevokedAt == null && t.ExpiresAt > DateTime.UtcNow);
             if (activePats >= MaxActivePatsPerUser)

@@ -52,7 +52,17 @@ namespace jewelry.Model.AiConnector
         // host ของ redirect_uri ให้ user ตรวจว่าจะกลับไปที่ไหน
         public string RedirectHost { get; set; } = "";
         public string UserDisplayName { get; set; } = "";
+        // MODULE เท่านั้น (DATA ไม่เป็นตัวเลือกแล้ว — Dev เปิดให้รายคน)
         public List<ConsentScope> Scopes { get; set; } = new List<ConsentScope>();
+        // หมวดข้อมูลอ่อนไหวที่ Dev เปิดให้ user นี้ (แสดงอย่างเดียว ไม่ใช่ checkbox) — เฉพาะที่ role ปัจจุบันยังมีสิทธิ์รองรับ
+        public List<ConsentGrantedCategory> GrantedCategories { get; set; } = new List<ConsentGrantedCategory>();
+        public string ExternalProviderWarningTh { get; set; } = "";
+    }
+
+    public class ConsentGrantedCategory
+    {
+        public string Code { get; set; } = "";
+        public string NameTh { get; set; } = "";
     }
 
     public class ApproveRequest : AuthorizeParams

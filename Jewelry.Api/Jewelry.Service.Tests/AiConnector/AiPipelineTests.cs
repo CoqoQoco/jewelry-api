@@ -53,6 +53,7 @@ public class AiPipelineTests
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, "1"), new(ClaimTypes.Name, "boss"), new(AiPrincipalFactory.TokenIdClaim, "5"),
+            new(AiPrincipalFactory.TokenKindClaim, AiTokenKinds.OAuth),
         };
         claims.AddRange(scopes.Select(s => new Claim(AiPrincipalFactory.ScopeClaim, s)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "t"));
@@ -128,7 +129,8 @@ public class AiPipelineTests
         var (p, env, _) = Create();
         env.AddRoleToBoss(9);
         await env.Context.SaveChangesAsync();
-        var r = await p.Run(Caller(AiScopes.ModuleExecutive, AiScopes.DataCost), "cost_tool", null, default);
+        env.GrantData(1, AiScopes.DataCost);
+        var r = await p.Run(Caller(AiScopes.ModuleExecutive), "cost_tool", null, default);
         Assert.Equal(777m, (decimal)JObject.Parse(r.Json)["data"]!["costThb"]!);
     }
 

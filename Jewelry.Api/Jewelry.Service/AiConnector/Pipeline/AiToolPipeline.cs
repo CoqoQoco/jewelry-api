@@ -81,10 +81,16 @@ namespace Jewelry.Service.AiConnector.Pipeline
             // 1 auth: principal มาจาก AiConnectorAuthenticationHandler (validate token + user แล้ว) — โหลดสิทธิ์ล่าสุดจาก DB อีกรอบ
             long.TryParse(caller.FindFirst(AiPrincipalFactory.TokenIdClaim)?.Value, out var tokenId);
             int.TryParse(caller.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId);
-            var scopes = caller.FindAll(AiPrincipalFactory.ScopeClaim).Select(c => c.Value).ToList();
+            var tokenKind = caller.FindFirst(AiPrincipalFactory.TokenKindClaim)?.Value;
+            var tokenScopes = caller.FindAll(AiPrincipalFactory.ScopeClaim).Select(c => c.Value).ToList();
 
             var user = userId > 0 ? await _users.Load(userId) : null;
-            if (user == null) return await Fail(null, userId, tokenId, toolName, scopes, null, sw, AiErrorCodes.Unauthorized);
+            if (user == null) return await Fail(null, userId, tokenId, toolName, tokenScopes.Where(s => !AiAccessRules.IsDataScope(s)).ToList(), null, sw, AiErrorCodes.Unauthorized);
+
+            // scope ที่ใช้จริง: MODULE จาก token · DATA จาก grant ของ user เฉพาะ token OAUTH
+            var scopes = await AiAccessRules.EffectiveScopes(_context, userId, tokenKind, tokenScopes);
+
+            if (await AiAccessRules.IsSuspended(_context, userId)) return await Fail(user, userId, tokenId, toolName, scopes, null, sw, AiErrorCodes.Suspended);
 
             if (!_rateLimiter.TryAcquire(userId)) return await Fail(user, userId, tokenId, toolName, scopes, null, sw, AiErrorCodes.RateLimited);
 

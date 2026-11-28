@@ -74,6 +74,19 @@ public sealed class AiTestEnv
     public void AddRoleToBoss(int roleId) =>
         Context.TbtUserRole.Add(new TbtUserRole { UserId = 1, Username = "boss", Role = roleId, CreateBy = "t", CreateDate = DateTime.UtcNow });
 
+    public void GrantData(int userId, params string[] scopes)
+    {
+        foreach (var s in scopes)
+            Context.TbtAiUserGrant.Add(new TbtAiUserGrant { UserId = userId, Scope = s, GrantedBy = "dev", GrantedAt = DateTime.UtcNow });
+        Context.SaveChanges();
+    }
+
+    public void Suspend(int userId)
+    {
+        Context.TbtAiUserSuspension.Add(new TbtAiUserSuspension { UserId = userId, Source = "manual", ReasonCode = "manual", CreatedBy = "dev", CreatedAt = DateTime.UtcNow });
+        Context.SaveChanges();
+    }
+
     public IOptions<AiConnectorOptions> Opt => Microsoft.Extensions.Options.Options.Create(Options);
     public IAiUserDirectory Users => new AiUserDirectory(Context);
     public IAiScopeCatalog Scopes => new AiScopeCatalog(Context);

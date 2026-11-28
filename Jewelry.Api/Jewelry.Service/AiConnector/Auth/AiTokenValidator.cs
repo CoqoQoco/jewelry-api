@@ -120,6 +120,7 @@ namespace Jewelry.Service.AiConnector.Auth
         public const string AuthenticationType = "AiConnector";
         public const string TokenIdClaim = "ai_token_id";
         public const string ScopeClaim = "ai_scope";
+        public const string TokenKindClaim = "ai_token_kind";
 
         public static ClaimsPrincipal Create(AiValidatedToken token)
         {
@@ -128,6 +129,7 @@ namespace Jewelry.Service.AiConnector.Auth
                 new Claim(ClaimTypes.NameIdentifier, token.UserId.ToString()),
                 new Claim(ClaimTypes.Name, token.Username),
                 new Claim(TokenIdClaim, token.TokenId.ToString()),
+                new Claim(TokenKindClaim, token.Kind),
             };
             claims.AddRange(token.Roles.Select(r => new Claim(ClaimTypes.Role, r)));
             claims.AddRange(token.Scopes.Select(s => new Claim(ScopeClaim, s)));

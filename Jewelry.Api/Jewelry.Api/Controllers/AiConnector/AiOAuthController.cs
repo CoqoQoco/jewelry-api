@@ -51,7 +51,7 @@ namespace Jewelry.Api.Controllers.AiConnector
         public async Task<IActionResult> ProtectedResourceMetadata()
         {
             if (!_options.IsConfigured) return Disabled();
-            var scopes = (await _scopes.Active()).Select(s => s.Code).ToList();
+            var scopes = (await _scopes.Active()).Where(s => s.Kind != "DATA").Select(s => s.Code).ToList();
             return new JsonResult(new
             {
                 resource = Resource,
@@ -69,7 +69,7 @@ namespace Jewelry.Api.Controllers.AiConnector
         {
             if (!_options.IsConfigured) return Disabled();
             var b = AiUrls.Base(HttpContext, _options);
-            var scopes = (await _scopes.Active()).Select(s => s.Code).ToList();
+            var scopes = (await _scopes.Active()).Where(s => s.Kind != "DATA").Select(s => s.Code).ToList();
             return new JsonResult(new
             {
                 issuer = b,

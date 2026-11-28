@@ -6,5 +6,6 @@ namespace jewelry.Model.Security
         public const string ProductionView = "production:view";
         public const string SaleViewMargin = "sale:view-margin";
         public const string AiConnect = "ai:connect";
+        public const string AiAdmin = "ai:admin";
     }
 }

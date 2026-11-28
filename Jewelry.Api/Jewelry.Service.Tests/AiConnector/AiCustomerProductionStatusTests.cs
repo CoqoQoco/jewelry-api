@@ -199,17 +199,20 @@ public class AiCustomerProductionStatusTests
 
         ClaimsPrincipal Caller(params string[] scopes)
         {
-            var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, "1"), new(ClaimTypes.Name, "boss"), new(AiPrincipalFactory.TokenIdClaim, "5") };
+            var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, "1"), new(ClaimTypes.Name, "boss"), new(AiPrincipalFactory.TokenIdClaim, "5"), new(AiPrincipalFactory.TokenKindClaim, AiTokenKinds.OAuth) };
             claims.AddRange(scopes.Select(s => new Claim(AiPrincipalFactory.ScopeClaim, s)));
             return new ClaimsPrincipal(new ClaimsIdentity(claims, "t"));
         }
 
         const string args = "{\"customer\":\"Al Sulaiman\"}";
-        var a = await pipeline.Run(Caller(AiScopes.ModuleProduction, AiScopes.DataCustomerNames), tool.Name, args, default);
+        env.GrantData(1, AiScopes.DataCustomerNames);
+        var a = await pipeline.Run(Caller(AiScopes.ModuleProduction), tool.Name, args, default);
         Assert.False(a.IsError);
         Assert.Contains("Al Sulaiman Jewellery", a.Json);
         Assert.Single(lookup.Patterns);
 
+        env.Context.TbtAiUserGrant.RemoveRange(env.Context.TbtAiUserGrant);
+        await env.Context.SaveChangesAsync();
         var b = await pipeline.Run(Caller(AiScopes.ModuleProduction), tool.Name, args, default);
         Assert.False(b.IsError);
         Assert.DoesNotContain("Sulaiman", b.Json);

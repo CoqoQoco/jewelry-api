@@ -9,10 +9,13 @@ namespace Jewelry.Service.AiConnector
         public const string RateLimited = "rate_limited";
         public const string ToolError = "tool_error";
         public const string Unauthorized = "unauthorized";
+        public const string Suspended = "suspended";
     }
 
     public static class AiErrorMessages
     {
+        public const string SuspendedTh = "บัญชีถูกระงับการใช้ AI ติดต่อผู้ดูแลระบบ";
+
         // เหตุผลภาษาคน — ใช้ทั้งตอบ AI (ข้อความสั้น ไม่มี stack trace) และแสดงในประวัติการดึงข้อมูล
         public static string Thai(string? code) => code switch
         {
@@ -24,6 +27,7 @@ namespace Jewelry.Service.AiConnector
             AiErrorCodes.RateLimited => "เรียกถี่เกินกำหนด (จำกัดครั้งต่อนาที) กรุณารอสักครู่",
             AiErrorCodes.ToolError => "ระบบดึงข้อมูลไม่สำเร็จ (ข้อผิดพลาดภายใน)",
             AiErrorCodes.Unauthorized => "การเชื่อมต่อหมดอายุหรือถูกยกเลิก",
+            AiErrorCodes.Suspended => SuspendedTh,
             _ => "เกิดข้อผิดพลาด",
         };
     }

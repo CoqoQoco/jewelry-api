@@ -86,7 +86,8 @@ namespace Jewelry.Service.AiConnector.Auth
                 throw new AiOAuthException("invalid_target", "resource ไม่ถูกต้อง", client.Verified);
 
             var catalog = await _scopes.Active();
-            var requested = AiScopes.Split(p.Scope).Distinct().ToList();
+            // data:* ที่ client ขอมาตัดทิ้งเงียบ ๆ — สิทธิ์ข้อมูลอ่อนไหวมาจาก Dev เปิดให้รายคนเท่านั้น
+            var requested = AiScopes.Split(p.Scope).Where(s => !AiAccessRules.IsDataScope(s)).Distinct().ToList();
             if (requested.Any(s => catalog.All(c => c.Code != s)))
                 throw new AiOAuthException("invalid_scope", "มี scope ที่ไม่รู้จัก", client.Verified);
             if (!requested.Any(s => catalog.First(c => c.Code == s).Kind == "MODULE"))
@@ -103,11 +104,13 @@ namespace Jewelry.Service.AiConnector.Auth
             var v = await ValidateAuthorize(request, expectedResource, ct);
             var user = await _users.Load(userId);
             var canApprove = user != null && user.Permissions.Contains(PermissionCodes.AiConnect);
+            var suspended = user != null && await AiAccessRules.IsSuspended(_context, userId, ct);
 
             var response = new ConsentResponse
             {
-                CanApprove = canApprove,
-                DenyReasonTh = canApprove ? null : "บัญชีนี้ยังไม่มีสิทธิ์เชื่อมต่อ AI ติดต่อผู้ดูแลระบบให้ผูก role บอสครับ",
+                CanApprove = canApprove && !suspended,
+                DenyReasonTh = suspended ? AiErrorMessages.SuspendedTh
+                    : canApprove ? null : "บัญชีนี้ยังไม่มีสิทธิ์เชื่อมต่อ AI ติดต่อผู้ดูแลระบบให้ผูก role บอสครับ",
                 ClientId = v.Client.ClientId,
                 ClientName = v.Client.ClientName,
                 ClientKind = v.Client.Kind,
@@ -116,22 +119,27 @@ namespace Jewelry.Service.AiConnector.Auth
                 RedirectUris = v.Client.RedirectUris.ToList(),
                 RedirectHost = new Uri(request.RedirectUri!).Host,
                 UserDisplayName = user?.DisplayName ?? "",
+                ExternalProviderWarningTh = "ข้อมูลที่ AI เรียกใช้จะถูกส่งไปประมวลผลที่ผู้ให้บริการ AI ภายนอก",
             };
+
+            if (user != null)
+            {
+                var granted = await AiAccessRules.ActiveGrants(_context, userId, ct);
+                response.GrantedCategories = granted
+                    .Select(g => SensitiveCategoryPolicy.ForScope(g)!)
+                    .Where(r => user.Permissions.Contains(r.Permission))
+                    .Select(r => new ConsentGrantedCategory { Code = r.Scope, NameTh = r.NameTh })
+                    .ToList();
+            }
 
             foreach (var s in v.Catalog)
             {
                 var required = s.Kind == "MODULE" && v.RequestedScopes.Contains(s.Code);
-                // MODULE ที่ client ไม่ได้ขอ แสดงเป็น checkbox เสริม (ไม่ติ๊กเป็นค่าเริ่มต้น) เหมือน DATA
-                if (s.Kind != "MODULE" && s.Kind != "DATA") continue;
+                // MODULE ที่ client ไม่ได้ขอ แสดงเป็น checkbox เสริม (ไม่ติ๊กเป็นค่าเริ่มต้น) · DATA ไม่เป็นตัวเลือกอีกต่อไป
+                if (s.Kind != "MODULE") continue;
 
-                var available = true;
-                string? reason = null;
-                if (s.Kind == "DATA")
-                {
-                    var rule = SensitiveCategoryPolicy.ForScope(s.Code);
-                    available = rule != null && user != null && user.Permissions.Contains(rule.Permission);
-                    if (!available) reason = "บัญชีนี้ไม่มีสิทธิ์ดูข้อมูลหมวดนี้";
-                }
+                const bool available = true;
+                const string? reason = null;
 
                 response.Scopes.Add(new ConsentScope
                 {
@@ -154,22 +162,16 @@ namespace Jewelry.Service.AiConnector.Auth
             var user = await _users.Load(userId);
             if (user == null || !user.Permissions.Contains(PermissionCodes.AiConnect))
                 throw new AiOAuthException("access_denied", "บัญชีนี้ไม่มีสิทธิ์เชื่อมต่อ AI");
+            if (await AiAccessRules.IsSuspended(_context, userId, ct))
+                throw new AiOAuthException("access_denied", AiErrorMessages.SuspendedTh);
 
-            var approved = request.ApprovedScopes.Distinct().ToList();
+            var approved = request.ApprovedScopes.Where(s => !AiAccessRules.IsDataScope(s)).Distinct().ToList();
             foreach (var s in approved)
             {
                 var entry = v.Catalog.FirstOrDefault(c => c.Code == s);
                 if (entry == null) throw new AiOAuthException("invalid_scope", "scope ไม่ถูกต้อง");
-                if (entry.Kind == "DATA")
-                {
-                    var rule = SensitiveCategoryPolicy.ForScope(s);
-                    if (rule == null || !user.Permissions.Contains(rule.Permission))
-                        throw new AiOAuthException("invalid_scope", "บัญชีนี้ไม่มีสิทธิ์ให้ scope " + s);
-                }
-                else if (entry.Kind != "MODULE")
-                {
+                if (entry.Kind != "MODULE")
                     throw new AiOAuthException("invalid_scope", "scope ไม่ถูกต้อง");
-                }
             }
             var requiredModules = v.RequestedScopes.Where(s => v.Catalog.First(c => c.Code == s).Kind == "MODULE");
             if (requiredModules.Any(m => !approved.Contains(m)))
@@ -250,6 +252,8 @@ namespace Jewelry.Service.AiConnector.Auth
             var user = await _users.Load(code.UserId);
             if (user == null || !user.Permissions.Contains(PermissionCodes.AiConnect))
                 throw new AiOAuthException("invalid_grant", "บัญชีไม่มีสิทธิ์เชื่อมต่อ AI แล้ว");
+            if (await AiAccessRules.IsSuspended(_context, user.UserId, ct))
+                throw new AiOAuthException("access_denied", AiErrorMessages.SuspendedTh);
 
             // atomic: UPDATE ... WHERE code_hash=@h AND used_at IS NULL ต้องได้ 1 แถว — คนที่แพ้ race ถือว่าใช้ code ซ้ำ
             if (!await _store.ClaimAuthCode(hash, now, ct))
@@ -314,6 +318,7 @@ namespace Jewelry.Service.AiConnector.Auth
         private async Task<TokenResponse> Issue(AiUserInfo user, string clientId, string clientName, string scopes,
             string familyId, DateTime? lastUsedAt, DateTime now, CancellationToken ct)
         {
+            scopes = AiAccessRules.StripData(scopes);
             var refresh = AiTokenCrypto.RandomToken(32);
             var row = new TbtAiToken
             {
