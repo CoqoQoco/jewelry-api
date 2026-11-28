@@ -3,6 +3,7 @@ using Jewelry.Data.Context;
 using Jewelry.Data.Models.Jewelry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -68,6 +69,7 @@ namespace Jewelry.Service.AiConnector.Auth
             if (!SsrfGuard.IsAllowedMetadataUrl(uri.ToString(), out _)) throw new InvalidOperationException("client_id URL ไม่ปลอดภัย");
             using var req = new HttpRequestMessage(HttpMethod.Get, uri);
             req.Headers.Accept.ParseAdd("application/json");
+            req.Headers.UserAgent.ParseAdd("DK-Jewelry-AS/1.0");
             using var res = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
             if (res.StatusCode != HttpStatusCode.OK) throw new InvalidOperationException("client metadata ตอบ " + (int)res.StatusCode);
             if (res.Content.Headers.ContentLength > MaxBytes) throw new InvalidOperationException("client metadata ใหญ่เกินไป");
@@ -102,9 +104,11 @@ namespace Jewelry.Service.AiConnector.Auth
         private readonly JewelryContext _context;
         private readonly IClientMetadataFetcher _fetcher;
         private readonly IMemoryCache _cache;
+        private readonly ILogger<AiClientRegistry>? _logger;
 
-        public AiClientRegistry(JewelryContext context, IClientMetadataFetcher fetcher, IMemoryCache cache)
+        public AiClientRegistry(JewelryContext context, IClientMetadataFetcher fetcher, IMemoryCache cache, ILogger<AiClientRegistry>? logger = null)
         {
+            _logger = logger;
             _context = context;
             _fetcher = fetcher;
             _cache = cache;
@@ -134,10 +138,12 @@ namespace Jewelry.Service.AiConnector.Auth
             try
             {
                 var json = await _fetcher.Fetch(uri, ct);
-                client = ParseMetadata(clientId, json);
+                client = ParseMetadata(clientId, json, out var reason);
+                if (client == null) _logger?.LogWarning("CIMD metadata rejected for {ClientId}: {Reason}", clientId, reason);
             }
             catch (Exception ex) when (ex is InvalidOperationException || ex is HttpRequestException || ex is TaskCanceledException || ex is SocketException || ex is JsonException)
             {
+                _logger?.LogWarning("CIMD metadata fetch failed for {ClientId}: {ExceptionType} {Message}", clientId, ex.GetType().Name, ex.Message);
                 client = null;
             }
 
@@ -192,28 +198,33 @@ namespace Jewelry.Service.AiConnector.Auth
         }
 
         // ตรวจชนิด JSON ทุกช่อง — ชนิดผิด = null (ไม่ throw) เพื่อให้ตอบ invalid_client แทน 500
-        public static AiClient? ParseMetadata(string clientId, string json)
+        public static AiClient? ParseMetadata(string clientId, string json) => ParseMetadata(clientId, json, out _);
+
+        public static AiClient? ParseMetadata(string clientId, string json, out string reason)
         {
+            reason = "";
             JObject doc;
             try { doc = JObject.Parse(json); }
-            catch (JsonException) { return null; }
+            catch (JsonException) { reason = "invalid_json"; return null; }
 
-            if (doc["client_id"]?.Type != JTokenType.String || !string.Equals((string?)doc["client_id"], clientId, StringComparison.Ordinal)) return null;
+            if (doc["client_id"]?.Type != JTokenType.String || !string.Equals((string?)doc["client_id"], clientId, StringComparison.Ordinal)) { reason = "client_id_mismatch"; return null; }
+            // AS ของเรารองรับแค่ "none" จึงถือทุก CIMD client เป็น public client — ยังบังคับ PKCE S256 + code ผูก client_id/redirect + redirect origin ต้องตรง client_id
             var authToken = doc["token_endpoint_auth_method"];
-            if (authToken != null && authToken.Type != JTokenType.Null)
-            {
-                if (authToken.Type != JTokenType.String || (string?)authToken != "none") return null;
-            }
+            var methodOk = authToken == null || authToken.Type == JTokenType.Null || (authToken.Type == JTokenType.String && (string?)authToken == "none");
+            if (!methodOk && doc["token_endpoint_auth_methods_supported"] is JArray supported
+                && supported.All(t => t.Type == JTokenType.String) && supported.Any(t => (string?)t == "none"))
+                methodOk = true;
+            if (!methodOk) { reason = "token_endpoint_auth_method_not_none"; return null; }
 
-            if (doc["client_name"]?.Type != JTokenType.String) return null;
+            if (doc["client_name"]?.Type != JTokenType.String) { reason = "client_name_invalid"; return null; }
             var name = ((string?)doc["client_name"])?.Trim();
-            if (string.IsNullOrEmpty(name)) return null;
+            if (string.IsNullOrEmpty(name)) { reason = "client_name_empty"; return null; }
             if (name.Length > 100) name = name.Substring(0, 100);
 
-            if (doc["redirect_uris"] is not JArray arr || arr.Count == 0 || arr.Count > 10) return null;
-            if (arr.Any(t => t.Type != JTokenType.String)) return null;
+            if (doc["redirect_uris"] is not JArray arr || arr.Count == 0 || arr.Count > 10) { reason = "redirect_uris_invalid"; return null; }
+            if (arr.Any(t => t.Type != JTokenType.String)) { reason = "redirect_uris_not_strings"; return null; }
             var uris = arr.Select(t => (string)t!).ToList();
-            if (uris.Any(u => !SsrfGuard.IsValidRedirectUri(u))) return null;
+            if (uris.Any(u => !SsrfGuard.IsValidRedirectUri(u))) { reason = "redirect_uri_not_valid"; return null; }
 
             // https redirect ต้อง origin เดียวกับ client_id (ยกเว้น loopback และ app scheme)
             var idUri = new Uri(clientId);
@@ -221,7 +232,7 @@ namespace Jewelry.Service.AiConnector.Auth
             {
                 var r = new Uri(u);
                 if (r.Scheme != Uri.UriSchemeHttps) continue;
-                if (!string.Equals(r.GetLeftPart(UriPartial.Authority), idUri.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase)) return null;
+                if (!string.Equals(r.GetLeftPart(UriPartial.Authority), idUri.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase)) { reason = "redirect_origin_mismatch"; return null; }
             }
 
             return new AiClient { ClientId = clientId, ClientName = name, Kind = "CIMD", RedirectUris = uris, MetadataUrl = clientId };

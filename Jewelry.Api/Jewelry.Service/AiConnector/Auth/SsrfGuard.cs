@@ -99,9 +99,19 @@ namespace Jewelry.Service.AiConnector.Auth
         public static bool IsKnownRedirect(string value)
         {
             if (!Uri.TryCreate(value, UriKind.Absolute, out var u)) return false;
-            if (u.Scheme == Uri.UriSchemeHttps) return KnownHttpsRedirects.Contains(value, StringComparer.Ordinal);
+            if (u.Scheme == Uri.UriSchemeHttps) return KnownHttpsRedirects.Contains(value, StringComparer.Ordinal) || IsChatGptConnectorRedirect(value, u);
             if (u.Scheme == Uri.UriSchemeHttp) return IsLoopbackHost(u.Host);
             return AppSchemes.Contains(u.Scheme);
+        }
+
+        private const string ChatGptConnectorPrefix = "https://chatgpt.com/connector/oauth/";
+
+        private static bool IsChatGptConnectorRedirect(string value, Uri u)
+        {
+            if (u.Host != "chatgpt.com" || !u.IsDefaultPort || !string.IsNullOrEmpty(u.Query) || !string.IsNullOrEmpty(u.Fragment) || !string.IsNullOrEmpty(u.UserInfo)) return false;
+            if (value.Contains('?') || value.Contains('#') || !value.StartsWith(ChatGptConnectorPrefix, StringComparison.Ordinal)) return false;
+            var segment = value.Substring(ChatGptConnectorPrefix.Length);
+            return segment.Length > 0 && segment.All(c => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-');
         }
 
         // redirect_uri ที่ยอมรับ: https · http เฉพาะ loopback · custom scheme ที่รู้จักหรือ reverse-DNS (allowlist)
