@@ -23,6 +23,10 @@ namespace jewelry.Model.Sale.Invoice.Get
         public string? CustomerRemark { get; set; }
         // เลขผู้เสียภาษีของลูกค้า — มีเฉพาะใบแจ้งหนี้วัตถุดิบ (มาจาก SM) ใบแจ้งหนี้สินค้าเป็น null เสมอ
         public string? CustomerTaxId { get; set; }
+        // ค่าจาก tbm_customer ณ ตอนอ่าน (สด ไม่ใช่สแนปช็อต) — ใช้กับพิมพ์บิลต่อเนื่อง/ใบกำกับภาษี TK202611280003
+        public string? CustomerMasterName { get; set; }
+        public string? CustomerMasterAddress { get; set; }
+        public string? CustomerMasterTaxId { get; set; }
 
         public string CurrencyUnit { get; set; }
         public decimal CurrencyRate { get; set; }

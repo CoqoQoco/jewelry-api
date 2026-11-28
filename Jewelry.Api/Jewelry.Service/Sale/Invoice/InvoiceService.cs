@@ -688,6 +688,25 @@ namespace Jewelry.Service.Sale.Invoice
                 RoundingAdjustment = invoiceHeader.RoundingAdjustment,
             };
 
+            if (invoiceHeader.InvoiceType != InvoiceTypes.Material
+                && !string.IsNullOrWhiteSpace(invoiceHeader.CustomerCode)
+                // WALKIN = ถังลูกค้าทั่วไป ไม่ใช่ลูกค้าจริง (เทียบ ExecutiveFlowService.IsBucketCode) — ปล่อย master เป็น null ให้ UI ใช้ snapshot ของบิล
+                && !string.Equals(invoiceHeader.CustomerCode.Trim(), "WALKIN", StringComparison.OrdinalIgnoreCase))
+            {
+                var customerCode = invoiceHeader.CustomerCode;
+                var master = await _jewelryContext.TbmCustomer.AsNoTracking()
+                    .Where(c => c.Code == customerCode)
+                    .Select(c => new { c.NameTh, c.Address, c.TaxId })
+                    .FirstOrDefaultAsync();
+
+                if (master != null)
+                {
+                    response.CustomerMasterName = string.IsNullOrWhiteSpace(master.NameTh) ? null : master.NameTh.Trim();
+                    response.CustomerMasterAddress = string.IsNullOrWhiteSpace(master.Address) ? null : master.Address.Trim();
+                    response.CustomerMasterTaxId = string.IsNullOrWhiteSpace(master.TaxId) ? null : master.TaxId.Trim();
+                }
+            }
+
             if (invoiceHeader.InvoiceType == InvoiceTypes.Material)
             {
                 // ใบแจ้งหนี้วัตถุดิบ: so_running คือ tbt_sale_material_header.running ไม่ใช่ SO — ข้ามการหา SO/สินค้าทั้งหมด
