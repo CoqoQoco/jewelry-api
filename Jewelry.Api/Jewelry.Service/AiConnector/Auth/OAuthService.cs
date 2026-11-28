@@ -107,7 +107,7 @@ namespace Jewelry.Service.AiConnector.Auth
             var response = new ConsentResponse
             {
                 CanApprove = canApprove,
-                DenyReasonTh = canApprove ? null : "บัญชีนี้ไม่มีสิทธิ์เชื่อมต่อ AI (ai:connect) กรุณาติดต่อผู้ดูแลระบบ",
+                DenyReasonTh = canApprove ? null : "บัญชีนี้ยังไม่มีสิทธิ์เชื่อมต่อ AI ติดต่อผู้ดูแลระบบให้ผูก role บอสครับ",
                 ClientId = v.Client.ClientId,
                 ClientName = v.Client.ClientName,
                 ClientKind = v.Client.Kind,
