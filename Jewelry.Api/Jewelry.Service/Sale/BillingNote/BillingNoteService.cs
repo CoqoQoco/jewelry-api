@@ -36,6 +36,32 @@ namespace Jewelry.Service.Sale.BillingNote
                 .Where(x => x.IsDelete == false && !billedInvoiceRunnings.Contains(x.Running));
         }
 
+        // ใบที่ vat_included: ยอดก่อน VAT = grand − vat_amount และ VAT ใช้ vat_amount ของ invoice ไม่บวกซ้ำ
+        public static decimal InvoiceAmountBeforeVat(TbtSaleInvoiceHeader x)
+            => x.VatIncluded ? (x.GrandTotalRounded ?? 0) - (x.VatAmount ?? 0) : (x.SubTotal ?? 0);
+
+        // ใบวางบิลเก่า (สร้างก่อนกติกา vat_included) ต้องคงยอดเดิม — ใช้กติกาใหม่เฉพาะเมื่อมี invoice vat_included และทุกใบมี AmountBeforeVat ตรงกติกาใหม่แล้ว
+        public static bool BuiltUnderNewRule(IEnumerable<TbtSaleInvoiceHeader> invoices, IEnumerable<TbtSaleBillingNoteItem> items)
+        {
+            var included = invoices.Where(x => x.VatIncluded).ToList();
+            var itemList = items.ToList();
+            return included.Count > 0
+                && included.All(x => itemList.Any(i => i.InvoiceRunning == x.Running && i.AmountBeforeVat == InvoiceAmountBeforeVat(x)));
+        }
+
+        public static (decimal subTotal, decimal vatAmount, decimal grandTotal) BillingTotals(
+            IEnumerable<TbtSaleInvoiceHeader> invoices, decimal vatPercent)
+        {
+            var list = invoices.ToList();
+            var includedEx = list.Where(x => x.VatIncluded).Sum(InvoiceAmountBeforeVat);
+            var includedVat = list.Where(x => x.VatIncluded).Sum(x => x.VatAmount ?? 0);
+            var otherSub = list.Where(x => !x.VatIncluded).Sum(x => x.SubTotal ?? 0);
+            var otherVat = otherSub * vatPercent / 100m;
+            var subTotal = includedEx + otherSub;
+            var vatAmount = includedVat + otherVat;
+            return (subTotal, vatAmount, MathHelper.RoundMoney(subTotal + vatAmount));
+        }
+
         public async Task<List<jewelry.Model.Sale.BillingNote.AvailableInvoices.Response>> AvailableInvoices(jewelry.Model.Sale.BillingNote.AvailableInvoices.Request request)
         {
             if (string.IsNullOrEmpty(request.CustomerCode))
@@ -50,7 +76,10 @@ namespace Jewelry.Service.Sale.BillingNote
                 {
                     InvoiceRunning = x.Running,
                     InvoiceDate = x.CreateDate,
-                    SubTotal = x.SubTotal ?? 0,
+                    SubTotal = x.VatIncluded ? (x.GrandTotalRounded ?? 0) - (x.VatAmount ?? 0) : (x.SubTotal ?? 0),
+                    VatIncluded = x.VatIncluded,
+                    VatAmount = x.VatAmount ?? 0,
+                    GrandTotalRounded = x.GrandTotalRounded ?? 0,
                     CustomerName = x.CustomerName
                 });
 
@@ -176,13 +205,14 @@ namespace Jewelry.Service.Sale.BillingNote
 
             var running = await _runningNumberService.GenerateBillingNoteNumber();
 
-            var subTotal = invoices.Sum(x => x.SubTotal ?? 0);
+            var bt = BillingTotals(invoices, request.VatPercent);
+            var subTotal = bt.subTotal;
             var goldResizeAmount = request.GoldResizeQty * request.GoldResizePerUnit;
             var silverResizeAmount = request.SilverResizeQty * request.SilverResizePerUnit;
             var supportAmount = request.HasSupport ? subTotal * request.SupportPercent / 100m : 0m;
             // ไม่ปัดเศษ vatAmount ระหว่างทาง ปัดครั้งเดียวที่ grandTotal เป็นทศนิยม 2 ตำแหน่งแบบ half-up
-            var vatAmount = subTotal * request.VatPercent / 100m;
-            var grandTotal = MathHelper.RoundMoney(subTotal + vatAmount);
+            var vatAmount = bt.vatAmount;
+            var grandTotal = bt.grandTotal;
 
             var header = new TbtSaleBillingNoteHeader
             {
@@ -234,7 +264,7 @@ namespace Jewelry.Service.Sale.BillingNote
                     Seq = seq,
                     InvoiceRunning = invoiceRunning,
                     InvoiceDate = invoice.CreateDate,
-                    AmountBeforeVat = invoice.SubTotal ?? 0,
+                    AmountBeforeVat = InvoiceAmountBeforeVat(invoice),
 
                     CreateBy = CurrentUsername,
                     CreateDate = DateTime.UtcNow
@@ -297,12 +327,33 @@ namespace Jewelry.Service.Sale.BillingNote
 
             header.HasSupport = request.HasSupport;
             header.SupportPercent = request.HasSupport ? request.SupportPercent : 0m;
-            header.SupportAmount = request.HasSupport ? header.SubTotal * request.SupportPercent / 100m : 0m;
 
             header.VatPercent = request.VatPercent;
             // ไม่ปัดเศษ vatAmount ระหว่างทาง ปัดครั้งเดียวที่ grandTotal เป็นทศนิยม 2 ตำแหน่งแบบ half-up
-            header.VatAmount = subTotal * request.VatPercent / 100m;
-            header.GrandTotal = MathHelper.RoundMoney(subTotal + header.VatAmount);
+            var billedItems = await _jewelryContext.TbtSaleBillingNoteItem
+                .AsNoTracking()
+                .Where(i => i.BillingNoteRunning == header.Running)
+                .ToListAsync();
+            var billedRunnings = billedItems.Select(i => i.InvoiceRunning).ToList();
+            var billedInvoices = await _jewelryContext.TbtSaleInvoiceHeader
+                .AsNoTracking()
+                .Where(x => billedRunnings.Contains(x.Running))
+                .ToListAsync();
+            var builtUnderNewRule = BuiltUnderNewRule(billedInvoices, billedItems);
+            if (builtUnderNewRule)
+            {
+                var bt = BillingTotals(billedInvoices, request.VatPercent);
+                header.SubTotal = bt.subTotal;
+                header.VatAmount = bt.vatAmount;
+                header.GrandTotal = bt.grandTotal;
+            }
+            else
+            {
+                header.VatAmount = subTotal * request.VatPercent / 100m;
+                header.GrandTotal = MathHelper.RoundMoney(subTotal + header.VatAmount);
+            }
+
+            header.SupportAmount = request.HasSupport ? header.SubTotal * request.SupportPercent / 100m : 0m;
 
             header.Remark = request.Remark;
 
@@ -341,11 +392,13 @@ namespace Jewelry.Service.Sale.BillingNote
 
             var invoiceRunnings = header.TbtSaleBillingNoteItem.Select(x => x.InvoiceRunning).Distinct().ToList();
 
-            var invoiceOwed = await _jewelryContext.TbtSaleInvoiceHeader
+            var noteInvoices = await _jewelryContext.TbtSaleInvoiceHeader
+                .AsNoTracking()
                 .Where(x => invoiceRunnings.Contains(x.Running))
-                .Select(x => new { x.Running, Owed = x.GrandTotalRounded ?? x.GrandTotalRaw ?? x.SubTotal ?? 0m })
                 .ToListAsync();
-            var owedMap = invoiceOwed.ToDictionary(x => x.Running, x => x.Owed);
+            var owedMap = noteInvoices.ToDictionary(x => x.Running, x => x.GrandTotalRounded ?? x.GrandTotalRaw ?? x.SubTotal ?? 0m);
+            var invoiceMap = noteInvoices.ToDictionary(x => x.Running);
+            var noteBuiltUnderNewRule = BuiltUnderNewRule(noteInvoices, header.TbtSaleBillingNoteItem);
 
             var receivedList = await _jewelryContext.TbtSaleInvoicePaymentItem
                 .Where(p => invoiceRunnings.Contains(p.InvoiceRunning) && p.IsDelete == false)
@@ -360,6 +413,7 @@ namespace Jewelry.Service.Sale.BillingNote
                 {
                     var invoiceGrandTotal = owedMap.GetValueOrDefault(x.InvoiceRunning, 0m);
                     var receivedAmount = receivedMap.GetValueOrDefault(x.InvoiceRunning, 0m);
+                    invoiceMap.TryGetValue(x.InvoiceRunning, out var inv);
                     return new jewelry.Model.Sale.BillingNote.Get.Item
                     {
                         Seq = x.Seq,
@@ -367,6 +421,10 @@ namespace Jewelry.Service.Sale.BillingNote
                         InvoiceDate = x.InvoiceDate,
                         AmountBeforeVat = x.AmountBeforeVat,
                         Remark = x.Remark,
+
+                        VatIncluded = noteBuiltUnderNewRule && inv != null && inv.VatIncluded,
+                        VatAmount = inv?.VatAmount ?? 0m,
+                        GrandTotalRounded = inv?.GrandTotalRounded ?? 0m,
 
                         InvoiceGrandTotal = invoiceGrandTotal,
                         ReceivedAmount = receivedAmount,

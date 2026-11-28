@@ -43,6 +43,24 @@ namespace Jewelry.Service.Helper
         public static bool IsForeignCurrency(string currencyUnit)
             => !string.Equals((currencyUnit ?? string.Empty).Trim(), "THB", StringComparison.OrdinalIgnoreCase);
 
+        public static decimal Round2(decimal value)
+            => Math.Round(Math.Round(value, 6, MidpointRounding.AwayFromZero), 2, MidpointRounding.AwayFromZero);
+
+        // invoice THB ที่ราคารวม VAT แล้ว: ถอด VAT ทีละแถว ปัดครึ่งขึ้น 2 ตำแหน่ง (ต้องตรงกับ money.js ฝั่ง UI)
+        public static (decimal sub, decimal discEx, decimal addEx, decimal freightEx, decimal vat, decimal grand)
+            ComputeInvoiceTotalsVatIncluded(IEnumerable<(decimal netInclVat, decimal qty)> rows,
+                decimal specialDiscount, decimal specialAddition, decimal freight, decimal vatPercent = 7m)
+        {
+            var divisor = 1m + vatPercent / 100m;
+            var sub = rows.Sum(r => Round2(Round2(r.netInclVat / divisor) * r.qty));
+            var discEx = Round2(specialDiscount / divisor);
+            var addEx = Round2(specialAddition / divisor);
+            var freightEx = Round2(freight / divisor);
+            var after = sub - discEx + addEx + freightEx;
+            var vat = Round2(after * (vatPercent / 100m));
+            return (sub, discEx, addEx, freightEx, vat, after + vat);
+        }
+
         public static (decimal subTotal, decimal vatAmount, decimal raw, decimal rounded, decimal adjustment)
             ComputeTotals(decimal subTotal, decimal specialDiscount, decimal specialAddition, decimal freight, decimal vatPercent)
         {

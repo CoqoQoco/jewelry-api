@@ -59,6 +59,10 @@ namespace jewelry.Model.Sale.BillingNote.Get
         public decimal AmountBeforeVat { get; set; }
         public string? Remark { get; set; }
 
+        public bool VatIncluded { get; set; }
+        public decimal VatAmount { get; set; }
+        public decimal GrandTotalRounded { get; set; }
+
         public decimal InvoiceGrandTotal { get; set; }
         public decimal ReceivedAmount { get; set; }
         public decimal OutstandingAmount { get; set; }

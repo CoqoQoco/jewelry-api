@@ -2525,6 +2525,9 @@ public partial class JewelryContext : DbContext
                 .HasMaxLength(20)
                 .HasColumnType("character varying")
                 .HasColumnName("invoice_type");
+            entity.Property(e => e.VatIncluded)
+                .HasDefaultValue(false)
+                .HasColumnName("vat_included");
         });
 
         modelBuilder.Entity<TbtSaleInvoicePaymentItem>(entity =>

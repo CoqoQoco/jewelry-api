@@ -46,7 +46,7 @@ namespace Jewelry.Service.Sale.Invoice
             _saleChannelService = saleChannelService;
         }
 
-        public async Task<string> Create(jewelry.Model.Sale.Invoice.Create.Request request)
+        public async Task<string> Create(jewelry.Model.Sale.Invoice.Create.Request request, bool allowVatIncluded = true)
         {
             // Validate required fields
             if (string.IsNullOrEmpty(request.SoNumber))
@@ -195,6 +195,26 @@ namespace Jewelry.Service.Sale.Invoice
                 x.PriceOrigin * (1 - (x.Discount ?? 0) / 100m) / request.CurrencyRate * x.Qty);
             var t = MathHelper.ComputeTotals(subTotal, request.SpecialDiscount, request.SpecialAddition, request.FreightAndInsurance, request.Vat);
 
+            // THB + vat 0 (ไม่ใช่ POS) = ราคารวม VAT 7% แล้ว: ถอด VAT ทีละแถว เก็บ vat (header) = 0 ต่อไป อ่านด้วย vat_included
+            // กติกานี้ mirror ที่ jeweley-ui src/services/utils/money.js `willBeVatIncluded` — แก้ต้องแก้ทั้งสองที่พร้อมกัน
+            var vatIncluded = allowVatIncluded
+                && MathHelper.IsForeignCurrency(request.CurrencyUnit) == false
+                && request.CurrencyRate == 1
+                && request.Vat == 0;
+            decimal discAmt = request.SpecialDiscount;
+            decimal addAmt = request.SpecialAddition;
+            decimal freightAmt = request.FreightAndInsurance;
+            if (vatIncluded)
+            {
+                var vi = MathHelper.ComputeInvoiceTotalsVatIncluded(
+                    getstockConfrim.Select(x => (x.PriceOrigin * (1 - (x.Discount ?? 0) / 100m), (decimal)x.Qty)),
+                    request.SpecialDiscount, request.SpecialAddition, request.FreightAndInsurance);
+                t = (vi.sub, vi.vat, vi.grand, vi.grand, 0m);
+                discAmt = vi.discEx;
+                addAmt = vi.addEx;
+                freightAmt = vi.freightEx;
+            }
+
             // ดึงใบสั่งขายเพื่อสแนปช็อตผู้ขาย/ผู้ช่วยขายมาเก็บที่ invoice ณ ตอนสร้าง — ถ้าไม่พบ SO ก็ไม่ throw ให้ปล่อยเป็น null (เป็นแค่ข้อมูลประกอบใบพิมพ์)
             var saleOrder = await _jewelryContext.TbtSaleOrder
                 .FirstOrDefaultAsync(x => x.SoNumber == request.SoNumber);
@@ -339,13 +359,14 @@ namespace Jewelry.Service.Sale.Invoice
                 Vat = request.Vat,
 
                 SubTotal = t.subTotal,
-                SpecialDiscountAmt = request.SpecialDiscount,
-                SpecialAdditionAmt = request.SpecialAddition,
-                FreightAmt = request.FreightAndInsurance,
+                SpecialDiscountAmt = discAmt,
+                SpecialAdditionAmt = addAmt,
+                FreightAmt = freightAmt,
                 VatAmount = t.vatAmount,
                 GrandTotalRaw = t.raw,
                 GrandTotalRounded = t.rounded,
                 RoundingAdjustment = t.adjustment,
+                VatIncluded = vatIncluded,
             };
 
             _jewelryContext.TbtSaleInvoiceHeader.Add(invoiceHeader);
@@ -677,6 +698,7 @@ namespace Jewelry.Service.Sale.Invoice
                 SpecialAddition = invoiceHeader.SpecialAddition,
                 FreightAndInsurance = invoiceHeader.FreightAndInsurance,
                 Vat = invoiceHeader.Vat,
+                VatIncluded = invoiceHeader.VatIncluded,
 
                 SubTotal = invoiceHeader.SubTotal,
                 SpecialDiscountAmt = invoiceHeader.SpecialDiscountAmt,
@@ -1011,6 +1033,8 @@ namespace Jewelry.Service.Sale.Invoice
 
                             GrandTotalRounded = invoice.GrandTotalRounded,
                             Deposit = invoice.Deposit,
+                            Vat = invoice.Vat,
+                            VatIncluded = invoice.VatIncluded,
 
                             ItemCount = invoice.InvoiceType == InvoiceTypes.Material
                                 ? _jewelryContext.TbtSaleMaterialItem.Count(i => i.Running == invoice.SoRunning)

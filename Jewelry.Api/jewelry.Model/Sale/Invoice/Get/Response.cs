@@ -52,6 +52,7 @@ namespace jewelry.Model.Sale.Invoice.Get
         public decimal SpecialAddition { get; set; }
         public decimal FreightAndInsurance { get; set; }
         public decimal Vat { get; set; }
+        public bool VatIncluded { get; set; }
 
         public decimal? SubTotal { get; set; }
         public decimal? SpecialDiscountAmt { get; set; }

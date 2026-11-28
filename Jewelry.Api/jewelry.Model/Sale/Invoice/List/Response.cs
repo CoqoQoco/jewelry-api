@@ -36,6 +36,7 @@ namespace jewelry.Model.Sale.Invoice.List
         public int ItemCount { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal Vat { get; set; }
+        public bool VatIncluded { get; set; }
 
         // PaidAmount = ผลรวมยอดชำระจริงจาก tbt_sale_invoice_payment_item (ไม่ใช่ค่าจาก header)
         public decimal PaidAmount { get; set; }

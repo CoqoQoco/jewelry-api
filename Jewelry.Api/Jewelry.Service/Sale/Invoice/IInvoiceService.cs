@@ -8,7 +8,7 @@ namespace Jewelry.Service.Sale.Invoice
 {
     public interface IInvoiceService
     {
-        Task<string> Create(jewelry.Model.Sale.Invoice.Create.Request request);
+        Task<string> Create(jewelry.Model.Sale.Invoice.Create.Request request, bool allowVatIncluded = true);
         Task<string> CreateFromMaterialSale(jewelry.Model.Sale.Invoice.CreateFromMaterialSale.Request request);
         Task<jewelry.Model.Sale.Invoice.Get.Response> Get(jewelry.Model.Sale.Invoice.Get.Request request);
         IQueryable<jewelry.Model.Sale.Invoice.List.Response> List(jewelry.Model.Sale.Invoice.List.Request request);

@@ -159,7 +159,7 @@ namespace Jewelry.Service.Sale.Pos
                     }).ToList()
                 };
 
-                var invoiceNumber = await _invoiceService.Create(invoiceRequest);
+                var invoiceNumber = await _invoiceService.Create(invoiceRequest, allowVatIncluded: false);
 
                 // 4) Create payment items (reuse InvoiceService.CreatePayment as-is, one call per payment)
                 decimal paidAmount = 0;

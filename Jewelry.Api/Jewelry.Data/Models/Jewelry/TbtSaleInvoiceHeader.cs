@@ -99,5 +99,7 @@ public partial class TbtSaleInvoiceHeader
 
     public string InvoiceType { get; set; } = "PRODUCT";
 
+    public bool VatIncluded { get; set; }
+
     public virtual ICollection<TbtSaleInvoicePaymentItem> TbtSaleInvoicePaymentItem { get; set; } = new List<TbtSaleInvoicePaymentItem>();
 }
