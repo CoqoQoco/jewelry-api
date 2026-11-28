@@ -777,6 +777,7 @@ namespace Jewelry.Service.ProductionPlan
                                                                                       }).ToList(),
 
                                                      TbtProductionPlanStatusGem = (from gem in item.TbtProductionPlanStatusDetailGem
+                                                                                   where gem.IsActive
                                                                                    let gemStock = stockGem.Where(x => x.Code == gem.GemCode).FirstOrDefault()
                                                                                    //let gemPrice = stockGem.Where(x => x.Code == gem.GemCode).FirstOrDefault()
                                                                                    select new StatusDetailGem()
@@ -827,6 +828,51 @@ namespace Jewelry.Service.ProductionPlan
                                 }).ToList())
                               : new List<Price>(),
             };
+
+            response.GemReturns = (from r in _jewelryContext.TbtProductionPlanGemReturn
+                                   where r.ProductionPlanId == id
+                                   orderby r.CreateDate descending, r.Id descending
+                                   select new PlanGemReturnItem()
+                                   {
+                                       ProductionPlanId = r.ProductionPlanId,
+                                       HeaderId = r.HeaderId,
+                                       ItemNo = r.ItemNo,
+                                       OutboundRunning = r.OutboundRunning,
+                                       GemCode = r.GemCode,
+                                       ReturnQty = r.ReturnQty,
+                                       ReturnWeight = r.ReturnWeight,
+                                       Mode = r.Mode,
+                                       InboundRunning = r.InboundRunning,
+                                       Reason = r.Reason,
+                                       Remark = r.Remark,
+                                       CreateBy = r.CreateBy,
+                                       CreateDate = r.CreateDate,
+                                   }).ToList();
+
+            var returnedItemNos = response.GemReturns.Select(x => x.ItemNo).Distinct().ToList();
+            if (returnedItemNos.Any())
+            {
+                var gemNames = (from g in _jewelryContext.TbtProductionPlanStatusDetailGem
+                                where g.ProductionPlanId == id && returnedItemNos.Contains(g.ItemNo)
+                                select new { g.ItemNo, g.GemName }).ToList();
+                var returnCodes = response.GemReturns.Select(x => x.GemCode).Distinct().ToList();
+                var stockNames = (from g in _jewelryContext.TbtStockGem
+                                  where returnCodes.Contains(g.Code)
+                                  select new { g.Code, g.GroupName, g.Shape, g.Size, g.Grade }).ToList();
+                foreach (var ret in response.GemReturns)
+                {
+                    var planName = gemNames.FirstOrDefault(x => x.ItemNo == ret.ItemNo)?.GemName;
+                    if (string.IsNullOrEmpty(planName))
+                    {
+                        var sg = stockNames.FirstOrDefault(x => x.Code == ret.GemCode);
+                        planName = sg != null ? $"{sg.Code}-{sg.GroupName}-{sg.Shape}-{sg.Size}-{sg.Grade}" : ret.GemCode;
+                    }
+                    ret.GemName = planName;
+                }
+            }
+
+            response.HasSavedPrice = _jewelryContext.TbtProductionPlanPrice.Any(x => x.ProductionId == id);
+            response.HasSavedBom = _jewelryContext.TbtProductionPlanBom.Any(x => x.ProductionId == id);
 
             return response;
         }

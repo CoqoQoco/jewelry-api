@@ -18,6 +18,7 @@ public partial class JewelryContext
             .HasColumnType("text");
 
         ConfigureMaterialStock(modelBuilder);
+        ConfigurePlanGemReturn(modelBuilder);
 
         modelBuilder.Entity<TbtPosCheckout>(entity =>
         {

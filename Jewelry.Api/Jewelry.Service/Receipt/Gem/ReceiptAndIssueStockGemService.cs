@@ -5,6 +5,9 @@ using jewelry.Model.Receipt.Gem.Inbound;
 using jewelry.Model.Receipt.Gem.List;
 using jewelry.Model.Receipt.Gem.Outbound;
 using jewelry.Model.Receipt.Gem.Picklist;
+using jewelry.Model.Receipt.Gem.PlanReturn;
+using Kendo.DynamicLinqCore;
+using System.Text.RegularExpressions;
 using jewelry.Model.Receipt.Gem.PickOff;
 using jewelry.Model.Receipt.Gem.Return;
 using jewelry.Model.Receipt.Gem.Scan;
@@ -43,6 +46,11 @@ namespace Jewelry.Service.Receipt.Gem
         IQueryable<PicklistResponse> Picklist(PicklistFilter request);
         Task<string> PickOffGem(PickOffRequest request);
         Task<PickReturnResponse> PickReturnGem(PickReturnRequest request);
+
+        Task<ReturnFromPlanResponse> ReturnFromPlan(ReturnFromPlanRequest request);
+        Task<List<InboundLineResponse>> ListLinkableInbound(ListLinkableInboundRequest request);
+        Task<List<CheckDuplicateOutboundResponse>> CheckDuplicateOutbound(CheckDuplicateOutboundRequest request);
+        Task<DataSourceResult> ListUnlinkedReturn(ListUnlinkedReturnRequest request);
     }
     public class ReceiptAndIssueStockGemService : BaseService, IReceiptAndIssueStockGemService
     {
@@ -998,6 +1006,346 @@ namespace Jewelry.Service.Receipt.Gem
             return runningNo;
 
         }
+        private IQueryable<InboundLineResponse> InboundLinesWithRemain()
+        {
+            return from t in _jewelryContext.TbtStockGemTransection
+                   where t.Type == 3
+                   let usedQty = _jewelryContext.TbtProductionPlanGemReturn
+                       .Where(h => h.InboundTransectionId == t.Id).Sum(h => (decimal?)h.ReturnQty) ?? 0
+                   let usedWeight = _jewelryContext.TbtProductionPlanGemReturn
+                       .Where(h => h.InboundTransectionId == t.Id).Sum(h => (decimal?)h.ReturnWeight) ?? 0
+                   select new InboundLineResponse()
+                   {
+                       TransectionId = t.Id,
+                       Running = t.Running,
+                       RequestDate = t.RequestDate,
+                       Code = t.Code,
+                       Qty = t.Qty,
+                       QtyWeight = t.QtyWeight,
+                       RemainQty = t.Qty - usedQty,
+                       RemainWeight = t.QtyWeight - usedWeight,
+                       JobOrPo = t.JobOrPo,
+                       Remark1 = t.Remark1,
+                       Remark2 = t.Remark2,
+                   };
+        }
+
+        public async Task<ReturnFromPlanResponse> ReturnFromPlan(ReturnFromPlanRequest request)
+        {
+            var response = new ReturnFromPlanResponse();
+
+            using (TransactionScope scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                var plan = await _jewelryContext.TbtProductionPlan.FirstOrDefaultAsync(x => x.Id == request.ProductionPlanId);
+                if (plan == null || plan.IsActive == false)
+                {
+                    throw new HandleException("ไม่พบใบงาน");
+                }
+
+                var itemNo = request.ItemNo;
+                var planId = request.ProductionPlanId;
+                var row = (await _jewelryContext.TbtProductionPlanStatusDetailGem
+                    .FromSqlInterpolated($"SELECT * FROM tbt_production_plan_status_detail_gem WHERE production_plan_id = {planId} AND item_no = {itemNo} FOR UPDATE")
+                    .ToListAsync()).FirstOrDefault();
+                if (row == null)
+                {
+                    throw new HandleException("ไม่พบรายการพลอยที่เบิกในใบงานนี้");
+                }
+
+                var rowQty = row.GemQty ?? 0;
+                var rowWeight = row.GemWeight ?? 0;
+                if ((request.ExpectedQty.HasValue && request.ExpectedQty.Value != rowQty)
+                    || (request.ExpectedWeight.HasValue && request.ExpectedWeight.Value != rowWeight))
+                {
+                    throw new HandleException("ข้อมูลพลอยในใบงานเปลี่ยนไปแล้ว กรุณาโหลดหน้าใหม่");
+                }
+                var rule = PlanGemReturnRules.Validate(plan.Status, row.IsActive, row.OutboundRunning, request.Reason, request.Mode,
+                    rowQty, rowWeight, request.ReturnQty, request.ReturnWeight);
+
+                var history = new TbtProductionPlanGemReturn()
+                {
+                    ProductionPlanId = row.ProductionPlanId,
+                    HeaderId = row.HeaderId,
+                    ItemNo = row.ItemNo,
+                    OutboundRunning = row.OutboundRunning,
+                    GemCode = row.GemCode,
+                    ReturnQty = request.ReturnQty,
+                    ReturnWeight = request.ReturnWeight,
+                    Mode = request.Mode,
+                    Reason = request.Reason,
+                    Remark = request.Remark,
+                    CreateBy = CurrentUsername,
+                    CreateDate = DateTime.UtcNow,
+                };
+
+                if (request.Mode == PlanGemReturnRules.ModeReturnNow)
+                {
+                    var gemData = await _jewelryContext.TbtStockGem.FirstOrDefaultAsync(x => x.Code == row.GemCode);
+                    if (gemData == null)
+                    {
+                        throw new HandleException($"{ErrorMessage.NotFound} --> {row.GemCode}");
+                    }
+
+                    var previousQty = gemData.Quantity;
+                    var previousQtyWeight = gemData.QuantityWeight;
+
+                    gemData.Quantity += request.ReturnQty;
+                    gemData.QuantityWeight += request.ReturnWeight;
+                    gemData.UpdateDate = DateTime.UtcNow;
+                    gemData.UpdateBy = CurrentUsername;
+                    _jewelryContext.TbtStockGem.Update(gemData);
+
+                    var remark2 = PlanGemReturnRules.ReasonText(request.Reason);
+                    if (!string.IsNullOrWhiteSpace(request.Remark))
+                    {
+                        remark2 += " : " + request.Remark;
+                    }
+
+                    var inboundRunning = await _runningNumberService.GenerateRunningNumberForGold("INB");
+                    var inbound = new TbtStockGemTransection()
+                    {
+                        Running = inboundRunning,
+                        Type = 3,
+                        Code = row.GemCode,
+                        JobOrPo = $"{plan.Wo}-{plan.WoNumber}",
+                        Remark1 = "คืนจากใบงาน",
+                        Remark2 = remark2,
+                        Qty = request.ReturnQty,
+                        QtyWeight = request.ReturnWeight,
+                        PreviousRemainQty = previousQty,
+                        PreviousRemianQtyWeight = previousQtyWeight,
+                        PointRemianQty = gemData.Quantity,
+                        PointRemianQtyWeight = gemData.QuantityWeight,
+                        Stastus = "completed",
+                        RefRunning = row.OutboundRunning,
+                        ProductionPlanWo = plan.Wo,
+                        ProductionPlanWoNumber = plan.WoNumber,
+                        ProductionPlanWoText = plan.WoText,
+                        ProductionPlanMold = plan.Mold,
+                        RequestDate = request.RequestDate == default ? DateTime.UtcNow : request.RequestDate.UtcDateTime,
+                        CreateBy = CurrentUsername,
+                        CreateDate = DateTime.UtcNow,
+                    };
+                    _jewelryContext.TbtStockGemTransection.Add(inbound);
+                    await _jewelryContext.SaveChangesAsync();
+
+                    history.InboundTransectionId = inbound.Id;
+                    history.InboundRunning = inboundRunning;
+                    response.InboundRunning = inboundRunning;
+                }
+                else
+                {
+                    if (!request.InboundTransectionId.HasValue)
+                    {
+                        throw new HandleException("กรุณาเลือกรายการรับเข้าที่ต้องการผูก");
+                    }
+
+                    var lineId = request.InboundTransectionId.Value;
+                    var line = (await _jewelryContext.TbtStockGemTransection
+                        .FromSqlInterpolated($"SELECT * FROM tbt_stock_gem_transection WHERE id = {lineId} FOR UPDATE")
+                        .ToListAsync()).FirstOrDefault();
+                    if (line == null || line.Type != 3 || line.Code != row.GemCode)
+                    {
+                        throw new HandleException("รายการรับเข้าไม่ถูกต้อง หรือเป็นพลอยคนละรหัส");
+                    }
+
+                    PlanGemReturnRules.CheckLinkPlan(line.JobOrPo, plan.Wo, plan.WoNumber);
+
+                    var used = await _jewelryContext.TbtProductionPlanGemReturn
+                        .Where(h => h.InboundTransectionId == lineId)
+                        .GroupBy(h => 1)
+                        .Select(g => new { Qty = g.Sum(h => h.ReturnQty), Weight = g.Sum(h => h.ReturnWeight) })
+                        .FirstOrDefaultAsync();
+                    PlanGemReturnRules.CheckLinkRemaining(line.Qty, line.QtyWeight, used?.Qty ?? 0, used?.Weight ?? 0,
+                        request.ReturnQty, request.ReturnWeight);
+
+                    history.InboundTransectionId = line.Id;
+                    history.InboundRunning = line.Running;
+                    response.InboundRunning = line.Running;
+                }
+
+                if (rule.IsFull)
+                {
+                    row.IsActive = false;
+                }
+                else
+                {
+                    row.GemQty = rule.RemainQty;
+                    row.GemWeight = rule.RemainWeight;
+                }
+                _jewelryContext.TbtProductionPlanStatusDetailGem.Update(row);
+                _jewelryContext.TbtProductionPlanGemReturn.Add(history);
+
+                await _jewelryContext.SaveChangesAsync();
+                scope.Complete();
+
+                response.IsFullReturn = rule.IsFull;
+            }
+
+            return response;
+        }
+
+        public async Task<List<InboundLineResponse>> ListLinkableInbound(ListLinkableInboundRequest request)
+        {
+            var code = request.GemCode;
+            var query = InboundLinesWithRemain()
+                .Where(x => x.Code == code && (x.RemainQty > 0 || x.RemainWeight > 0))
+                .OrderByDescending(x => x.RequestDate).ThenByDescending(x => x.TransectionId);
+
+            if (!request.ProductionPlanId.HasValue)
+            {
+                return await query.Take(50).ToListAsync();
+            }
+
+            var planId = request.ProductionPlanId.Value;
+            var plan = await _jewelryContext.TbtProductionPlan
+                .Where(p => p.Id == planId)
+                .Select(p => new { p.Wo, p.WoNumber })
+                .FirstOrDefaultAsync();
+            var lines = await query.Take(300).ToListAsync();
+            if (plan != null)
+            {
+                foreach (var l in lines)
+                {
+                    l.MatchesPlan = PlanGemReturnRules.MatchesPlan(l.JobOrPo, plan.Wo, plan.WoNumber);
+                }
+            }
+            return lines.OrderByDescending(x => x.MatchesPlan).Take(50).ToList();
+        }
+
+        public async Task<List<CheckDuplicateOutboundResponse>> CheckDuplicateOutbound(CheckDuplicateOutboundRequest request)
+        {
+            var result = new List<CheckDuplicateOutboundResponse>();
+            var items = request.Items ?? new List<CheckDuplicateOutboundItem>();
+            if (!items.Any())
+            {
+                return result;
+            }
+
+            var woSet = items.Select(x => x.Wo).Distinct().ToList();
+            var plans = (await _jewelryContext.TbtProductionPlan
+                .Where(p => woSet.Contains(p.Wo))
+                .Select(p => new { p.Id, p.Wo, p.WoNumber })
+                .ToListAsync())
+                .Where(p => items.Any(i => i.Wo == p.Wo && i.WoNumber == p.WoNumber))
+                .ToList();
+            if (!plans.Any())
+            {
+                return result;
+            }
+
+            var planIds = plans.Select(p => p.Id).ToList();
+            var codes = items.Select(x => x.Code).Distinct().ToList();
+            var gems = await _jewelryContext.TbtProductionPlanStatusDetailGem
+                .Where(g => planIds.Contains(g.ProductionPlanId) && g.IsActive
+                    && g.OutboundRunning != null && g.OutboundRunning != "" && codes.Contains(g.GemCode))
+                .ToListAsync();
+
+            foreach (var item in items)
+            {
+                var plan = plans.FirstOrDefault(p => p.Wo == item.Wo && p.WoNumber == item.WoNumber);
+                if (plan == null) continue;
+                foreach (var g in gems.Where(x => x.ProductionPlanId == plan.Id && x.GemCode == item.Code))
+                {
+                    result.Add(new CheckDuplicateOutboundResponse()
+                    {
+                        Code = item.Code,
+                        Wo = item.Wo,
+                        WoNumber = item.WoNumber,
+                        OutboundRunning = g.OutboundRunning,
+                        OutboundDate = g.OutboundDate,
+                        Qty = g.GemQty ?? 0,
+                        Weight = g.GemWeight ?? 0,
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        public async Task<DataSourceResult> ListUnlinkedReturn(ListUnlinkedReturnRequest request)
+        {
+            var search = request.Search;
+            var now = DateTimeOffset.UtcNow;
+            var startDate = search?.RequestDateStart ?? new DateTimeOffset(now.Year, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            var endDate = search?.RequestDateEnd ?? now;
+            var start = startDate.StartOfDayUtc();
+            var end = endDate.EndOfDayUtc();
+            if ((end - start).TotalDays > 366)
+            {
+                throw new HandleException("ช่วงวันที่ต้องไม่เกิน 366 วัน");
+            }
+
+            var lines = await InboundLinesWithRemain()
+                .Where(l => (l.RemainQty > 0 || l.RemainWeight > 0)
+                    && l.RequestDate >= start && l.RequestDate <= end
+                    && l.JobOrPo != null && Regex.IsMatch(l.JobOrPo, @"\d{7}\s*[-/]\s*\d+"))
+                .OrderByDescending(l => l.RequestDate).ThenByDescending(l => l.TransectionId)
+                .ToListAsync();
+
+            var parsed = new Dictionary<long, (string Wo, int WoNumber)>();
+            foreach (var l in lines)
+            {
+                var pr = PlanGemReturnRules.ParsePlanRef(l.JobOrPo);
+                if (pr.HasValue) parsed[l.TransectionId] = pr.Value;
+            }
+
+            var rows = new List<UnlinkedReturnResponse>();
+            if (parsed.Any())
+            {
+                var woSet = parsed.Values.Select(x => x.Wo).Distinct().ToList();
+                var plans = (await _jewelryContext.TbtProductionPlan
+                    .Where(p => woSet.Contains(p.Wo))
+                    .Select(p => new { p.Id, p.Wo, p.WoNumber, p.WoText })
+                    .ToListAsync())
+                    .Where(p => parsed.Values.Any(v => v.Wo == p.Wo && v.WoNumber == p.WoNumber))
+                    .ToList();
+
+                var planIds = plans.Select(p => p.Id).ToList();
+                var codes = lines.Select(r => r.Code).Distinct().ToList();
+                var gems = planIds.Any()
+                    ? await _jewelryContext.TbtProductionPlanStatusDetailGem
+                        .Where(g => planIds.Contains(g.ProductionPlanId) && g.IsActive
+                            && g.OutboundRunning != null && g.OutboundRunning != "" && codes.Contains(g.GemCode))
+                        .ToListAsync()
+                    : new List<TbtProductionPlanStatusDetailGem>();
+
+                foreach (var l in lines)
+                {
+                    if (!parsed.TryGetValue(l.TransectionId, out var key)) continue;
+                    var plan = plans.FirstOrDefault(p => p.Wo == key.Wo && p.WoNumber == key.WoNumber);
+                    if (plan == null) continue;
+
+                    var candidates = gems.Where(g => g.ProductionPlanId == plan.Id && g.GemCode == l.Code).ToList();
+                    var pick = candidates.FirstOrDefault(g => (g.GemQty ?? 0) == l.RemainQty) ?? candidates.FirstOrDefault();
+                    if (pick == null) continue;
+
+                    rows.Add(new UnlinkedReturnResponse()
+                    {
+                        TransectionId = l.TransectionId,
+                        Running = l.Running,
+                        RequestDate = l.RequestDate,
+                        Code = l.Code,
+                        Qty = l.Qty,
+                        QtyWeight = l.QtyWeight,
+                        RemainQty = l.RemainQty,
+                        RemainWeight = l.RemainWeight,
+                        JobOrPo = l.JobOrPo,
+                        Remark1 = l.Remark1,
+                        Remark2 = l.Remark2,
+                        ProductionPlanId = plan.Id,
+                        WoText = plan.WoText,
+                        SuggestedItemNo = pick.ItemNo,
+                        SuggestedOutboundRunning = pick.OutboundRunning,
+                        SuggestedQty = pick.GemQty,
+                        SuggestedWeight = pick.GemWeight,
+                    });
+                }
+            }
+
+            return rows.AsQueryable().ToDataSourceResult(request);
+        }
+
         public async Task<PickReturnResponse> PickReturnGem(PickReturnRequest request)
         {
             var runningNoPickReturn = string.Empty;

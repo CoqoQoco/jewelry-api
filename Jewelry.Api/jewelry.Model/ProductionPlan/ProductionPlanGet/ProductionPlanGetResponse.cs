@@ -47,6 +47,27 @@ namespace jewelry.Model.ProductionPlan.ProductionPlanGet
 
         public List<StatusDetailHeader>? TbtProductionPlanStatusHeader { get; set; }
         public List<Price> PriceItems { get; set; } = new List<Price>();
+        public List<PlanGemReturnItem> GemReturns { get; set; } = new List<PlanGemReturnItem>();
+        public bool HasSavedPrice { get; set; }
+        public bool HasSavedBom { get; set; }
+    }
+
+    public class PlanGemReturnItem
+    {
+        public int ProductionPlanId { get; set; }
+        public int? HeaderId { get; set; }
+        public string ItemNo { get; set; }
+        public string? OutboundRunning { get; set; }
+        public string GemCode { get; set; }
+        public string? GemName { get; set; }
+        public decimal ReturnQty { get; set; }
+        public decimal ReturnWeight { get; set; }
+        public string Mode { get; set; }
+        public string? InboundRunning { get; set; }
+        public string Reason { get; set; }
+        public string? Remark { get; set; }
+        public string? CreateBy { get; set; }
+        public DateTime CreateDate { get; set; }
     }
 
     public class StatusDetailHeader 

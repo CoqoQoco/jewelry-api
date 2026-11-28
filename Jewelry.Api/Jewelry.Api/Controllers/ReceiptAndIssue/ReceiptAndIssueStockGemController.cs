@@ -5,6 +5,7 @@ using jewelry.Model.Receipt.Gem.List;
 using jewelry.Model.Receipt.Gem.Outbound;
 using jewelry.Model.Receipt.Gem.Picklist;
 using jewelry.Model.Receipt.Gem.PickOff;
+using jewelry.Model.Receipt.Gem.PlanReturn;
 using jewelry.Model.Receipt.Gem.Return;
 using jewelry.Model.Receipt.Gem.Scan;
 using jewelry.Model.Receipt.Gem.Update;
@@ -203,6 +204,73 @@ namespace Jewelry.Api.Controllers.Receipt
             try
             {
                 var result = await _service.PickReturnGem(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ReturnFromPlan")]
+        [HttpPost]
+        [RequirePermission("stock-gem:return-from-plan")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(ReturnFromPlanResponse))]
+        public async Task<IActionResult> ReturnFromPlan([FromBody] ReturnFromPlanRequest request)
+        {
+            try
+            {
+                var result = await _service.ReturnFromPlan(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListLinkableInbound")]
+        [HttpPost]
+        [RequirePermission("stock-gem:return-from-plan")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<InboundLineResponse>))]
+        public async Task<IActionResult> ListLinkableInbound([FromBody] ListLinkableInboundRequest request)
+        {
+            try
+            {
+                var result = await _service.ListLinkableInbound(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("CheckDuplicateOutbound")]
+        [HttpPost]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(List<CheckDuplicateOutboundResponse>))]
+        public async Task<IActionResult> CheckDuplicateOutbound([FromBody] CheckDuplicateOutboundRequest request)
+        {
+            try
+            {
+                var result = await _service.CheckDuplicateOutbound(request);
+                return Ok(result);
+            }
+            catch (HandleException ex)
+            {
+                return BadRequest(new NotFoundResponse() { Message = ex.Message });
+            }
+        }
+
+        [Route("ListUnlinkedReturn")]
+        [HttpPost]
+        [RequirePermission("stock-gem:return-from-plan")]
+        [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(DataSourceResult))]
+        public async Task<IActionResult> ListUnlinkedReturn([FromBody] ListUnlinkedReturnRequest request)
+        {
+            try
+            {
+                var result = await _service.ListUnlinkedReturn(request);
                 return Ok(result);
             }
             catch (HandleException ex)
